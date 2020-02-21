@@ -3,9 +3,9 @@ package compiler
 import compiler.VarKind._
 
 sealed class VarKind {
-  def needStored=this match { case   DisplayField(_, _) | BugifField(_) | LayerField(_) | ParamD() |ParamR() | ParamDR() | StoredField()
+  def needStored: Boolean =this match { case DisplayField(_, _) | BugifField(_) | LayerField(_) | ParamD() | ParamR() | ParamDR() | StoredField()
        => true; case _ => false } 
-  def notInMacro=this match { case   DisplayField(_, _) | BugifField(_) |     StoredField()
+  def notInMacro: Boolean =this match { case DisplayField(_, _) | BugifField(_) | StoredField()
        => true; case _ => false }
   /**True if variable is live before each loop iteration. */
   def isInput : Boolean = this match { case LayerField(_) | ParamD() => true; case _ => false }
@@ -21,7 +21,7 @@ sealed class VarKind {
 object VarKind {
   /**Used to compute liveness at the beginning and at the end of the loop body  */
   final case class Field() extends VarKind
-  final case class LayerField(val nb:Int) extends VarKind
+  final case class LayerField(nb:Int) extends VarKind
   final case class ParamD() extends VarKind
   final case class ParamR() extends VarKind
   /**the famous data-result param. It is used in the specific case when a layer is passed and updated by the same macro, 
@@ -31,8 +31,8 @@ object VarKind {
   /**for exemple, stored is necessary for a variable created to be passed as a resultParameter.  */
    final case class StoredField() extends VarKind 
   /**   if usefull, variables is computed even if not displayed*/
-  final case class DisplayField(val name: String, val usefull: Boolean) extends VarKind
-  final case class BugifField(val name: String) extends VarKind
+  final case class DisplayField(name: String, usefull: Boolean) extends VarKind
+  final case class BugifField(name: String) extends VarKind
   /**usable only in elementary macro to be compiled in loops */
-  final case class Timetminus1(val name: String) extends VarKind
+  final case class Timetminus1(name: String) extends VarKind
 }

@@ -28,21 +28,22 @@ abstract class Circuit[L <: Locus, R <: Ring](override val p: Param[_]*) extends
    *  after generating the instruction,  the state is contained in  three  maps: allinstructions,  affectmap, fundef
    *  after computing nbit, we then have 1-a table which tells how much bits are used for each symbol
    *                                     2-a table  which tells for each expression, how much bits is needed to store them.
-   *  @replaced contains substitution pair, the left hand side, is replaced by the right hand side
+   *  @param replaced contains substitution pair, the left hand side, is replaced by the right hand side
    */
 
   def compile(m:Machine, replaced: List[(AST[_], AST[_])] = List()): Unit = {
     body = computeRoot //we pretend that the circuit is a function.
     val repl: iAstField[AST[_]] = immutable.HashMap.empty ++ replaced.toMap
     val prog1 = ProgData(this, repl)
-    val prog2 = prog1.deDagise(repl); // print(prog2);
+    val prog2 = prog1.deDagise(repl); //  print(prog2);
     val prog3 = prog2.procedurise()
     val prog4 = prog3.nbit(List(1)); //faut mettre les tailles des entiers utilisés pour appeller main.
     val prog5=prog4.macroise()
-    print(prog5+ "\n\n")
+   // print(prog5+ "\n\n")
     val prog6=prog5.unfoldSpace(m)
-      print(prog6);  
-    val prog7=prog6.foldRegister()
+  //  print(prog6)
+     val prog7=prog6.foldRegister() //
+
     //TODO mettre les noms sur les fonctions, aussi.
   }
 }

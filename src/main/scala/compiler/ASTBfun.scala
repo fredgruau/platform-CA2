@@ -35,18 +35,18 @@ object ASTBfun {
   def xorRedop[R<:Ring](implicit n:repr[R]):redop[R]={if(n.name.isInstanceOf[I]) (xorI.asInstanceOf[Fundef2[R, R, R]],Intof[UISI](0).asInstanceOf[ASTB[R]])
     else(xorB.asInstanceOf[Fundef2[R, R, R]],Boolof(false).asInstanceOf[ASTB[R]]) }
   
-  val andLBtoR: Fundef2[B, UISI, UISI] = { val (xb, y) = (p[B]("xb"), p[UISI]("y"));
-      Fundef2( "andLBtoR", Mapp1(y, {val yb = p[B]("yb");  Fundef1("toto",xb & yb,yb )}    ), xb, y) }
- val concat2f: Fundef2[UISIB,UISIB,UISI] = { val (x, y) = (p[UISIB]("x"), p[UISIB]("y"));
-      Fundef2( "concat",  Concat2(x,y), x , y) }
+  val andLBtoR: Fundef2[B, UISI, UISI] = { val (xb, y) = (p[B]("xb"), p[UISI]("y"))
+    Fundef2( "andLBtoR", Mapp1(y, {val yb = p[B]("yb");  Fundef1("toto",xb & yb,yb )}    ), xb, y) }
+ val concat2f: Fundef2[UISIB,UISIB,UISI] = { val (x, y) = (p[UISIB]("x"), p[UISIB]("y"))
+   Fundef2( "concat",  Concat2(x,y), x , y) }
   def elt(i: Int): Fundef1[UISI, B] = { val x = p[UISI]("x"); Fundef1("elt", Elt[UISI](i, x), x) }
   def extend(i: Int): Fundef1[UISI, UISI] = { val x = p[UISI]("x"); Fundef1("extend" + i, Extend[UISI](i, x), x) }
   // addition must be programmed
-  val inc: Fundef1R[UISI] = { val x = p[UISI]("x"); Fundef1("inc", x ^ Scan1(x, andB, true, Left(), true), x) } //TODO a tester
+  val inc: Fundef1R[UISI] = { val x = p[UISI]("x"); Fundef1("inc", x ^ Scan1(x, andB, true, Left(), initUsed = true), x) } //TODO a tester
   //val gtB: Fundef1[SI,B] = { val xsi = Param[SI]("xsi"); Fundef1("gt",   Concat2( Elt(2), x) } //TODO a tester
 //  val addI: Fundef2R[UISI] = { val (x, y) = (p[UISI]("x"), p[UISI]("y")); Fundef2("add", x ^ y ^ Scan2(x, y, carry, False[B], Left(), true), x, y) }
 //  def add2[R <: I](implicit n: repr[R]) = { val (x, y) = (p[R]("x"), p[R]("y")); Fundef2("add", x ^ y ^ Scan2(x, y, carry, False[B], Left(), true), x, y) }
-  val addUISI = { val (x, y) = (p[UISI]("x"), p[UISI]("y")); Fundef2("add", x ^ y ^ Scan2(x, y, carry, false, Left(), true), x, y) }
+  val addUISI: Fundef2[UISI, UISI, UISI] = { val (x, y) = (p[UISI]("x"), p[UISI]("y")); Fundef2("add", x ^ y ^ Scan2(x, y, carry, false, Left(), initUsed = true), x, y) }
  
   // def addI[R <: I](implicit n: repr[R]): Fundef2R[R] = addUISI.asInstanceOf[Fundef2R[R]] 
 
@@ -57,8 +57,8 @@ object ASTBfun {
   val oppSI: Fundef1R[SI] = { val x = p[SI]("x");   Fundef1("opp", new Call1(inc.asInstanceOf[Fundef1R[SI]], Neg(x).asInstanceOf[AST[SI]]) with ASTBt[SI], x) }
   val other: Fundef2R[B] = { val (xb, yb) = (p[B]("xb"), p[B]("yb")); Fundef2("other", yb, xb, yb) }
   /** result in shifting bits towards the tail, entering a zero at the end of the list  */
-  val halveB: Fundef1R[UISI] = { val x = p[UISI]("x"); Fundef1("halve", Scan1(x, other, false, Right(), true), x) } //TODO a tester
-  val orScanRightB: Fundef1R[UISI] = { val x = p[UISI]("x"); Fundef1("orScanRight", Scan1(x, orB, false, Right(), false), x) }
+  val halveB: Fundef1R[UISI] = { val x = p[UISI]("x"); Fundef1("halve", Scan1(x, other, false, Right(), initUsed = true), x) } //TODO a tester
+  val orScanRightB: Fundef1R[UISI] = { val x = p[UISI]("x"); Fundef1("orScanRight", Scan1(x, orB, false, Right(), initUsed = false), x) }
   // def notNull[R <: I](x: ASTB[R]) = FoldLeft1(x, Or[B])
 
 }

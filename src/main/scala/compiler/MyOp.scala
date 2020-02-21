@@ -11,9 +11,9 @@ import compiler.ASTL._
  */
 trait MyOp[L <: Locus, R <: Ring] {
   this: ASTLt[L, R] =>
-  /**
+  /*
    * In order to obtain covariance, we would need to introduc types L,U
-   *   def ^[U >: R <: Ring ](that: ASTLscal[L,U])(implicit m: repr[L],n:repr[U]): ASTL[L, U] =    {      val res = ring match {
+   *   def &#94;[U >: R <: Ring ](that: ASTLscal[L,U])(implicit m: repr[L],n:repr[U]): ASTL[L, U] =    {      val res = ring match {
    * case B() => Binop(xorB, this.asInstanceOf[ASTLscal[L, B]], that.asInstanceOf[ASTLscal[L, B]],m,repr.nomB)
    * case _   => Binop(xorUISI.asInstanceOf[Fundef2[R,U,U]], this , that ,m,n)
    * }; res.asInstanceOf[ASTL[L, U]]    }
@@ -31,7 +31,7 @@ trait MyOpInt2[L <: Locus, R <: Ring] { this: ASTLt[L, R] =>
   /**   minus  imposes signed SI.*/
   def -[U >: R <: SI](that: ASTLt[L, SI])(implicit m: repr[L], n: repr[SI]): ASTL[L, SI] = add[L, SI](this.asInstanceOf[ASTL[L, SI]], -that)
 
-//  def unary_-(implicit m: repr[L]): ASTLt[L, SI] = { ASTL.Unop(opp.asInstanceOf[Fundef1[R, SI]], this, m, repr.nomSI) }
+//  def unary_-(implicit m: repr[L]): ASTLt[L, SI] = { ASTL.Unop(opp.asobtainInstanceOf[Fundef1[R, SI]], this, m, repr.nomSI) }
   def unary_-(implicit m: repr[L], n: repr[R]): ASTLt[L, SI] = opp(this)
  
 }

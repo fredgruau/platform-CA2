@@ -9,9 +9,9 @@ public class Name {
   	//appel: setName((Named)progCompiled, ""); 
 	//static void printableDeep(Object o, int n){ 
 
-	static int nbCap(String s){int caps=0; for (int i=0; i<s.length(); i++)  if (Character.isUpperCase(s.charAt(i))) caps++; return caps;};
-	
-  /**for hashtable, name = connteneur name + hashtablename + "yyy*+ the key name. */
+	static int nbCap(String s){int caps=0; for (int i=0; i<s.length(); i++)  if (Character.isUpperCase(s.charAt(i))) caps++; return caps;}
+
+	/**for hashtable, name = connteneur name + hashtablename + "yyy*+ the key name. */
 	public static void setName(Named conteneur, String conteneurName) {		Class<?> c = conteneur.getClass();
 	  do {java.lang.reflect.Field[] fs = c.getDeclaredFields();
 	  for (java.lang.reflect.Field f : fs) {	Object o2 = null;	f.setAccessible(true);String fieldName = f.getName();
@@ -35,8 +35,8 @@ public class Name {
 		if(fieldName==null) fieldName="toto"+compteurToto++;
 		Boolean hide= false;//(fieldToName instanceof AST) ? ((AST) fieldToName).hidden():true; 
 		 
-		if(fieldName.charAt(0)=='_') 	{fieldName=fieldName.substring(1);hide=true;}; 
-		 if( Named.OkToUseForName(fieldName) )  
+		if(fieldName.charAt(0)=='_') 	{fieldName=fieldName.substring(1);hide=true;}
+		if( Named.OkToUseForName(fieldName) )
 		{	if (!conteneurName.equals("")) 	fieldName = ("" + fieldName.charAt(0)).toUpperCase() + fieldName.substring(1).toLowerCase();
 		    //if(fieldToName.ignoreForName)  	fieldName="";
 	     	if (fieldToName.name() == null || fieldToName.name() != null && nbCap(fieldToName.name()) > nbCap(conteneurName + fieldName)	)

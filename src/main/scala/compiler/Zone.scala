@@ -5,6 +5,6 @@ package compiler
 
 import scala.collection._
 
-class Zone[+T<:Locus](//val affs:Iterable[Affect[_<:T]],val root: Affect[_<:T], a zone does not need to know its instructions, apriori.
+class Zone[+T<:Locus](//val affs:Iterable[Affect[_<:T]],val root: Affect[_<:T], a zone does not need to know its instructions.
    val neighbor:immutable.HashSet[Zone[_]]){
 }

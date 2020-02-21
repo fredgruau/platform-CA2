@@ -16,49 +16,52 @@ import scala.collection._
  * Identifies AST corresponding to int or bool, plus a locus, excludes those obtained with cons
  */
 
-trait ASTLt[L <: Locus, R <: Ring] extends AST[Tuple2[L, R]] with MyOp[L, R] with MyOpInt2[L, R] {
+trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOpInt2[L, R] {
 
-  self: AST[Tuple2[L, R]] =>
-  def locus = mym.name._1; def ring = mym.name._2;
+  self: AST[(L, R)] =>
+  def locus: L = mym.name._1
+  def ring: R = mym.name._2
+
   def extendMe(n: Int): ASTLt[L, R] = ASTL.extend(n, this)(new repr(locus), new repr(ring))
 
   /**
    * Important to specify that the L,R type of AST nodes is preserved, for type checking consistency
-   * Surprisingly, when building ASTL explicitely, we need to drop the fact that the type is preserved, and go from ASTL[L,R] to ASTLg
+   * Surprisingly, when building ASTL explicitely, we need to drop the fact that the type is preserved,
+   * and go from ASTL[L,R] to ASTLg
    * Transform a Dag of AST into a forest of trees, removes the delayed.
-   * @nUser the number of other expression using this expression
    * @return the Dag where expression used more than once are replaced by read.
    *  generates ASTs such as READ that preserve the implementation of  ASTLscal by using "with"
    */
-  override def deDag(usedTwice: immutable.HashSet[AST[_]], repr: Map[AST[_], AST[_]], replaced: Map[AST[_], AST[_]]): ASTLt[L, R] = {
-    val newD = if (usedTwice.contains(this) && usedTwice.contains(this)) new Read[Tuple2[L, R]](repr(this).name)(mym) with ASTLt[L, R]
+  override def deDag(usedTwice: immutable.HashSet[AST[_]], repr: Map[AST[_], AST[_]],
+                     replaced: Map[AST[_], AST[_]]): ASTLt[L, R] = {
+    val newD = if (usedTwice.contains(this) && usedTwice.contains(this)) new Read[(L, R)](repr(this).name)(mym) with ASTLt[L, R]
     else if (replaced.contains(this)) replaced(this).deDag(usedTwice, repr, replaced)
     else this match {
 
       case a: ASTL[_, _] =>
-        if (a.isInstanceOf[Layer[_, _]]) new Read[Tuple2[L, R]]("l" + repr(this).name)(mym) with ASTLt[L, R]
+        if (a.isInstanceOf[Layer[_, _]]) new Read[(L, R)]("l" + repr(this).name)(mym) with ASTLt[L, R]
         else a.propagate((d: ASTLt[L, R]) => d.deDag(usedTwice, repr, replaced))
       case _ => this.asInstanceOf[AST[_]] match {
-        case Param(s) => new Read[Tuple2[L, R]]("p" + repr(this).name)(mym) with ASTLt[L, R]
-        case Read(s)  => throw new RuntimeException("Deja dedagifié!")
+        case Param(_) => new Read[(L, R)]("p" + repr(this).name)(mym) with ASTLt[L, R]
+        case Read(_)  => throw new RuntimeException("Deja dedagifié!")
         case _        => this.propagate((d: AST[(L, R)]) => d.deDag(usedTwice, repr, replaced))
       }
     }
     newD.setName(this.name); newD.asInstanceOf[ASTLt[L, R]]
   }
 
-  /**For AST created with ASTLscal, we cannot do simple copy, because the ''with ASTLscal is lost. */
+  /**For AST created with ASTLscal, we cannot do simple copy, because the "with ASTLscal"  is lost. */
   def propagate(g: bij2[(L, R)]): ASTLt[L, R] = { //to allow covariance on R, second argument of bij2 is l
-    val m = mym.asInstanceOf[repr[Tuple2[L, R]]];
+    val m = mym.asInstanceOf[repr[(L, R)]]
     val newThis = this.asInstanceOf[AST[_]] match {
-      case Read(s)         => this
-      case Param(s)        => this
-      case e @ Taail(a)    => new Taail[(L, R)](g(a.asInstanceOf[AST[(L, R)]]).asInstanceOf[AST[(Any, (L, R))]])(m) with ASTLt[L, R]
-      case e @ Heead(a)    => new Heead[(L, R)](g(a.asInstanceOf[AST[(L, R)]]).asInstanceOf[AST[((L, R), Any)]])(m) with ASTLt[L, R]
-      case e @ Call1(f, a) => new Call1(f.asInstanceOf[Fundef1[Any, (L, R)]], g(a.asInstanceOf[AST[(L, R)]]))(m) with ASTLt[L, R]
-      case e @ Call2(f, a, a2) => new Call2(f.asInstanceOf[Fundef2[Any, Any, (L, R)]], g(a.asInstanceOf[AST[(L, R)]]),
+      case Read(_)         => this
+      case Param(_)        => this
+      case Taail(a) => new Taail[(L, R)](g(a.asInstanceOf[AST[(L, R)]]).asInstanceOf[AST[(Any, (L, R))]])(m) with ASTLt[L, R]
+      case Heead(a) => new Heead[(L, R)](g(a.asInstanceOf[AST[(L, R)]]).asInstanceOf[AST[((L, R), Any)]])(m) with ASTLt[L, R]
+      case Call1(f, a) => new Call1(f.asInstanceOf[Fundef1[Any, (L, R)]], g(a.asInstanceOf[AST[(L, R)]]))(m) with ASTLt[L, R]
+      case Call2(f, a, a2) => new Call2(f.asInstanceOf[Fundef2[Any, Any, (L, R)]], g(a.asInstanceOf[AST[(L, R)]]),
         g(a2.asInstanceOf[AST[(L, R)]]))(m) with ASTLt[L, R]
-      case e @ Call3(f, a, a2, a3) => new Call3(
+      case Call3(f, a, a2, a3) => new Call3(
         f.asInstanceOf[Fundef3[Any, Any, Any, (L, R)]],
         g(a.asInstanceOf[AST[(L, R)]]).asInstanceOf[AST[Any]], g(a2.asInstanceOf[AST[(L, R)]]).asInstanceOf[AST[Any]],
         g(a3.asInstanceOf[AST[(L, R)]]).asInstanceOf[AST[Any]])(m) with ASTLt[L, R]
@@ -67,9 +70,9 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[Tuple2[L, R]] with MyOp[L, R] wit
     newThis.setName(this.name); newThis
   }
 
-  /**  @nbitLB: computes the #bit of all the ASTL sub expressions, there can be several.   */
+  /**  @param nbitLB: computes the #bit of all the ASTL sub expressions, there can be several.   */
   override def nbit(cur: ProgData1[_], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): ASTLt[L, R] = {
-    var newThis = this.propagate((d: AST[(L, R)]) => d.nbit(cur, nbitLB, tSymb, newFuns))
+    val newThis = this.propagate((d: AST[(L, R)]) => d.nbit(cur, nbitLB, tSymb, newFuns))
     nbitLB += (newThis -> newThis.newNbitAST(nbitLB, tSymb, newFuns))
     newThis.setName(this.name); newThis //.asInstanceOf[ASTLt[L, R]]
   }
@@ -78,25 +81,25 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[Tuple2[L, R]] with MyOp[L, R] wit
   override def unfoldSpace(m: Machine): List[ASTBt[_]] =
     this.asInstanceOf[AST[_]] match {
       case Read(s) =>
-        val r = rpart(mym.asInstanceOf[repr[Tuple2[L, R]]]);
+        val r = rpart(mym.asInstanceOf[repr[(L, R)]])
         deploy(s, this.locus).map(new Read(_)(r) with ASTBt[R])
       case _ => this.locus match {
-        case s: S      => this.unfoldSimplic(m).toList
-        case T(s1, s2) => this.unfoldTransfer(m).map(_.toList).toList.flatten
+        case _: S      => this.unfoldSimplic(m).toList
+        case T(_, _) => this.unfoldTransfer(m).map(_.toList).toList.flatten
       }
     }
 
   override def unfoldSimplic(m: Machine): ArrAst = this.asInstanceOf[AST[_]] match {
     case Read(s) =>
-      val r = rpart(mym.asInstanceOf[repr[Tuple2[L, R]]]);
-      this.locus.sufx.map((suf: String) => (new Read[R](s+"$"+ suf)(r) with ASTBt[R]). asInstanceOf[ ASTBt[_<:Ring ]] ) 
-    case _ => throw (new RuntimeException("unfoldSpace act only on Reads for ASTL "))
+      val r = rpart(mym.asInstanceOf[repr[(L, R)]])
+      this.locus.sufx.map((suf: String) => new Read[R](s+"$"+ suf)(r) with ASTBt[R]. asInstanceOf[ ASTBt[_<:Ring ]] )
+    case _ => throw new RuntimeException("unfoldSpace act only on Reads for ASTL ")
   }
   override def unfoldTransfer(m: Machine): ArrArrAst = this.asInstanceOf[AST[_]] match {
     case Read(s) =>
-      val T(s1, s2) = this.locus; val r = rpart(mym.asInstanceOf[repr[Tuple2[L, R]]]);
-      s1.sufx.map((suf1: String) => this.locus.sufx.map((suf2: String) =>(new Read(s+"$"+ suf1+suf2)(r) with ASTBt[R]). asInstanceOf[ ASTBt[_<:Ring ]] )) 
-    case _ => throw (new RuntimeException("unfoldSpace act only on Reads for ASTL "))
+      val T(s1, _) = this.locus; val r = rpart(mym.asInstanceOf[repr[(L, R)]])
+      s1.sufx.map((suf1: String) => this.locus.sufx.map((suf2: String) => new Read(s+"$"+ suf1+suf2)(r) with ASTBt[R]. asInstanceOf[ ASTBt[_<:Ring ]] ))
+    case _ => throw new RuntimeException("unfoldSpace act only on Reads for ASTL ")
   }
   override def align(cs:TabConstr,v:String):iTabSymb[Array[Int]] =  this.asInstanceOf[AST[_]] match {
     case Read(s) =>  immutable.HashMap( s->locus.neutral)

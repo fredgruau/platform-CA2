@@ -8,28 +8,34 @@ import compiler.UsrInstr._
 import compiler.VarKind._
 
 import scala.collection._
+import scala.collection.immutable.HashSet
 
 /**Instruction used within the compiler, call, affect. Dag and Union allows to defined ConnectedComp  */
 abstract class Instr extends Dag[Instr] with Align[Instr] {
-  def useless = false; 
-  var neighbor: List[Instr] = List.empty; //to be set if we want to use the Dag feature.
+
+  def useless = false
+  /**  true for instruction part or Transfer Connected Components */
+ def isTransfer:Boolean
+
+  var inputNeighbors: List[Instr] = List.empty; //to be set if we want to use the Dag feature.
   var alignPerm:iTabSymb[Array[Int]]=Map.empty  // to be set if we want to use the Align feature, contains an alignment towards each usedvars of the instr (indexed by the string)
   /*Must return an alignement from this to n.   */
   def neighborAlign(n:  Instr ): Array[Int]={
-      if(alignPerm.isEmpty) return null
-  else if(alignPerm.contains(n.names(0))) //n is a used var of this, so "this" is an element of n.neighbor, 
-       alignPerm(n.names(0)) //neighborAligned(n.names(0))  is an alignement from "this" to n,
-    else  if(n.alignPerm.contains( names(0)))   //ca doit etre le contraire, i.e. this is a used var of n. we find an alignement from n to "this", we must invert
-         Align.invert(n.alignPerm(names(0)))
+      if(alignPerm.isEmpty) null
+  else if(alignPerm.contains(n.names.head)) //n is a used var of this, so "this" is an element of n.neighbor,
+       alignPerm(n.names.head) //neighborAligned(n.names(0))  is an alignement from "this" to n,
+    else  if(n.alignPerm.contains( names.head))   //ca doit etre le contraire, i.e. this is a used var of n. we find an alignement from n to "this", we must invert
+         Align.invert(n.alignPerm(names.head))
     else throw new RuntimeException(" Not find alignement ") 
   }
   /** names of variables modified by instruction.*/
   def usedVars: immutable.HashSet[String]
   def names: List[String]
   // val exp:AST[T]
-  /**@hd @tl are build, in order to  find out the id of formal parameter passed by results. */
+  /**@param hd head
+   * @param tl and tail  are built, in order to  find out the id of formal parameter passed by results. */
   def buildhdtl(hd: TabSymb[String], tl: TabSymb[String]): Unit = this match {
-    case Affect(s, exp) => exp match {
+    case Affect(_, exp) => exp match {
       case Heead(Read(s)) => hd += s -> exp.name
       case Taail(Read(s)) => tl += s -> exp.name
       case _              =>
@@ -44,7 +50,7 @@ abstract class Instr extends Dag[Instr] with Align[Instr] {
     this match {
       case Affect(s, exp) => exp match {
         case c: Call[_] =>
-          val res = subNames(s);
+          val res = subNames(s)
           //value which are sent through call and retrieved from the procedure, have to be stored
           for (r <- res ::: c.args.toList.map(_.name)) if (t(r).k == Field()) t += r -> new InfoType(t(r).t, StoredField()); // register the fact that results must be stored.
 
@@ -64,7 +70,7 @@ abstract class Instr extends Dag[Instr] with Align[Instr] {
       val newexps = exps.map(_.nbit(cur, nbitLB, tSymb, newFuns))
       val nbitarg = newexps.map(a => nbitLB(a)) //.toList.flatten
       val newnamef = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _)
-      if (!newFuns.contains(newnamef)) newFuns += (newnamef -> cur.funs(f).nbit(nbitarg).asInstanceOf[ProgData2]) // re-creates the code of f, taking into account nbitarg.
+      if (!newFuns.contains(newnamef)) newFuns += (newnamef -> cur.funs(f).nbit(nbitarg)) // re-creates the code of f, taking into account nbitarg.
       val fprog = newFuns(newnamef)
       val nbitResult = fprog.paramR.map(s => fprog.tSymbVar(s).nb) //we get the number of bits of results
       (names zip nbitResult).foreach { sn => tSymb += sn._1 -> new InfoNbit(cur.tSymbVar(sn._1).t, cur.tSymbVar(sn._1).k, sn._2) }
@@ -77,36 +83,41 @@ abstract class Instr extends Dag[Instr] with Align[Instr] {
     case Affect(v, exp) => // println(exp.toStringTree) ;
       exp.asInstanceOf[ASTLt[_, _]].locus match {
         case s: S => s.sufx.zip(exp.unfoldSimplic(m)).map({ case (suf, e) => Affect(v +"$"+suf, e) }).toList
-        case l @ T(s1, s2) => s1.sufx.zip(exp.unfoldTransfer(m)).map({
+        case l @ T(s1, _) => s1.sufx.zip(exp.unfoldTransfer(m)).map({
           case (suf1, t) =>
             l.sufx.zip(t).map({ case (suf2, e) => Affect(v + "$"+ suf1 + suf2, e) }).toList
         }).toList.flatten
       }
-    case CallProc(f, n, e) => List(CallProc(f, n.map(deploy(_, tSymb)).flatten, e.map(_.unfoldSpace(m)).flatten)) //tSymb(n).t._1
+    case CallProc(f, n, e) => List(CallProc(f, n.flatMap(deploy(_, tSymb)), e.flatMap(_.unfoldSpace(m)))) //tSymb(n).t._1
   }
   
-  def align(cs:TabSymb[immutable.HashSet [Constraint]])={ alignPerm=a(this).exp.align(cs, names(0))  }
+  def align(cs:TabSymb[ Constraint ]): Unit =   alignPerm=a(this).exp.align(cs, names.head)
+
 }
 
 /**   call of a procedure, where several parameters can be passed by result. Printed shows them as results being affected at the same time  */
-case class CallProc(val f: String, val names: List[String], val exps: List[AST[_]]) extends Instr {
-  override def toString = pad(names.foldLeft(" ")(_ + "," + _).substring(2), 25) + "<-" + f + "(" + exps.map(_.toStringTree).foldLeft(" ")(_ + " " + _) + ")\n"
-  def usedVars = exps.map(_.symbols).foldLeft(immutable.HashSet.empty[String])(_ | _)
-};
+case class CallProc(f: String, names: List[String], exps: List[AST[_]]) extends Instr {
+  override def toString: String = pad(names.foldLeft(" ")(_ + "," + _).substring(2), 25) + "<-" + f + "(" + exps.map(_.toStringTree).foldLeft(" ")(_ + " " + _) + ")\n"
+  def usedVars: HashSet[String] = exps.map(_.symbols).foldLeft(immutable.HashSet.empty[String])(_ | _)
 
-case class Affect[+T](val name: String, val exp: AST[T]) extends Instr {
-  val names = List(name); override def toString = pad(name, 25) + "<-  " + exp.toStringTree   +  alignPerm.map({case(k,v)=> k +" "+ v.toList+";  "})  + "\n"
+  override def isTransfer: Boolean =  throw new RuntimeException("test wether transfer is done only in macro, which do not have CallProc instr. ")
+}
+
+case class Affect[+T](name: String, exp: AST[T]) extends Instr {
+  val names = List(name); override def toString: String = pad(name, 25) + "<-  " + exp.toStringTree   +  alignPerm.map({case(k,v)=> k +" "+ v.toList+";  "})  + "\n"
    
-  def usedVars = exp.symbols
+  def usedVars: HashSet[String] = exp.symbols
   /**
    * for a non macro affectation of parameter or a Layer creates a useless entry in the memory of the CA
    * because the parameter or the layer is already present in the memory of the CA
    */
-  override def useless: Boolean = exp match { case l: ASTL.Layer[_, _] => true case Param(_) => true case _ => false }
-};
+  override def useless: Boolean = exp match { case _: ASTL.Layer[_, _] => true case Param(_) => true case _ => false }
+
+  override def isTransfer: Boolean = exp.asInstanceOf[ASTLt[_,_]].locus.isInstanceOf[TT] // || exp.isInstanceOf[Red2[_,_,_]]
+}
 
 object Instr {
-  def a(i:Instr) =i.asInstanceOf[Affect[_]]
+  def a(i:Instr): Affect[_] =i.asInstanceOf[Affect[_]]
   def read(s: String, m: repr[(Locus, Ring)]) = new Read(s)(m) with ASTLt[Locus, Ring]
   /**utility used to align instruction when printed */
   def pad(s: String, n: Int): String = s + " " * (n - s.length())
@@ -117,8 +128,8 @@ object Instr {
   //replace the return expression by affectation
   def affectizeReturn(tsymb: TabSymb[InfoType[_]], paramD: mutable.LinkedHashSet[String], e: AST[_]): List[Instr] = {
     def process(e: AST[_]): List[Affect[_]] = {
-      val already = tsymb.contains(e.name);
-      val newName = if (!already || already && tsymb(e.name).k == Field()) e.name else checkName2 //we create another variable to return result, in case it is a layer.
+      val already = tsymb.contains(e.name)
+      val newName = if (!already || already && tsymb(e.name).k == Field()) e.name else checkName2() //we create another variable to return result, in case it is a layer.
       paramD += newName; tsymb += newName -> InfoType(e, ParamR()); if (already && newName == e.name) List() else List(Affect(newName, e))
     }
     e match { case Coons(e1, e2) => process(e1) ::: affectizeReturn(tsymb, paramD, e2) case _ => process(e) }
@@ -127,15 +138,15 @@ object Instr {
 }
 
 /**Instructions generated within the ast that will not be used after dedagification.  */
-case class UsrInstr[+T](val c: Codop, val exp: AST[_]) extends Instr {
+case class UsrInstr[+T](c: Codop, exp: AST[_]) extends Instr {
   def usedVars = immutable.HashSet.empty[String]
-  val names = List(); override def toString = pad(c.toString.substring(2), 25) + "<-  " + exp.toStringTree
+  val names = List(); override def toString: String = pad(c.toString.substring(2), 25) + "<-  " + exp.toStringTree
 
   /**
    * Generate the affect instructions from a memorize, display or bugif instruction.
    *  for display if variable has also been used somewhere else, no affect needs to be generated
-   *  @expfather the expression associated either pictured, debugged or the layer if it is a memorize
-   *  @usedForCompute true if expression is also used in the computation (meaning it has been stored already)
+   *  @param expFather the expression associated either pictured, debugged or the layer if it is a memorize
+   *  @param usedForCompute true if expression is also used in the computation (meaning it has been stored already)
    */
   def affectize(expFather: AST[_], usedForCompute: Boolean, t: TabSymb[InfoType[_]]): Option[Affect[_]] =
     c match {
@@ -143,12 +154,15 @@ case class UsrInstr[+T](val c: Codop, val exp: AST[_]) extends Instr {
         val nbit = expFather.asInstanceOf[ASTL.Layer[_, _]].nbit
         addSymbL(t, expFather, LayerField(nbit)); Some(Affect("l" + expFather.name, exp))
       case Bugif() =>
-        if (usedForCompute) throw new RuntimeException("Debug exp is allzero=>not usable for compute");
-        addSymb(t, exp, BugifField(expFather.name));
+        if (usedForCompute) throw new RuntimeException("Debug exp is allzero=>not usable for compute")
+        addSymb(t, exp, BugifField(expFather.name))
         if (t.contains(exp.name))  None  else    Some(Affect(exp.name, exp)) //the bugif has allready been generated, we need to change the varialbe
       case Display() => if (usedForCompute || t.contains(exp.name)) None
       else { addSymb(t, exp, DisplayField(expFather.name, usedForCompute)); Some(Affect(exp.name, exp)) }
     }
+
+  /** true for instruction part or Transfer Connected Components */
+  override def isTransfer: Boolean = exp.mym.name.isInstanceOf[TT]
 }
 object UsrInstr {
   sealed class Codop
