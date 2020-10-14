@@ -26,13 +26,14 @@ object ASTLfun {
     //val temp: BoolfV = xorR2(tslope )
     val temp: BoolfV =   clock(~tslope)
     val temp2: BoolfV =   anticlock(~tslope)
-    val temp6:BooleV= sym( tslope)
-    val temp5:BoolfV=clock(~temp6)
-    val temp3: BoolfV =  or( temp5,xor( temp, temp2))
-    val vortex: BoolF = andR(transfer(temp3))
+    //val temp6:BooleV= sym( tslope)
+    //val temp5:BoolfV=clock(~temp6)
+  //  val temp3: BoolfV =  or( temp5,xor( temp, temp2))
+    val vortex: BoolF =  orR(transfer(xor( temp, temp2)))
+   // val test= vortex |   andR(transfer(temp5)) ;  slope.bugif(test) //ceci provoque bien l'erreur attendue java.lang.RuntimeException: Debug exp is allzero=>not usable for compute
+                                                 //ca montre que debug ne peut etre réutilisé.
     slope.bugif(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
     grad.setName("grad"); tepred.setName("tepred"); slope.setName("slope"); delta.setName("delta"); vortex.setName("vortex")
-
     Fundef1("boolgrad", Coons(slope, delta), x)
   }
 

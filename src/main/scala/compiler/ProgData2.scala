@@ -56,8 +56,7 @@ class ProgData2(private val instrs: List[Instr],private  val funs: iTabSymb[Prog
     new ProgData2(finstrs.toList, mutable.HashMap.empty, newtSymbVar, fparamD, fparamR.map(_.names.head))
   }
 
-  /** instructions using variables **/
-
+  /** instructions comming after i, using variable created by i**/
   private def outputNeighbor(i: Instr, u: Map[String, List[Instr]]) = u.getOrElse(a(i).name, List())
 
   /** Compute the Dag of instructions, where a neighbor is an input neigbor, i.e. affectation which set variables which are used, needs to compute definedBy
@@ -110,8 +109,6 @@ class ProgData2(private val instrs: List[Instr],private  val funs: iTabSymb[Prog
     else new ProgData2(instrs.flatMap(_.unfoldSpace(m, tSymbVar)), funs2, tSymbVar, paramD, paramR)
   }
 
-
-
   /** tries to reuse registers so as to have one or two registers for each instruction */
   //noinspection EmptyCheck,EmptyCheck,EmptyCheck
   def foldRegister(): ProgData2 = {
@@ -124,7 +121,7 @@ class ProgData2(private val instrs: List[Instr],private  val funs: iTabSymb[Prog
     readDependancy(instrs, tSymbVar)
     for (i <- instrs) { i.align(constraints);   i.reset   }
     if (!constraints.isEmpty) println("Constraint: " + constraints)
-    print(toStringHead + instrs.mkString(""))
+ //   print(toStringHead + instrs.mkString(""))
     val notFolded  = mutable.HashSet.empty[String] //we must remember variables that cound not be folded.
     val (tInstrs, sInstrs) = instrs.partition(_.isTransfer) //transfer-instrs build TCCs, and then simplicial-instrs build SCCs
     TCCs(constraints, rootConstraintsT, tInstrs, notFolded)
@@ -137,14 +134,18 @@ class ProgData2(private val instrs: List[Instr],private  val funs: iTabSymb[Prog
 
   private def printConstraints(l: List[Instr], typeZone: String, rootConstraints: TabSymb[Constraint], notFolded: mutable.HashSet[String],rootConstraints2: TabSymb[Constraint]=null): Unit = {
     val cc = paquets(l);  var n = 0
-    for (instrs2 <- cc) //we print the constraint for each components, they are associated to the root of the component.
-      if (notFolded.contains(a(instrs2.head).name)) println(a(instrs2.head).name + " is not Folded")
+    for (instrs2 <- cc){  //we print the constraint for each components, they are associated to the root of the component.
+      print("      paquet de " + instrs2.size + " instructions\n"//, de racine: ", instrs2.head.root
+       + instrs2.mkString(";"))
+
+      if (notFolded.contains(a(instrs2.head).name)) println( a(instrs2.head).name + " This " + typeZone +  " zone cannot fold")
       else { n = n + 1;val name=a(instrs2.head.root).name
-        println("      paquet de " + instrs2.size + " instruction, de racine: ", instrs2.head.root, " de schedule "
-          + rootConstraints(name) )
+        println( " de schedule "     + rootConstraints(name) + " sur "+name )
+        println( " de schedule " + instrs2.head.root.locus.get )
         if(rootConstraints2!=null && rootConstraints2.contains(name))   println("the schedule for inner reduction is " + rootConstraints2 (name))
-      }
-    println("==> In total, there is: " + n + " " + typeZone + " zone synchronized")
+
+      }}
+    if(cc.size>0)    println("==> In total, there is: " + n + " " + typeZone + " zone synchronized\n")
   }
 
   /** When encountering a cycle constr, we tries to spare register further */
@@ -173,7 +174,7 @@ class ProgData2(private val instrs: List[Instr],private  val funs: iTabSymb[Prog
         var constraintCur: Constraint =   constraints.getOrElse(nameTransfer,AllConstr(6)) //we start with all schedules, unless we found a cycle constraint    during the calls to align
          val n = outputNeighbor(iTransfer, usedBy).filter(_.isTransfer) //we consider only transfer output neighbor, candicate to be unioned to form a bigger TCCs.
         val cc = paquets(n);  for (instrs2 <- cc) //instruction in instr2   share same root
-          if (!constraintCur.empty) {
+          if (!constraintCur.empty) { //if the instruction cannot fold we can stop the analysis
             val aligns = immutable.HashSet.empty[Array[Int]] ++ instrs2.map((i2: Instr) =>
               compose(invert(i2.alignPerm(nameTransfer)), i2.alignToRoot))
             val align = aligns.size match { //how to align i to instr2's root.
@@ -208,7 +209,6 @@ class ProgData2(private val instrs: List[Instr],private  val funs: iTabSymb[Prog
       })
       //   we add a constraint to start by evaluating clock on a  delayedVar)
       if (delayedVar.nonEmpty) addConstr(cs, v, BeginWithEither(delayedVar, 6))
-
     }
   }
 
@@ -222,14 +222,16 @@ class ProgData2(private val instrs: List[Instr],private  val funs: iTabSymb[Prog
     for (iSimplic <- simplicialInstr.reverse) {
       val nameSimplic: String = a(iSimplic).name
       val locusSimplic = a(iSimplic).exp.asInstanceOf[ASTLt[_, _]].locus.asInstanceOf[S]
-      var constraintCur: Constraint = AllConstr(locusSimplic.arity) //we start with all possible schedules, and add constraints as we meet them
+      var constraintCur: Constraint =
+         if (constraints.contains(nameSimplic))   constraints(nameSimplic) //  useless for the moment since align only generate constraints for transfer instructions.
+         else  AllConstr(locusSimplic.arity) //we start with all possible schedules, and add constraints as we meet them
+
       //step 1, we consider output instruction of simplicial type
       val outn = outputNeighbor(iSimplic, usedBy)
-      val simplicialOutput = outn.filter(!_.isTransfer) //// we do the union of the constraints of simplicial output neighbors
+      val simplicialOutput = outn.filter(!_.isTransfer)
+      //// we do the union of the constraints of simplicial output neighbors
       for (instrs2 <- paquets(simplicialOutput)) { //instruction of instr2 have been visited already, they share same root
-        if (constraints.contains(nameSimplic)) //useless for the moment since align only generate constraints for transfer instructions.
-          constraintCur = constraintCur.intersect(constraints(nameSimplic)) //we instersect with the found constraint
-        val rootName = a(instrs2.head.root).name //root variable of SCC ,
+         val rootName = a(instrs2.head.root).name //root variable of SCC ,
         if (rootConstraintsS.contains(rootName)) //if it has a constraint
           constraintCur = constraintCur.intersect(rootConstraintsS(rootName)) //we do not need to align
       }
@@ -238,14 +240,14 @@ class ProgData2(private val instrs: List[Instr],private  val funs: iTabSymb[Prog
       val newRootConstrT :TabSymb[Constraint]= mutable.HashMap.empty  //used to update the transfer constraints, by adding partition.
       val transferOutput = outn.filter(_.isTransfer)
       for (instrs2 <- paquets(transferOutput)) { //we consider components
-        val iRepr = instrs2.head
-        val rootName = a(iRepr.root).name //root variable of TCC ,
-        val constrPartition: Constraint = Partition.partOrAll(iRepr.alignPerm(nameSimplic), locusSimplic)
-        var constrPartPerm = constrPartition.permute(iRepr.alignToRoot)
+        val iRepr = instrs2.head //irepr is an output instruction
+        val rootName = a(iRepr.root).name //root variable of TCC containing irepr ,
+        val constrPartition: Constraint = Partition.partitionOrAll(iRepr.alignPerm(nameSimplic), locusSimplic)
+        var constrPartPerm = constrPartition.permute(iRepr.alignToRoot)  //expressed with respect to root.
         if (rootConstraintsT.contains(rootName)) //add a constraint from the root if there is one
           constrPartPerm = constrPartPerm.intersect(rootConstraintsT(rootName))
-        addConstr(newRootConstrT ,rootName , constrPartPerm)
-        val p = constrPartPerm.permute(invert(iRepr.alignToRoot)).project(locusSimplic.arity)
+        addConstr(newRootConstrT ,rootName , constrPartPerm) //met a jour les contraintes sur T
+        val p = constrPartPerm.permute(invert(iRepr.alignToRoot)).project(locusSimplic.arity) //the constraint constrPartPerm must be partitionnable, it is projected
         constraintCur = constraintCur.intersect(p)
       }
       //step 3, we add the projection of contraint of input transfer instructions
@@ -253,20 +255,23 @@ class ProgData2(private val instrs: List[Instr],private  val funs: iTabSymb[Prog
       for (instrs2 <- paquets(transferInput)) {
         val iRepr = instrs2.head
         val rootName = a(iRepr.root).name //root variable of TCC ,
-        val constrPartition: Constraint = Partition.partOrAll(locusSimplic)
+        val constrPartition: Constraint = Partition.partitionOrAll(locusSimplic)
         var constrPartPerm = constrPartition.permute(iRepr.alignToRoot)
         if (rootConstraintsT.contains(rootName)) //add a constraint from the root if there is one
           constrPartPerm = constrPartPerm.intersect(rootConstraintsT(rootName))
         addConstr(newRootConstrT,rootName, constrPartPerm)
         val p = constrPartPerm.permute(invert(iRepr.alignToRoot))
-        addConstr(newRootConstrT ,nameSimplic , p) //iSimplic is a reduce (Only a single reduce generates simplicial from transfer), hence we would also need a transfer schedule for this reduce
+        addConstr(newRootConstrT ,nameSimplic , p) //iSimplic is a reduce (Only a single reduce generates simplicial from transfer),
+        // hence we will also need a transfer schedule for this reduce, and will also need constraints for this schedule
         val pp = p.project(locusSimplic.arity)
         constraintCur = constraintCur.intersect(pp)
       }
-      //if the total resulting constraint  "contraintCur" is not satisfiable, iSimpoic is declared not foldable, else we proceed to build a new component
-      if (constraintCur.empty) notFolded.add(nameSimplic) //constraints can be apply, so we can proceed to make the union of i with all output TCCs
-      else {
-        for (instrs2 <- paquets(simplicialOutput)) iSimplic.union(instrs2.head, doAlign = false) // there is no need to compute alignement to root for simplicial instr, since it always the neutral element.
+      //if the total resulting constraint  "contraintCur" is not satisfiable, iSimpoic is declared not foldable,
+      // else we proceed to build a new component
+      if (constraintCur.empty) notFolded.add(nameSimplic)
+        else {//constraints can be apply, so we can proceed to make the union of i with all output TCCs
+        for (instrs2 <- paquets(simplicialOutput)) iSimplic.union(instrs2.head, doAlign = false)
+        // there is no need to compute alignement to root for simplicial instr, since it always the neutral element.
         rootConstraintsS.addOne(nameSimplic -> constraintCur.permute(iSimplic.alignToRoot))
         rootConstraintsT.addAll(newRootConstrT)
       }

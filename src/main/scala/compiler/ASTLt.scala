@@ -9,8 +9,8 @@ import scala.collection._
 
 /**
  * Adds boolean spatial operator to AST of spatial types
- * Also used to bridge the gap with AST. ASTL is inheriting from ASTLtrait,
- * an ASTL is therefore a more specific instance of ASTLtrait which  makes use of the catalog of ASTL's contructors.
+ * Also used to bridge the gap with AST. ASTL is inheriting from ASTLt,
+ * an ASTL is therefore a more specific instance of ASTLt which  makes use of the catalog of ASTL's contructors.
  * ASTLtrait = AST + ASTL, therefore we should process them separately with a preliminary match, at the level of ASTLtrait.
  * ASTL's constructor uses ASTLtrait for children in order to incorporate AST's nodes.
  * Identifies AST corresponding to int or bool, plus a locus, excludes those obtained with cons
@@ -78,7 +78,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
   }
 
   /**  Only read node are non ASTL nodes and are treated in ASTLt.*/
-  override def unfoldSpace(m: Machine): List[ASTBt[_]] =
+    def unfoldSpace(m: Machine): List[ASTBt[_]] =
     this.asInstanceOf[AST[_]] match {
       case Read(s) =>
         val r = rpart(mym.asInstanceOf[repr[(L, R)]])
@@ -89,7 +89,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
       }
     }
 
-  override def unfoldSimplic(m: Machine): ArrAst = this.asInstanceOf[AST[_]] match {
+    def unfoldSimplic(m: Machine): ArrAst = this.asInstanceOf[AST[_]] match {
     case Read(s) =>
       val r = rpart(mym.asInstanceOf[repr[(L, R)]])
       this.locus.sufx.map((suf: String) => new Read[R](s+"$"+ suf)(r) with ASTBt[R]. asInstanceOf[ ASTBt[_<:Ring ]] )

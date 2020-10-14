@@ -35,14 +35,17 @@ abstract class Circuit[L <: Locus, R <: Ring](override val p: Param[_]*) extends
     body = computeRoot //we pretend that the circuit is a function.
     val repl: iAstField[AST[_]] = immutable.HashMap.empty ++ replaced.toMap
     val prog1 = ProgData(this, repl)
-    val prog2 = prog1.deDagise(repl); //  print(prog2);
+    val prog2 = prog1.deDagise(repl);
+    //  print(prog2);
     val prog3 = prog2.procedurise()
+    // print(prog3+ "\n\n")
     val prog4 = prog3.nbit(List(1)); //faut mettre les tailles des entiers utilisés pour appeller main.
+    //  print(prog4+ "\n\n")
     val prog5=prog4.macroise()
-   // print(prog5+ "\n\n")
+    print(prog5+ "\n\n")
     val prog6=prog5.unfoldSpace(m)
-  //  print(prog6)
-     val prog7=prog6.foldRegister() //
+    //print(prog6)
+    val prog7=prog6.foldRegister() //
 
     //TODO mettre les noms sur les fonctions, aussi.
   }

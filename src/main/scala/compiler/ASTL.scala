@@ -27,7 +27,8 @@ abstract class S extends Locus with Ordered[S] {
   def compare(that: S): Int = { toString.compareTo(that.toString) }
   /** defines which components are regrouped upon partitionning a transfer variable */
   val proj: Array[Int]
-  /** how to project a schedule */
+  /** projects a transfer schedule
+   * @param t encodes a schedule */
   def scheduleProj(t:Seq[Int]):Array[Int]
   /**Number of schedule that can be partitionned */
   val card: Int
@@ -50,16 +51,16 @@ final case class V() extends S {
 
 final case class E() extends S {
   /* "h" stands for horizontal, "d" diagonal, "ad" antidiagonal */
-  val sufx: Array[String] = Array("h", "d", "ad");
+  val sufx: Array[String] = Array("h", "d", "ad")
   val proj: Array[Int] = Array(0, 0, 1, 1, 2, 2); val card = 48; val cardSucc = 6
   def propagateFrom(s: Array[Int], c: Array[Int]): Option[Array[Int]] = Some(Array(c(s(0) * 2), c(s(0) * 2) + 1, c(s(1) * 2), c(s(1) * 2) + 1, c(s(2) * 2), c(s(2) * 2) + 1))
   /** how to project a schedule */
-  override def scheduleProj(t: Seq[Int]): Array[Int] = Array(proj(t(0)),proj(t(2)),proj(t(4)))
+  override def scheduleProj(t: Seq[Int]): Array[Int] = Array(proj(t.head),proj(t(2)),proj(t(4)))
   private val modif=List(Array(0,0,0),Array(0,0,1),Array(0,1,0),Array(0,1,1),Array(1,0,0),Array(1,0,1),Array(1,1,0),Array(1,1,1) )
-  private def combine(t:Array[Int],u:Array[Int]): Array[Int] =Array(t(0)+u(0),t(0)+1-(u(0)),t(1)+u(1),t(1)+1-(u(1)),t(2)+u(2),t(2)+1-u(2))
+  private def combine(t:Array[Int],u:Array[Int]): Array[Int] =Array(t(0)+u(0),t(0)+1- u(0),t(1)+u(1),t(1)+1- u(1),t(2)+u(2),t(2)+1-u(2))
   val partitionnables: Option[Iterator[Array[Int]]] = Some(Array(0, 2, 4).permutations.flatMap((t: Array[Int]) => modif.map(combine(t, _))))
 
-};
+}
 
 final case class F() extends S {
   val sufx: Array[String] = Array("up", "do"); val proj: Array[Int] = Array(0, 0, 0, 1, 1, 1); val card = 48; val cardSucc = 2
@@ -80,6 +81,8 @@ final case class T[+S1 <: S, +S2 <: S](from: S1, to: S2) extends TT {
     case E() => to match { case V() | F() => Array("1", "2") }
     case F() => to match { case E() => Array("p", "b1", "b2") case V() => Array("b", "s1", "s2") } //"s" stands for side, "b" for base.
   }
+  val les6sufx: Array[String]  = from.sufx.flatMap  ((suf1: String) => to.sufx.map((suf2: String) =>  suf1+suf2  ))
+
 }
 
 /**
@@ -165,8 +168,8 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case Broadcast(_, _, _) => throw new RuntimeException("Broadcast creates   a transfer type")
       case Send(_)            => throw new RuntimeException("Broadcast creates   a transfer type")
       case Transfer(_, _, _)  => throw new RuntimeException("Transfer creates   a transfer type")
-      case Unop(op, a, _, _)  => a.unfoldSimplic(m).map(new Call1(op.asInstanceOf[Fundef1[Any, R]], _)(r) with ASTBt[R])
-      case Binop(op, a, a2, _, _) => a.unfoldSimplic(m).zip(a2.unfoldSimplic(m)).map({
+      case Unop(op, a, _, _)  => a.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m).map(new Call1(op.asInstanceOf[Fundef1[Any, R]], _)(r) with ASTBt[R])
+      case Binop(op, a, a2, _, _) => a.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m).zip(a2.unfoldSimplic(m)).map({
         case (c, c2) => new Call2(op.asInstanceOf[Fundef2[Any, Any, R]], c, c2)(r) with ASTBt[R].asInstanceOf[ASTBg]
       })
       case Redop(op, a, _, _) =>
@@ -183,10 +186,10 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
     val T(s1, des) = this.locus; val l2 = this.locus.sufx.length
     this.asInstanceOf[ASTLg] match {
       case Const(cte, _, _)   => Array.fill(s1.sufx.length, l2)(cte)
-      case Broadcast(a, _, _) => a.unfoldSimplic(m).map(Array.fill(l2)(_))
+      case Broadcast(a, _, _) => a.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m).map(Array.fill(l2)(_))
       case Send(a) =>
         if (a.length != l2) throw new RuntimeException("incorrect number of arguments for send")
-        a.toArray.map(_.unfoldSimplic(m)).transpose
+        a.toArray.map(_.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m)).transpose
       case Transfer(a, _, _) => m(des, s1, a.unfoldTransfer(m))
       case Unop(op, a, _, n) => a.unfoldTransfer(m).map(_.map(new Call1(op.asInstanceOf[Fundef1[Any, R]], _)(n.asInstanceOf[repr[R]]) with ASTBt[R].asInstanceOf[ASTBg]))
       case Binop(op, a, a2, _, n) => a.unfoldTransfer(m).zip(a2.unfoldTransfer(m)).map({
@@ -328,7 +331,7 @@ object ASTL {
 
 
 
-  //Build a tranfser, just like v,e,f, however specify a diffent Simplicial field for each component.
+  //Build a transfer, just like v,e,f, however specify a diffent Simplicial field for each component.
   def sendv[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, V]], n: repr[R]): Send[S1, V, R] = { assert(args.length == 6 / args.head.locus.arity); Send[S1, V, R](args); } //TODO check the length of args
   // def sende[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, E]], n: repr[R]) = Send[S1, E, R](args) ;
   //  def sendf[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, F]], n: repr[R]) = Send[S1, F, R](args) ;

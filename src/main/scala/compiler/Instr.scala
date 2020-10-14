@@ -16,9 +16,11 @@ abstract class Instr extends Dag[Instr] with Align[Instr] {
   def useless = false
   /**  true for instruction part or Transfer Connected Components */
  def isTransfer:Boolean
-
+ def locus:Option[Locus]=None
   var inputNeighbors: List[Instr] = List.empty; //to be set if we want to use the Dag feature.
-  var alignPerm:iTabSymb[Array[Int]]=Map.empty  // to be set if we want to use the Align feature, contains an alignment towards each usedvars of the instr (indexed by the string)
+  /** to be set if we want to use the Align feature, contains an alignment towards each usedvars of the instr (indexed by the string)*/
+    var alignPerm:iTabSymb[Array[Int]]=Map.empty
+
   /*Must return an alignement from this to n.   */
   def neighborAlign(n:  Instr ): Array[Int]={
       if(alignPerm.isEmpty) null
@@ -77,18 +79,19 @@ abstract class Instr extends Dag[Instr] with Align[Instr] {
       CallProc(newnamef, names, newexps).asInstanceOf[Instr]
   }
 
+
   // TabSymb[InfoNbit[_]]
   /**we add one (resp. two) suffixes, for simplicial (resp. transfer) variables  */
   def unfoldSpace(m: Machine, tSymb: TabSymb[InfoNbit[_]]): List[Instr] = this match {
     case Affect(v, exp) => // println(exp.toStringTree) ;
       exp.asInstanceOf[ASTLt[_, _]].locus match {
-        case s: S => s.sufx.zip(exp.unfoldSimplic(m)).map({ case (suf, e) => Affect(v +"$"+suf, e) }).toList
+        case s: S => s.sufx.zip(exp.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m)).map({ case (suf, e) => Affect(v +"$"+suf, e) }).toList
         case l @ T(s1, _) => s1.sufx.zip(exp.unfoldTransfer(m)).map({
           case (suf1, t) =>
             l.sufx.zip(t).map({ case (suf2, e) => Affect(v + "$"+ suf1 + suf2, e) }).toList
         }).toList.flatten
       }
-    case CallProc(f, n, e) => List(CallProc(f, n.flatMap(deploy(_, tSymb)), e.flatMap(_.unfoldSpace(m)))) //tSymb(n).t._1
+    case CallProc(f, n, e) => List(CallProc(f, n.flatMap(deploy(_, tSymb)), e.asInstanceOf[List[ASTLt[_,_]]].flatMap(_.unfoldSpace(m)))) //tSymb(n).t._1
   }
   
   def align(cs:TabSymb[ Constraint ]): Unit =   alignPerm=a(this).exp.align(cs, names.head)
@@ -104,19 +107,27 @@ case class CallProc(f: String, names: List[String], exps: List[AST[_]]) extends 
 }
 
 case class Affect[+T](name: String, exp: AST[T]) extends Instr {
-  val names = List(name); override def toString: String = pad(name, 25) + "<-  " + exp.toStringTree   +  alignPerm.map({case(k,v)=> k +" "+ v.toList+";  "})  + "\n"
-   
+  val names = List(name);
+  override def toString: String = pad(name, 25) + "<-  " + exp.toStringTree   + show(locus)  + alignPerm.map({case(k,v)=> k +" "+ v.toList+";  "})  + "\n"
+  private def show(x: Option[Locus]) = x match {    case Some(s) => ""+ s    case None => ""  }
+
   def usedVars: HashSet[String] = exp.symbols
   /**
    * for a non macro affectation of parameter or a Layer creates a useless entry in the memory of the CA
    * because the parameter or the layer is already present in the memory of the CA
    */
   override def useless: Boolean = exp match { case _: ASTL.Layer[_, _] => true case Param(_) => true case _ => false }
+  /** @return if instruction is ASTLt, returns the locus */
+  override def locus:Option[Locus] =  exp match{
+    case a:ASTLt[_ ,_] => Some(a.locus)
+    case _ => None}
 
   override def isTransfer: Boolean = exp.asInstanceOf[ASTLt[_,_]].locus.isInstanceOf[TT] // || exp.isInstanceOf[Red2[_,_,_]]
 }
 
 object Instr {
+  /** @param i instruction
+   *  @return  i.asInstanceOf[Affect[_]] */
   def a(i:Instr): Affect[_] =i.asInstanceOf[Affect[_]]
   def read(s: String, m: repr[(Locus, Ring)]) = new Read(s)(m) with ASTLt[Locus, Ring]
   /**utility used to align instruction when printed */
@@ -155,8 +166,16 @@ case class UsrInstr[+T](c: Codop, exp: AST[_]) extends Instr {
         addSymbL(t, expFather, LayerField(nbit)); Some(Affect("l" + expFather.name, exp))
       case Bugif() =>
         if (usedForCompute) throw new RuntimeException("Debug exp is allzero=>not usable for compute")
+        val b=t.contains(exp.name)
         addSymb(t, exp, BugifField(expFather.name))
-        if (t.contains(exp.name))  None  else    Some(Affect(exp.name, exp)) //the bugif has allready been generated, we need to change the varialbe
+        if (b)
+          { print("bonjur")
+            None}
+        else {
+          print("aurevoir")
+          Some(Affect(exp.name, exp))
+
+        }//the bugif has allready been generated, we need to change the varialbe
       case Display() => if (usedForCompute || t.contains(exp.name)) None
       else { addSymb(t, exp, DisplayField(expFather.name, usedForCompute)); Some(Affect(exp.name, exp)) }
     }

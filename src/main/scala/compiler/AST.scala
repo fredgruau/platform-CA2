@@ -1,5 +1,5 @@
 package compiler
-
+//toto
 import compiler.AST._
 import compiler.ProgData._
 
@@ -101,8 +101,8 @@ abstract class AST[+T]()(implicit m: repr[T]) extends Dag[AST[_]] with Named {
     case _              => false
   }
 
-  def unfoldSpace(m:Machine ):List[ASTBt[_]] =  throw new RuntimeException("unfoldSpace must be applied on ASTLtonly ")
-  def unfoldSimplic(m:Machine ):ArrAst= throw new RuntimeException("unfoldSpace must be applied on ASTLtonly ")
+ // def unfoldSpace(m:Machine ):List[ASTBt[_]] =  throw new RuntimeException("unfoldSpace must be applied on ASTLtonly ")
+ // def unfoldSimplic(m:Machine ):ArrAst= throw new RuntimeException("unfoldSpace must be applied on ASTLtonly ")
   def unfoldTransfer(m:Machine ):ArrArrAst= throw new RuntimeException("unfoldSpace must be applied on ASTLtonly ")
   /**   Compute alignement with respect to input variables, and also constraint, given that v is the variable if we make a reduction*/
   def align(cs:TabConstr,v:String):iTabSymb[Array[Int]]= throw new RuntimeException("align must be applied on ASTLtonly ")

@@ -34,7 +34,8 @@ object ProgData {
   def listOf[T](t: Map[String, T]): List[(String, T)] = { val (anon, definedMacros) = t.partition((x: (String, T)) => x._1.startsWith("_fun")); anon.toList ::: definedMacros.toList }
   // def string(t: iTabSymb[_], c: String): String = t.map { case (k, v) ⇒ k → v.toString }.foldLeft(" ")(_ + c + _)
   /**pring a map on several small lines, instead of one big line */
-  def string[T](t: TabSymb[T], s: String): String = t.toList.grouped(4).toList.map(_.mkString(s)).mkString("\n") + "\n"
+ // def string[T](t: TabSymb[T], s: String): String = t.toList.grouped(4).toList.map(_.mkString(s)).mkString("\n") + "\n"
+  def string[T](t: TabSymb[T], s: String): String = t.toList.grouped(4).map(_.mkString(s)).mkString("\n") + "\n"
 
   /**add one (resp. two) suffixes to the variable names, for simplicial (resp. tranfer) variable */
   def deploy(n: String, tSymb: TabSymb[InfoNbit[_]]): List[String] = deploy(n, tSymb(n).t.asInstanceOf[(_ <: Locus, _)]_1)
@@ -81,15 +82,15 @@ object ProgData {
         val Array(Array(h1, h2), Array(d1, d2), Array(ad1, ad2)) = t; //common to vE and fE
         des match {
           case V() => /*vE->eV*/
-            Array(Array(h2, Tminus1(ad2), Tminus1(shiftR(d2)), shiftR(h1), shiftR(ad1), shiftR(d1)))
+            Array(Array(h2, Tminus1(ad2), Tminus1(shiftR(d2)), shiftR(h1), shiftR(ad1), d1))
           case F() => /*fE->eF*/
-            Array(Array(Tminus1(h1), ad1, d1), Array(shiftL(h2), ad2, d2))
+            Array(Array(Tminus1(h2), Tminus1(ad1), Tminus1(d1)), Array( h1   ,Tminus1(shiftL(ad2)) , Tminus1(d2)))
         }
       case F() => des match {
         case V() => /*vF->fV*/
-          val Array(Array(dp, db1, db2), Array(up, ub1, ub2)) = t; Array(Array(Tminus1(ub1), Tminus1(dp), shiftR(Tminus1(ub2)), shiftR(db1), shiftR(up), db2))
+          val Array(Array(dp, db1, db2), Array(up, ub1, ub2)) = t; Array(Array(Tminus1(shiftR(ub1)), Tminus1(dp),  Tminus1(shiftR(ub2))), Array(  shiftR(db1) ,shiftR(up),  db2) )
         case E() => /*eF->fE*/
-          val Array(Array(db, ds1, ds2), Array(ub, us1, us2)) = t; Array(Array(db, Tminus1(ub)), Array(ds2, us2), Array(ds1, shiftR(us1)))
+          val Array(Array(db, ds1, ds2), Array(ub, us1, us2)) = t; Array(Array(Tminus1(ub), db), Array(ds2, us2), Array(ds1, shiftR(us1)))
       }
     }
   }
@@ -136,7 +137,7 @@ class ProgData[+T](val f: Fundef[T], val funs: iTabSymb[ProgData[_]], val allNod
 
   /**
    * Replaces DAG by a list of trees, adding a read node using names, and building  a list  of affect instruction.
-   *  also does Substitution is usefull only for the main body,
+   *  also does Substitution which is usefull only for the main body, the
    *     @param replaced   substitution map
    */
   def deDagise(replaced: iAstField[AST[_]] = immutable.HashMap.empty): ProgData1[T] = {
@@ -175,6 +176,7 @@ class ProgData[+T](val f: Fundef[T], val funs: iTabSymb[ProgData[_]], val allNod
     val t: TabSymb[InfoType[_]] = mutable.HashMap.empty
     t ++= affectExpList.map(e => (e.name, new InfoType(e.mym.name.asInstanceOf[T], Field())))
     t ++= f.p.toList.map(a => ("p" + a.name, InfoType(a, ParamD()))) //type of parameters this statement must happen after the addition of affects otherwise paramD varkind will be replaced by Affectk
+   // affectExpList.map(e=>println(e.name + "="+ e.toStringTree))
 
     val affectInstr = affectExpList.map(e => Affect(e.name, e))
     val allUsedTwice = immutable.HashSet.empty[AST[_]] ++ usedTwiceAsValue ++ UsedTwiceAskey
@@ -183,7 +185,7 @@ class ProgData[+T](val f: Fundef[T], val funs: iTabSymb[ProgData[_]], val allNod
       e.sysInstrs.map(i => new UsrInstr(i.c, i.exp.deDag(toBeReplaced, represent, replaced)) //  dedagify   exp used in system instructions
         .affectize(e, allUsedTwice.contains(i.exp), t))
     }).flatten //one flatten for list of list, and another one for None/Some
-
+  //  print(string(t , "  | "))
     f.body = f.body.deDag(toBeReplaced, represent, replaced)
     new ProgData1(f, affectInstr ::: newInstrsSys.reverse, funs.map { case (k, v) ⇒ k -> v.deDagise() }, t, f.p.toList.map("p" + _.name), List()) //result parameter to be added letter by procedure step.
   }
@@ -191,7 +193,7 @@ class ProgData[+T](val f: Fundef[T], val funs: iTabSymb[ProgData[_]], val allNod
 
 /**
  * Stores all the data associated to a program, used for compilation
- *  @ tabSymbVar,  stores info about parameters or re-used expression,
+ *  @ tSymbVar,  stores info about parameters or re-used expression,
  * @ Info: Type associated to variable, number of bits, to be completed progressively.
  * @ instrs instructions of the program (return, display, debug,...), the return instruction is stored separately.
  * @ funs list of functions used by the program, indexed by names.
@@ -201,7 +203,7 @@ class ProgData[+T](val f: Fundef[T], val funs: iTabSymb[ProgData[_]], val allNod
 class ProgData1[+T](val f: Fundef[T], val instrs: List[Instr], val funs: iTabSymb[ProgData1[_]], val tSymbVar: TabSymb[InfoType[_]],
                     val paramD: List[String], val paramR: List[String]) {
   override def toString: String = paramD.mkString(" ") + "=>" + paramR.mkString(" ") + "\n" + instrs.mkString("") +
-    string(tSymbVar, "  |  \n ") + "\n" + listOf(funs).mkString("\n \n  ")
+    string(tSymbVar, "  | ") + "\n" + listOf(funs).mkString("\n \n  ")
 
   // override def toString: String = string(paramD, " ") + "=>" + string(paramR, " ") + "\n" + string(instrs, " ") + "\n" + tSymbVar.toString + "\n" + string(funs, "\n Macro:") + "\n"
   /**replaces function call by procedure call, introduces new names in tabSymb*/
