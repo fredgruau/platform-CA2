@@ -4,86 +4,12 @@ import compiler.AST._
 import compiler.ASTB._
 import compiler.ASTBfun._
 import compiler.ASTL._
-import compiler.Align._
+import dataStruc.Align._
 import compiler.Constraint._
-import compiler.ProgData._
+import compiler.Circuit._
 import compiler.repr._
-
 import scala.collection._
 import scala.reflect.ClassTag
-
-/**The 9 locus. Three simplicial locus: V for vertex, E for edge, F for face, */
-sealed abstract class Locus {
-  /**suffix of variable names representing simplicial types */
-  val sufx: Array[String]
-  def isTransfer = false
-  def arity: Int = if (isTransfer) 6 else sufx.length
-
-  /**encodes a neutral permutation with the right number of elements. */
-  lazy val neutral: Array[Int] = Array.range(0, arity) //we put lazy otherwise pb in initialization order
-}
-abstract class S extends Locus with Ordered[S] {
-  def propagateFrom(s: Array[Int], c: Array[Int]): Option[Array[Int]]
-  def compare(that: S): Int = { toString.compareTo(that.toString) }
-  /** defines which components are regrouped upon partitionning a transfer variable */
-  val proj: Array[Int]
-  /** projects a transfer schedule
-   * @param t encodes a schedule */
-  def scheduleProj(t:Seq[Int]):Array[Int]
-  /**Number of schedule that can be partitionned */
-  val card: Int
-
-  /**Number of schedule that can be partitionned and verify a strict ordering */
-  val cardSucc: Int
-  val partitionnables: Option[Iterator[Array[Int]]]
-
-
-}
-final case class V() extends S {
-  val sufx: Array[String] = Array("")
-  val proj: Array[Int] = Array(0, 0, 0, 0, 0, 0); val card = 0; val cardSucc = 0
-  def propagateFrom(s: Array[Int], c: Array[Int]): Option[Array[Int]] = None
-  /** how to project a schedule, useless for V */
-  override def scheduleProj(t: Seq[Int]): Array[Int] = Array(0)
-  val partitionnables: Option[  Iterator[Array[Int]]] =  None
-
-}
-
-final case class E() extends S {
-  /* "h" stands for horizontal, "d" diagonal, "ad" antidiagonal */
-  val sufx: Array[String] = Array("h", "d", "ad")
-  val proj: Array[Int] = Array(0, 0, 1, 1, 2, 2); val card = 48; val cardSucc = 6
-  def propagateFrom(s: Array[Int], c: Array[Int]): Option[Array[Int]] = Some(Array(c(s(0) * 2), c(s(0) * 2) + 1, c(s(1) * 2), c(s(1) * 2) + 1, c(s(2) * 2), c(s(2) * 2) + 1))
-  /** how to project a schedule */
-  override def scheduleProj(t: Seq[Int]): Array[Int] = Array(proj(t.head),proj(t(2)),proj(t(4)))
-  private val modif=List(Array(0,0,0),Array(0,0,1),Array(0,1,0),Array(0,1,1),Array(1,0,0),Array(1,0,1),Array(1,1,0),Array(1,1,1) )
-  private def combine(t:Array[Int],u:Array[Int]): Array[Int] =Array(t(0)+u(0),t(0)+1- u(0),t(1)+u(1),t(1)+1- u(1),t(2)+u(2),t(2)+1-u(2))
-  val partitionnables: Option[Iterator[Array[Int]]] = Some(Array(0, 2, 4).permutations.flatMap((t: Array[Int]) => modif.map(combine(t, _))))
-
-}
-
-final case class F() extends S {
-  val sufx: Array[String] = Array("up", "do"); val proj: Array[Int] = Array(0, 0, 0, 1, 1, 1); val card = 48; val cardSucc = 2
-  def propagateFrom(s: Array[Int], c: Array[Int]): Option[Array[Int]] = Some(Array(c(s(0) * 3), c(s(0) * 3) + 1, c(s(0) * 3 + 2), c(s(1) * 3), c(s(1) * 3) + 1, c(s(1) * 3 + 2)))
-  override def scheduleProj(t: Seq[Int]): Array[Int] = Array(proj(t(0)),proj(t(3)))
-  private val  p2=List(3,4,5).permutations
-  private def combine(t:List[Int],u:List[Int]): Seq[Array[ Int]] = List( (t:::u).toArray,(u:::t).toArray )
-  val partitionnables: Option[Iterator[Array[Int]]] = Some( List(0, 1, 2).permutations.flatMap((t: List[Int]) => p2.map(combine(t, _))).flatten)
-
-}
-
- abstract class TT extends Locus
-/** T stands for Transfer, and uses two simplicial locus. The first is the simplicial. T[V,E] corresponds to  eV  */
-final case class T[+S1 <: S, +S2 <: S](from: S1, to: S2) extends TT {
-  override def isTransfer = true
-  val sufx: Array[String] = from match {
-    case V() => to match { case E() => Array("w", "nw", "ne", "e", "se", "sw") case F() => Array("wn", "n", "en", "es", "s", "ws") }
-    case E() => to match { case V() | F() => Array("1", "2") }
-    case F() => to match { case E() => Array("p", "b1", "b2") case V() => Array("b", "s1", "s2") } //"s" stands for side, "b" for base.
-  }
-  val les6sufx: Array[String]  = from.sufx.flatMap  ((suf1: String) => to.sufx.map((suf2: String) =>  suf1+suf2  ))
-
-}
 
 /**
  * AST of spatial type
@@ -241,7 +167,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         if (k.nonEmpty) { //k is the aux defined by an instr which will have to use two registers.
           val e = k.head //here we assume that there is a single input variable
           if (!(a1(e) sameElements a2(e)))
-            cs += v ->  Cycle( compose(invert(a1(e)), a2(e)))
+            cs += v ->  Cycle( compose(invert(a1(e)), a2(e)), locus.asInstanceOf[TT])
         }
         a1 ++ a2 //arg2 has priority over arg if non equal
       case Redop(_, arg, _, _) => //we compute a constraint, that is implicitely, the constraint to be checked for partitionning the Reduction. 
@@ -332,7 +258,7 @@ object ASTL {
 
 
   //Build a transfer, just like v,e,f, however specify a diffent Simplicial field for each component.
-  def sendv[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, V]], n: repr[R]): Send[S1, V, R] = { assert(args.length == 6 / args.head.locus.arity); Send[S1, V, R](args); } //TODO check the length of args
+  def sendv[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, V]], n: repr[R]): Send[S1, V, R] = { assert(args.length == 6 / args.head.locus.density); Send[S1, V, R](args); } //TODO check the length of args
   // def sende[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, E]], n: repr[R]) = Send[S1, E, R](args) ;
   //  def sendf[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, F]], n: repr[R]) = Send[S1, F, R](args) ;
 

@@ -2,16 +2,12 @@ package compiler
 
 import compiler.ASTB._
 import compiler.ASTBfun._
-import junit.framework.TestCase
 
-import junit.framework.Assert.assertEquals
-import junit.framework.Assert.fail
-import ASTB._
-import ASTBfun._
+import org.scalatest.FunSuite
 import scala.collection.immutable.HashMap
 
 /**Test the correct implementation of integer operation, by evaluating them */
-class ASTBtest extends TestCase {
+class ASTBtest extends  FunSuite  {
   /**repeat last bits to reach the count of n. */
   Array.fill[Byte](5)(0)
   List.fill[Int](5)(0)
@@ -108,27 +104,27 @@ class ASTBtest extends TestCase {
     // case _ => List(true, false)*/
   }
   val env = HashMap.empty[Param[_], List[Boolean]]
-  def testBinary() {   assertEquals(toInt(toBinary(3, 5)), 3) }
-  def testCarry() {
-    assertEquals(eval(Call3(carry, true,true,false), env), List(true))
-    assertEquals(eval(Call3(carry, true,false,false), env), List(false))
+   test("Binary") {   assert(toInt(toBinary(3, 5))=== 3) }
+   test("Carry") {
+    assert(eval(Call3(carry, true,true,false), env)=== List(true))
+    assert(eval(Call3(carry, true,false,false), env)===List(false))
   } 
   val quatre = Intof[SI](4 ); val moins1 = Extend(4,Intof[SI](-1))
   //print( eval(moins1,env))
   val trois =  quatre + moins1 ;
-  def testadd1() { assert(toInt(eval(trois, env)) == 3) }
+    test("add1") { assert(toInt(eval(trois, env)) === 3) }
   val sept  =  trois | quatre ;
-  def testOr() { assert(toInt(eval(sept, env)) == 7) }
+   test("Or") { assert(toInt(eval(sept, env)) === 7) }
     val six = trois+trois
 
-  def testAdd2() { assert(toInt(eval(six, env)) == 6) }
+    test("Add2") { assert(toInt(eval(six, env)) === 6) }
   val septbis:ASTBt[SI]= new Call1(inc .asInstanceOf[Fundef1R[SI]], six) with ASTBt[SI]  //note here that it is possible to go from UISI originally deliverd by inc, towards SI. 
-  def testInc() { assert(toInt(eval(septbis, env)) == 7) }
+   test("Inc") { assert(toInt(eval(septbis, env)) === 7) }
   val quatrebis = Call1(halveB.asInstanceOf[Fundef1R[SI]], sept) 
-  def testHalve() { assert(toInt(eval(quatrebis, env)) == 3) }
+    test("Halve") { assert(toInt(eval(quatrebis, env)) == 3) }
   val grand = Intof[SI](15 )
 
-  def testComputeNbit() {  val nbitP = scala.collection.mutable.HashMap.empty[Param[_], Int] //virgin, to retrieve the nbits computed for the param.
+    test("ComputeNbit") {  val nbitP = scala.collection.mutable.HashMap.empty[Param[_], Int] //virgin, to retrieve the nbits computed for the param.
       val n = nBitR(HashMap.empty[AST[_], Int], quatre,nbitP)
     assert(n == 4)
   }

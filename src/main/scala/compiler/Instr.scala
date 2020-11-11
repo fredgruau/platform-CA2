@@ -3,20 +3,25 @@ package compiler
 import compiler.AST._
 import compiler.InfoType._
 import compiler.Instr._
-import compiler.ProgData._
+import compiler.Locus.{deploy, _}
 import compiler.UsrInstr._
 import compiler.VarKind._
+import dataStruc.{Align, DagNode}
+import compiler.Circuit._
+import scala.language.postfixOps
 
 import scala.collection._
 import scala.collection.immutable.HashSet
 
 /**Instruction used within the compiler, call, affect. Dag and Union allows to defined ConnectedComp  */
-abstract class Instr extends Dag[Instr] with Align[Instr] {
-
+abstract class Instr extends DagNode[Instr] with Align[Instr] {
+  override def aligned= !alignPerm.isEmpty //faut de mefier, ca va pas marcher pour load?
   def useless = false
   /**  true for instruction part or Transfer Connected Components */
  def isTransfer:Boolean
+ /** @return the locus of expressions, for affectation. */
  def locus:Option[Locus]=None
+  def isV=locus.get == V()
   var inputNeighbors: List[Instr] = List.empty; //to be set if we want to use the Dag feature.
   /** to be set if we want to use the Align feature, contains an alignment towards each usedvars of the instr (indexed by the string)*/
     var alignPerm:iTabSymb[Array[Int]]=Map.empty
@@ -91,7 +96,7 @@ abstract class Instr extends Dag[Instr] with Align[Instr] {
             l.sufx.zip(t).map({ case (suf2, e) => Affect(v + "$"+ suf1 + suf2, e) }).toList
         }).toList.flatten
       }
-    case CallProc(f, n, e) => List(CallProc(f, n.flatMap(deploy(_, tSymb)), e.asInstanceOf[List[ASTLt[_,_]]].flatMap(_.unfoldSpace(m)))) //tSymb(n).t._1
+    case CallProc(f, n, e) => List(CallProc(f, n.flatMap(Instr.deploy(_, tSymb)), e.asInstanceOf[List[ASTLt[_,_]]].flatMap(_.unfoldSpace(m)))) //tSymb(n).t._1
   }
   
   def align(cs:TabSymb[ Constraint ]): Unit =   alignPerm=a(this).exp.align(cs, names.head)
@@ -102,8 +107,7 @@ abstract class Instr extends Dag[Instr] with Align[Instr] {
 case class CallProc(f: String, names: List[String], exps: List[AST[_]]) extends Instr {
   override def toString: String = pad(names.foldLeft(" ")(_ + "," + _).substring(2), 25) + "<-" + f + "(" + exps.map(_.toStringTree).foldLeft(" ")(_ + " " + _) + ")\n"
   def usedVars: HashSet[String] = exps.map(_.symbols).foldLeft(immutable.HashSet.empty[String])(_ | _)
-
-  override def isTransfer: Boolean =  throw new RuntimeException("test wether transfer is done only in macro, which do not have CallProc instr. ")
+  override def isTransfer: Boolean =  throw new RuntimeException("test isTransfer is done only in macro, which do not have CallProc instr. ")
 }
 
 case class Affect[+T](name: String, exp: AST[T]) extends Instr {
@@ -135,8 +139,8 @@ object Instr {
   def apply(s: String, p: ProgData2): Instr = CallProc(s, p.paramR,
     p.paramD.map(x => read(x, repr(p.tSymbVar(x).t).asInstanceOf[repr[(_ <: Locus, _ <: Ring)]])))
 
-  //new Read[Int](x)))
-  //replace the return expression by affectation
+  private  def deploy(n: String, tSymb: TabSymb[InfoNbit[_]]): List[String] =  Locus.deploy(n, tSymb(n).t.asInstanceOf[(_ <: Locus, _)]_1)
+
   def affectizeReturn(tsymb: TabSymb[InfoType[_]], paramD: mutable.LinkedHashSet[String], e: AST[_]): List[Instr] = {
     def process(e: AST[_]): List[Affect[_]] = {
       val already = tsymb.contains(e.name)
@@ -168,14 +172,8 @@ case class UsrInstr[+T](c: Codop, exp: AST[_]) extends Instr {
         if (usedForCompute) throw new RuntimeException("Debug exp is allzero=>not usable for compute")
         val b=t.contains(exp.name)
         addSymb(t, exp, BugifField(expFather.name))
-        if (b)
-          { print("bonjur")
-            None}
-        else {
-          print("aurevoir")
-          Some(Affect(exp.name, exp))
-
-        }//the bugif has allready been generated, we need to change the varialbe
+        if (b)  None
+        else  Some(Affect(exp.name, exp))   //the bugif has allready been generated, we need to change the varialbe
       case Display() => if (usedForCompute || t.contains(exp.name)) None
       else { addSymb(t, exp, DisplayField(expFather.name, usedForCompute)); Some(Affect(exp.name, exp)) }
     }

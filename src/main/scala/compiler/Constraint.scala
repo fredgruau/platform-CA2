@@ -1,98 +1,216 @@
 package compiler
 
-import com.sun.xml.internal.bind.v2.TODO
 import compiler.Constraint._
-
-import scala.collection.immutable
-
-//import scala.collection._
-//import scala.collection._
-import Align._
+import dataStruc.Align._
 import scala.collection.immutable.{ArraySeq, HashSet}
-/** allows to delete evaluation of constraints: it is either a set of Constraints, or a set of possible schedules (expressed constraints) */
-//trait Schedules {
-//  def isEmpty: Boolean
-//  /**needed to  align the constraint
-//   * @param p array encoding a permutation
-//   * @return the permuted schedules*/
-//  def permute(p: Array[Int] ):Schedules
-//}
-/**
- * represent a set of possible schedule. a constraint linking Scc to Tcc (partition partitionSucc) must be able to take an Scc Schedule,
- * and compute a set of Tcc Schedule complying with the constraint
- * Thereafter, find out if it has a non null intersection within the current constraint on the Tcc.
- *It could also be done by taking a Tcc schedule, see if it check the partition, and if yes, compute the corresponding Scc schedule,
- *  however, in this case, one would
- *have to scan all the possible Tcc schedule, until we find one whose corresponding Scc schedule match our chosen schedule.
- * If there is no constraint on the set of possible Tcc schedule, its size is the number of permutation: fact(6)
- */
-/**
- * Represents a set of schedules.
- * @param size represent the constraint's arity
- */
-sealed abstract class Constraint(val size:Int)
-{
-  /**  Transform a transfer constraint into a simplicial constraints   */
-  //TODO must have checked partitionned
-  def project(newSize:Int): Constraint
 
-  /**The number of possible schedules checking the constraint.  */
+/**
+ * Represents a set of schedules of a 2Dfield's components.
+ * @param locus 2Dtype of the field
+ */
+sealed abstract class Constraint(val locus:Locus)
+{  /**The number of possible schedules checking the constraint.  */
   def card:Int
-  /**Defined for constraint between a T component and an E/F component, if there is a unique possible T schedule, for each E (or each F) schedule 
+  /**Defined for constraint between a T component and an E/F component,
+   * if there is a unique possible T schedule, for each E (or each F) schedule
    * it transforms an E or an F schedule into a T schedule*/
   def propagateFrom(a:Array[Int]):Option[Array[Int]]=None
-  /** Veriefies if a  schedule satisfies the constraint
+  /** Verifies if a  schedule satisfies the constraint
    * @param a schedules to be checked */
   def verified(a:Seq[Int]):Boolean
-  /**Applies a permutation to a constraint.  Used for aligning  to the root
-   * @param p the permutation*/
-  def permute(p: Array[Int] ):Constraint
+  /**Applies a permutation to a constraint.  Used for aligning  to a new  root
+   * valid only for transfer constraints
+   * @param p the alignement to the new root*/
+  def permute(p: Array[Int],locus:Locus ):Constraint
   /**@return all the schedules verifying the constraint  */
   def schedules: HashSet[Seq[Int]]
   /**  Compute a joint constraint.  generates the schedules for the smallest card, and verify with the other.
    * unless specific cases where it can be deduced in a cheaper way */
-  def intersect(c:Constraint):Constraint= {
+  def intersect(c:Constraint):Constraint= {  require(c.locus == this.locus, "intersected constraint have distinct loci")
     if(c.isInstanceOf[AllConstr] || (c==this)) this
     else if(c.card<card) c.intersect(this)    // c has smallest card
-    else { val s= schedules
-      val s2 =s.filter(c.verified(_))
-      Schedules( HashSet.empty[Seq[Int]]++ s2,size)
-    }
+    else   Schedules( HashSet.empty[Seq[Int]]++ schedules.filter(c.verified(_)),c.locus)
   }
-  //Schedules(schedules.intersect(c.schedules))
-  /** In general an isolated constraint has at least one schedules satifying it */
+  /** In general an isolated constraint has at least one schedule satifying it */
   def empty:Boolean=false
+  /** constraint obtained by picking one schedule TODO could be improved to avoid generate all the schedules, but only the first one! */
+  def pick():Constraint= {
+    if (empty) throw new RuntimeException("empty constraint cannot be picked + this")
+    val s=schedules
+    Schedules(HashSet( s.head),locus)
+  }
 }
 
 object Constraint {
-  @scala.annotation.tailrec
-  def factorial(n: Int, accum:  Int = 1):  Int =   if (n == 0)   accum   else    factorial(n - 1, n * accum)
-  private def complement6(l:List[Int]): HashSet[Int] =   HashSet(0,1,2,3,4,5,6)--l
-  private val simplic: Array[S]=Array(V(),V(),F(),E())
-  /**  constraint defined by schedules.*/
-  final case class Schedules( b: HashSet[Seq[Int]] ,override val size:Int) extends Constraint(size){
+   def intersect(cs:List[Constraint],l:Locus): Constraint ={
+    var res:Constraint=AllConstr(l)
+    for(c<-cs)    res=res.intersect(c)
+    res
+  }
+
+   /**  constraint defined by schedules.*/
+  final case class Schedules( b: HashSet[Seq[Int]] ,override val locus:Locus) extends Constraint(locus){
     def card: Int =b.size
-    def permute(p: Array[Int] ): Schedules =Schedules(b.map(_.map(p(_))),size)
+    def permute(p: Array[Int],l:Locus ): Schedules =Schedules(b.map(_.map(p(_))),l)
     def schedules: HashSet[Seq[Int]] =b
     override def empty: Boolean = schedules.isEmpty
     override def verified(a: Seq[Int]): Boolean = b.contains(a)
-    // override def toString: String ="mise a plat: "+b.toList.map(_.toList).mkString(",")
-    override def project(newSize: Int): Constraint = Schedules(b.map(simplic(newSize).scheduleProj(_)),newSize)
+     private def printSched(a:Seq[Int])=    a.map(locus.lessufx(_))
+    override def toString: String ="on " +locus   +" there is "+ b.size + "  schedules: " + b.toList.map(printSched(_).mkString("->"))
   }
   /**  constraint allways true.*/
-  final case class AllConstr(override val size:Int) extends Constraint(size){
-    def card: Int = factorial(6)
-    def permute(p: Array[Int] ): Constraint =this
-    def schedules=  HashSet.empty[Seq[Int]]++ArraySeq(0,1,2,3,4,5).permutations
+    final case class AllConstr(override val locus:Locus) extends Constraint(locus){
+    private val id=(0 to locus.density-1).toSeq
+    def card: Int = factorial(locus.density)
+    def permute(p: Array[Int],l:Locus ): Constraint =AllConstr(l)
+    def schedules=  HashSet.empty[Seq[Int]]++id.permutations
+    override def pick()=Schedules(HashSet(id), locus)
     override def intersect(c: Constraint): Constraint = c
     override def verified(a: Seq[Int]): Boolean = true
-    override def project(newSize: Int): Constraint = AllConstr(newSize)
+
 
   }
+
+  /** @param b is an intrinsic permutation on 6 integers. */
+   final case class Cycle(b:Seq[Int] , override val  locus:TT) extends Constraint(locus){
+    {require(b.length==locus.density)}
+    /**   Cycles could go both direction so we should multiply by two.  we consider just one, for "simplification" */
+    def card: Int =b.length
+    def permute(p: Array[Int],l:Locus ): Constraint = Cycle(compose(invert(p),compose(b,p)).toArray[Int],l.asInstanceOf[TT])
+    override def toString: String ="Cycle "+ (orbitofZero.map(locus.les6sufx(_)). mkString("->"))
+    def schedules: HashSet[Seq[Int]] = {
+      checkCycleLength()
+      var result= HashSet.empty[Seq[Int]];    var possible=b
+      for (i <- 0 to b.length -1 )   {  result=result+possible;possible=compose(b,possible);}
+      result;
+    }
+    override def pick()=Schedules(HashSet(orbitofZero), locus)
+    override def verified(a: Seq[Int]): Boolean = a == orbit(a(0),b)
+    /**
+    @param init starting integer
+    @param perm permution
+     */
+    private def orbit(init:Int,perm:Seq[Int])={var r =List[Int]();var c:Int=init; for(i<-0 to  5){r=c::r;c=perm(c)} ;r.reverse}
+    private lazy val orbitofZero =orbit(0,b)
+    private def checkCycleLength()={
+      /** c stores orbital,   */
+      var c=Array.fill[Int](b.size)(0);var cycleLength=0
+      var next =0;      val t:Array[Boolean]=Array(true,true,true,true, true,true)
+      for(i<-0 to 5) { //intialisation of c needs to
+        c(i)=b(next); t(next)=false;   next=b(next)
+        if(!t(next)){if(cycleLength==0) cycleLength=i+1;
+          next=t.indexOf(true) //explore the (possibly numerous) cycles.
+        }
+      }
+      if(cycleLength!=6) throw new RuntimeException("for the moment we consider only cycles of length 6"+this )
+
+    }
+  }
+
+  /** @param locus must be a transfer locus
+   * @param b array of size 6 which maps  each   components of locus to a simplicial component of slocus,
+   *  A partition constraint links a Tcc set of schedule to an Scc set of schedules
+   *  Upon reduction from vE to E, the partition is E.proj = (0, 0, 1, 1, 2, 2)
+   *   *  */
+  final case class Partition( b:Seq[Int],slocus:S, override val locus:TT) extends Constraint(locus) {
+    {  require(b.size == 6, "a partition specifies a mapping for 6 components")
+      require(!slocus.isInstanceOf[V], "thereis partitionning towards a V does not constrain")    }
+    override def toString: String ={
+      val distrib=Array.fill[List[String]](slocus.density)(List())
+      for (i<-0 to 5)   distrib(b(i))=locus.les6sufx(i)::distrib(b(i))
+      "Partition "+ "targetlocus"+ slocus+" "+ distrib.map(_.mkString(",")).mkString("|")
+    }
+    def card: Int = slocus.card
+    def permute(p: Array[Int], l: Locus): Partition = Partition(compose(invert(p), b), slocus, l.asInstanceOf[TT])
+    def schedules: HashSet[Seq[Int]] = if (slocus.isInstanceOf[V]) AllConstr(locus).schedules
+    else {  val possible=slocus.partitionnables.get.toList
+      HashSet.empty ++  possible.map(  compose(_, rectify).toSeq)     }
+    override def verified(a: Seq[Int]): Boolean = slocus.partitionable(compose(a, b))
+    /***
+     * @param x transfer schedule that is partitionnable
+     * @return projection on the Slocus of the partition
+     */
+      def project(x:Seq[Int])=slocus.scheduleProj (compose(x,  b)).toSeq
+      def invProject(x:Seq[Int]) = {
+        require(x.length== slocus.density )
+         x.flatMap(bm1(_)).toSeq  }
+
+    /** invert of b, there is several value for each int */
+    private lazy val bm1={val toto= Array.fill[List[Int]](slocus.density)(List()); for (i<-5 to 0 by -1)  toto(b(i))=i::toto(b(i));toto}
+    /**
+     * let c=b o rectify, we have c(0)=c(1) =0, c(2)=c(3)=1 c(4)=c(5)=2
+     */
+      private lazy val rectify={
+       val distrib2=Array.fill(6)(0)
+        for (i<-0 to slocus.fanout -1)   for(j<- 0 to slocus.density -1)
+            distrib2(i+ j * slocus.fanout) = bm1(j)(i)
+        for(i<-0 to 5) require(b(distrib2(i))==i/slocus.fanout) //verification
+        distrib2
+      }
+  }
+
+
+
+
+  /**
+   * @param p Partition linking and SCC to a SCC
+   * @param c Constraints to be propagated
+   * Wrapper to case class Propagate, handles the easy case p==c, and finds out the locus of the result
+   * returns a constraint obtained by propagating $c or vice versa*/
+  def propagate(p:Partition,c:Constraint ):Constraint= {
+      if (c == p) {   AllConstr(p.slocus) }
+    else c.locus match {
+      case p.locus =>  PropagateToS(p, c)
+      case p.slocus => PropagateToT(p, c)
+    }
+  }
+  /** Build a new constraint out of two constraints, the first one being a partition
+   *  @param p partition defines a binding between an s-locus and a t-locus,
+   *  @param c constraints on a tlocus that must be propagated to the s-locus
+   *  @ return  propagated constraints*/
+  final  case class PropagateToS(p:Partition,c:Constraint) extends Constraint(p.slocus){
+    {require(c.locus.isInstanceOf[TT])}
+    def card: Int = c.card  //TODO a vérifier si on pourrait pas etre plus précis
+    def permute(p: Array[Int], l: Locus): PropagateToS = throw new RuntimeException("Propagated constraint need not be permuted" )
+    def schedules: HashSet[Seq[Int]] = {
+      val sch1= c.schedules.filter(p.verified(_))
+      HashSet.empty ++ sch1 .map( p.project(_))  //we project only those schedules which can be partitionned
+    }
+    override def verified(a: Seq[Int]): Boolean = throw new RuntimeException("Difficult to implement, we should program the invert function" )
+    /** We redefined intersect in order to force evaluation of schedules */
+    override def intersect(c:Constraint):Constraint= {
+      require(c.locus == this.locus, "intersected constraints have distinct loci")
+      if(c.isInstanceOf[AllConstr] || (c==this)) this
+      else    Schedules( HashSet.empty[Seq[Int]]++ schedules.filter(c.verified(_)),c.locus)
+    }
+
+  }
+  /** Build a new constraint out of two constraints, the first one being a partition
+   *  @param p partition defines a binding between an s-locus and a t-locus,
+   *  @param c constraints on a slocus that must be propagated to the other locus
+   *  @ return  propagated constraints*/
+  final case class PropagateToT(p:Partition,c:Constraint) extends Constraint(p.locus){
+    {require(c.locus.isInstanceOf[S])}
+    def card: Int = c.card  //TODO a vérifier si on pourrait pas etre plus précis
+    def permute(p: Array[Int], l: Locus): Constraint =throw new RuntimeException("Propagated constraint need not be permuted" )
+    def schedules: HashSet[Seq[Int]] =  throw new RuntimeException("Difficult to implement, we should program the invert function" )
+    //slocus.partitionnables.head.map(compose(_, b).toSeq)
+    override def pick()= Constraint.Schedules(HashSet[Seq[Int]](p.invProject(c.pick().schedules.head)),locus)
+    override def verified(a: Seq[Int]): Boolean = c.verified( p.project(a))
+    /** We redefined intersect in order to force evaluation of verified */
+    override def intersect(c:Constraint):Constraint= {
+      require(c.locus == this.locus, "intersected constraint have distinct loci")
+      if(c.isInstanceOf[AllConstr] || (c==this)) this
+      else { val s= c.schedules
+        val s2 =s.filter(verified(_))
+        Schedules( HashSet.empty[Seq[Int]]++ s2,c.locus)
+      }
+    }
+  }
   /** Constraint on transfer schedules */
-  final case class BeginWithEither(b:List[Int] ,override val size:Int) extends Constraint(size){
+  final case class BeginWithEither(b:List[Int] ,override val locus:Locus) extends Constraint(locus){
     def card: Int =b.length*factorial(5)
-    def permute(p: Array[Int] ): Constraint =BeginWithEither(b.map(p(_)),size)
+    def permute(p: Array[Int],l:Locus ): Constraint =BeginWithEither(b.map(p(_)),l)
     def schedules: HashSet[Seq[Int]] ={
       val u=b.map((x: Int) =>   complement6(List(x)).toList.permutations.map(x :: _)).flatten.map(_.toArray )
       // immutable.HashSet.empty[Seq[Int]] ++ b.map((x: Int) =>   complement6(List(x)).toList.permutations.map(x :: _)).flatten
@@ -101,95 +219,20 @@ object Constraint {
       S
     }
     override def verified(a: Seq[Int]): Boolean = return b.contains(a(0))
-    override def project(newSize: Int): Constraint ={
-      val s: immutable.HashSet[Int]=HashSet.empty++b.map(simplic(newSize).proj(_))
-      BeginWithEither(s.toList,newSize)
-    }
-  }
-  final case class Cycle(b:Seq[Int] ) extends Constraint(b.length){
-    def card: Int =b.length //it depends where we starts. Cycles could go both direction, so we should multiply by two.  we consider just one, for "simplification"
-    def permute(p: Array[Int] ): Constraint = Cycle(compose(b,p).toArray[Int])
-    def schedules: HashSet[Seq[Int]] = {
-      var c=b.toArray;var cycleLength=0
-      var next =0
-      val t:Array[Boolean]=Array(true,true,true,true, true,true)
-      for(i<-0 to 5) { //intialisation of c needs to explore the (possibly numerous) cycles.
-        c(i)=b(next); t(next)=false;   next=b(next)
-        if(!t(next)){if(cycleLength==0) cycleLength=i+1   ;next=t.indexOf(true) }
-      }
-      var result= HashSet.empty[Seq[Int]]
-      for (i <- 1 to b.length/cycleLength)   {val c2: Seq[Int] =c;result=result+c2;c=ASTL.rotR(c,cycleLength);}
-      result;}
-    override def verified(a: Seq[Int]): Boolean =
-    { val start= a. indexOf(b(0), 0)
-      for(i<-0 to b.length-1) if(a((i+start)%a.length)!=b(i)) return false
-      return true
-    }
-    override def toString: String ="Cycle "+b.mkString(" ")
-    override def project(newSize: Int): Constraint = Cycle( simplic(newSize).scheduleProj(b))
   }
 
-  /** s is either an E or an F schedule upon creating the constraint,
-   *  the constraint is valid for schedule such that in the image by b, the numbers get "not mixed" for exemple their can't be 010122, but 110022 is ok.
-   *  b integrates the projection on the s, because it depends on the use of the simplicial field within the instruction
-   *  */
-  final case class Partition( b:Seq[Int],s:S) extends Constraint(size = 6){
-    //  override def toString: String = "Partition "+s+" "+b.toSeq
-    def card: Int =s.card
-    def permute(p: Array[Int] ): Constraint =   Partition( compose(invert(p),b),s)
-    def schedules: HashSet[Seq[Int]] = if (s.isInstanceOf[V]) AllConstr(1).schedules
-    else  HashSet.empty ++ s.partitionnables.head.map( compose(_,b).toSeq)
-    /** @param a represents a schedule of transfer, so it must be of size 6;
-     *  @return  true if a can be partitionned on S,  */
-    private def partitionable(a:scala.Seq[Int],s:S):Boolean={
-      if  (s.isInstanceOf[V]) return true
-      // val a2=compose(a,proj) //here we use proj, which is distinct for V,E and F
-      //we check that values in a2 are "grouped"
-      val alreadyMet =Array.fill[Boolean](s.card)(false)
-      val res=Array.fill[Int](s.card)(0)
-      var last = -1
-      for (i<-0 to 5)
-        if(a(i)!=last) {
-          if (alreadyMet(a(i)) == true) return false // we just met a new index that was already met
-          alreadyMet(a(i)) = true // register the fact that we start a zone.
-          last = a(i)
-        }
-      return true
-    }
-    override def verified(a:  Seq[Int]): Boolean = partitionable(compose(a,b ),s ) //TODO a completer
-    /** if it is alone, the Partition constraint does not constrain the simplicial type*/
-    override def project(newSize: Int): Constraint = AllConstr(newSize)
-  }
-
-  object Partition {
-    /**@param b mapping for a transfer variable to a simplicial variable
-     * @param s Simplicial locus of connected SCC
-     * @return  Constraint Specifying partition  of a transfer variable which is reduced.  */
-    def partitionOrAll(b:Seq[Int], s:S): Constraint=
-      if(s.isInstanceOf[V])
-        AllConstr(6)
-      else
-        this(b,s)
-    def partitionOrAll(s:S): Constraint= partitionOrAll(s.proj,s)
-  }
-
-  /** s is either an E or an F schedule upon creating the constraint, b must contain s.part at the beginning,
-   *  the constraint is valid for schedule such that 
-   *  1 after dividing by two for E (resp. by 3 for F) the image by b, 
-   *  the numbers get "not mixed" for exemple their can't be 010122, but 110022 is ok.
-   */
-
-  final case class PartitionSucc( b:Array[Int],s:S) extends Constraint(size=6){
+  final case class PartitionSucc( b:Array[Int],s:S,override val locus:Locus) extends Constraint(locus){
     def card: Int =s.cardSucc //it depends where we starts. Cycles could go both direction, so we should multiply by two.  we consider just one, for "simplification"
-
-    def permute(p: Array[Int] ): Constraint =PartitionSucc(compose(invert(p),b) ,s)
-
+    def permute(p: Array[Int] ,l:Locus): Constraint =PartitionSucc(compose(invert(p),b) ,s,l )
     def schedules: HashSet[Seq[Int]] =null //TODO a completer
     override def propagateFrom(s2:Array[Int]):Option[Array[Int]]= s.propagateFrom(s2,b)
     override def verified(a: Seq[Int]): Boolean = false //TODO a completer
-    /** we must have checked partitionned before */
-    override def project(newSize: Int): Constraint = null //TODO finish
   }
+
+  @scala.annotation.tailrec
+  private def factorial(n: Int, accum:  Int = 1):  Int =   if (n == 0)   accum   else    factorial(n - 1, n * accum)
+  private def complement6(l:List[Int]): HashSet[Int] =   HashSet(0,1,2,3,4,5,6)--l
+
 
 
 

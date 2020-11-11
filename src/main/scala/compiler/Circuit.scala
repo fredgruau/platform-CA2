@@ -1,9 +1,13 @@
 package compiler
-
+//TOTOooo
 import compiler.AST._
+import compiler.ASTB.{Tminus1, shiftL, shiftR}
+import compiler.ASTBfun.ASTBg
 import compiler.ProgData._
+import compiler.Circuit._
 
 import scala.collection._
+import scala.collection.immutable.HashMap
 
 /**
  * Analysed by the compiler to produce a CA rule, a circuit is implemented like a function definition:
@@ -34,20 +38,104 @@ abstract class Circuit[L <: Locus, R <: Ring](override val p: Param[_]*) extends
   def compile(m:Machine, replaced: List[(AST[_], AST[_])] = List()): Unit = {
     body = computeRoot //we pretend that the circuit is a function.
     val repl: iAstField[AST[_]] = immutable.HashMap.empty ++ replaced.toMap
-    val prog1 = ProgData(this, repl)
-    val prog2 = prog1.deDagise(repl);
+/* val prog1=ProgDataBis(this)
+   val prog2 = prog1.deDagise(repl);
+   print(prog2);*/
+  //  print(prog1)
+   val prog1 = ProgData(this, repl)
+  val prog2 = prog1.deDagise(repl);
     //  print(prog2);
-    val prog3 = prog2.procedurise()
-    // print(prog3+ "\n\n")
-    val prog4 = prog3.nbit(List(1)); //faut mettre les tailles des entiers utilisés pour appeller main.
-    //  print(prog4+ "\n\n")
-    val prog5=prog4.macroise()
-    print(prog5+ "\n\n")
-    val prog6=prog5.unfoldSpace(m)
-    //print(prog6)
-    val prog7=prog6.foldRegister() //
+ val prog3 = prog2.procedurise()
+    //print(prog3+ "\n\n")
+      val prog4 = prog3.nbit(List(1)); //ici faudra mettre les tailles des entiers utilisés pour appeller main.
+ //  print(prog4+ "\n\n")
+ val prog5=prog4.macroise()
+print(prog5+ "\n\n")
+ /* val g6=prog5.unfoldSpace(m)
 
-    //TODO mettre les noms sur les fonctions, aussi.
-  }
+ val prog7=prog6.foldRegister() //
+ // print(prog6)
+ //TODO mettre les noms sur les fonctions, aussi.*/
 }
- 
+}
+
+/**
+* contains singletons uses trhoughout the compilation.
+*/
+object Circuit{
+def listOf[T](t: Map[String, T]): List[(String, T)] = { val (anon, definedMacros) = t.partition((x: (String, T)) => x._1.startsWith("_fun")); anon.toList ::: definedMacros.toList }
+/**pring a map on several small lines, instead of one big line */
+def string[T](t: TabSymb[T], s: String): String = t.toList.grouped(4).map(_.mkString(s)).mkString("\n") + "\n"
+
+private var nameCompteur = 0
+def getCompteur: Int = { nameCompteur += 1; nameCompteur }
+def newFunName(): String = "_fun" + getCompteur
+
+type TabSymb[T] = mutable.HashMap[String, T]; type AstField[T] = mutable.HashMap[AST[_], T]
+type TabConstr = TabSymb[ Constraint]
+type iTabSymb[T] = Map[String, T];
+type iTabSymb2[T] = immutable.HashMap[String, T];
+type iAstField[T] = Map[AST[_], T]
+/**spatial unfolding of an ASTL of "simplicial" type creates an array of array of ASTB. The cardinal of first array is 1,2,3 for V,F,E,  */
+type ArrAst = Array[ASTBg]
+/**spatial unfolding of an ASTL of "transfer type" creates an array of array of ASTB. The cardinal of first array is 1,2,3 for V,F,E, the seconds array is 6,3,2  */
+type ArrArrAst = Array[Array[ASTBg]]
+/**
+* The only place where a machine differs from another is when compiling the transfer function,
+* it is parameterise by One function for each pair of simplicial type.
+* Type of input is transfer(src,des) type of output is transfer(des,src) , where "src" is first S, and "des" is second S
+*/
+type Machine = (S, S, ArrArrAst) => ArrArrAst
+/** correspondance between suffix and index */
+val order: HashMap[String, Int] = immutable.HashMap("w" -> 0, "nw" -> 1, "ne" -> 2, "e" -> 3, "se" -> 4, "sw" -> 5,
+ "wn" -> 0, "n" -> 1, "en" -> 2, "es" -> 3, "s" -> 4, "ws" -> 5,
+ "h" -> 0, "d" -> 1, "ad" -> 2,
+ "h1" -> 0, "h2" -> 1, "d1" -> 2, "d2" -> 3, "ad1" -> 4, "ad2" -> 5,
+ "do" -> 0, "up" -> 1,
+ "dop" -> 0, "dob1" -> 1, "dob2" -> 2, "upp" -> 3, "upb1" -> 4, "upb2" -> 5,
+ "dob" -> 0, "dos1" -> 1, "dos2" -> 2, "upb" -> 3, "ups1" -> 4, "ups2" -> 5)
+val transfers: List[(S, S)] = List((V(), E()), (E(), V()), (V(), F()), (F(), V()), (E(), F()), (F(), E()))
+/** generates an input array*/
+def inAr(s1: S, s2: S): ArrArrAst = { var i = -1; def nameInt = { i += 1; "" + i }; def myp() = new Param[B](nameInt) with ASTBt[B]; Array.fill(s1.density)(Array.fill(6 / s1.density)(myp())) }
+
+/**
+* The hexagon machine models communication according to the perfect hexagonal grid.
+* diagonal (d1,d2) and antidiagonla (ad1,ad2) are oriented so that all the shift and delay gets applied on d1 (up), so that the same computation is applied
+* on d2 and ad2, when the vE fields is obtain by a broadcast followed by a transfer.
+*/
+val hexagon: Machine = (src: S, des: S, t: ArrArrAst) => {
+ implicit val scalarType: repr[_ <: Ring] = t(0)(0).mym; src match {
+   case V() => des match {
+     case E() => /*eV->vE*/
+       val Array(e, ne, nw, w, sw, se) = t(0)
+       Array(Array(shiftL(Tminus1(w)), Tminus1(e)), Array(Tminus1(se), nw), Array(shiftL(Tminus1(sw)), ne))
+     case F() => /*fV->vF*/
+       val Array(ne, n, nw, sw, s, se) = t(0); Array(Array(n, Tminus1(sw), Tminus1(se)), Array(shiftL(Tminus1(s)), ne, shiftL(nw)))
+   }
+   case E() =>
+     val Array(Array(h1, h2), Array(d1, d2), Array(ad1, ad2)) = t; //common to vE and fE
+     des match {
+       case V() => /*vE->eV*/
+         Array(Array(h2, Tminus1(ad2), Tminus1(shiftR(d2)), shiftR(h1), shiftR(ad1), d1))
+       case F() => /*fE->eF*/
+         Array(Array(Tminus1(h2), Tminus1(ad1), Tminus1(d1)), Array( h1   ,Tminus1(shiftL(ad2)) , Tminus1(d2)))
+     }
+   case F() => des match {
+     case V() => /*vF->fV*/
+       val Array(Array(dp, db1, db2), Array(up, ub1, ub2)) = t; Array(Array(Tminus1(shiftR(ub1)), Tminus1(dp),  Tminus1(shiftR(ub2))), Array(  shiftR(db1) ,shiftR(up),  db2) )
+     case E() => /*eF->fE*/
+       val Array(Array(db, ds1, ds2), Array(ub, us1, us2)) = t; Array(Array(Tminus1(ub), db), Array(ds2, us2), Array(ds1, shiftR(us1)))
+   }
+ }
+}
+/** automatically computes permutation implied by hexagon*/
+val hexPermut: immutable.Map[(S, S), Array[Int]] = immutable.HashMap.empty ++ transfers.map((ss: (S, S)) => ss ->
+ {
+   val (s1, s2) = ss;
+   val t = Circuit.hexagon(s1, s2, inAr(s1, s2));
+   val l = t.map(_.toList).toList.flatten; //compute the permutation of T[S1,S2] => T[S2,S1]
+   val r = new Array[Int](6);
+   var i = 0; for (a <- l) { r(i) = a.symbols.head.toInt; i += 1 }; r
+ })
+}
+

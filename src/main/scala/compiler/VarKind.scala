@@ -11,8 +11,8 @@ sealed class VarKind {
   def isInput : Boolean = this match { case LayerField(_) | ParamD() => true; case _ => false }
   /**True if variable is live after each loop iteration. */
   def isOutput : Boolean = this match { case LayerField(_) | ParamR()|  DisplayField(_, _) | BugifField(_) => true; case _ => false }
-    /**True if variable shall not be used by other instr*/
-  def isMin : Boolean = this match { case LayerField(_) | ParamR()|  DisplayField(_, false) | BugifField(_) => true; case _ => false }
+    /**True for variable that needs to be computed, (and will not be used by others?*/
+  def needCompute : Boolean = this match { case LayerField(_) | ParamR() | DisplayField(_, false) | BugifField(_) => true; case _ => false }
   def isLayer:Boolean= this match { case LayerField(_)   => true; case _ => false }
 }
 

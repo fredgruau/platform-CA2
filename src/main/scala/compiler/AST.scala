@@ -1,8 +1,7 @@
 package compiler
-//toto
 import compiler.AST._
-import compiler.ProgData._
-
+import dataStruc.{DagNode, Named}
+import compiler.Circuit._
 import scala.collection._
 import scala.collection.immutable.HashSet
 
@@ -12,10 +11,10 @@ import scala.collection.immutable.HashSet
  * The parameter type T is the type of the associated expression
  * covariant because
  * @param m parameter used to compute this type. */
-abstract class AST[+T]()(implicit m: repr[T]) extends Dag[AST[_]] with Named {
+abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named {
   val mym: repr[T] = m //if type of mym is set to repr[_] this allow covariance even if repr is not covariant
   /**  system instruction can be associated to any spatial field, so as to be latter retrievable from the compiling method. */
-  private var sysInstr: List[UsrInstr[AST[_]]] = List.empty; def sysInstrs: List[UsrInstr[AST[_]]] = sysInstr
+  private var sysInstr: List[UsrInstr[AST[_]]] = List.empty; def sysInstrs: List[UsrInstr[AST[_]]] = sysInstr //TODO defines sysInstr on ASTL's layer
   override def other: List[AST[_]] = sysInstr.map(_.exp) //so that compute nodes used in instructions can be directly explored.
   /**@param a is true where there is a bug associated to the field "this" */
   def bugif(a: ASTLt[_ <: Locus, B]): Unit = { sysInstr ::= UsrInstr.bugif(a).asInstanceOf[UsrInstr[AST[_]]] }
@@ -57,8 +56,8 @@ abstract class AST[+T]()(implicit m: repr[T]) extends Dag[AST[_]] with Named {
    * @return the Dag where expression used more than once are replaced by read.
    */
   def deDag(usedTwice: immutable.HashSet[AST[_]], repr: Map[AST[_], AST[_]], replaced: Map[AST[_], AST[_]]): AST[T] = {
-    if (usedTwice.contains(this)) new Read[T](repr(this).name)(mym.asInstanceOf[repr[T]])
-    else if (replaced.contains(this)) replaced(this).asInstanceOf[AST[T]].deDag(usedTwice, repr, replaced)
+     if (usedTwice.contains(this)) new Read[T](repr(this).name)(mym.asInstanceOf[repr[T]])  else
+    if (replaced.contains(this)) replaced(this).asInstanceOf[AST[T]].deDag(usedTwice, repr, replaced)
     else this match {
       case Param(_) => throw new RuntimeException("bordel de merde") //; new Read[T](repr(this).name)(mym.asInstanceOf[repr[T]])
       case _        => this.propagate((d: AST[T]) => d.deDag(usedTwice, repr, replaced))
@@ -119,12 +118,11 @@ abstract class AST[+T]()(implicit m: repr[T]) extends Dag[AST[_]] with Named {
 }
 
 object AST {
-
-  trait EmptyBag[T <: Dag[T]] extends Dag[T] { def inputNeighbors: List[T] = List.empty; }
-  trait Singleton[T <: Dag[T]] extends Dag[T] { def arg: T; def inputNeighbors: List[T] = List(arg) }
-  trait Doubleton[T <: Dag[T]] extends Dag[T] { def arg: T; def arg2: T; def inputNeighbors: List[T] = List(arg, arg2) }
-  trait Tripleton[T <: Dag[T]] extends Dag[T] { def arg: T; def arg2: T; def arg3: T; def inputNeighbors: List[T] = List(arg, arg2, arg3) }
-  trait Neton[T <: Dag[T]] extends Dag[T] { def args: List[T]; def inputNeighbors: List[T] = args  }
+  trait EmptyBag[T <: DagNode[T]] extends DagNode[T] { def inputNeighbors: List[T] = List.empty; }
+  trait Singleton[T <: DagNode[T]] extends DagNode[T] { def arg: T; def inputNeighbors: List[T] = List(arg) }
+  trait Doubleton[T <: DagNode[T]] extends DagNode[T] { def arg: T; def arg2: T; def inputNeighbors: List[T] = List(arg, arg2) }
+  trait Tripleton[T <: DagNode[T]] extends DagNode[T] { def arg: T; def arg2: T; def arg3: T; def inputNeighbors: List[T] = List(arg, arg2, arg3) }
+  trait Neton[T <: DagNode[T]] extends DagNode[T] { def args: List[T]; def inputNeighbors: List[T] = args  }
 
   private var nameCompteur: Int = 0
 
@@ -132,6 +130,7 @@ object AST {
   def checkName2(): String = "_aux" + AST.getCompteur
 
   type bij2[U] = AST[U] => AST[U]
+  /** There is not ASTLt type for Coons.  */
   case class Coons[Thead, Ttail](arg: AST[Thead], arg2: AST[Ttail])(implicit n: repr[(Thead, Ttail)]) extends AST[(Thead, Ttail)] with Doubleton[AST[_]] //{ def setArg(a: AST[_]) = arg = a.asInstanceOf[AST[Thead]]; def setArg2(a: AST[_]) = arg2 = a.asInstanceOf[AST[Ttail]] }
   case class Heead[Thead](arg: AST[(Thead, _)])(implicit n: repr[Thead]) extends AST[Thead] with Singleton[AST[_]] //{ def setArg(a: AST[_]) = arg = a.asInstanceOf[AST[Tuple2[Thead, _]]]; }
   case class Taail[Ttail](arg: AST[(_, Ttail)])(implicit n: repr[Ttail]) extends AST[Ttail] with Singleton[AST[_]] //{ def setArg(a: AST[_]) = arg = a.asInstanceOf[AST[Tuple2[_, Ttail]]]; }

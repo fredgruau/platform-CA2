@@ -2,7 +2,7 @@ package prog
 //import compiler.ASTB._
 import compiler.ASTL._
 import macros.ASTLfun._
-import compiler.ProgData.hexagon
+import compiler.Circuit.hexagon
 
 import compiler._
 class Dist(val source: BoolV) extends Layer[V, SI](3) {
@@ -12,7 +12,6 @@ class Dist(val source: BoolV) extends Layer[V, SI](3) {
   val grad: IntvE =  tepred - sym(tepred)  ; //should use opp to make only one subtraction, we need to adress selectively the two neighbors of an edge.
   val greater: BoolvE = gt(grad); render (greater)
 //  val greaterOptimized:BoolvE=  notNull(tepred & v(mstb(xorR(tepred))))  //same as greater, but cost in gates is diminished!
-
   // val next= addL(pred,extend(3,cond(source, sign(opp(pred)), minR(transfer(sign(  addL(grad,const[T[E,V],SI](c,ConstInt(-2,3)))))))))
    val next =    pred + extend(3, cond(source, sign(- pred) , minR(transfer(sign( grad - 2 ) ))))
 //  val nextOld = delayedL(  pred | cond(source, - pred  , minR(transfer( grad   ))))
@@ -43,7 +42,8 @@ class CycleLayer(nbit: Int)(implicit m: repr[V]) extends Layer[V, SI](nbit) {
 }
 
 object Dist { //  def g[L<:Locus](t:AST[L,B])(implicit m : repr[L]) = m.name; exemple de implicit que je conserve.
-  val myInput: AST.Param[(V, B)] with ASTLt[V, B] =p[V, B]("input")
+  /** initial position of sources, I guess. or fake parameter ????  */
+  val myInput: AST.Param[(V, B)] with ASTLt[V, B]=p[V, B]("input")
   def main(args: Array[String]) {
     //val t: BoolV = true
     val testDist = new TestDist()

@@ -1,4 +1,5 @@
-package compiler
+package dataStruc
+
 import scala.collection.mutable
 
 object Named{

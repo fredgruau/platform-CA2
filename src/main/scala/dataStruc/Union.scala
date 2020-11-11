@@ -1,6 +1,6 @@
-package compiler
+package dataStruc
 
-import compiler.Align._
+import dataStruc.Align._
 
 trait Union2[T] {
   private var parent: Union2[T] = this
@@ -8,6 +8,7 @@ trait Union2[T] {
 }
 trait Union[T<:Union[T]] {   self:T =>
   private var rank = 0
+  def aligned=false;
   protected var parent: T = this
   def reset={parent=this}
   protected var xroot, yroot = null
@@ -17,6 +18,8 @@ trait Union[T<:Union[T]] {   self:T =>
    * @param x element which need to be aligned on
    * @param y new element to be aligned to */
   def transitiveClosure (xroot: T, x:T, y: T): Unit = {}
+  /** There will be some check to do on align two instruction already sharing roots are merged */
+  def checkIsSameRoot (  x:T, y: T): Unit = {println("tata"+x+y);}
   def union (y: T,doAlign:Boolean=true): Unit = {
     val xroot = root; val yroot = y.root
     if (xroot != yroot) { //dans le cas de align, si xroot = yroot faut quand meme vérifier que les alignement coincide.
@@ -29,6 +32,7 @@ trait Union[T<:Union[T]] {   self:T =>
         if (xroot.rank == yroot.rank) xroot.rank += 1
       }
     }
+    else(checkIsSameRoot(this,y))
   }
 }
 
@@ -52,31 +56,43 @@ trait Align[T<:Align[T]] extends Union[T] { self:T =>
   override def transitiveClosure (xroot : T,x : T, y: T): Unit ={
     val ny=x.neighborAlign(y);  //align from x to y
     xroot.alignToPar=
-      if(y==null)    null
+      if(y==null)  null
       else  compose(invert(x.alignToRoot),  compose(ny, y.alignToRoot)) //align from xroot to y's root is
     //equal to alig from xroot to x) (we must take the invert of alignto root)
     //commposed with align from x to y composed with align from y to y's root.
   }
+  /** gives an error message to investigate if a cycle is to be installed */
+  override def checkIsSameRoot(x: T, y: T): Unit = {
+    if(aligned)
+      if(x.alignToRoot.toList != y.alignToRoot.toList)
+       throw new RuntimeException("instructions mis-aligned, needs a cycle"+ x.alignToRoot.toList + y.alignToRoot.toList )
+  }
+
  }
 
 object Align {
  /** Computes T2 o T1 */
   def compose(T1: Seq[Int], T2: Seq[Int]): Array[Int] = // T1.map(T2(_))
-
-  {
-    if(T1==null||T2==null) return null 
+  {if(T1==null||T2==null) return null
     val r =   new Array[Int](6)
     for (i <- 0 to T1.length-1) r(i) = T2(T1(i))
     r
   }
 
 
+  //def antecedant(T1: Seq[Int], T2: Seq[Int])
   def isPermutation(t: Array[Int] ):Boolean={
     val l=t.toList.sortWith(_ < _)
     return l==List(0,1,2,3,4,5);
   }
 
-  def invert(t: Array[Int]): Array[Int] = {
+ /* def invert(t: Array[Int]): Array[Int] = {
+    //assert(isPermutation(t))
+    val r =  new Array[Int](t.length)
+    for (i <- 0 to t.length-1) r(t(i)) = i
+    r
+  }*/
+  def invert(t: Seq[Int]): Array[Int] = {
     //assert(isPermutation(t))
     val r =  new Array[Int](t.length)
     for (i <- 0 to t.length-1) r(t(i)) = i

@@ -4,6 +4,7 @@ import compiler.AST._
 import compiler.ASTL._
 import compiler.ProgData._
 import compiler.repr._
+import compiler.Circuit._
 
 import scala.collection._
 
@@ -17,7 +18,6 @@ import scala.collection._
  */
 
 trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOpInt2[L, R] {
-
   self: AST[(L, R)] =>
   def locus: L = mym.name._1
   def ring: R = mym.name._2
@@ -34,7 +34,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
    */
   override def deDag(usedTwice: immutable.HashSet[AST[_]], repr: Map[AST[_], AST[_]],
                      replaced: Map[AST[_], AST[_]]): ASTLt[L, R] = {
-    val newD = if (usedTwice.contains(this) && usedTwice.contains(this)) new Read[(L, R)](repr(this).name)(mym) with ASTLt[L, R]
+    val newD = if (usedTwice.contains(this)  ) new Read[(L, R)](repr(this).name)(mym) with ASTLt[L, R]
     else if (replaced.contains(this)) replaced(this).deDag(usedTwice, repr, replaced)
     else this match {
 
@@ -50,7 +50,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
     newD.setName(this.name); newD.asInstanceOf[ASTLt[L, R]]
   }
 
-  /**For AST created with ASTLscal, we cannot do simple copy, because the "with ASTLscal"  is lost. */
+  /**For AST created with ASTLt, we cannot do simple copy, because the "with ASTLscal"  is lost. */
   def propagate(g: bij2[(L, R)]): ASTLt[L, R] = { //to allow covariance on R, second argument of bij2 is l
     val m = mym.asInstanceOf[repr[(L, R)]]
     val newThis = this.asInstanceOf[AST[_]] match {
@@ -82,7 +82,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
     this.asInstanceOf[AST[_]] match {
       case Read(s) =>
         val r = rpart(mym.asInstanceOf[repr[(L, R)]])
-        deploy(s, this.locus).map(new Read(_)(r) with ASTBt[R])
+        Locus.deploy(s, this.locus).map(new Read(_)(r) with ASTBt[R])
       case _ => this.locus match {
         case _: S      => this.unfoldSimplic(m).toList
         case T(_, _) => this.unfoldTransfer(m).map(_.toList).toList.flatten
