@@ -123,9 +123,11 @@ case class ScanRight2[R <: I](exp: ASTB1[R], exp2: ASTB1[R], op: Fundef3R[B], in
   else log2(n + Epsilon) + (if (t == SI()) 1 else 0)
   /**
    * //TODO memoiser pour ne pas avoir a rappeler 40,000 fois add
+   *
    * @param nbit stores the number of bits of parameters
-   * @param d the AST we want to know how many bits it has
-   * @param pm used to bring back change of parameter 's bit number
+   * @param d    the AST we want to know how many bits it has
+   * @param pm   memorizes change of parameter 's bit number if any
+   * @return bit size of $d
    */
   def nBitR(nbit: immutable.HashMap[AST[_], Int], d: AST[_], pm: mutable.HashMap[Param[_], Int]): Int = {
     /** register parames that needs to be extended, with more bits, because they are combined with Ints having more bits.  */
@@ -134,32 +136,30 @@ case class ScanRight2[R <: I](exp: ASTB1[R], exp2: ASTB1[R], op: Fundef3R[B], in
         x match { case p: Param[_] => pm += (p -> a2); case _ => throw new RuntimeException("pb bit number in ASTB") }
       }
     } //if not a parameter ca bugge.
-
     def maxim(x: AST[_], y: AST[_]): Int = {
       val (nx, ny) = (nBitR(nbit, x, pm), nBitR(nbit, y, pm))
       levelup(x, nx, ny); levelup(y, ny, nx); math.max(nx, ny)
     }
     d match {
       case Intof(n)                            => nbitCte(n, d.mym.name.asInstanceOf[I])
-      case Boolof(_)                           => 1
-      case Call1(f, e)                         => nBitR(nbit + (f.p1 -> nBitR(nbit, e, pm)), f.arg, pm)
-      case Call2(f, e, e2)                     => nBitR(nbit + (f.p1 -> nBitR(nbit, e, pm)) + (f.p2 -> nBitR(nbit, e2, pm)), f.arg, pm)
-      case e @ Param(_)                        => nbit(e)
-      case Neg(x)                              => nBitR(nbit, x, pm)
-      case Xor(_, _)                           => 1
-      case Or(_, _)                            => 1
-      case And(_, _)                           => 1
-      case Scan1(exp, _, _, _, initused)       => nBitR(nbit, exp, pm) + (if (initused) 0 else 0)
+      case Boolof(_) => 1
+      case Call1(f, e) => nBitR(nbit + (f.p1 -> nBitR(nbit, e, pm)), f.arg, pm)
+      case Call2(f, e, e2) => nBitR(nbit + (f.p1 -> nBitR(nbit, e, pm)) + (f.p2 -> nBitR(nbit, e2, pm)), f.arg, pm)
+      case e@Param(_) => nbit(e)
+      case Neg(x) => nBitR(nbit, x, pm)
+      case Xor(_, _) => 1
+      case Or(_, _) => 1
+      case And(_, _) => 1
+      case Scan1(exp, _, _, _, initused) => nBitR(nbit, exp, pm) + (if (initused) 0 else 0)
       case Scan2(exp, exp2, _, _, _, _) => maxim(exp, exp2)
+      case Reduce(_, _, _) => 1 //FIXME doesnot work for the reduction with concat
+      case Mapp2(exp, exp2, _) => maxim(exp, exp2)
 
-      case Reduce(_, _, _)               => 1 //FIXME doesnot work for concat
-      case Mapp2(exp, exp2, _)               => maxim(exp, exp2)
-
-      case Mapp1(exp, _)                       => nBitR(nbit, exp, pm)
+      case Mapp1(exp, _) => nBitR(nbit, exp, pm)
       //case MappBI(exp, exp2, opp)               => nBitR(nbit, exp2, pm)
-      case Elt(_, _)                         => 1;
-      case Concat2(exp, exp2)                  => nBitR(nbit, exp2, pm) + nBitR(nbit, exp, pm) //
-      case Extend(n, _)                      => n
+      case Elt(_, _) => 1;
+      case Concat2(exp, exp2) => nBitR(nbit, exp2, pm) + nBitR(nbit, exp, pm) //
+      case Extend(n, _) => n
     }
   }
   /* class NamedFunction2[T1, T2, R](name: String, f: Function2[T1, T2, R]) extends Function2[T1, T2, R] {

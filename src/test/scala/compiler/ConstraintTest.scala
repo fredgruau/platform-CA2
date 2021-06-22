@@ -12,7 +12,8 @@ class ConstraintTest extends FunSuite {
     // println(c)
     assert(c.verified(ArraySeq( 2,3,4,5,0,1)))
     val cs=Schedules(c.schedules,c.locus)
-    assert(cs.card===6)
+    assert(cs.card === 6)
+    print(cs)
   }
 
   test("testPartition") {

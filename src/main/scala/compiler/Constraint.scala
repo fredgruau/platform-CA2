@@ -2,6 +2,8 @@ package compiler
 
 import compiler.Constraint._
 import dataStruc.Align._
+
+
 import scala.collection.immutable.{ArraySeq, HashSet}
 
 /**
@@ -14,25 +16,41 @@ sealed abstract class Constraint(val locus:Locus)
   /**Defined for constraint between a T component and an E/F component,
    * if there is a unique possible T schedule, for each E (or each F) schedule
    * it transforms an E or an F schedule into a T schedule*/
-  def propagateFrom(a:Array[Int]):Option[Array[Int]]=None
+  def propagateFrom(a: Array[Int]): Option[Array[Int]] = None
+
   /** Verifies if a  schedule satisfies the constraint
+   *
    * @param a schedules to be checked */
-  def verified(a:Seq[Int]):Boolean
-  /**Applies a permutation to a constraint.  Used for aligning  to a new  root
+  def verified(a: Seq[Int]): Boolean
+
+  /** Applies a permutation to a constraint.  Used for aligning  to a new  root
    * valid only for transfer constraints
-   * @param p the alignement to the new root*/
-  def permute(p: Array[Int],locus:Locus ):Constraint
-  /**@return all the schedules verifying the constraint  */
+   *
+   * @param p the alignement to the new root */
+  def permute(p: Array[Int], locus: Locus): Constraint
+
+  /** @return all the schedules verifying the constraint  */
   def schedules: HashSet[Seq[Int]]
-  /**  Compute a joint constraint.  generates the schedules for the smallest card, and verify with the other.
-   * unless specific cases where it can be deduced in a cheaper way */
-  def intersect(c:Constraint):Constraint= {  require(c.locus == this.locus, "intersected constraint have distinct loci")
-    if(c.isInstanceOf[AllConstr] || (c==this)) this
-    else if(c.card<card) c.intersect(this)    // c has smallest card
-    else   Schedules( HashSet.empty[Seq[Int]]++ schedules.filter(c.verified(_)),c.locus)
+
+  def printSchedules(): String = {
+    var result: String = "";
+    for (s <- schedules)
+      result += s.map(locus.lessufx(_)).mkString("->")
+    result
   }
+
+  /** Compute a joint constraint.  generates the schedules for the smallest card, and verify with the other.
+   * unless specific cases where it can be deduced in a cheaper way */
+  def intersect(c: Constraint): Constraint = {
+    require(c.locus == this.locus, "intersected constraint have distinct loci")
+    if (c.isInstanceOf[AllConstr] || (c == this)) this
+    else if (c.card < card) c.intersect(this) // c has smallest card
+    else Schedules(HashSet.empty[Seq[Int]] ++ schedules.filter(c.verified(_)), c.locus)
+  }
+
   /** In general an isolated constraint has at least one schedule satifying it */
-  def empty:Boolean=false
+  def empty: Boolean = false
+
   /** constraint obtained by picking one schedule TODO could be improved to avoid generate all the schedules, but only the first one! */
   def pick():Constraint= {
     if (empty) throw new RuntimeException("empty constraint cannot be picked + this")
@@ -42,22 +60,54 @@ sealed abstract class Constraint(val locus:Locus)
 }
 
 object Constraint {
-   def intersect(cs:List[Constraint],l:Locus): Constraint ={
-    var res:Constraint=AllConstr(l)
-    for(c<-cs)    res=res.intersect(c)
+
+  def intersect(c1: Option[Constraint], c2: Option[Constraint]): Option[Constraint] =
+    (c1, c2) match {
+      case (None, None) => None
+      case (None, Some(c)) => Some(c)
+      case (Some(c), None) => Some(c)
+      case (Some(c), Some(cc)) => Some(c.intersect(cc))
+    }
+
+  def permute(c: Option[Constraint], p: Array[Int], l: Locus): Option[Constraint] =
+    c match {
+      case None => None;
+      case Some(c2) => Some(c2.permute(p, l))
+    }
+
+  def noneIsEmpty(cs: List[Constraint]): Boolean = {
+    for (c <- cs) if (c.empty) return false;
+    return true
+  }
+
+  def noneEmpty(cs: List[Constraint]): Boolean = cs.map(_.empty).reduce((x, y) => x || y)
+
+  def intersect(cs: List[Constraint], l: Locus): Constraint = {
+    var res: Constraint = AllConstr(l)
+    for (c <- cs) res = res.intersect(c)
     res
   }
 
-   /**  constraint defined by schedules.*/
-  final case class Schedules( b: HashSet[Seq[Int]] ,override val locus:Locus) extends Constraint(locus){
-    def card: Int =b.size
-    def permute(p: Array[Int],l:Locus ): Schedules =Schedules(b.map(_.map(p(_))),l)
-    def schedules: HashSet[Seq[Int]] =b
+  /** constraint defined by schedules. */
+  final case class Schedules(b: HashSet[Seq[Int]], override val locus: Locus) extends Constraint(locus) {
+    def card: Int = b.size
+
+    def permute(p: Array[Int], l: Locus): Schedules = Schedules(b.map(_.map(p(_))), l)
+
+    def schedules: HashSet[Seq[Int]] = b
+
     override def empty: Boolean = schedules.isEmpty
+
     override def verified(a: Seq[Int]): Boolean = b.contains(a)
-     private def printSched(a:Seq[Int])=    a.map(locus.lessufx(_))
-    override def toString: String ="on " +locus   +" there is "+ b.size + "  schedules: " + b.toList.map(printSched(_).mkString("->"))
+
+    private def printSched(a: Seq[Int]) = a.map(locus.lessufx(_))
+
+    override def toString: String = "on " + locus +
+      (if (b.size == 1) "  picked" else ("there is " + b.size)) +
+      "  schedules: " + printSchedules()
   }
+
+  def empty(l: Locus) = Schedules(HashSet(),l)
   /**  constraint allways true.*/
     final case class AllConstr(override val locus:Locus) extends Constraint(locus){
     private val id=(0 to locus.density-1).toSeq
@@ -72,25 +122,44 @@ object Constraint {
   }
 
   /** @param b is an intrinsic permutation on 6 integers. */
-   final case class Cycle(b:Seq[Int] , override val  locus:TT) extends Constraint(locus){
-    {require(b.length==locus.density)}
-    /**   Cycles could go both direction so we should multiply by two.  we consider just one, for "simplification" */
-    def card: Int =b.length
-    def permute(p: Array[Int],l:Locus ): Constraint = Cycle(compose(invert(p),compose(b,p)).toArray[Int],l.asInstanceOf[TT])
-    override def toString: String ="Cycle "+ (orbitofZero.map(locus.les6sufx(_)). mkString("->"))
+   final case class Cycle(b:Seq[Int] , override val  locus:TT) extends Constraint(locus) {
+    {
+      require(b.length == locus.density)
+    }
+
+    /** Cycles could go both direction so we should multiply by two.  we consider just one, for "simplification" */
+    def card: Int = b.length
+
+    def permute(p: Array[Int], l: Locus): Constraint = Cycle(compose(p, compose(b, invert(p))).toArray[Int], l.asInstanceOf[TT])
+
+    override def toString: String = "Cycle " + (orbitofZero.map(locus.les6sufx(_)).mkString("->"))
     def schedules: HashSet[Seq[Int]] = {
       checkCycleLength()
-      var result= HashSet.empty[Seq[Int]];    var possible=b
-      for (i <- 0 to b.length -1 )   {  result=result+possible;possible=compose(b,possible);}
+      var result = HashSet.empty[Seq[Int]];
+      var sched: Seq[Int] = orbitofZero;
+      var possible = b
+      for (i <- 0 to b.length - 1) {
+        result = result + sched;
+        sched = rotateLeft(sched)
+      }
       result;
     }
     override def pick()=Schedules(HashSet(orbitofZero), locus)
-    override def verified(a: Seq[Int]): Boolean = a == orbit(a(0),b)
+
+    override def verified(a: Seq[Int]): Boolean = a == orbit(a(0), b)
+
     /**
-    @param init starting integer
-    @param perm permution
+     * @param init starting integer
+     * @param perm permution
+     * @return the orbit of $init
      */
-    private def orbit(init:Int,perm:Seq[Int])={var r =List[Int]();var c:Int=init; for(i<-0 to  5){r=c::r;c=perm(c)} ;r.reverse}
+    private def orbit(init: Int, perm: Seq[Int]): Seq[Int] = {
+      var r = List[Int]();
+      var c: Int = init;
+      for (i <- 0 to 5) {
+        r = c :: r; c = perm(c)
+      };
+      r.reverse}
     private lazy val orbitofZero =orbit(0,b)
     private def checkCycleLength()={
       /** c stores orbital,   */
@@ -113,8 +182,9 @@ object Constraint {
    *  Upon reduction from vE to E, the partition is E.proj = (0, 0, 1, 1, 2, 2)
    *   *  */
   final case class Partition( b:Seq[Int],slocus:S, override val locus:TT) extends Constraint(locus) {
-    {  require(b.size == 6, "a partition specifies a mapping for 6 components")
-      require(!slocus.isInstanceOf[V], "thereis partitionning towards a V does not constrain")    }
+    {
+      require(b.size == 6, "a partition specifies a mapping for 6 components")
+      require(!slocus.isInstanceOf[V], " partitionning towards  V does not constrain")    }
     override def toString: String ={
       val distrib=Array.fill[List[String]](slocus.density)(List())
       for (i<-0 to 5)   distrib(b(i))=locus.les6sufx(i)::distrib(b(i))
@@ -149,9 +219,6 @@ object Constraint {
       }
   }
 
-
-
-
   /**
    * @param p Partition linking and SCC to a SCC
    * @param c Constraints to be propagated
@@ -180,10 +247,9 @@ object Constraint {
     /** We redefined intersect in order to force evaluation of schedules */
     override def intersect(c:Constraint):Constraint= {
       require(c.locus == this.locus, "intersected constraints have distinct loci")
-      if(c.isInstanceOf[AllConstr] || (c==this)) this
-      else    Schedules( HashSet.empty[Seq[Int]]++ schedules.filter(c.verified(_)),c.locus)
+      if (c.isInstanceOf[AllConstr] || (c == this)) this
+      else Schedules(HashSet.empty[Seq[Int]] ++ schedules.filter(c.verified(_)),c.locus)
     }
-
   }
   /** Build a new constraint out of two constraints, the first one being a partition
    *  @param p partition defines a binding between an s-locus and a t-locus,

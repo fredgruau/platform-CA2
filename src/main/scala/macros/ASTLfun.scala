@@ -16,21 +16,17 @@ object ASTLfun {
     //val x:IntV= p[V, SI]("dis")
     val x = p[V, SI]("dis")
     val tepred = transfer(e(x))
-    val g=subESI(tepred)
-    val grad:IntvE = sendv(List(g,-g))
-  //val grad: IntvE = tepred - sym(tepred) //TODO should use opp to make only one subtraction, we need to adress selectively the two neighbors of an edge.
+    val g = subESI(tepred)
+    val grad: IntvE = sendv(List(g, -g))
+    //val grad: IntvE = tepred - sym(tepred) //TODO should use opp to make only one subtraction, we need to adress selectively the two neighbors of an edge.
     val slope: BoolvE = gt(grad)
-    val tslope=transfer(slope)
+
     val delta: IntV = minR(transfer(sign(grad + -2)))
     //val temp: BoolfV = xorR2(tslope )
-    val temp: BoolfV =   clock(tslope)
-    val temp2: BoolfV =   anticlock(tslope)
-    val vortex: BoolF =  andR(transfer(xor( temp, temp2)))
-   // val test= vortex |   andR(transfer(temp5)) ;  slope.bugif(test)
-    // ceci provoque bien l'erreur attendue java.lang.RuntimeException: Debug exp is allzero=>not usable for compute
-    //ca montre que debug ne peut etre réutilisé.
-    slope.bugif(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
-    grad.setName("grad"); tepred.setName("tepred"); slope.setName("slope"); delta.setName("delta"); vortex.setName("vortex")
+    grad.setName("grad");
+    tepred.setName("tepred");
+    slope.setName("slope");
+    delta.setName("delta"); //vortex.setName("vortex")
     Fundef1("boolgrad", Coons(slope, delta), x)
   }
 

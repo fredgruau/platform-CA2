@@ -83,9 +83,17 @@ final case class T[+S1 <: S, +S2 <: S](from: S1, to: S2) extends TT {
   /** Suffix distinguishing   tlocus attached to the same slocus. for edge it is just a number, for face we distinguishes 3 angles;
    * for vertices there is 6 choices which do not have the same name for fV and eV*/
   val sufx: Array[String] = from match {
-    case V() => to match { case E() => Array("w", "nw", "ne", "e", "se", "sw") case F() => Array("wn", "n", "en", "es", "s", "ws") }
-    case E() => to match { case V() | F() => Array("1", "2") }
-    case F() => to match { case E() => Array("p", "b1", "b2") case V() => Array("b", "s1", "s2") } //"s" stands for side, "b" for base.
+    case V() => to match {
+      case E() => Array("w", "nw", "ne", "e", "se", "sw")
+      case F() => Array("wn", "n", "en", "es", "s", "ws")
+    }
+    case E() => to match {
+      case V() | F() => Array("1", "2")
+    }
+    case F() => to match {
+      case V() => Array("p", "b1", "b2")
+      case E() => Array("b", "s1", "s2")
+    } //"s" stands for side, "b" for base.
   }
 
   // lazy val les6sufx: Array[String]  = from.sufx.flatMap  ((suf1: String) => to.sufx.map((suf2: String) =>  suf1+suf2  ))

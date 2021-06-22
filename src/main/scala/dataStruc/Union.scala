@@ -13,32 +13,38 @@ trait Union[T<:Union[T]] {   self:T =>
   def reset={parent=this}
   protected var xroot, yroot = null
   def root: T = if (parent == this) parent else { parent = parent.root; parent } // "compressing path towards the root."
-  /**to be defined if we need to compute alignement
+  /** to be defined if we need to compute alignement
+   *
    * @param xroot former root,
-   * @param x element which need to be aligned on
-   * @param y new element to be aligned to */
-  def transitiveClosure (xroot: T, x:T, y: T): Unit = {}
+   * @param x     element which need to be aligned on
+   * @param y     new element to be aligned to */
+  def transitiveClosure(xroot: T, x: T, y: T): Unit = {}
+
   /** There will be some check to do on align two instruction already sharing roots are merged */
-  def checkIsSameRoot (  x:T, y: T): Unit = {println("tata"+x+y);}
-  def union (y: T,doAlign:Boolean=true): Unit = {
-    val xroot = root; val yroot = y.root
+  def checkIsSameRoot(x: T, y: T): Unit = {}
+
+  def union(y: T, doAlign: Boolean = true): Unit = {
+    val xroot = root;
+    val yroot = y.root
     if (xroot != yroot) { //dans le cas de align, si xroot = yroot faut quand meme vérifier que les alignement coincide.
       if (xroot.rank < yroot.rank) {
-        if(doAlign) transitiveClosure(xroot,this , y); //x was aligned to x root, now it must be aligne to y's root
-          xroot.parent = yroot;  //the parent of x directly points to the new root
+        if (doAlign) transitiveClosure(xroot, this, y); //x was aligned to x root, now it must be aligne to y's root
+        xroot.parent = yroot; //the parent of x directly points to the new root
       }
       else {
-        yroot.parent = xroot; if(doAlign) transitiveClosure(yroot,y, this)
+        yroot.parent = xroot;
+        if (doAlign) transitiveClosure(yroot, y, this)
         if (xroot.rank == yroot.rank) xroot.rank += 1
       }
     }
-    else(checkIsSameRoot(this,y))
+    else (checkIsSameRoot(this, y)) //x and y are already in the same component. we must check if alignement coincide
   }
 }
 
 
 /** adds the possiblity  to compute an alignement to the root, while computing the root*/
 trait Align[T<:Align[T]] extends Union[T] { self:T =>
+  /** implements alignement with respect to neighbor */
   def neighborAlign(n:T): Array[Int]
   /**permutation to apply in order to go from this to parent! */
   private var alignToPar: Array[Int] = Array.range(0, 6) //  neutral permutation
@@ -64,8 +70,8 @@ trait Align[T<:Align[T]] extends Union[T] { self:T =>
   /** gives an error message to investigate if a cycle is to be installed */
   override def checkIsSameRoot(x: T, y: T): Unit = {
     if(aligned)
-      if(x.alignToRoot.toList != y.alignToRoot.toList)
-       throw new RuntimeException("instructions mis-aligned, needs a cycle"+ x.alignToRoot.toList + y.alignToRoot.toList )
+      if (x.alignToRoot.toList != y.alignToRoot.toList) //TODO we must compose with the alignement from x to y!!
+        throw new RuntimeException("instructions mis-aligned, needs a cycle" + x.alignToRoot.toList + y.alignToRoot.toList )
   }
 
  }
