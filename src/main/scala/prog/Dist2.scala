@@ -37,7 +37,7 @@ class Dist2(val source: BoolV) extends Layer2[(V, SI)](3) with ASTLt[V, SI] {
 
 /** returns a constant layer. */
 class ConstLayer2[L <: Locus, R <: Ring](nbit: Int)(implicit m: repr[L], n: repr[R]) extends Layer2[(L, R)](nbit) with ASTLt[L, R] {
-  val next: ASTLt[L, R] = ~this //yes
+  val next: ASTLt[L, R] = delayedL(~this) //yes
 }
 
 class TestDist2 extends Circuit[V, SI](Dist2.myInput) {

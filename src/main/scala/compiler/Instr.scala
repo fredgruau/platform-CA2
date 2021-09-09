@@ -6,7 +6,7 @@ import compiler.Instr._
 import compiler.Locus.{deploy, _}
 import compiler.UsrInstr._
 import compiler.VarKind._
-import dataStruc.{Align, DagNode, SetInput}
+import dataStruc.{Align, DagNode, SetInput, SetOutput}
 import compiler.Circuit._
 
 import scala.language.postfixOps
@@ -14,7 +14,7 @@ import scala.collection._
 import scala.collection.immutable.HashSet
 
 /** Instruction used within the compiler, call, affect. Dag and Union allows to defined ConnectedComp  */
-abstract class Instr extends DagNode[Instr] with Align[Instr] with SetInput[Instr] {
+abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Instr] {
 
   def isReturn: Boolean = this match {
     case CallProc("return", _, _) => true;
@@ -93,20 +93,21 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetInput[Inst
     }
   }
 
-  def nbit(cur: ProgData1[_], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): Instr = this match {
-    case Affect(s, exp) =>
-      val newExp = exp.nbit(cur, nbitLB, tSymb, newFuns)
-      tSymb += s -> new InfoNbit(cur.tSymbVar(s).t, cur.tSymbVar(s).k, nbitLB(newExp)); Affect(s, newExp).asInstanceOf[Instr]
-    case CallProc(f, names, exps) =>
-      val newexps = exps.map(_.nbit(cur, nbitLB, tSymb, newFuns))
-      val nbitarg = newexps.map(a => nbitLB(a)) //.toList.flatten
-      val newnamef = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _)
-      if (!newFuns.contains(newnamef)) newFuns += (newnamef -> cur.funs(f).nbit(nbitarg)) // re-creates the code of f, taking into account nbitarg.
-      val fprog = newFuns(newnamef)
-      val nbitResult = fprog.paramR.map(s => fprog.tSymbVar(s).nb) //we get the number of bits of results
-      (names zip nbitResult).foreach { sn => tSymb += sn._1 -> new InfoNbit(cur.tSymbVar(sn._1).t, cur.tSymbVar(sn._1).k, sn._2) }
-      CallProc(newnamef, names, newexps).asInstanceOf[Instr]
-  }
+  //
+  //  def nbit(cur: ProgData1[_], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): Instr = this match {
+  //    case Affect(s, exp) =>
+  //      val newExp = exp.nbit(cur, nbitLB, tSymb, newFuns)
+  //      tSymb += s -> new InfoNbit(cur.tSymbVar(s).t, cur.tSymbVar(s).k, nbitLB(newExp)); Affect(s, newExp).asInstanceOf[Instr]
+  //    case CallProc(f, names, exps) =>
+  //      val newexps = exps.map(_.nbit(cur, nbitLB, tSymb, newFuns))
+  //      val nbitarg = newexps.map(a => nbitLB(a)) //.toList.flatten
+  //      val newnamef = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _)
+  //      if (!newFuns.contains(newnamef)) newFuns += (newnamef -> cur.funs(f).nbit(nbitarg)) // re-creates the code of f, taking into account nbitarg.
+  //      val fprog = newFuns(newnamef)
+  //      val nbitResult = fprog.paramR.map(s => fprog.tSymbVar(s).nb) //we get the number of bits of results
+  //      (names zip nbitResult).foreach { sn => tSymb += sn._1 -> new InfoNbit(cur.tSymbVar(sn._1).t, cur.tSymbVar(sn._1).k, sn._2) }
+  //      CallProc(newnamef, names, newexps).asInstanceOf[Instr]
+  //  }
 
   /**
    *
@@ -116,7 +117,8 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetInput[Inst
    * @param newFuns Functions generated
    * @return The instructions rewritten so as to include Extend where necessary.
    */
-  def bitIfy(cur: DataProg[_, InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[DataProg[_, InfoNbit[_]]]): Instr = this match {
+  def
+  bitIfy(cur: DataProg[_, InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[DataProg[_, InfoNbit[_]]]): Instr = this match {
     case Affect(s, exp) =>
       val newExp = exp.bitIfy(cur, nbitLB, tSymb, newFuns)
       tSymb += s -> new InfoNbit(cur.tSymbVar(s).t, cur.tSymbVar(s).k, nbitLB(newExp));
@@ -142,18 +144,20 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetInput[Inst
 
   // TabSymb[InfoNbit[_]]
   /** we add one (resp. two) suffixes, for simplicial (resp. transfer) variables  */
-  def unfoldSpace(m: Machine, tSymb: TabSymb[InfoNbit[_]]): List[Instr] = this match {
-    case Affect(v, exp) => // println(exp.toStringTree) ;
-      val exp2 = exp.asInstanceOf[ASTLt[_, _]]
-      exp2.locus match {
-        case s: S => s.sufx.zip(exp2.unfoldSimplic(m)).map({ case (suf, e) => Affect(v + "$" + suf, e) }).toList
-        case l@T(s1, _) => s1.sufx.zip(exp2.unfoldTransfer(m)).map({
-          case (suf1, t) =>
-            l.sufx.zip(t).map({ case (suf2, e) => Affect(v + "$" + suf1 + suf2, e) }).toList
-        }).toList.flatten
-      }
-    case CallProc(f, n, e) => List(CallProc(f, n.flatMap(Instr.deploy(_, tSymb)), e.asInstanceOf[List[ASTLt[_, _]]].flatMap(_.unfoldSpace(m)))) //tSymb(n).t._1
-  }
+  def unfoldSpace(m: Machine, tSymb: TabSymb[InfoNbit[_]]): List[Instr] =
+    this match {
+      case Affect(v, exp) => // println(exp.toStringTree) ;
+        val exp2 = exp.asInstanceOf[ASTLt[_, _]]
+        exp2.locus match {
+          case s: S => s.sufx.zip(exp2.unfoldSimplic(m)).map({ case (suf, e) => Affect(v + "$" + suf, e) }).toList
+          case l@T(s1, _) => s1.sufx.zip(exp2.unfoldTransfer(m)).map({
+            case (suf1, t) =>
+              l.sufx.zip(t).map({ case (suf2, e) => Affect(v + "$" + suf1 + suf2, e) }).toList
+          }).toList.flatten
+        }
+      case CallProc(f, n, e) => List(CallProc(f, n.flatMap(Instr.deploy(_, tSymb)),
+        e.asInstanceOf[List[ASTLt[_, _]]].flatMap(_.unfoldSpace(m)))) //tSymb(n).t._1
+    }
 
   def align(cs: TabSymb[Constraint]): Unit = alignPerm = a(this).exp.asInstanceOf[ASTLt[_, _]].align(cs, names.head)
 
@@ -272,7 +276,7 @@ object Instr {
   val sysInstr = HashSet("return", "bug", "show", "memo")
 
   /** @param i instruction
-   * @return i.asInstanceOf[Affect[_]]*/
+   * @return i.asInstanceOf[Affect[_]] */
   def a(i: Instr): Affect[_] = i.asInstanceOf[Affect[_]]
 
   def read(s: String, m: repr[(Locus, Ring)]) = new Read(s)(m) with ASTLt[Locus, Ring]
@@ -280,8 +284,8 @@ object Instr {
   /** utility used to align instruction when printed */
   def pad(s: String, n: Int): String = s + " " * (n - s.length())
 
-  def apply(s: String, p: ProgData2): Instr = CallProc(s, p.paramR,
-    p.paramD.map(x => read(x, repr(p.tSymbVar(x).t).asInstanceOf[repr[(_ <: Locus, _ <: Ring)]])))
+  //  def apply(s: String, p: ProgData2): Instr = CallProc(s, p.paramR,
+  //    p.paramD.map(x => read(x, repr(p.tSymbVar(x).t).asInstanceOf[repr[(_ <: Locus, _ <: Ring)]])))
 
   /**
    * @param s name of function
@@ -293,7 +297,14 @@ object Instr {
     call
   }
 
+  /**
+   *
+   * @param n identifier
+   * @param tSymb
+   * @return add one (resp. two) suffixes to the variable names, for simplicial (resp. tranfer) variable
+   */
   private def deploy(n: String, tSymb: TabSymb[InfoNbit[_]]): List[String] = Locus.deploy(n, tSymb(n).t.asInstanceOf[(_ <: Locus, _)] _1)
+
 
   /**
    *
@@ -309,7 +320,7 @@ object Instr {
      */
     def process(e: AST[_]): List[Affect[_]] = {
       val already = tsymb.contains(e.name)
-      val newName = if (!already || already && tsymb(e.name).k == Field()) e.name else checkName2() //we create another variable to return result, in case it is a layer.
+      val newName = if (!already || already && tsymb(e.name).k == Field()) e.name else newFunName2() //we create another variable to return result, in case it is a layer.
       paramD += newName;
       tsymb += newName -> InfoType(e, ParamR())
       if (already && newName == e.name) List() else List(Affect(newName, e))
@@ -325,7 +336,6 @@ object Instr {
 /**Instructions generated within the ast that will not be used after dedagification.  */
 case class UsrInstr[+T](c: Codop, exp: AST[_]) extends Instr {
   def exps = List(exp)
-
   def usedVars = immutable.HashSet.empty[String]
   val names = List(); override def toString: String = pad(c.toString.substring(2), 25) + "<-  " + exp.toStringTree
 

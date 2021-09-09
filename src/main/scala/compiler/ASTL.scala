@@ -9,6 +9,7 @@ import dataStruc.Align._
 import compiler.Constraint._
 import compiler.Circuit.{iTabSymb2, _}
 import compiler.repr._
+
 import scala.collection.{mutable, _}
 import scala.reflect.ClassTag
 
@@ -294,41 +295,44 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case e@Redop(_, a, _, _) => e.copy(arg = id2(a))
       case e@Clock(a, _) => e.copy(arg = id2(a))(lpart(e.mym), rpart(e.mym))
       case e@Sym(a, _, _, _) => e.copy(arg = id2(a))
-    }; newD.setName(this.name); newD.asInstanceOf[ASTL[L, R]]
-  }
-
-  override def nbit(cur: ProgData1[_], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): ASTLt[L, R] = {
-    val nbitB = immutable.HashMap.empty[AST[_], Int] //stores the bit number of an ASTB expression
-    val nbitP = mutable.HashMap.empty[Param[_], Int] //virgin, to retrieve the nbits computed for the param.
-    val result = this match {
-      case Binop(op, a, a2, l2, r2) => //BINOP needs more work, because it triggers possible insertion of a new node "extend";
-        var anew = a.nbit(cur, nbitLB, tSymb, newFuns); var a2new = a2.nbit(cur, nbitLB, tSymb, newFuns)
-        //we start evaluation of binop by adding the number of bits of the arguments
-        val startnbitB = nbitB + (op.p1 -> nbitLB(anew)) + (op.p2 -> nbitLB(a2new))
-        val nbitResult = ASTB.nBitR(startnbitB, op.arg, nbitP) //retrieves the number of bit computed from the call to the ASTBfun.
-        if (nbitP.contains(op.p1)) anew = anew.extendMe(nbitP(op.p1))
-        if (nbitP.contains(op.p2)) a2new = a2new.extendMe(nbitP(op.p2))
-        val newthis = Binop(op, anew, a2new, l2, r2)
-        nbitLB += newthis -> nbitResult //the hashtable stores the number of bits of the newly computed tree.
-        newthis
-      case _ => //in all the other cases, no change is done on the AST, only  nbitLB is updated.
-        val newthis = this.propagateASTL((d: ASTLt[L, R]) => d.nbit(cur, nbitLB, tSymb, newFuns))
-
-        def newNbit() = nbitLB(newthis.asInstanceOf[Singleton[AST[_]]].arg) //the nbit value of the arg is stored in nbitLB
-        nbitLB += newthis -> (newthis.asInstanceOf[ASTL[_, _]] match {
-          // case l:Layer[_,_] =>  l.nbit
-          case Coonst(cte, _, _) => ASTB.nBitR(nbitB, cte, nbitP)
-          case Unop(op, _, _, _) => ASTB.nBitR(nbitB + (op.p1 -> newNbit()), op.arg, nbitP)
-          case Redop(_, _, _, _) | Clock(_, _) | Transfer(_, _, _) | Broadcast(_, _, _) | Sym(_, _, _, _) => newNbit()
-          case Send(_) => nbitLB(newthis.asInstanceOf[Neton[AST[_]]].args.head)
-          //FIXME for the concat redop, the number of bit must take into account the arity (2,3, or 6)
-        })
-        newthis
     };
-    result.setName(this.name);
-    result
+    newD.setName(this.name);
+    newD.asInstanceOf[ASTL[L, R]]
   }
 
+  //
+  //  override def nbit(cur: ProgData1[_], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): ASTLt[L, R] = {
+  //    val nbitB = immutable.HashMap.empty[AST[_], Int] //stores the bit number of an ASTB expression
+  //    val nbitP = mutable.HashMap.empty[Param[_], Int] //virgin, to retrieve the nbits computed for the param.
+  //    val result = this match {
+  //      case Binop(op, a, a2, l2, r2) => //BINOP needs more work, because it triggers possible insertion of a new node "extend";
+  //        var anew = a.nbit(cur, nbitLB, tSymb, newFuns); var a2new = a2.nbit(cur, nbitLB, tSymb, newFuns)
+  //        //we start evaluation of binop by adding the number of bits of the arguments
+  //        val startnbitB = nbitB + (op.p1 -> nbitLB(anew)) + (op.p2 -> nbitLB(a2new))
+  //        val nbitResult = ASTB.nBitR(startnbitB, op.arg, nbitP) //retrieves the number of bit computed from the call to the ASTBfun.
+  //        if (nbitP.contains(op.p1)) anew = anew.extendMe(nbitP(op.p1))
+  //        if (nbitP.contains(op.p2)) a2new = a2new.extendMe(nbitP(op.p2))
+  //        val newthis = Binop(op, anew, a2new, l2, r2)
+  //        nbitLB += newthis -> nbitResult //the hashtable stores the number of bits of the newly computed tree.
+  //        newthis
+  //      case _ => //in all the other cases, no change is done on the AST, only  nbitLB is updated.
+  //        val newthis = this.propagateASTL((d: ASTLt[L, R]) => d.nbit(cur, nbitLB, tSymb, newFuns))
+  //
+  //        def newNbit() = nbitLB(newthis.asInstanceOf[Singleton[AST[_]]].arg) //the nbit value of the arg is stored in nbitLB
+  //        nbitLB += newthis -> (newthis.asInstanceOf[ASTL[_, _]] match {
+  //          // case l:Layer[_,_] =>  l.nbit
+  //          case Coonst(cte, _, _) => ASTB.nBitR(nbitB, cte, nbitP)
+  //          case Unop(op, _, _, _) => ASTB.nBitR(nbitB + (op.p1 -> newNbit()), op.arg, nbitP)
+  //          case Redop(_, _, _, _) | Clock(_, _) | Transfer(_, _, _) | Broadcast(_, _, _) | Sym(_, _, _, _) => newNbit()
+  //          case Send(_) => nbitLB(newthis.asInstanceOf[Neton[AST[_]]].args.head)
+  //          //FIXME for the concat redop, the number of bit must take into account the arity (2,3, or 6)
+  //        })
+  //        newthis
+  //    };
+  //    result.setName(this.name);
+  //    result
+  //  }
+  //
   /**
    * * @param cur The current programm
    * * @param nbitLB Stores number of bits of subfields.
@@ -372,10 +376,12 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
     result
   }
 
-  override def concatElt: Boolean = this match {
-    case Unop(Fundef1("elt", _, _), arg, _, _) => arg.concatElt
-    case Binop(Fundef2("concat", _, _, _), arg, arg2, _, _) => arg.concatElt && arg2.concatElt
-    case _ => super.concatElt
+  /**
+   * @return true if the expression is only a concatenation of elements   */
+  override def justConcats: Boolean = this match {
+    case Unop(Fundef1("elt", _, _), arg, _, _) => arg.justConcats
+    case Binop(Fundef2("concat", _, _, _), arg, arg2, _, _) => arg.justConcats && arg2.justConcats
+    case _ => super.justConcats
   }
 
   override def unfoldSimplic(m: Machine): ArrAst = {
@@ -384,8 +390,8 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
     this.asInstanceOf[ASTLg] match {
       case Coonst(cte, _, _) => Array.fill(s.sufx.length)(cte)
       case Broadcast(_, _, _) => throw new RuntimeException("Broadcast creates   a transfer type")
-      case Send(_)            => throw new RuntimeException("Broadcast creates   a transfer type")
-      case Transfer(_, _, _)  => throw new RuntimeException("Transfer creates   a transfer type")
+      case Send(_) => throw new RuntimeException("Broadcast creates   a transfer type")
+      case Transfer(_, _, _) => throw new RuntimeException("Transfer creates   a transfer type")
       case Unop(op, a, _, _)  => a.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m).map(new Call1(op.asInstanceOf[Fundef1[Any, R]], _)(r) with ASTBt[R])
       case Binop(op, a, a2, _, _) => a.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m).zip(a2.unfoldSimplic(m)).map({
         case (c, c2) => new Call2(op.asInstanceOf[Fundef2[Any, Any, R]], c, c2)(r) with ASTBt[R].asInstanceOf[ASTBg]

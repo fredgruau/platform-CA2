@@ -1,5 +1,5 @@
 package compiler
-import dataStruc.DagInstr.setInputNeighbor
+//import dataStruc.DagInstr.setInputNeighbor2
 import compiler.AST._
 import compiler.Circuit._
 import compiler.VarKind._
@@ -54,14 +54,16 @@ class ProgData[+T](val f: Fundef[T], val funs: iTabSymb[ProgData[_]], val allNod
 
     //  val needAffect: immutable.HashSet[AST[_]] = immutable.HashSet.empty ++ allNodes.filter { e => //we force affectation on those to facilitate latter processing @TODO forcer aussi l'affect sur les parametres données.
     //    e match { case Taail(_) | Heead(_) | Call1(_, _) | Call2(_, _, _) | Call3(_, _, _, _) => !usedTwiceAsValue.contains(e) case _ => false }    }
-    val redops: Set[AST[_]] =immutable.HashSet.empty ++ allNodes.flatMap { _.redExpr } //set of expressions being reduced.
+    val redops: Set[AST[_]] = immutable.HashSet.empty ++ allNodes.asInstanceOf[List[ASTLt[_, _]]].flatMap {
+      _.redExpr
+    } //set of expressions being reduced.
     val callAndHeadAndRedop = allNodes.filter((x: AST[_]) =>
-      if(redops.contains(x)) true    else
+      if (redops.contains(x)) true else
         x match {
-      case Taail(_) | Heead(_) | Call1(_, _) | Call2(_, _, _) | Call3(_, _, _, _) => true
-      case a: ASTL[_, _] => a.shouldAffect
-      case ast:AST[_]=> redops.contains(ast)
-    })
+          case Taail(_) | Heead(_) | Call1(_, _) | Call2(_, _, _) | Call3(_, _, _, _) => true
+          case a: ASTL[_, _] => a.shouldAffect
+          case ast: AST[_] => redops.contains(ast)
+        })
     val inCall = callAndHeadAndRedop.flatMap(_ match { case c: Call[_] => c.args.filter(_.inputNeighbors.nonEmpty).toList case _ => List[AST[_]]() })
     val needAffect2 = callAndHeadAndRedop ::: inCall //.filter(  !usedTwiceAsValue.contains(_))
     //  for (e <- needAffect2   ) e.checkName()
@@ -123,22 +125,22 @@ class ProgData1[+T](val f: Fundef[T], val instrs: List[Instr], val funs: iTabSym
     new ProgData1(f, instrs.flatMap(i => i.procedurIfy(hd, tl, tSymbVar)) ::: paraResAffect, procedureFun, tSymbVar, paramD, paramRmut.toList)
   }
 
-  /**
-   * Computes the number of bits of parameters, and affectation, and also internal nodes of all the ASTs.
-   *
-   *   @param nbitP: list of number of bits for each parameter assumed to be ASTLs.
-   */
-  def nbit(nbitP: List[Int]): ProgData2 = {
-    val nbitExp: AstField[Int] = mutable.HashMap.empty
-    val newFuns: TabSymb[ProgData2] = mutable.HashMap.empty
-    val newtSymb: TabSymb[InfoNbit[_]] = mutable.HashMap.empty //we store the number of bits of parameters in newTabSymbVar:
-    //Initalize the nbit of layers
-    tSymbVar.map { case (nom, v) => if (v.k.isLayer) newtSymb += nom -> new InfoNbit(tSymbVar(nom).t, tSymbVar(nom).k, v.k.asInstanceOf[LayerField].nb) }
-
-    newtSymb ++= (paramD zip nbitP).map { case (nom, nbi) => nom -> new InfoNbit(tSymbVar(nom).t, tSymbVar(nom).k, nbi) } //we assume that parameter are ASTLs
-    val newInstrs = instrs.map(_.nbit(this, nbitExp, newtSymb, newFuns))
-    new ProgData2(newInstrs, newFuns, newtSymb, paramD, paramR)
-  }
+  //  /**
+  //   * Computes the number of bits of parameters, and affectation, and also internal nodes of all the ASTs.
+  //   *
+  //   *   @param nbitP: list of number of bits for each parameter assumed to be ASTLs.
+  //   */
+  //  def nbit(nbitP: List[Int]): ProgData2 = {
+  //    val nbitExp: AstField[Int] = mutable.HashMap.empty
+  //    val newFuns: TabSymb[ProgData2] = mutable.HashMap.empty
+  //    val newtSymb: TabSymb[InfoNbit[_]] = mutable.HashMap.empty //we store the number of bits of parameters in newTabSymbVar:
+  //    //Initalize the nbit of layers
+  //    tSymbVar.map { case (nom, v) => if (v.k.isLayer) newtSymb += nom -> new InfoNbit(tSymbVar(nom).t, tSymbVar(nom).k, v.k.asInstanceOf[LayerField].nb) }
+  //
+  //    newtSymb ++= (paramD zip nbitP).map { case (nom, nbi) => nom -> new InfoNbit(tSymbVar(nom).t, tSymbVar(nom).k, nbi) } //we assume that parameter are ASTLs
+  //    val newInstrs = instrs.map(_.nbit(this, nbitExp, newtSymb, newFuns))
+  //    new ProgData2(newInstrs, newFuns, newtSymb, paramD, paramR)
+  //  }
 
 }
 

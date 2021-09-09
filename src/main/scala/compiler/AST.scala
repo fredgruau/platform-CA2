@@ -7,15 +7,19 @@ import scala.collection.immutable.HashSet
 import Circuit.AstPred
 
 /**
- * Represent a field using an Abstract Syntax Tree using Function definition, and calls, reading of variables, delaying of evaluation.
- * Reused to implement  1- the AST of spatial  field (ASTL) and 2- the AST of arithmetic field(ASTB)
- * The parameter type T is the type of the associated expression
- * covariant because
+ * Represent a field using an Abstract Syntax Tree using
+ * Function definition, and calls, reading of variables, delaying of evaluation.
+ * Reused to implement
+ * 1- the AST of spatial  field (ASTL)
+ * 2- the AST of arithmetic field(ASTB)
+ *
+ * @tparam T type of the expression
  * @param m parameter used to compute this type. */
 abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named {
   val mym: repr[T] = m //if type of mym is set to repr[_] this allow covariance even if repr is not covariant
   /** system instruction can be associated to any spatial field, so as to be latter retrievable from the compiling method. */
   protected var sysInstr: List[UsrInstr[AST[_]]] = List.empty;
+
 
   def sysInstrs: List[UsrInstr[AST[_]]] = sysInstr //TODO defines sysInstr on ASTL's layer
   override def other: List[AST[_]] = sysInstr.map(_.exp) //so that compute nodes used in instructions can be directly explored.
@@ -24,42 +28,46 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
     sysInstr ::= UsrInstr.bugif(a).asInstanceOf[UsrInstr[AST[_]]]
   }
 
-  /** if AST does not have names, generates one */
-  def setNameIfNull(): AST[T] = {
-    if (name == null) name = "_aux" + AST.getCompteur; this
-  }
-
-  /** Builds the set of affected symbols which are read. */
-  def reads: immutable.HashSet[String] = this match {
-    case Read(s) => HashSet(s)
-    case _ => inputNeighbors.map(e => e.reads).foldLeft(HashSet.empty[String])((x, y) => x.union(y))
-  }
+  //  /** generates a unique name starting by "aux" for AST which do not a name yet  */
+  //  def setNameIfNull()  = {
+  //    if (name == null) name = "_aux" + AST.getCompteur
+  //  }
+  //
+  //  /** Builds the set of affected symbols which are read. */
+  //  def reads: immutable.HashSet[String] = this match {
+  //    case Read(s) => HashSet(s)
+  //    case _ => inputNeighbors.map(e => e.reads).foldLeft(HashSet.empty[String])((x, y) => x.union(y))
+  //  }
 
   /** Builds the set of symbols which are read . */
-  def symbols: immutable.HashSet[String] = this match {
-    case Read(s) => HashSet(s)
-    case Param(s) => HashSet(s)
-    case l: ASTL.Layer[_, _] => HashSet(l.name)
-    case _ => inputNeighbors.map(e => e.symbols).foldLeft(HashSet.empty[String])((x, y) => x.union(y))
-  }
+  def symbols: immutable.HashSet[String] =
+    this match {
+      case Read(s) => HashSet(s)
+      case Param(s) => HashSet(s)
+      case l: ASTL.Layer[_, _] => HashSet(l.name)
+      case _ => inputNeighbors.map(e => e.symbols).foldLeft(HashSet.empty[String])((x, y) => x.union(y))
+    }
 
-  /** predicate to insert affectation for the procedurise step. */
-  def isCoons: Boolean = this match {
-    case Taail(_) | Heead(_) | Call1(_, _) | Call2(_, _, _) | Call3(_, _, _, _) => true;
-    case _ => false
-  }
+  //
+  //  /** predicate to insert affectation for the procedurise step. */
+  //  def isCoons: Boolean = this match {
+  //    case Taail(_) | Heead(_) | Call1(_, _) | Call2(_, _, _) | Call3(_, _, _, _) => true;
+  //    case _ => false
+  //  }
 
-  override def toString: String = this.asInstanceOf[AST[_]] match {
-    case Read(s) => s
-    case Param(s) => "Param " + s
-    // case f: Fundef[_]      => "Fundef " + f.namef + " of param " + f.p.map(p => p.nameP).foldLeft("")(_ + ", " + _)
-    case c: Call[_] => c.f.namef + " "
-    case Heead(_) => "head"
-    case Taail(_) => "tail"
-    case Coons(_, _) => "cons"
-    case Delayed(arg) => "Delayed"
-    case l: Layer2[_] => "Layer2 " + this.name + ":" + mym.name
-    case _ => throw new RuntimeException("merdouille")
+  override def toString: String =
+
+    this.asInstanceOf[AST[_]] match {
+      case Read(s) => s
+      case Param(s) => "Param " + s
+      // case f: Fundef[_]      => "Fundef " + f.namef + " of param " + f.p.map(p => p.nameP).foldLeft("")(_ + ", " + _)
+      case c: Call[_] => "Call " + c.f.namef + " "
+      case Heead(_) => "head"
+      case Taail(_) => "tail"
+      case Coons(_, _) => "cons"
+      case Delayed(arg) => "Delayed"
+      case l: Layer2[_] => "Layer2 " + this.name + ":" + mym.name
+      case _ => throw new RuntimeException("merdouille")
   }
   /**
    * Important to specify that the L,R type of AST nodes is preserved, for type checking consistency
@@ -84,24 +92,21 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
    *
    * @param usedTwice dags which are used twice, or which need to be affected for some other reason.
    * @param repr      : representant of the equivalence class with respect to equal on case class hierarchy
-   * @return the Dag where expression used more than once are replaced by read.
+   * @return the AST where expression used more than once are replaced by read.
    */
-  def deDag(usedTwice: AstPred, repr: Map[AST[_], String]): AST[T] = {
-    val rewrite = (d: AST[T]) => d.deDag(usedTwice, repr)
+  def treeIfy(usedTwice: AstPred, repr: Map[AST[_], String]): AST[T] = {
+    val rewrite = (d: AST[T]) => d.treeIfy(usedTwice, repr)
     if (usedTwice(this)) new Read[T](repr(this))(mym.asInstanceOf[repr[T]])
     else this.propagate(rewrite)
   }
 
-  /*def replaceBy(src:String,target:String): AST[T] = {
-    val rewrite=(d: AST[T]) => d.replaceBy(src,target)
-    this.propagate(rewrite)
-  }*/
-  def nbit(cur: ProgData1[_], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): AST[T] = {
-    val newthis = this.propagate((d: AST[T]) => d.nbit(cur, nbitLB, tSymb, newFuns))
-    nbitLB += (newthis -> newthis.newNbitAST(nbitLB, tSymb, newFuns))
-    newthis.setName(this.name);
-    newthis
-  }
+  //
+  //  def nbit(cur: ProgData1[_], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): AST[T] = {
+  //    val newthis = this.propagate((d: AST[T]) => d.nbit(cur, nbitLB, tSymb, newFuns))
+  //    nbitLB += (newthis -> newthis.newNbitAST(nbitLB, tSymb, newFuns))
+  //    newthis.setName(this.name);
+  //    newthis
+  //  }
 
   /**
    * * @param cur The current programm
@@ -130,14 +135,15 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
     case t: Layer2[_] => t.nbit
   }
 
-  /** Compute the number of bits needed, using  mutable structures, that have  been previously updated. */
-  def newNbitAST(nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): Int = this.asInstanceOf[AST[_]] match {
-    //   case Heead(a)          => List(nbitLB(a).head)
-    //  case Taail(a)          => nbitLB(a).tail
-    case Param(s) => tSymb(s).nb
-    case Read(s) => tSymb(s).nb
-    //  case Coons(a, b)       => nbitLB(a).head :: nbitLB(b) //for ((k,v)<-nbitLB) println( k.toStringTree)     println( b.toStringTree)
-  }
+  //
+  //  /** Compute the number of bits needed, using  mutable structures, that have  been previously updated. */
+  //  def newNbitAST(nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): Int = this.asInstanceOf[AST[_]] match {
+  //    //   case Heead(a)          => List(nbitLB(a).head)
+  //    //  case Taail(a)          => nbitLB(a).tail
+  //    case Param(s) => tSymb(s).nb
+  //    case Read(s) => tSymb(s).nb
+  //    //  case Coons(a, b)       => nbitLB(a).head :: nbitLB(b) //for ((k,v)<-nbitLB) println( k.toStringTree)     println( b.toStringTree)
+  //  }
 
   /**
    * @param id1 a bijection betwee AST
@@ -150,32 +156,30 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
     val newD = this.asInstanceOf[AST[_]] match {
       case Read(_) => this //throw  new RuntimeException("Deja dedagifié!" )
       case e: EmptyBag[_] => e
-      case Delayed(arg) => id2(arg()) //the useless delayed node is supressed
+      //case Delayed(arg) => id2(arg()) //the useless delayed node is supressed Delayed are now ASTLt
+
       case e@Heead(a) => e.copy(arg = id2(a))(e.mym) //{ e.substitute(a,id2(a));e }//{e.arg = id2(a);e} //
       case e@Taail(a) => e.copy(arg = id2(a))(e.mym)
       case e@Coons(a, a2) => e.copy(arg = id2(a), arg2 = id2(a2))(e.mym)
       case e@Call1(_, a) => e.copy(arg = id2(a))(e.mym)
       case e@Call2(_, a, a2) => e.copy(arg = id2(a), arg2 = id2(a2))(e.mym)
       case e@Call3(_, a, a2, a3) => e.copy(arg = id2(a), arg2 = id2(a2), arg3 = id2(a3))(e.mym)
-    }; newD.setName(this.name); newD.asInstanceOf[AST[T]]
-  }
-  def concatElt: Boolean = this match {
-    case _: EmptyBag[_] => true
-    case _              => false
+    };
+    newD.setName(this.name);
+    newD.asInstanceOf[AST[T]]
   }
 
-  /**   Compute alignement with respect to input variables, and also constraint, given that v is the variable if we make a reduction */
-  //def align(cs:TabConstr,v:String):iTabSymb[Array[Int]]= throw new RuntimeException("align must be applied on ASTLtonly ")
-   /**True if "this" is a call to a fun2, whose first arg is a Tminus1 */
-  def firstArgDelayed(muInstr:iTabSymb[List[Affect[_]]] ):Boolean=this match{
-    case Call2(_, Read(s), _) =>
-      val Array(rad,suf)=   s.split("\\$") //on separe le radical du suffixe
-      muInstr(rad)(order(suf)) .exp.isInstanceOf[ASTB.Tminus1[_]]
-    case _ => false
-  }
 
-  /** Defined non empty in ASTL */
-   def redExpr = List.empty[AST[_]]
+  //  /**   Compute alignement with respect to input variables, and also constraint, given that v is the variable if we make a reduction */
+  //  //def align(cs:TabConstr,v:String):iTabSymb[Array[Int]]= throw new RuntimeException("align must be applied on ASTLtonly ")
+  //   /**True if "this" is a call to a fun2, whose first arg is a Tminus1 */
+  //  def firstArgDelayed(muInstr:iTabSymb[List[Affect[_]]] ):Boolean=this match{
+  //    case Call2(_, Read(s), _) =>
+  //      val Array(rad,suf)=   s.split("\\$") //on separe le radical du suffixe
+  //      muInstr(rad)(order(suf)) .exp.isInstanceOf[ASTB.Tminus1[_]]
+  //    case _ => false
+  //  }
+
 
 }
 
@@ -223,13 +227,6 @@ object AST {
     def inputNeighbors: List[T] = args
   }
 
-  private var nameCompteur: Int = 0
-
-  def getCompteur: Int = {
-    nameCompteur += 1; nameCompteur
-  }
-
-  def checkName2(): String = "_aux" + AST.getCompteur
 
   type rewriteAST[U] = AST[U] => AST[U]
   type rewriteAST2 = AST[_] => AST[_]
@@ -266,10 +263,21 @@ object AST {
 
   case class Read[T](which: String)(implicit m: repr[T]) extends AST[T]() with EmptyBag[AST[_]]
 
+  /**
+   * The DFS algo of DAG visite recursively all Delayed node of an  AST  as soon as they are created, because
+   * the delayed expression is an input of the Delayed node.
+   *
+   * @param _arg delayed expression   */
   case class Delayed[T](_arg: () => AST[T])(implicit m: repr[T]) extends AST[T]() with Singleton[AST[_]] {
     lazy val arg: AST[_] = {
       /* _arg().user+=this;*/ _arg()
     }
+  }
+
+  /** Delayed uses a trick found on the net, to have a call by name, together with a case class necessary to make the match */
+  def delayed[T](_arg: => AST[T])(implicit m: repr[T]): AST[T] = {
+    lazy val delayed = _arg;
+    new Delayed[T](() => delayed)
   }
 
   //on se sert de DELAYED que dans ASTL, donc on va directement l'y mettre.
@@ -285,7 +293,7 @@ object AST {
    * @tparam T
    * Unlike other constructors,  Layer is not defined as a case class,
    * otherwise equality between any two layer of identical number of bits would allways hold
-   * Layer is an AST constructor, because it is used to also stores system instructions.
+   * Layer2 is an AST constructor, because it is used to also stores system instructions.
    **/
   abstract class Layer2[T](val nbit: Int)(implicit m: repr[T]) extends AST[T]() with EmptyBag[AST[_]] with Strate2[T] {
     val v = 1

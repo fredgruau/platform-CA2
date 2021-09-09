@@ -1,11 +1,10 @@
 package dataStruc
 
 import compiler.{AST, Instr}
-import dataStruc.DagInstr.setInputNeighbor2
+import dataStruc.DagInstr.setInputAndOutputNeighbor
 import dataStruc.DagNode.paquets
-import scala.collection.immutable.HashSet
 import scala.collection.{mutable, _}
-
+import scala.collection.immutable.HashSet
 /**
  * Node of a Directed Acyclic Graph (DAG)
  * getCycle is used to test the absence of cycles
@@ -50,30 +49,39 @@ object Dag {
  * @param generators optional initial generators
  * @tparam T
  */
-class Dag[T <: DagNode[T]](generators: List[T]) { //TODO put all the fields in the constructor to avoid recomputing when transtlatin dag[Instr] into DagInstr
+class Dag[T <: DagNode[T]](generators: List[T]) {
+  //TODO put all the fields in the constructor to avoid recomputing when transtlatin dag[Instr] into DagInstr
   def this() = this(List())
 
+  /** We create an exeption which can store the cycle
+   * in order to be able to print it nicely later
+   * nicely means with names  identifying fiedls in the client program */
+  class CycleException(val cycle: Vector[T]) extends Exception("cycle détecté") {}
+
   //def setInputNeighbor(instrs: List[T] ) = ()
+
   /**   all the generators -maximal elements- from which all the other can be reached */
   var allGenerators: List[T] = List() //TODO maintain nonGenerator together with allGenerator, and forget visitedL
-  /** @return distinguish non maximal dag's element */
+  /** @return non maximal dag's element */
   def nonGenerators(): List[T] = {
-    val aG = HashSet.empty[AST[_]] ++ allGenerators; visitedL.filter(!aG.contains(_))
+    val aG = HashSet.empty[AST[_]] ++ allGenerators
+    visitedL.filter(!aG.contains(_))
   }
 
   /** all visited dag's node, ordered with generators first. */
   var visitedL: List[T] = List()
   /** newly visited node */
-  var newVisitedL: List[T] = List()
+  private var newVisitedL: List[T] = List()
   var visited: HashSet[T] = HashSet()
-  addGenerators(generators)
-
+  addGenerators(generators) //visits all the Dag's nodes
   override def toString = allGenerators.map(_.toStringTree).mkString("\n")
 
-  //def reset()= { allGenerators=List();visited=HashSet();  visitedL=List(); newVisitedL=List()}
+
   /**
-   * @param newGenerators other nodes possibly not in the DAG yet, which need to be expored.
-   * @return list of new node added from those newGenerators.
+   * add new generators to the Dag together with nodes which can be accessed from those.
+   *
+   * @param newGenerators generators possibly not in the DAG yet.
+   * @return list of new node accessible from those newGenerators.
    */
   def addGenerators(newGenerators: List[T]): List[T] = {
     allGenerators ++= newGenerators
@@ -81,7 +89,8 @@ class Dag[T <: DagNode[T]](generators: List[T]) { //TODO put all the fields in t
     newVisitedL = List()
     for (b <- newGenerators)
       dfs(b, Vector.empty) match {
-        case Some(path) => throw new RuntimeException("cycle detected in AST:" + path)
+        case Some(path) => throw new CycleException(path)
+        //  case Some(path) => throw new RuntimeException("cycle detected in AST:" + path)
         case None =>
       }
     visitedL = newVisitedL ::: visitedL
@@ -114,25 +123,34 @@ class Dag[T <: DagNode[T]](generators: List[T]) { //TODO put all the fields in t
     }
     None
   }
+
+  /** @param called input from outside usage which must also be counted
+   * @return set of Dag's elements which are at least two times input to another dag's element */
+  def inputTwice(called: Seq[T] = Seq.empty[T]): Set[T] = {
+    /** Expression is used in a CallProc */
+    val nUser2 = immutable.HashMap.empty[T, Int] ++
+      (visitedL.flatMap(_.inputNeighbors) ++ called).groupBy(identity).map { case (k, v) ⇒ k -> v.size }
+    toSet(visitedL.filter(e => nUser2.contains(e) && nUser2(e) > 1))
+  }
 }
 
-
+/** Allows to compute input neighbors */
 trait SetInput[T <: SetInput[T]] {
   /** to be set if we want to use the Dag feature. */
   var inputNeighbors: List[T] = List.empty;
 
   /** names of variables modified by instruction. */
   def usedVars: immutable.HashSet[String]
-
   def names: List[String]
 }
 
-trait SetOutput[T <: SetInput[T]] {
+/** Allows to compute output neighbors */
+trait SetOutput[T <: SetOutput[T]] extends SetInput[T] {
   /** to be set if we want to use the Dag feature. */
   var outputNeighbors: List[T] = List.empty;
 }
 
-trait DagSetInput[T <: DagNode[T] with Union[T] with SetInput[T]] extends Dag[T] {
+trait DagSetInput[T <: DagNode[T] with Union[T] with SetOutput[T]] extends Dag[T] {
   self: Dag[T] =>
   /**
    *
@@ -140,7 +158,7 @@ trait DagSetInput[T <: DagNode[T] with Union[T] with SetInput[T]] extends Dag[T]
    * @param trans will compute one or several instructions associated to each group.
    * @return the quotient  DAG
    */
-  def quotient2[T2 <: DagNode[T2] with SetInput[T2]](p: (T, T) => Boolean, trans: Iterable[T] => List[T2]): Dag[T2] = {
+  def quotient2[T2 <: DagNode[T2] with SetOutput[T2]](p: (T, T) => Boolean, trans: Iterable[T] => List[T2]): Dag[T2] = {
     for (src <- visitedL)
       for (target <- src.inputNeighbors)
         if (p(src, target))
@@ -148,9 +166,9 @@ trait DagSetInput[T <: DagNode[T] with Union[T] with SetInput[T]] extends Dag[T]
     val connectedComp: Iterable[Iterable[T]] = paquets(visitedL)
     /** generators are instructions group which contains generators. */
     val (groupWithGenerator, groupWithoutGenerator) = connectedComp.partition(a => overlap(a, toSet(allGenerators)))
-    var newGenerators = groupWithGenerator.flatMap(trans).toList
-    val newNonGenerators = groupWithoutGenerator.flatMap(trans).toList
-    setInputNeighbor2(newGenerators ::: newNonGenerators)
+    var newGenerators: List[T2] = groupWithGenerator.flatMap(trans).toList
+    val newNonGenerators: List[T2] = groupWithoutGenerator.flatMap(trans).toList
+    setInputAndOutputNeighbor(newGenerators ::: newNonGenerators)
     //generators have no output
     newGenerators = newGenerators.filter({ case a: SetOutput[_] => a.outputNeighbors.isEmpty; case _ => true })
     new Dag(newGenerators)
@@ -165,7 +183,7 @@ trait DagSetInput[T <: DagNode[T] with Union[T] with SetInput[T]] extends Dag[T]
   def propagateUnit(rewrite: T => T, otherInstr: List[T] = List()): Dag[T] = {
     val newGenerators = (allGenerators).map(rewrite)
     val newNonGenerators = nonGenerators.map(rewrite)
-    setInputNeighbor2(newGenerators ::: newNonGenerators ::: otherInstr)
+    setInputAndOutputNeighbor(newGenerators ::: newNonGenerators ::: otherInstr)
     new Dag(newGenerators) //reconstruit quand meme tout le Dag
   }
 
@@ -178,7 +196,7 @@ trait DagSetInput[T <: DagNode[T] with Union[T] with SetInput[T]] extends Dag[T]
   def propagate(rewrite: T => List[T], otherInstr: List[T] = List()): Dag[T] = {
     val newGenerators = (allGenerators).flatMap(rewrite)
     val newNonGenerators = nonGenerators.flatMap(rewrite)
-    setInputNeighbor2(newGenerators ::: newNonGenerators ::: otherInstr)
+    setInputAndOutputNeighbor(newGenerators ::: newNonGenerators ::: otherInstr)
     new Dag(newGenerators)
   }
 
@@ -191,7 +209,7 @@ trait DagSetInput[T <: DagNode[T] with Union[T] with SetInput[T]] extends Dag[T]
   def propagateReverse(rewrite: T => T, otherInstr: List[T] = List()): Dag[T] = {
     val newNonGenerators = nonGenerators.reverse.map(rewrite).reverse
     val newGenerators = (allGenerators).reverse.map(rewrite).reverse
-    setInputNeighbor2(newGenerators ::: newNonGenerators ::: otherInstr)
+    setInputAndOutputNeighbor(newGenerators ::: newNonGenerators ::: otherInstr)
     new Dag(newGenerators)
   }
 
