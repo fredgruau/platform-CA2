@@ -250,8 +250,13 @@ class DataProg[+T, U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[Dat
     new DataProg(newDagis, newFuns ++ funs.map { case (k, v) ⇒ k -> v.macroIfy() }, p.tSymbVar, paramD, paramR)
   }
 
+  /**
+   *
+   * @return computes the offsets of the layers    */
 
-  def foldRegister(): DataProg[_, InfoNbit[_]] = {
+  def foldRegister(offset: Integer): DataProg[_, InfoNbit[_]] = {
+
+
     val funs2 = funs.map { case (k, v) ⇒ k -> v.foldRegister() }
     val p = this.asInstanceOf[DataProg[T, InfoNbit[_]]]
     if (!isLeafCaLoop) return new DataProg(dagis, funs2, p.tSymbVar, paramD, paramR)

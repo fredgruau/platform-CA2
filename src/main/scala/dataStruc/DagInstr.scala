@@ -1,7 +1,7 @@
 package dataStruc
 
 import compiler.Circuit.{AstPred, TabSymb, iTabSymb}
-import compiler.{AST, Affect, CallProc, InfoNbit, InfoType, Instr, ProgData1}
+import compiler.{AST, Affect, CallProc, InfoNbit, InfoType, Instr}
 import compiler.AST.{isNotRead, rewriteAST2}
 import scala.collection.immutable.HashSet
 import scala.collection.{Iterable, immutable, mutable}

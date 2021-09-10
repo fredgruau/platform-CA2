@@ -18,15 +18,12 @@ import Circuit.AstPred
 abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named {
   val mym: repr[T] = m //if type of mym is set to repr[_] this allow covariance even if repr is not covariant
   /** system instruction can be associated to any spatial field, so as to be latter retrievable from the compiling method. */
-  protected var sysInstr: List[UsrInstr[AST[_]]] = List.empty;
+  //protected var sysInstr: List[UsrInstr[AST[_]]] = List.empty;
 
 
-  def sysInstrs: List[UsrInstr[AST[_]]] = sysInstr //TODO defines sysInstr on ASTL's layer
-  override def other: List[AST[_]] = sysInstr.map(_.exp) //so that compute nodes used in instructions can be directly explored.
-  /** @param a is true where there is a bug associated to the field "this" */
-  def bugif(a: ASTLt[_ <: Locus, B]): Unit = {
-    sysInstr ::= UsrInstr.bugif(a).asInstanceOf[UsrInstr[AST[_]]]
-  }
+  //def sysInstrs: List[UsrInstr[AST[_]]] = sysInstr //TODO defines sysInstr on ASTL's layer
+  //override def other: List[AST[_]] = sysInstr.map(_.exp) //so that compute nodes used in instructions can be directly explored.
+
 
   //  /** generates a unique name starting by "aux" for AST which do not a name yet  */
   //  def setNameIfNull()  = {
@@ -39,12 +36,13 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
   //    case _ => inputNeighbors.map(e => e.reads).foldLeft(HashSet.empty[String])((x, y) => x.union(y))
   //  }
 
-  /** Builds the set of symbols which are read . */
+  /** Builds the set of symbols which are read
+   * do not consider layer, those represent memory cells to be loaded */
   def symbols: immutable.HashSet[String] =
     this match {
       case Read(s) => HashSet(s)
       case Param(s) => HashSet(s)
-      case l: ASTL.Layer[_, _] => HashSet(l.name)
+      case l: Layer2[_] => HashSet() //HashSet(l.name)
       case _ => inputNeighbors.map(e => e.symbols).foldLeft(HashSet.empty[String])((x, y) => x.union(y))
     }
 
@@ -69,26 +67,27 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
       case l: Layer2[_] => "Layer2 " + this.name + ":" + mym.name
       case _ => throw new RuntimeException("merdouille")
   }
-  /**
-   * Important to specify that the L,R type of AST nodes is preserved, for type checking consistency
-   * Surprisingly, when building ASTL explicitely, we need to drop the fact that the type is preserved, and go from ASTL[L,R] to ASTLg
-   * Transform a Dag of AST into a forest of trees, removes the delayed.
-   *
-   * @param usedTwice  dags which are used twice, or which need to be affected for some other reason.
-   * @param repr: representant of the equivalence class with respect to equal on case class hierarchy
-   * @param replaced: map encoding a substitution.
-   * @return the Dag where expression used more than once are replaced by read.
-   */
-  def deDag(usedTwice: immutable.HashSet[AST[_]], repr: Map[AST[_], AST[_]], replaced: Map[AST[_], AST[_]]): AST[T] = {
-    if (usedTwice.contains(this)) new Read[T](repr(this).name)(mym.asInstanceOf[repr[T]]) else if (replaced.contains(this)) replaced(this).asInstanceOf[AST[T]].deDag(usedTwice, repr, replaced)
-    else this match {
-      case Param(_) => throw new RuntimeException("bordel de merde") //; new Read[T](repr(this).name)(mym.asInstanceOf[repr[T]])
-      case _ => this.propagate((d: AST[T]) => d.deDag(usedTwice, repr, replaced))
-    }
-  }
+
+  /*  /**
+     * @param usedTwice  dags which are used twice, or which need to be affected for some other reason.
+     * @param repr: representant of the equivalence class with respect to equal on case class hierarchy
+     * @param replaced: map encoding a substitution.
+     * @return the Dag where expression used more than once are replaced by read.
+     */
+    def deDag(usedTwice: immutable.HashSet[AST[_]], repr: Map[AST[_], AST[_]], replaced: Map[AST[_], AST[_]]): AST[T] = {
+      if (usedTwice.contains(this)) new Read[T](repr(this).name)(mym.asInstanceOf[repr[T]]) else if (replaced.contains(this)) replaced(this).asInstanceOf[AST[T]].deDag(usedTwice, repr, replaced)
+      else this match {
+        case Param(_) => throw new RuntimeException("bordel de merde") //; new Read[T](repr(this).name)(mym.asInstanceOf[repr[T]])
+        case _ => this.propagate((d: AST[T]) => d.deDag(usedTwice, repr, replaced))
+      }
+    }*/
 
   /**
    * Transform a Dag of AST into a forest of trees, removes the delayed.
+   * Important to specify that the L,R type of AST nodes is preserved, for type checking consistency
+   * Surprisingly, when building ASTL explicitely, we need to drop the fact that the type is preserved, and go from ASTL[L,R] to ASTLg
+   * Transform a Dag of AST into a forest of trees, removes the delayed.
+   * *
    *
    * @param usedTwice dags which are used twice, or which need to be affected for some other reason.
    * @param repr      : representant of the equivalence class with respect to equal on case class hierarchy
@@ -108,32 +107,21 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
   //    newthis
   //  }
 
-  /**
-   * * @param cur The current programm
-   * * @param nbitLB Stores number of bits of subfields.
-   * * @param tSymb The symbol table with number of bits
-   * * @param newFuns Functions generated
-   * * @return Expression rewritten so as to include Extend where necessary.
-   *
-   */
-  def bitIfy(cur: DataProg[_, InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[DataProg[_, InfoNbit[_]]]): AST[T] = {
-    val newthis = this.propagate((d: AST[T]) => d.bitIfy(cur, nbitLB, tSymb, newFuns))
-    nbitLB += (newthis -> newthis.newNbitAST2(nbitLB, tSymb, newFuns))
-    newthis.setName(this.name);
-    newthis
-  }
+  /*  /**
+     * * @param cur The current programm
+     * * @param nbitLB Stores number of bits of subfields.
+     * * @param tSymb The symbol table with number of bits
+     * * @param newFuns Functions generated
+     * * @return Expression rewritten so as to include Extend where necessary.
+     *
+     */
+    def bitIfy(cur: DataProg[_, InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[DataProg[_, InfoNbit[_]]]): AST[T] = {
+      val newthis = this.propagate((d: AST[T]) => d.bitIfy(cur, nbitLB, tSymb, newFuns))
+      nbitLB += (newthis -> newthis.newNbitAST2(nbitLB, tSymb, newFuns))
+      newthis.setName(this.name);
+      newthis
+    }*/
 
-  /**
-   * @param nbitLB  Stores number of bits of subfields.
-   * @param tSymb   The symbol table with number of bits
-   * @param newFuns Functions generated
-   * @return number of bits needed to store the expression this,  using  mutable structures, that have  been previously updated.
-   */
-  def newNbitAST2(nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[DataProg[_, InfoNbit[_]]]): Int = this.asInstanceOf[AST[_]] match {
-    case Param(s) => tSymb(s).nb
-    case Read(s) => tSymb(s).nb
-    case t: Layer2[_] => t.nbit
-  }
 
   //
   //  /** Compute the number of bits needed, using  mutable structures, that have  been previously updated. */
@@ -293,9 +281,12 @@ object AST {
    * @tparam T
    * Unlike other constructors,  Layer is not defined as a case class,
    * otherwise equality between any two layer of identical number of bits would allways hold
-   * Layer2 is an AST constructor, because it is used to also stores system instructions.
+   * Layer2 is an AST constructor, because it is used both in ASTL and ASTB
+   * it is used to also stores system instructions.
    **/
   abstract class Layer2[T](val nbit: Int)(implicit m: repr[T]) extends AST[T]() with EmptyBag[AST[_]] with Strate2[T] {
+    protected var sysInstr: List[UsrInstr[AST[_]]] = List.empty;
+
     val v = 1
     /** the value at t, which  is represented as  the layer itself. */
     val pred: AST[T] = this
@@ -309,7 +300,7 @@ object AST {
     override def other: List[AST[_]] = next :: super.other
 
     /** instructions also includes updating the layer by storing the next value.  */
-    override def sysInstrs: List[UsrInstr[AST[_]]] = UsrInstr.memorize(next).asInstanceOf[UsrInstr[AST[_]]] :: super.sysInstrs
+    def sysInstrs: List[UsrInstr[AST[_]]] = UsrInstr.memorize(next).asInstanceOf[UsrInstr[AST[_]]] :: sysInstrs
 
     /** system instruction can be associated to any spatial field, so as to be latter retrievable from the compiling method. */
     private var sysInstr2: List[CallProc] = List.empty;

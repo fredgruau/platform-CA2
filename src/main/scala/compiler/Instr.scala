@@ -25,7 +25,7 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
 
   def propagate(id1: rewriteAST2): Instr
 
-  override def aligned = !alignPerm.isEmpty //faut de mefier, ca va pas marcher pour load?
+  override def aligned = !alignPerm.isEmpty //faut se mefier, ca va pas marcher pour load?
   def useless = false
 
   /** true for instruction part or Transfer Connected Components */
@@ -117,14 +117,13 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
    * @param newFuns Functions generated
    * @return The instructions rewritten so as to include Extend where necessary.
    */
-  def
-  bitIfy(cur: DataProg[_, InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[DataProg[_, InfoNbit[_]]]): Instr = this match {
+  def bitIfy(cur: DataProg[_, InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[DataProg[_, InfoNbit[_]]]): Instr = this match {
     case Affect(s, exp) =>
-      val newExp = exp.bitIfy(cur, nbitLB, tSymb, newFuns)
+      val newExp = exp.asInstanceOf[ASTLt[_, _]].bitIfy(cur, nbitLB, tSymb)
       tSymb += s -> new InfoNbit(cur.tSymbVar(s).t, cur.tSymbVar(s).k, nbitLB(newExp));
       Affect(s, newExp).asInstanceOf[Instr]
     case CallProc(f, names, exps) =>
-      val newexps = exps.map(_.bitIfy(cur, nbitLB, tSymb, newFuns))
+      val newexps = exps.map(_.asInstanceOf[ASTLt[_, _]].bitIfy(cur, nbitLB, tSymb))
       val nbitarg = newexps.map(a => nbitLB(a)) //.toList.flatten
       val newnamef = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _)
       if (sysInstr.contains(f))
@@ -159,7 +158,11 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
         e.asInstanceOf[List[ASTLt[_, _]]].flatMap(_.unfoldSpace(m)))) //tSymb(n).t._1
     }
 
-  def align(cs: TabSymb[Constraint]): Unit = alignPerm = a(this).exp.asInstanceOf[ASTLt[_, _]].align(cs, names.head)
+  /*
+
+    def align(cs: TabSymb[Constraint]): Unit =
+      alignPerm = a(this).exp.asInstanceOf[ASTLt[_, _]].align(cs, names.head)
+  */
 
 }
 
@@ -229,7 +232,7 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
    * because the parameter or the layer is already present in the memory of the CA
    */
   override def useless: Boolean = exp match {
-    case _: ASTL.Layer[_, _] => true
+    case _: Layer2[_] => true
     case Param(_) => true
     case _ => false
   }
@@ -243,22 +246,22 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
   override def isTransfer: Boolean = exp.asInstanceOf[ASTLt[_, _]].locus.isInstanceOf[TT] // || exp.isInstanceOf[Red2[_,_,_]]
   override def propagate(id1: rewriteAST2): Instr = Affect(name, id1(exp))
 
+
+  /*  def align2(cs: TabSymb[Constraint]): Affect[_] = {
+      val toto = exp.asInstanceOf[ASTLt[_, _]].align2
+      val tree = toto._1
+      val algn = toto._4
+      val c = toto._2
+      val instrs = toto._3
+      val newAffect = Affect(name, tree)
+      newAffect.alignPerm = algn
+      if (c != None) cs.addOne(name -> c.get)
+      newAffect
+    }*/
   /**
    *
    * @param cs
    */
-  def align2(cs: TabSymb[Constraint]): Affect[_] = {
-    val toto = exp.asInstanceOf[ASTLt[_, _]].align2
-    val tree = toto._1
-    val algn = toto._4
-    val c = toto._2
-    val instrs = toto._3
-    val newAffect = Affect(name, tree)
-    newAffect.alignPerm = algn
-    if (c != None) cs.addOne(name -> c.get)
-    newAffect
-  }
-
   def align3(cs: TabSymb[Constraint]): Affect[_] = {
     val r = Result()
     val newExp = exp.asInstanceOf[ASTLt[_, _]].align3(r)
@@ -339,26 +342,29 @@ case class UsrInstr[+T](c: Codop, exp: AST[_]) extends Instr {
   def usedVars = immutable.HashSet.empty[String]
   val names = List(); override def toString: String = pad(c.toString.substring(2), 25) + "<-  " + exp.toStringTree
 
-  /**
-   * Generate the affect instructions from a memorize, display or bugif instruction.
-   *  for display if variable has also been used somewhere else, no affect needs to be generated
-   *  @param expFather the expression associated either pictured, debugged or the layer if it is a memorize
-   *  @param usedForCompute true if expression is also used in the computation (meaning it has been stored already)
-   */
-  def affectize(expFather: AST[_], usedForCompute: Boolean, t: TabSymb[InfoType[_]]): Option[Affect[_]] =
-    c match {
-      case Memorize() =>
-        val nbit = expFather.asInstanceOf[ASTL.Layer[_, _]].nbit
-        addSymbL(t, expFather, LayerField(nbit)); Some(Affect("l" + expFather.name, exp))
-      case Bugif() =>
-        if (usedForCompute) throw new RuntimeException("Debug exp is allzero=>not usable for compute")
-        val b=t.contains(exp.name)
-        addSymb(t, exp, BugifField(expFather.name))
-        if (b)  None
-        else  Some(Affect(exp.name, exp))   //the bugif has allready been generated, we need to change the varialbe
-      case Display() => if (usedForCompute || t.contains(exp.name)) None
-      else { addSymb(t, exp, DisplayField(expFather.name, usedForCompute)); Some(Affect(exp.name, exp)) }
-    }
+  /*
+
+    /**
+     * Generate the affect instructions from a memorize, display or bugif instruction.
+     *  for display if variable has also been used somewhere else, no affect needs to be generated
+     *  @param expFather the expression associated either pictured, debugged or the layer if it is a memorize
+     *  @param usedForCompute true if expression is also used in the computation (meaning it has been stored already)
+     */
+    def affectize(expFather: AST[_], usedForCompute: Boolean, t: TabSymb[InfoType[_]]): Option[Affect[_]] =
+      c match {
+        case Memorize() =>
+          val nbit = expFather.asInstanceOf[ASTL.Layer[_, _]].nbit
+          addSymbL(t, expFather, LayerField(nbit)); Some(Affect("l" + expFather.name, exp))
+        case Bugif() =>
+          if (usedForCompute) throw new RuntimeException("Debug exp is allzero=>not usable for compute")
+          val b=t.contains(exp.name)
+          addSymb(t, exp, BugifField(expFather.name))
+          if (b)  None
+          else  Some(Affect(exp.name, exp))   //the bugif has allready been generated, we need to change the varialbe
+        case Display() => if (usedForCompute || t.contains(exp.name)) None
+        else { addSymb(t, exp, DisplayField(expFather.name, usedForCompute)); Some(Affect(exp.name, exp)) }
+      }
+  */
 
   /** true for instruction part or Transfer Connected Components */
   override def isTransfer: Boolean = exp.mym.name.isInstanceOf[TT]

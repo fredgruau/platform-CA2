@@ -57,25 +57,6 @@ object ASTL {
     val next: ASTLt[L, R]
   }
 
-  /** Unlike other constructors,  Layer is not defined as a case class, otherwise equality between two layer of identical number of bits would allways hold */
-  abstract class Layer[L <: Locus, R <: Ring](val nbit: Int)(implicit m: repr[L], n: repr[R]) extends ASTL[L, R]() with EmptyBag[AST[_]] with Strate[L, R] {
-    val v = 1
-    /** the value at t, which  is represented as  the layer itself. */
-    val pred: ASTL[L, R] = this
-
-    /** @param a allows to visualize "this" with a minimalistic coloring load on the screen */
-    def render(a: ASTL.ASTLg) {
-      sysInstr ::= UsrInstr.display(a).asInstanceOf[UsrInstr[AST[_]]]
-    }
-
-    /** needed to visite the next fields */
-    override def other: List[AST[_]] = next :: super.other
-
-    /** instructions also includes updating the layer by storing the next value.  */
-    override def sysInstrs: List[UsrInstr[AST[_]]] = UsrInstr.memorize(next).asInstanceOf[UsrInstr[AST[_]]] :: super.sysInstrs
-  }
-
-
   def rotL[T](a: Array[T])(implicit m: ClassTag[T]): Array[T] = a.drop(1) :+ a(0)
 
   def rotR[T](a: Array[T])(implicit m: ClassTag[T]): Array[T] = a(a.length - 1) +: a.take(a.length - 1)
@@ -104,9 +85,6 @@ object ASTL {
   //type bij2[L <: Locus, R <: Ring] = ASTL[L, R] => ASTL[L, R]
 
   /** ***************the wrapper *******************/
-  def displayIn(l: Layer[_ <: Locus, _ <: Ring], f: ASTLg): Unit = l.render(f)
-
-  def bugIfIn(l: Layer[_ <: Locus, _ <: Ring], f: ASTL[_ <: Locus, B]): Unit = l.bugif(f)
 
   def const[L <: Locus, R <: Ring](cte: ASTB[R])(implicit m: repr[L], n: repr[R]): Coonst[L, R] = Coonst(cte, m, n)
 
@@ -261,9 +239,8 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
   override def toString: String =
     this.asInstanceOf[ASTL[_, _]] match {
       //  case Layer(s, _)                 => "Layer " + this.name + ":" + locus.toString.charAt(0) + "-" + ring.toString.charAt(0)
-      case _: Layer[_, _] => "Layer " + this.name + ":" + locus.toString.charAt(0) + "-" + ring.toString.charAt(0)
-      case Binop(op, _, _, _, _) => op.namef
-      case Coonst(cte, _, _) => "Const" + cte.toString + locus.toString.charAt(0) + "_" + ring.toString.substring(0, ring.toString.length() - 2);
+     case Binop(op, _, _, _, _) => op.namef
+     case Coonst(cte, _, _) => "Const" + cte.toString + locus.toString.charAt(0) + "_" + ring.toString.substring(0, ring.toString.length() - 2);
 
       //  case Multop(op, args,_,_)      => op.toString
       case Unop(op, _, _, _) => op.namef
@@ -300,39 +277,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
     newD.asInstanceOf[ASTL[L, R]]
   }
 
-  //
-  //  override def nbit(cur: ProgData1[_], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): ASTLt[L, R] = {
-  //    val nbitB = immutable.HashMap.empty[AST[_], Int] //stores the bit number of an ASTB expression
-  //    val nbitP = mutable.HashMap.empty[Param[_], Int] //virgin, to retrieve the nbits computed for the param.
-  //    val result = this match {
-  //      case Binop(op, a, a2, l2, r2) => //BINOP needs more work, because it triggers possible insertion of a new node "extend";
-  //        var anew = a.nbit(cur, nbitLB, tSymb, newFuns); var a2new = a2.nbit(cur, nbitLB, tSymb, newFuns)
-  //        //we start evaluation of binop by adding the number of bits of the arguments
-  //        val startnbitB = nbitB + (op.p1 -> nbitLB(anew)) + (op.p2 -> nbitLB(a2new))
-  //        val nbitResult = ASTB.nBitR(startnbitB, op.arg, nbitP) //retrieves the number of bit computed from the call to the ASTBfun.
-  //        if (nbitP.contains(op.p1)) anew = anew.extendMe(nbitP(op.p1))
-  //        if (nbitP.contains(op.p2)) a2new = a2new.extendMe(nbitP(op.p2))
-  //        val newthis = Binop(op, anew, a2new, l2, r2)
-  //        nbitLB += newthis -> nbitResult //the hashtable stores the number of bits of the newly computed tree.
-  //        newthis
-  //      case _ => //in all the other cases, no change is done on the AST, only  nbitLB is updated.
-  //        val newthis = this.propagateASTL((d: ASTLt[L, R]) => d.nbit(cur, nbitLB, tSymb, newFuns))
-  //
-  //        def newNbit() = nbitLB(newthis.asInstanceOf[Singleton[AST[_]]].arg) //the nbit value of the arg is stored in nbitLB
-  //        nbitLB += newthis -> (newthis.asInstanceOf[ASTL[_, _]] match {
-  //          // case l:Layer[_,_] =>  l.nbit
-  //          case Coonst(cte, _, _) => ASTB.nBitR(nbitB, cte, nbitP)
-  //          case Unop(op, _, _, _) => ASTB.nBitR(nbitB + (op.p1 -> newNbit()), op.arg, nbitP)
-  //          case Redop(_, _, _, _) | Clock(_, _) | Transfer(_, _, _) | Broadcast(_, _, _) | Sym(_, _, _, _) => newNbit()
-  //          case Send(_) => nbitLB(newthis.asInstanceOf[Neton[AST[_]]].args.head)
-  //          //FIXME for the concat redop, the number of bit must take into account the arity (2,3, or 6)
-  //        })
-  //        newthis
-  //    };
-  //    result.setName(this.name);
-  //    result
-  //  }
-  //
+
   /**
    * * @param cur The current programm
    * * @param nbitLB Stores number of bits of subfields.
@@ -342,14 +287,13 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
    * and one of the two operands has not enough bits.
    *
    */
-  override def bitIfy(cur: DataProg[_, InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]],
-                      newFuns: TabSymb[DataProg[_, InfoNbit[_]]]): ASTLt[L, R] = {
+  override def bitIfy(cur: DataProg[_, InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
     val nbitB = immutable.HashMap.empty[AST[_], Int] //stores the bit number of an ASTB expression
     val nbitP = mutable.HashMap.empty[Param[_], Int] //virgin, to retrieve the nbits computed for the param.
     val result = this match {
       case Binop(op, a, a2, l2, r2) => //BINOP needs more work, because it triggers possible insertion of a new node "extend";
-        var anew = a.bitIfy(cur, nbitLB, tSymb, newFuns);
-        var a2new = a2.bitIfy(cur, nbitLB, tSymb, newFuns)
+        var anew = a.bitIfy(cur, nbitLB, tSymb);
+        var a2new = a2.bitIfy(cur, nbitLB, tSymb)
         //we start evaluation of binop by adding the number of bits of the arguments
         val startnbitB = nbitB + (op.p1 -> nbitLB(anew)) + (op.p2 -> nbitLB(a2new))
         val nbitResult = ASTB.nBitR(startnbitB, op.arg, nbitP) //retrieves the number of bit computed from the call to the ASTBfun.
@@ -359,7 +303,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         nbitLB += newthis -> nbitResult //the hashtable stores the number of bits of the newly computed tree.
         newthis
       case _ => //in all the other cases, no change is done on the AST, only  nbitLB is updated.
-        val newthis = this.propagateASTL((d: ASTLt[L, R]) => d.bitIfy(cur, nbitLB, tSymb, newFuns))
+        val newthis = this.propagateASTL((d: ASTLt[L, R]) => d.bitIfy(cur, nbitLB, tSymb))
 
         def newNbit() = nbitLB(newthis.asInstanceOf[Singleton[AST[_]]].arg) //the nbit value of the arg is stored in nbitLB
         nbitLB += newthis -> (newthis.asInstanceOf[ASTL[_, _]] match {
@@ -504,156 +448,155 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
     newExp.asInstanceOf[ASTL[L, R]]
   }
 
-  /**
-   *
-   * @return tree with some id being replaced by shifted version,
-   *         cycle constraint, instruction setting the shifted version, alignement with respect to used variables.
-   */
-  override def align2: (ASTLg, Option[Constraint], iTabSymb2[ShiftInstr], iTabSymb2[Array[Int]]) =
-    this.asInstanceOf[ASTLg] match { //read and Call treated in ASTLt.
-      case Coonst(_, _, _) => (this, None, immutable.HashMap.empty, immutable.HashMap.empty)
-      case Broadcast(arg, _, _) =>
-        val toto = arg.align2;
-        val tree = toto._1;
-        val algn = toto._4
-        (tree.asInstanceOf[ASTLg], None, immutable.HashMap.empty, algn.map { case (k, _) => k -> arg.locus.proj }) //does not depend on v, because v is constant
-      case e@Send(args) => {
-        var newArgs = List[ASTLt[S, Ring]]()
-        var aligns: iTabSymb2[Array[Int]] = immutable.HashMap.empty[String, Array[Int]]
-        for (arg <- args) {
-          val toto = arg.align2
-          val tree = toto._1
-          val algn = toto._4
-          newArgs = tree.asInstanceOf[ASTLt[S, Ring]] :: newArgs
-          aligns ++= algn.map({ case (k, _) => k -> arg.locus.proj }) //Todo we could have the same pb has in binop here.
-        }
-        (e.copy(args = newArgs)(lpart(e.mym), rpart(e.mym)), None, immutable.HashMap.empty, aligns)
-      }
-      case e@Transfer(arg, _, _) =>
-        val T(s1, s2) = arg.locus;
-        val t = hexPermut((s1, s2));
-        val toto = arg.align2
-        val tree = toto._1
-        val algn = toto._4
-        val c = toto._2
-        val instrs = toto._3
-        (e.copy(arg = tree.asInstanceOf[ASTLt[T[S, S], Ring]]), permute(c, t, e.locus), instrs, composeAll2(t, algn))
-      case e@Unop(_, arg, _, _) => val toto = arg.align2
-        val tree = toto._1
-        val algn = toto._4
-        val c = toto._2
-        val instrs = toto._3
-        (e.copy(arg = tree.asInstanceOf[ASTLt[Locus, Ring]]), c, instrs, algn)
+  /* /**
+    *
+    * @return tree with some id being replaced by shifted version,
+    *         cycle constraint, instruction setting the shifted version, alignement with respect to used variables.
+    */
+   override def align2: (ASTLg, Option[Constraint], iTabSymb2[ShiftInstr], iTabSymb2[Array[Int]]) =
+     this.asInstanceOf[ASTLg] match { //read and Call treated in ASTLt.
+       case Coonst(_, _, _) => (this, None, immutable.HashMap.empty, immutable.HashMap.empty)
+       case Broadcast(arg, _, _) =>
+         val toto = arg.align2;
+         val tree = toto._1;
+         val algn = toto._4
+         (tree.asInstanceOf[ASTLg], None, immutable.HashMap.empty, algn.map { case (k, _) => k -> arg.locus.proj }) //does not depend on v, because v is constant
+       case e@Send(args) => {
+         var newArgs = List[ASTLt[S, Ring]]()
+         var aligns: iTabSymb2[Array[Int]] = immutable.HashMap.empty[String, Array[Int]]
+         for (arg <- args) {
+           val toto = arg.align2
+           val tree = toto._1
+           val algn = toto._4
+           newArgs = tree.asInstanceOf[ASTLt[S, Ring]] :: newArgs
+           aligns ++= algn.map({ case (k, _) => k -> arg.locus.proj }) //Todo we could have the same pb has in binop here.
+         }
+         (e.copy(args = newArgs)(lpart(e.mym), rpart(e.mym)), None, immutable.HashMap.empty, aligns)
+       }
+       case e@Transfer(arg, _, _) =>
+         val T(s1, s2) = arg.locus;
+         val t = hexPermut((s1, s2));
+         val toto = arg.align2
+         val tree = toto._1
+         val algn = toto._4
+         val c = toto._2
+         val instrs = toto._3
+         (e.copy(arg = tree.asInstanceOf[ASTLt[T[S, S], Ring]]), permute(c, t, e.locus), instrs, composeAll2(t, algn))
+       case e@Unop(_, arg, _, _) => val toto = arg.align2
+         val tree = toto._1
+         val algn = toto._4
+         val c = toto._2
+         val instrs = toto._3
+         (e.copy(arg = tree.asInstanceOf[ASTLt[Locus, Ring]]), c, instrs, algn)
 
-      case e@Binop(_, arg, arg2, _, _) =>
-        //We compute the cycle  constraint here, because we can
-        val toto = arg.align2
-        val tree = toto._1
-        val algn = toto._4
-        val c = toto._2
-        val instrs = toto._3
-        var newTree = tree
-        val toto2 = arg2.align2
-        val tree2 = toto2._1
-        val algn2 = toto2._4
-        val c2 = toto2._2
-        val instrs2 = toto2._3
-        var c3 = intersect(c, c2)
-        var newInstr = instrs ++ instrs2
-        var newAlign = algn ++ algn2 //arg2 has priority over arg if re-use
-        val k = algn.keys.toSet.intersect(algn2.keys.toSet)
-        if (k.nonEmpty) { //k is the aux defined by an instr which will have to use two registers.
-          val e = k.head //here we assume that there is a single input variable
-          assert(k.size == 1, " more than one to aligne !")
-          if (!(algn(e) sameElements algn2(e))) {
-            val perm = compose(invert(algn(e)), algn2(e))
-            val shiftedE = "shift" + e
-            c3 = intersect(c3, Some(Cycle(perm, locus.asInstanceOf[TT])))
-            val shiftInstr = ShiftInstr(shiftedE, e, perm)
-            newInstr += e -> shiftInstr //TODO le align perm on peut le faire ensuite!
-            newAlign += shiftedE -> algn(e)
-            newTree = tree.replaceBy(e, shiftedE)
-          }
-        }
-        (e.copy(arg = newTree.asInstanceOf[ASTLt[Locus, Ring]], arg2 = tree2.asInstanceOf[ASTLt[Locus, Ring]]), c3, newInstr, newAlign)
+       case e@Binop(_, arg, arg2, _, _) =>
+         //We compute the cycle  constraint here, because we can
+         val toto = arg.align2
+         val tree = toto._1
+         val algn = toto._4
+         val c = toto._2
+         val instrs = toto._3
+         var newTree = tree
+         val toto2 = arg2.align2
+         val tree2 = toto2._1
+         val algn2 = toto2._4
+         val c2 = toto2._2
+         val instrs2 = toto2._3
+         var c3 = intersect(c, c2)
+         var newInstr = instrs ++ instrs2
+         var newAlign = algn ++ algn2 //arg2 has priority over arg if re-use
+         val k = algn.keys.toSet.intersect(algn2.keys.toSet)
+         if (k.nonEmpty) { //k is the aux defined by an instr which will have to use two registers.
+           val e = k.head //here we assume that there is a single input variable
+           assert(k.size == 1, " more than one to aligne !")
+           if (!(algn(e) sameElements algn2(e))) {
+             val perm = compose(invert(algn(e)), algn2(e))
+             val shiftedE = "shift" + e
+             c3 = intersect(c3, Some(Cycle(perm, locus.asInstanceOf[TT])))
+             val shiftInstr = ShiftInstr(shiftedE, e, perm)
+             newInstr += e -> shiftInstr //TODO le align perm on peut le faire ensuite!
+             newAlign += shiftedE -> algn(e)
+             newTree = tree.replaceBy(e, shiftedE)
+           }
+         }
+         (e.copy(arg = newTree.asInstanceOf[ASTLt[Locus, Ring]], arg2 = tree2.asInstanceOf[ASTLt[Locus, Ring]]), c3, newInstr, newAlign)
 
-      case Redop(_, arg, _, _) => //we compute a constraint, that is implicitely, the constraint to be checked for partitionning the Reduction.
-        val (_, c, instrs, algn) = arg.align2
-        (this, c, instrs, algn) //Redop is done in 6 instruction that will be scheduled according to the alignemet of its operand.
-      //note that here, the expression has a simplicial type, thus, the alignement is not used to compute an alignement to a root,
-      //it will be used to schedule the 6 redop operations. we will have to compose with the alignement to the root of the reduced transfer variable.
-      case e@Clock(arg, dir) =>
-        val toto = arg.align2
-        val tree = toto._1
-        val algn = toto._4
-        val c = toto._2
-        val instrs = toto._3
-        val T(_, des) = this.locus;
-        val T(_, src) = arg.locus;
-        val trigo = !dir;
-        val atr = rotPerm(if (trigo) 1 else 5) //faudrait vérifier is c'est pas le contraire
-        val newTree = e.copy(arg = tree.asInstanceOf[ASTLt[T[S, S], Ring]])(lpart(e.mym), rpart(e.mym))
-        if ((src < des) ^ dir) (newTree, c, instrs, algn)
-        else (newTree, permute(c, atr, arg.locus), instrs, composeAll2(atr, algn))
-      case e@Sym(arg, _, _, _) =>
-        val toto = arg.align2
-        val tree = toto._1
-        val algn = toto._4
-        val c = toto._2
-        val instrs = toto._3
-        val newTree = e.copy(arg = tree.asInstanceOf[ASTLt[T[S, S], Ring]])
-        val T(_, des) = this.locus;
-        val T(s1, src) = arg.locus;
-        val atr = rotPerm(s1 match { case E() => 1 case F() => if (src < des) 1 else 2 case V() => 3 })
-        (newTree, permute(c, atr, arg.locus), instrs, composeAll2(atr, algn))
-      /* case l: Layer2[_, _] => immutable.HashMap(l.name -> l.locus.neutral)
-       */
+       case Redop(_, arg, _, _) => //we compute a constraint, that is implicitely, the constraint to be checked for partitionning the Reduction.
+         val (_, c, instrs, algn) = arg.align2
+         (this, c, instrs, algn) //Redop is done in 6 instruction that will be scheduled according to the alignemet of its operand.
+       //note that here, the expression has a simplicial type, thus, the alignement is not used to compute an alignement to a root,
+       //it will be used to schedule the 6 redop operations. we will have to compose with the alignement to the root of the reduced transfer variable.
+       case e@Clock(arg, dir) =>
+         val toto = arg.align2
+         val tree = toto._1
+         val algn = toto._4
+         val c = toto._2
+         val instrs = toto._3
+         val T(_, des) = this.locus;
+         val T(_, src) = arg.locus;
+         val trigo = !dir;
+         val atr = rotPerm(if (trigo) 1 else 5) //faudrait vérifier is c'est pas le contraire
+         val newTree = e.copy(arg = tree.asInstanceOf[ASTLt[T[S, S], Ring]])(lpart(e.mym), rpart(e.mym))
+         if ((src < des) ^ dir) (newTree, c, instrs, algn)
+         else (newTree, permute(c, atr, arg.locus), instrs, composeAll2(atr, algn))
+       case e@Sym(arg, _, _, _) =>
+         val toto = arg.align2
+         val tree = toto._1
+         val algn = toto._4
+         val c = toto._2
+         val instrs = toto._3
+         val newTree = e.copy(arg = tree.asInstanceOf[ASTLt[T[S, S], Ring]])
+         val T(_, des) = this.locus;
+         val T(s1, src) = arg.locus;
+         val atr = rotPerm(s1 match { case E() => 1 case F() => if (src < des) 1 else 2 case V() => 3 })
+         (newTree, permute(c, atr, arg.locus), instrs, composeAll2(atr, algn))
+       /* case l: Layer2[_, _] => immutable.HashMap(l.name -> l.locus.neutral)
+        */
 
-    }
+     }
 
-  /**
-   *
-   * @param cs
-   * @param v
-   * @return
-   */
-  override def align(cs: TabConstr, v: String): iTabSymb[Array[Int]] = {
-    this.asInstanceOf[ASTLg] match { //read and Call treated in ASTLt.
-      case Coonst(_, _, _) => immutable.HashMap()
-      case Broadcast(arg, _, _) => arg.align(cs, v).map { case (k, _) => k -> arg.locus.proj } //does not depend on v, because v is constant
-      case Send(args) => immutable.HashMap.empty ++ args.flatMap(a => a.align(cs, v).map { case (k, _) => k -> a.locus.proj }) //we can make  a union because does not depend on v
-      case Transfer(arg, _, _) =>
-        val T(s1, s2) = arg.locus; val t = hexPermut((s1, s2)); composeAll(t, arg.align(cs, v))
-      case Unop(_, arg, _, _) => arg.align(cs, v)
-      case Binop(_, arg, arg2, _, _) =>
-        //be compute the constraint cycle here, because we can
-        val a1 = arg.align(cs, v);
-        val a2 = arg2.align(cs, v)
-        val k = a1.keys.toSet.intersect(a2.keys.toSet)
-        if (k.nonEmpty) { //k is the aux defined by an instr which will have to use two registers.
-          val e = k.head //here we assume that there is a single input variable
-          if (!(a1(e) sameElements a2(e)))
-            cs += v -> Cycle(compose(invert(a1(e)), a2(e)), locus.asInstanceOf[TT]);
+   /**
+    *
+    * @param cs
+    * @param v
+    * @return
+    */
+   override def align(cs: TabConstr, v: String): iTabSymb[Array[Int]] = {
+     this.asInstanceOf[ASTLg] match { //read and Call treated in ASTLt.
+       case Coonst(_, _, _) => immutable.HashMap()
+       case Broadcast(arg, _, _) => arg.align(cs, v).map { case (k, _) => k -> arg.locus.proj } //does not depend on v, because v is constant
+       case Send(args) => immutable.HashMap.empty ++ args.flatMap(a => a.align(cs, v).map { case (k, _) => k -> a.locus.proj }) //we can make  a union because does not depend on v
+       case Transfer(arg, _, _) =>
+         val T(s1, s2) = arg.locus; val t = hexPermut((s1, s2)); composeAll(t, arg.align(cs, v))
+       case Unop(_, arg, _, _) => arg.align(cs, v)
+       case Binop(_, arg, arg2, _, _) =>
+         //be compute the constraint cycle here, because we can
+         val a1 = arg.align(cs, v);
+         val a2 = arg2.align(cs, v)
+         val k = a1.keys.toSet.intersect(a2.keys.toSet)
+         if (k.nonEmpty) { //k is the aux defined by an instr which will have to use two registers.
+           val e = k.head //here we assume that there is a single input variable
+           if (!(a1(e) sameElements a2(e)))
+             cs += v -> Cycle(compose(invert(a1(e)), a2(e)), locus.asInstanceOf[TT]);
+         }
+         a1 ++ a2 //arg2 has priority over arg if non equal
+       case Redop(_, arg, _, _) => //we compute a constraint, that is implicitely, the constraint to be checked for partitionning the Reduction.
 
-        }
-        a1 ++ a2 //arg2 has priority over arg if non equal
-      case Redop(_, arg, _, _) => //we compute a constraint, that is implicitely, the constraint to be checked for partitionning the Reduction.
-
-        arg.align(cs, v) //Redop is done in 6 instruction that will be scheduled according to the alignemet of its operand.
-      //note that here, the expression has a simplicial type, thus, the alignement is not used to compute an alignement to a root,
-      //it will be used to schedule the 6 redop operations. we will have to compose with the alignement to the root of the reduced transfer variable.
+         arg.align(cs, v) //Redop is done in 6 instruction that will be scheduled according to the alignemet of its operand.
+       //note that here, the expression has a simplicial type, thus, the alignement is not used to compute an alignement to a root,
+       //it will be used to schedule the 6 redop operations. we will have to compose with the alignement to the root of the reduced transfer variable.
 
 
-      case Clock(arg, dir) =>
-        val T(_, des) = this.locus;
-        val T(_, src) = arg.locus;
-        val trigo = !dir;
-        val atr = rotPerm(if (trigo) 1 else 5) //faudrait vérifier is c'est pas le contraire
-        if ((src < des) ^ dir) arg.align(cs, v) else composeAll(atr, arg.align(cs, v))
-      case Sym(arg, _, _, _) =>
-        val T(_, des) = this.locus; val T(s1, src) = arg.locus; val atr = rotPerm(s1 match { case E() => 1 case F() => if (src < des) 1 else 2 case V() => 3 }); composeAll(atr, arg.align(cs, v))
-      case l: Layer[_, _] => immutable.HashMap(l.name -> l.locus.neutral)
-    }
-  }
+       case Clock(arg, dir) =>
+         val T(_, des) = this.locus;
+         val T(_, src) = arg.locus;
+         val trigo = !dir;
+         val atr = rotPerm(if (trigo) 1 else 5) //faudrait vérifier is c'est pas le contraire
+         if ((src < des) ^ dir) arg.align(cs, v) else composeAll(atr, arg.align(cs, v))
+       case Sym(arg, _, _, _) =>
+         val T(_, des) = this.locus; val T(s1, src) = arg.locus; val atr = rotPerm(s1 match { case E() => 1 case F() => if (src < des) 1 else 2 case V() => 3 }); composeAll(atr, arg.align(cs, v))
+       case l: Layer[_, _] => immutable.HashMap(l.name -> l.locus.neutral)
+     }
+   }*/
 }
 

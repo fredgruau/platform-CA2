@@ -3,7 +3,6 @@ package compiler
 import compiler.AST._
 import compiler.ASTB.{Tminus1, shiftL, shiftR}
 import compiler.ASTBfun.ASTBg
-import compiler.ProgData._
 import compiler.Circuit._
 
 import scala.collection._
@@ -45,8 +44,10 @@ abstract class Circuit[L <: Locus, R <: Ring](override val p: Param[_]*) extends
     val prog3 = prog2.procedurIfy(); //print(prog3);
     val prog4: DataProg[_, InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
     // print(prog4 + "\n\n")
-    val prog5: DataProg[_, InfoNbit[_]] = prog4.macroIfy(); // print(prog5 + "\n\n")
-    val prog7 = prog5.unfoldSpace(m); //print(prog7)
+    val prog5: DataProg[_, InfoNbit[_]] = prog4.macroIfy();
+    print(prog5 + "\n\n")
+    val prog6: DataProg[_, InfoNbit[_]] = prog5.foldRegister()
+    //  val prog7 = prog5.unfoldSpace(m); //print(prog7)
   }
 }
 
