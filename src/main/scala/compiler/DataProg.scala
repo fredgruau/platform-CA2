@@ -30,7 +30,7 @@ object DataProg {
   def apply[T](f: Fundef[T]): DataProg[T, InfoType[_]] = {
     def getSysInstr(l: List[AST[_]]): List[CallProc] = l.collect { case la: Layer2[_] => la.systInstrs2 }.flatten
 
-    //TODO build the layer structure here, exploit tthat we have it!
+    //TODO build the layer structure here, exploit that we have it!
     val dag: Dag[AST[_]] = Dag()
     /** f.body  is the expression containing the value returned by the functions.
      * It  is the  access point to all the AST nodes needed to compute the function.
@@ -257,7 +257,7 @@ class DataProg[+T, U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[Dat
   def foldRegister(offset: Integer): DataProg[_, InfoNbit[_]] = {
 
 
-    val funs2 = funs.map { case (k, v) ⇒ k -> v.foldRegister() }
+    val funs2 = funs.map { case (k, v) ⇒ k -> v.foldRegister(0) }
     val p = this.asInstanceOf[DataProg[T, InfoNbit[_]]]
     if (!isLeafCaLoop) return new DataProg(dagis, funs2, p.tSymbVar, paramD, paramR)
     /** Each instruction affecting  name, has a set of constraint indexed with name. */
