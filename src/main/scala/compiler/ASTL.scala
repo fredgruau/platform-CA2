@@ -389,29 +389,29 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
   }
 
   /**
-   *
+   * @param r stores results consisting of alignement, shifted instructions, and generated constraints
    * @return tree with some id being replaced by shifted version,
    *         cycle constraint, instruction setting the shifted version, alignement with respect to used variables.
    */
-  override def align3(r: Result): ASTLt[L, R] = {
+  override def align(r: Result): ASTLt[L, R] = {
     val newExp = this.asInstanceOf[ASTLg] match { //read and Call treated in ASTLt.
       case Coonst(_, _, _) => this
       case Broadcast(arg, _, _) => r.algn = r.algn.map { case (k, v) => k -> arg.locus.proj }; this //does not depend on v, because v is constant
-      case e@Send(args) => val newArgs = args.map(_.align3(r)) //collects results in $r
+      case e@Send(args) => val newArgs = args.map(_.align(r)) //collects results in $r
         r.algn = r.algn.map { case (k, v) => k -> args.head.locus.proj } //does not depend on v, because v is constant
         e.copy(args = newArgs)(lpart(e.mym), rpart(e.mym))
       case e@Transfer(arg, _, _) =>
         val T(s1, s2) = arg.locus;
         val t = hexPermut((s1, s2));
-        val newArg = arg.align3(r);
+        val newArg = arg.align(r);
         r.c = permute(r.c, t, e.locus);
         r.algn = composeAll2(t, r.algn)
         e.copy(arg = newArg)
-      case e@Unop(_, arg, _, _) => e.copy(arg = arg.align3(r))
+      case e@Unop(_, arg, _, _) => e.copy(arg = arg.align(r))
       case e@Binop(_, arg, arg2, _, _) =>
-        var newArg = arg.align3(r)
+        var newArg = arg.align(r)
         val algn = r.algn
-        val newArg2 = arg2.align3(r)
+        val newArg2 = arg2.align(r)
         val k = algn.keys.toSet.intersect(r.algn.keys.toSet);
         assert(k.size <= 1, " more than one to aligne !")
         if (k.nonEmpty && !(algn(k.head) sameElements r.algn(k.head))) { //k is the aux defined by an instr which will have to use two registers.
@@ -425,18 +425,19 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
           newArg = newArg.replaceBy(e, shiftedE)
         }
         e.copy(arg = newArg, arg2 = newArg2)
-      case e@Redop(_, arg, _, _) => e.copy(arg = arg.align3(r))
+      case e@Redop(_, arg, _, _) => e.copy(arg = arg.align(r))
       case e@Clock(arg, dir) =>
-        val newArg = arg.align3(r)
+        val newArg = arg.align(r)
         val T(_, des) = this.locus;
         val T(_, src) = arg.locus;
         val trigo = !dir;
         val atr = rotPerm(if (trigo) 1 else 5) //faudrait vérifier is c'est pas le contraire
         if ((src < des) ^ dir) {
-          r.c = permute(r.c, atr, e.locus); r.algn = composeAll2(atr, r.algn)
+          r.c = permute(r.c, atr, e.locus);
+          r.algn = composeAll2(atr, r.algn)
         }
         e.copy(arg = newArg)(lpart(e.mym), rpart(e.mym))
-      case e@Sym(arg, _, _, _) => val newArg = arg.align3(r)
+      case e@Sym(arg, _, _, _) => val newArg = arg.align(r)
         val T(_, des) = this.locus;
         val T(s1, src) = arg.locus;
         val atr = rotPerm(s1 match { case E() => 1 case F() => if (src < des) 1 else 2 case V() => 3 });

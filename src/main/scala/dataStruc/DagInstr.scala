@@ -51,41 +51,51 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
   /**
    *
    * @param toBeReplaced predicate true for AST node to be replaced
-   * @return new DagInstr,  by replacing toBeReplaced nodes
-   *         *   by read expressions.
-   *         usage:    1-  with dedagify, for each AST nodes used more than once
-   *         2-   with procedurIfy, for expressions with head and tail, (e.isCoons)
-   *         3-  for effectiive data parameter in CallProc
-   *         *
-   **/
-  def affectIfy(toBeReplaced: AstPred): DagInstr = {
-    /** reads are removed from toBeRepl to not generatre x=x */
+   * @return   new DagInstr,  by replacing toBeReplaced nodes
+   *           *   by read expressions.
+   *           usage:    1-  with dedagify, for each AST nodes used more than once
+   *           2-   with procedurIfy, for expressions with head and tail, (e.isCoons)
+   *           3-  with bitify, for effective data parameter in CallProc
+   *           this will thus include system instructions such as memo or show
+   *           - for memo it is not apropriate, because store could be directly made
+   *           - neither is it for debug because we want to spare this computation
+   *           - for show it is because displayed film are normally computed anyway
+   *           and returning the array allows to avoid making tests all the time in the macro
+   *           the test will be done a single time in the enclosing fun which is not a macro*
+   ***/
+  def affectIfy(toBeReplaced: AstPred): DagInstr = { //TODO faire un seul appel pour éviter de reconstuire le DAG plusieurs fois
+    /** reads are removed from toBeReplaced to not generatre x=x */
     val toBeRepl: List[AST[_]] = dagAst.visitedL.filter(a => toBeReplaced(a) && isNotRead(a));
 
     toBeRepl.map(_.setNameIfNull());
+    val tobeReplIfNeeded: HashSet[AST[_]] = HashSet() ++ toBeRepl
     if (toSet(toBeRepl).size < toBeRepl.size) //since name are given by hand we check that no two names are equals
-      throw new RuntimeException("a name is reused two times")
+      throw new RuntimeException("a name is reused two times or we want to rewrite a read")
     val repr = represent
     val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.treeIfy(toBeReplaced, repr)
-    /** avoid generate e=read(e) when rewrite recursively the affected expression */
-    val deDagExclude = (e: AST[_]) => e.treeIfy((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
+    //val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.treeIfy(toBeReplaced, repr)
+    /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
+    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.treeIfy((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
 
     /** rewrite recursviely the affect expression. we use this slightly modified dedagExclude instead of dedagRewrite
      * to not generatre x=x  */
     val affectExpList = toBeRepl.map(deDagExclude)
 
-    /** the newly generated affect instruction */
+    /** returns the newly generated affect instruction */
     newAffect = affectExpList.map((e: AST[_]) => Affect(e.name, e))
     val rewrite: Instr => Instr = (i: Instr) => i.propagate(deDagRewrite)
-    propagateUnit(rewrite, newAffect)
+    propagateUnit(rewrite, newAffect) //computes input and output neighbors
   }
 
   /**
    * @return set of AST which are used twice within those instruction to be replaced by an affectation
    *         we must also add up usage from callProc instruction
    */
-  def inputTwice =
-    dagAst.inputTwice(visitedL.flatMap(_.exps))
+  def inputTwice: collection.Set[AST[_]] = {
+    val l: collection.Set[AST[_]] = dagAst.inputTwice(visitedL.flatMap(_.exps))
+    //  print(l)
+    l
+  }
 
 
   /**

@@ -35,26 +35,6 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
 
   def extendMe(n: Int): ASTLt[L, R] = ASTL.extend(n, this)(new repr(locus), new repr(ring))
 
-  //
-  //  override def deDag(usedTwice: immutable.HashSet[AST[_]], repr: Map[AST[_], AST[_]],
-  //                     replaced: Map[AST[_], AST[_]]): ASTLt[L, R] = {
-  //    val newD = if (usedTwice.contains(this)) new Read[(L, R)](repr(this).name)(mym) with ASTLt[L, R]
-  //    else if (replaced.contains(this)) replaced(this).deDag(usedTwice, repr, replaced)
-  //    else this match {
-  //      case a: ASTL[_, _] =>
-  //        if (a.isInstanceOf[Layer[_, _]])
-  //          new Read[(L, R)]("l" + repr(this).name)(mym) with ASTLt[L, R]
-  //        else a.propagateASTL((d: ASTLt[L, R]) => d.deDag(usedTwice, repr, replaced))
-  //      case _ => this.asInstanceOf[AST[_]] match {
-  //        case Param(_) => new Read[(L, R)]("p" + repr(this).name)(mym) with ASTLt[L, R]
-  //        case Read(_) => throw new RuntimeException("Deja dedagifié!")
-  //        case _ => this.propagate((d: AST[(L, R)]) => d.deDag(usedTwice, repr, replaced))
-  //      }
-  //    }
-  //    newD.setName(this.name);
-  //    newD.asInstanceOf[ASTLt[L, R]]
-  //  }
-
   /**
    * Important to specify that the L,R type of AST nodes is preserved, for type checking consistency
    * Surprisingly, when building ASTL explicitely, we need to drop the fact that the type is preserved,
@@ -72,8 +52,11 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
         a.propagateASTL(rewrite)
       case _ => this.asInstanceOf[AST[_]] match {
         case Param(_) => new Read[(L, R)]("p" + repr(this))(mym) with ASTLt[L, R]
+        case l: Layer2[_] => new Read[(L, R)](DataProg.lify(repr(this)))(mym) with ASTLt[L, R]
         case Read(_) => this //throw new RuntimeException("Deja dedagifié!")
-        case Delayed(arg) => arg().asInstanceOf[ASTLt[L, R]] //the useless delayed node is supressed
+        case Delayed(arg) => //arg.asInstanceOf[ASTLt[L, R]].propagate(rewrite)
+          arg().asInstanceOf[ASTLt[L, R]].treeIfy(usedTwice, repr) //the useless delayed node is supressed
+
         case _ => this.propagate((d: AST[(L, R)]) => d.treeIfy(usedTwice, repr))
       }
     }
@@ -170,24 +153,8 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
   /** Defined non empty in ASTL */
   def redExpr = List.empty[AST[_]]
 
-  /*
-    def align(cs: TabConstr, v: String): iTabSymb[Array[Int]] = this.asInstanceOf[AST[_]] match {
-      case Read(s) => immutable.HashMap(s -> locus.neutral)
-      case Param(s) => immutable.HashMap(s -> locus.neutral)
-    }
 
-    /**
-     *
-     * @return tree with some id being replaced by shifted version,
-     *         cycle constraint, instruction setting the shifted version, alignement with respect to used variables.
-     */
-    def align2: (ASTLt[_, _], Option[Constraint], iTabSymb2[ShiftInstr], iTabSymb2[Array[Int]]) = this.asInstanceOf[AST[_]] match {
-      case Read(s) => (this, None, immutable.HashMap.empty, immutable.HashMap(s -> locus.neutral))
-      case Param(s) => (this, None, immutable.HashMap.empty, immutable.HashMap(s -> locus.neutral))
-      case l: Layer2[_] => (this, None, immutable.HashMap.empty, immutable.HashMap.empty)
-    }*/
-
-  def align3(r: Result): ASTLt[L, R] = this.asInstanceOf[AST[_]] match {
+  def align(r: Result): ASTLt[L, R] = this.asInstanceOf[AST[_]] match {
     case Read(s) => r.algn = immutable.HashMap(s -> locus.neutral); this
     case Param(s) => r.algn = immutable.HashMap(s -> locus.neutral); this
     case l: Layer2[_] => ; this

@@ -18,33 +18,21 @@ import Circuit.AstPred
 abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named {
   val mym: repr[T] = m //if type of mym is set to repr[_] this allow covariance even if repr is not covariant
   /** system instruction can be associated to any spatial field, so as to be latter retrievable from the compiling method. */
-  //protected var sysInstr: List[UsrInstr[AST[_]]] = List.empty;
 
-
-  //def sysInstrs: List[UsrInstr[AST[_]]] = sysInstr //TODO defines sysInstr on ASTL's layer
-  //override def other: List[AST[_]] = sysInstr.map(_.exp) //so that compute nodes used in instructions can be directly explored.
-
-
-  //  /** generates a unique name starting by "aux" for AST which do not a name yet  */
-  //  def setNameIfNull()  = {
-  //    if (name == null) name = "_aux" + AST.getCompteur
-  //  }
-  //
-  //  /** Builds the set of affected symbols which are read. */
-  //  def reads: immutable.HashSet[String] = this match {
-  //    case Read(s) => HashSet(s)
-  //    case _ => inputNeighbors.map(e => e.reads).foldLeft(HashSet.empty[String])((x, y) => x.union(y))
-  //  }
 
   /** Builds the set of symbols which are read
    * do not consider layer, those represent memory cells to be loaded */
-  def symbols: immutable.HashSet[String] =
+  def symbolsExcepLayers: immutable.HashSet[String] =
     this match {
-      case Read(s) => HashSet(s)
+      case Read(s) => if (isLayer(s)) HashSet() else HashSet(s)
       case Param(s) => HashSet(s)
       case l: Layer2[_] => HashSet() //HashSet(l.name)
-      case _ => inputNeighbors.map(e => e.symbols).foldLeft(HashSet.empty[String])((x, y) => x.union(y))
+      case _ => inputNeighbors.map(e => e.symbolsExcepLayers).foldLeft(HashSet.empty[String])((x, y) => x.union(y))
     }
+
+
+  //def symbolsNoLayer: HashSet[String] = symbols.filter(!isLayer(_))
+
 
   //
   //  /** predicate to insert affectation for the procedurise step. */
@@ -172,6 +160,7 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
 }
 
 object AST {
+  def isLayer(str: String) = str.charAt(0) == 'l' && str.charAt(1) == 'l'
   val isNotRead: AstPred = {
     case AST.Read(which) => false;
     case _ => true
@@ -285,22 +274,16 @@ object AST {
    * it is used to also stores system instructions.
    **/
   abstract class Layer2[T](val nbit: Int)(implicit m: repr[T]) extends AST[T]() with EmptyBag[AST[_]] with Strate2[T] {
-    protected var sysInstr: List[UsrInstr[AST[_]]] = List.empty;
 
     val v = 1
     /** the value at t, which  is represented as  the layer itself. */
     val pred: AST[T] = this
 
-    /** @param a allows to visualize "this" with a minimalistic coloring load on the screen */
-    def render(a: AST[_]) {
-      sysInstr ::= UsrInstr.display(a).asInstanceOf[UsrInstr[AST[_]]]
-    }
+
 
     /** needed to visite the next fields */
     override def other: List[AST[_]] = next :: super.other
 
-    /** instructions also includes updating the layer by storing the next value.  */
-    def sysInstrs: List[UsrInstr[AST[_]]] = UsrInstr.memorize(next).asInstanceOf[UsrInstr[AST[_]]] :: sysInstrs
 
     /** system instruction can be associated to any spatial field, so as to be latter retrievable from the compiling method. */
     private var sysInstr2: List[CallProc] = List.empty;
@@ -309,7 +292,15 @@ object AST {
 
     def bugif2(v: AST[_]) = sysInstr2 ::= CallProc("bug", List(), List(v))
 
-    def systInstrs2: List[CallProc] = CallProc("memo", List(name), List(next)) :: sysInstr2
+    /**
+     * nb callProc memo is re-created therefore its name is not precised
+     *
+     * @return
+     */
+
+    def systInstrs2: List[CallProc] = CallProc("memo", List(DataProg.lify(name)), List(next)) :: sysInstr2
+
+    // def systInstrs2: List[CallProc] = CallProc("memo", List(name), List(next)) :: sysInstr2
 
 
   }

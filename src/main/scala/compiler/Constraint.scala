@@ -42,7 +42,7 @@ sealed abstract class Constraint(val locus:Locus)
   /** Compute a joint constraint.  generates the schedules for the smallest card, and verify with the other.
    * unless specific cases where it can be deduced in a cheaper way */
   def intersect(c: Constraint): Constraint = {
-    require(c.locus == this.locus, "intersected constraint have distinct loci")
+    require(c.locus == this.locus, "intersected constraint have identical loci")
     if (c.isInstanceOf[AllConstr] || (c == this)) this
     else if (c.card < card) c.intersect(this) // c has smallest card
     else Schedules(HashSet.empty[Seq[Int]] ++ schedules.filter(c.verified(_)), c.locus)
@@ -51,11 +51,12 @@ sealed abstract class Constraint(val locus:Locus)
   /** In general an isolated constraint has at least one schedule satifying it */
   def empty: Boolean = false
 
-  /** constraint obtained by picking one schedule TODO could be improved to avoid generate all the schedules, but only the first one! */
-  def pick():Constraint= {
+  /** constraint obtained by picking one schedule
+   * TODO could be improved to avoid generate all the schedules, but only the first one! */
+  def pick(): Constraint = {
     if (empty) throw new RuntimeException("empty constraint cannot be picked + this")
-    val s=schedules
-    Schedules(HashSet( s.head),locus)
+    val s = schedules
+    Schedules(HashSet(s.head), locus)
   }
 }
 
@@ -117,8 +118,6 @@ object Constraint {
     override def pick()=Schedules(HashSet(id), locus)
     override def intersect(c: Constraint): Constraint = c
     override def verified(a: Seq[Int]): Boolean = true
-
-
   }
 
   /** @param b is an intrinsic permutation on 6 integers. */

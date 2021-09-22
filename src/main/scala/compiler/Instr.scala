@@ -15,6 +15,9 @@ import scala.collection.immutable.HashSet
 
 /** Instruction used within the compiler, call, affect. Dag and Union allows to defined ConnectedComp  */
 abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Instr] {
+  def callProcToAffect: Instr = this
+
+  def tobeProcessedInMacro: Boolean = false
 
   def isReturn: Boolean = this match {
     case CallProc("return", _, _) => true;
@@ -26,7 +29,7 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
   def propagate(id1: rewriteAST2): Instr
 
   override def aligned = !alignPerm.isEmpty //faut se mefier, ca va pas marcher pour load?
-  def useless = false
+
 
   /** true for instruction part or Transfer Connected Components */
   def isTransfer: Boolean
@@ -39,19 +42,21 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
   /** to be set if we want to use the Align feature, contains an alignment towards each usedvars of the instr (indexed by the string) */
   var alignPerm: iTabSymb[Array[Int]] = Map.empty
 
-  /*Must return an alignement from this to n.   */
-  def neighborAlign(n:  Instr ): Array[Int]={
-      if(alignPerm.isEmpty) null
-  else if(alignPerm.contains(n.names.head)) //n is a used var of this, so "this" is an element of n.neighbor,
-       alignPerm(n.names.head) //neighborAligned(n.names(0))  is an alignement from "this" to n,
-    else  if(n.alignPerm.contains( names.head))   //ca doit etre le contraire, i.e. this is a used var of n. we find an alignement from n to "this", we must invert
-         Align.invert(n.alignPerm(names.head))
-    else throw new RuntimeException(" Not find alignement ") 
+  /**
+   * @return alignement from this to n.   */
+  def neighborAlign(n: Instr): Array[Int] = {
+    if (alignPerm.isEmpty)
+      null
+    else if (alignPerm.contains(n.names.head)) //n is a used var of this, so "this" is an element of n.neighbor,
+      alignPerm(n.names.head) //neighborAligned(n.names(0))  is an alignement from "this" to n,
+    else if (n.alignPerm.contains(names.head)) //ca doit etre le contraire, i.e. this is a used var of n. we find an alignement from n to "this", we must invert
+      Align.invert(n.alignPerm(names.head))
+    else throw new RuntimeException(" Not find alignement ")
   }
 
   // val exp:AST[T]
-  /**@param hd head
-   * @param tl and tail  are built, in order to  find out the id of formal parameter passed by results. */
+  /** @param hd head
+   * @param tl  and tail  are built, in order to  find out the id of formal parameter passed by results. */
   def buildhdtl(hd: TabSymb[String], tl: TabSymb[String]): Unit = this match {
     case Affect(_, exp) => exp match {
       case Heead(Read(s)) => hd += s -> exp.name
@@ -82,7 +87,7 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
           val res = subNames(s)
           //value which are sent through call and retrieved from the procedure, have to be stored
           for (r <- res ::: c.args.toList.map(_.name))
-            if (t(r).k == Field()) t += r -> new InfoType(t(r).t, StoredField()); // register the fact that results must be stored.
+            if (t(r).k == MacroField()) t += r -> new InfoType(t(r).t, StoredField()); // register the fact that results must be stored.
 
           List(CallProc(c.f.namef, res, c.args.toList))
         case Taail(_) | Heead(_) => List() //we do not need those any more.
@@ -92,22 +97,6 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
       case _ => if (this.isReturn) List() else List(this)
     }
   }
-
-  //
-  //  def nbit(cur: ProgData1[_], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): Instr = this match {
-  //    case Affect(s, exp) =>
-  //      val newExp = exp.nbit(cur, nbitLB, tSymb, newFuns)
-  //      tSymb += s -> new InfoNbit(cur.tSymbVar(s).t, cur.tSymbVar(s).k, nbitLB(newExp)); Affect(s, newExp).asInstanceOf[Instr]
-  //    case CallProc(f, names, exps) =>
-  //      val newexps = exps.map(_.nbit(cur, nbitLB, tSymb, newFuns))
-  //      val nbitarg = newexps.map(a => nbitLB(a)) //.toList.flatten
-  //      val newnamef = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _)
-  //      if (!newFuns.contains(newnamef)) newFuns += (newnamef -> cur.funs(f).nbit(nbitarg)) // re-creates the code of f, taking into account nbitarg.
-  //      val fprog = newFuns(newnamef)
-  //      val nbitResult = fprog.paramR.map(s => fprog.tSymbVar(s).nb) //we get the number of bits of results
-  //      (names zip nbitResult).foreach { sn => tSymb += sn._1 -> new InfoNbit(cur.tSymbVar(sn._1).t, cur.tSymbVar(sn._1).k, sn._2) }
-  //      CallProc(newnamef, names, newexps).asInstanceOf[Instr]
-  //  }
 
   /**
    *
@@ -126,7 +115,9 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
       val newexps = exps.map(_.asInstanceOf[ASTLt[_, _]].bitIfy(cur, nbitLB, tSymb))
       val nbitarg = newexps.map(a => nbitLB(a)) //.toList.flatten
       val newnamef = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _)
-      if (sysInstr.contains(f))
+
+      //  if (f.size>2 && sysInstr.contains(f.substring(0,3)))
+      if (isSysInstr(f))
       //there is not code to be generated for system calls
         CallProc(f, names, newexps).asInstanceOf[Instr]
       else {
@@ -157,13 +148,6 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
       case CallProc(f, n, e) => List(CallProc(f, n.flatMap(Instr.deploy(_, tSymb)),
         e.asInstanceOf[List[ASTLt[_, _]]].flatMap(_.unfoldSpace(m)))) //tSymb(n).t._1
     }
-
-  /*
-
-    def align(cs: TabSymb[Constraint]): Unit =
-      alignPerm = a(this).exp.asInstanceOf[ASTLt[_, _]].align(cs, names.head)
-  */
-
 }
 
 /**
@@ -174,22 +158,38 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
  * @param names resutl's name
  * @param exps  passed as data
  */
-case class CallProc(p: String, names: List[String], exps: List[AST[_]]) extends Instr {
+case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) extends Instr {
+  override def callProcToAffect: Instr = if (tobeProcessedInMacro) new Affect(names(0), exps(0))
+  else throw new Exception("only memo callProc gets macroified");
+  null
+
+  override def tobeProcessedInMacro =
+    isProcessedInMacro(p)
+
+  // override def namesDefined: List[String] = if() List()
+  /**
+   * for bug and show we will add the name of the motherLayer to the name of the call
+   *
+   * @param motherLayer : Layer to which the bug or the show is attached
+   */
+  def preciseName(motherLayer: String) = p += motherLayer
+
   /**
    * @return string shows the results being affected simultaneously
    */
   override def toString: String = pad(names.mkString(","), 25) + "<-" + p + "(" + exps.map(_.toStringTree).mkString(" ") + ")\n"
 
-  //override def toString: String = pad(names.foldLeft(" ")(_ + "," + _).substring(2), 25) + "<-" + p + "(" + exps.map(_.toStringTree).foldLeft(" ")(_ + " " + _) + ")\n"
-  def usedVars: HashSet[String] = exps.map(_.symbols).foldLeft(immutable.HashSet.empty[String])(_ | _)
 
-  override def isTransfer: Boolean = throw new RuntimeException("test isTransfer is done only in macro, which do not have CallProc instr. ")
+  //override def toString: String = pad(names.foldLeft(" ")(_ + "," + _).substring(2), 25) + "<-" + p + "(" + exps.map(_.toStringTree).foldLeft(" ")(_ + " " + _) + ")\n"
+  def usedVars: HashSet[String] = exps.map(_.symbolsExcepLayers).foldLeft(immutable.HashSet.empty[String])(_ | _)
+
+  override def isTransfer: Boolean =
+    throw new RuntimeException("test isTransfer is done only in macro, which do not have CallProc instr. ")
 
   override def propagate(id1: rewriteAST2): Instr = {
     val newInstr = CallProc(p, names, exps.map((a: AST[_]) => id1(a)))
     newInstr
   }
-
 }
 
 /**
@@ -210,12 +210,15 @@ case class ShiftInstr(name: String, shifted: String, perm: Array[Int]) extends I
   override def usedVars: HashSet[String] = HashSet(shifted)
 
   override def names: List[String] = List(shifted)
+
+  // override def namesDefined: List[String] = List(shifted)
 }
 
 case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
   def exps = List(exp)
 
   val names = List(name);
+  val namesDefined = List(name);
 
   override def toString: String = pad(name, 25) + "<-  " + exp.toStringTree + show(locus) +
     (if (alignPerm.isEmpty) "" else alignPerm.map({ case (k, v) => k + " " + v.toList + ";  " })) + "\n"
@@ -225,17 +228,8 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
     case None => ""
   }
 
-  def usedVars: HashSet[String] = exp.symbols
+  def usedVars: HashSet[String] = exp.symbolsExcepLayers
 
-  /**
-   * for a non macro affectation of parameter or a Layer creates a useless entry in the memory of the CA
-   * because the parameter or the layer is already present in the memory of the CA
-   */
-  override def useless: Boolean = exp match {
-    case _: Layer2[_] => true
-    case Param(_) => true
-    case _ => false
-  }
 
   /** @return if instruction is ASTLt, returns the locus */
   override def locus: Option[Locus] = exp match {
@@ -246,37 +240,39 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
   override def isTransfer: Boolean = exp.asInstanceOf[ASTLt[_, _]].locus.isInstanceOf[TT] // || exp.isInstanceOf[Red2[_,_,_]]
   override def propagate(id1: rewriteAST2): Instr = Affect(name, id1(exp))
 
-
-  /*  def align2(cs: TabSymb[Constraint]): Affect[_] = {
-      val toto = exp.asInstanceOf[ASTLt[_, _]].align2
-      val tree = toto._1
-      val algn = toto._4
-      val c = toto._2
-      val instrs = toto._3
-      val newAffect = Affect(name, tree)
-      newAffect.alignPerm = algn
-      if (c != None) cs.addOne(name -> c.get)
-      newAffect
-    }*/
   /**
    *
    * @param cs
    */
-  def align3(cs: TabSymb[Constraint]): Affect[_] = {
+  def align(cs: TabSymb[Constraint]): Affect[_] = {
     val r = Result()
-    val newExp = exp.asInstanceOf[ASTLt[_, _]].align3(r)
+    val newExp = exp.asInstanceOf[ASTLt[_, _]].align(r)
     val newAffect = Affect(name, newExp)
     newAffect.alignPerm = r.algn
     if (r.c != None)
       cs.addOne(name -> r.c.get)
     newAffect
   }
-
-
 }
 
 object Instr {
-  val sysInstr = HashSet("return", "bug", "show", "memo")
+  val sysInstr = HashSet("ret", "bug", "sho", "mem")
+
+  /**
+   *
+   * @return true for callProc that will not need to store their result in storedField, but instead are executed directly
+   **/
+  def isProcessedInMacro(p: String) = p == "memo" //TODO programmer memo comme une sous classe de callProc
+  //|| p.startsWith("bug") we decide to keep call to bug outside macro
+  // memo will be replaced by affectation to paramR, when moved to macro
+
+
+  /**
+   *
+   * @param f name of a procedure
+   * @return true if f is a system call
+   */
+  def isSysInstr(f: String) = f.size > 2 && sysInstr.contains(f.substring(0, 3))
 
   /** @param i instruction
    * @return i.asInstanceOf[Affect[_]] */
@@ -323,7 +319,8 @@ object Instr {
      */
     def process(e: AST[_]): List[Affect[_]] = {
       val already = tsymb.contains(e.name)
-      val newName = if (!already || already && tsymb(e.name).k == Field()) e.name else newFunName2() //we create another variable to return result, in case it is a layer.
+      val newName = if (!already || already && tsymb(e.name).k == MacroField()) e.name else newFunName2()
+      //we create another variable to return result, in case it is a layer.
       paramD += newName;
       tsymb += newName -> InfoType(e, ParamR())
       if (already && newName == e.name) List() else List(Affect(newName, e))
@@ -336,11 +333,17 @@ object Instr {
   }
 }
 
-/**Instructions generated within the ast that will not be used after dedagification.  */
+/** Instructions generated within the ast that will not be used after dedagification.  */
 case class UsrInstr[+T](c: Codop, exp: AST[_]) extends Instr {
   def exps = List(exp)
+
   def usedVars = immutable.HashSet.empty[String]
-  val names = List(); override def toString: String = pad(c.toString.substring(2), 25) + "<-  " + exp.toStringTree
+
+  val names = List();
+
+  override def toString: String = {
+    pad(c.toString.substring(2), 25) + "<-  " + exp.toStringTree
+  }
 
   /*
 
@@ -371,6 +374,7 @@ case class UsrInstr[+T](c: Codop, exp: AST[_]) extends Instr {
 
   override def propagate(id1: rewriteAST2): Instr = this
 }
+
 object UsrInstr {
 
   sealed class Codop

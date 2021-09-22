@@ -39,15 +39,23 @@ abstract class Circuit[L <: Locus, R <: Ring](override val p: Param[_]*) extends
 
     val prog1: DataProg[_, InfoType[_]] = DataProg(this);
     print(prog1)
+    val prog2 = prog1.treeIfy();
+    print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
+    val prog3 = prog2.procedurIfy();
+    print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
+    val prog4: DataProg[_, InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
 
-    // val prog2 = prog1.treeIfy(); //print(prog2);
-    //  val prog3 = prog2.procedurIfy(); //print(prog3);
-    // val prog4: DataProg[_, InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
-    // print(prog4 + "\n\n")
-    //val prog5: DataProg[_, InfoNbit[_]] = prog4.macroIfy();
-    // print(prog5 + "\n\n")
-    //val prog6: DataProg[_, InfoNbit[_]] = prog5.foldRegister()
-    //  val prog7 = prog5.unfoldSpace(m); //print(prog7)
+    print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
+    val prog5: DataProg[_, InfoNbit[_]] = prog4.macroIfy();
+
+    // print("55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n"+prog5 + "\n\n")
+
+
+    val prog7 = prog5.unfoldSpace(m);
+    print(prog7)
+    // print("7777777777777777777777777777777777777777777777777777777\n"+prog7 + "\n\n")
+    val prog6: DataProg[_, InfoNbit[_]] = prog5.foldRegister(0)
+    /* */
   }
 }
 
@@ -155,7 +163,7 @@ object Circuit {
     val r = new Array[Int](6);
     var i = 0;
     for (a <- l) {
-      r(i) = a.symbols.head.toInt; i += 1
+      r(i) = a.symbolsExcepLayers.head.toInt; i += 1
     };
     r
   })

@@ -10,7 +10,7 @@ import macros.ASTLfun._
 
 class Dist2(val source: BoolV) extends Layer2[(V, SI)](3) with ASTLt[V, SI] {
   val level: BoolV = elem(2, this);
-  render(level)
+  //render2(level)
   /*
   val tepred = transfer(e(pred))
   val grad: IntvE =  tepred - sym(tepred)  ; //should use opp to make only one subtraction, we need to adress selectively the two neighbors of an edge.

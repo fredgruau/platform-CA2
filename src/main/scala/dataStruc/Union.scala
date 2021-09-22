@@ -43,27 +43,40 @@ trait Union[T<:Union[T]] {   self:T =>
 
 
 /** adds the possiblity  to compute an alignement to the root, while computing the root*/
-trait Align[T<:Align[T]] extends Union[T] { self:T =>
+trait Align[T<:Align[T]] extends Union[T] {
+  self: T =>
   /** implements alignement with respect to neighbor */
-  def neighborAlign(n:T): Array[Int]
-  /**permutation to apply in order to go from this to parent! */
+  def neighborAlign(n: T): Array[Int]
+
+  /** permutation to apply in order to go from this to parent! */
   private var alignToPar: Array[Int] = Array.range(0, 6) //  neutral permutation
-  override def reset={super.reset;alignToPar=Array.range(0, 6)}
+  /**
+   * will compute alignement
+   */
+  override def reset = {
+    super.reset; alignToPar = Array.range(0, 6)
+  }
+
   /** @return aligntoRoot(shedule) = rootschedule */
   def alignToRoot: Array[Int] =
     if (parent == this)
-       Array.range(0, 6)
+      Array.range(0, 6)
     else compose(alignToPar, parent.alignToRoot)
-  override def root: T = if (parent == this) this else { alignToPar = alignToRoot; parent = parent.root;   parent } // "compressing path towards the root."
-  /**to be defined if we need to compute alignement
+
+  override def root: T = if (parent == this) this else {
+    alignToPar = alignToRoot; parent = parent.root; parent
+  } // "compressing path towards the root."
+  /** to be defined if we need to compute alignement
+   *
    * @param xroot former root of x,
-   * @param x element which need to be aligned on
+   * @param x     element which need to be aligned on
    * @param y  element whose root is the new root */
   override def transitiveClosure (xroot : T,x : T, y: T): Unit ={
     val ny=x.neighborAlign(y);  //align from x to y
     xroot.alignToPar=
-      if(y==null)  null
-      else  compose(invert(x.alignToRoot),  compose(ny, y.alignToRoot)) //align from xroot to y's root is
+      if (y == null) null
+      else if (x.alignToRoot == null) null //rajouté récemment pour éviter des plantages sauvages
+      else compose(invert(x.alignToRoot), compose(ny, y.alignToRoot)) //align from xroot to y's root is
     //equal to alig from xroot to x) (we must take the invert of alignto root)
     //commposed with align from x to y composed with align from y to y's root.
   }

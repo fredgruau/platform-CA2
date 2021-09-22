@@ -56,7 +56,7 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
   /** We create an exeption which can store the cycle
    * in order to be able to print it nicely later
    * nicely means with names  identifying fiedls in the client program */
-  class CycleException(val cycle: Vector[T]) extends Exception("cycle détecté") {}
+  class CycleException(val cycle: Vector[T]) extends Exception("cycle is detected, depth increase from left to right\n" + cycle) {}
 
   //def setInputNeighbor(instrs: List[T] ) = ()
 
@@ -90,7 +90,6 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
     for (b <- newGenerators)
       dfs(b, Vector.empty) match {
         case Some(path) => throw new CycleException(path)
-        //  case Some(path) => throw new RuntimeException("cycle detected in AST:" + path)
         case None =>
       }
     visitedL = newVisitedL ::: visitedL
@@ -105,12 +104,12 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
    *
    * @param n        node to test
    * @param visiting nodes being checked for adding to visited.
-   * @return option type with a cycle is there is one.
+   * @return option type with a cycle is there is one. starting and ending with the same element found at a deeper place
    */
   def dfs(n: T, visiting: Vector[T]): Option[Vector[T]] = {
     if (visited(n)) return None
     else if (visiting.contains(n))
-      return Some(visiting.drop(visiting.indexOf(n) - 1))
+      return Some((visiting).drop(visiting.indexOf(n)) :+ n)
     else {
       val visiting2 = visiting :+ n
       for (e <- n.inputNeighbors)
@@ -125,7 +124,8 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
   }
 
   /** @param called input from outside usage which must also be counted
-   * @return set of Dag's elements which are at least two times input to another dag's element */
+   * @return set of Dag's elements which are at least two times input to another dag's element
+   *         we produce a set in order to be sure to eliminate doublon, we thus loose the order */
   def inputTwice(called: Seq[T] = Seq.empty[T]): Set[T] = {
     /** Expression is used in a CallProc */
     val nUser2 = immutable.HashMap.empty[T, Int] ++
@@ -141,7 +141,10 @@ trait SetInput[T <: SetInput[T]] {
 
   /** names of variables modified by instruction. */
   def usedVars: immutable.HashSet[String]
+
   def names: List[String]
+
+  // def namesDefined: List[String]
 }
 
 /** Allows to compute output neighbors */
@@ -184,7 +187,7 @@ trait DagSetInput[T <: DagNode[T] with Union[T] with SetOutput[T]] extends Dag[T
     val newGenerators = (allGenerators).map(rewrite)
     val newNonGenerators = nonGenerators.map(rewrite)
     setInputAndOutputNeighbor(newGenerators ::: newNonGenerators ::: otherInstr)
-    new Dag(newGenerators) //reconstruit quand meme tout le Dag
+    new Dag(newGenerators) //reconstruit quand meme tout le Dag ca devrait assurer le bon ordre
   }
 
   /**
