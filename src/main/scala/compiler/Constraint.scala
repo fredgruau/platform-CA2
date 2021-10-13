@@ -34,7 +34,7 @@ sealed abstract class Constraint(val locus:Locus)
 
   def printSchedules(): String = {
     var result: String = "";
-    for (s <- schedules)
+    for (s: Seq[Int] <- schedules)
       result += s.map(locus.lessufx(_)).mkString("->")
     result
   }

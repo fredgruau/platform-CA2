@@ -143,7 +143,7 @@ trait SetInput[T <: SetInput[T]] {
   def usedVars: immutable.HashSet[String]
 
   def names: List[String]
-
+  def isShift = (names.nonEmpty) && names(0).startsWith("shift")
   // def namesDefined: List[String]
 }
 
@@ -164,8 +164,13 @@ trait DagSetInput[T <: DagNode[T] with Union[T] with SetOutput[T]] extends Dag[T
   def quotient2[T2 <: DagNode[T2] with SetOutput[T2]](p: (T, T) => Boolean, trans: Iterable[T] => List[T2]): Dag[T2] = {
     for (src <- visitedL)
       for (target <- src.inputNeighbors)
-        if (p(src, target))
+        if (p(src, target)) {
+          //          if(target.isShift)
+          //            {val name=target.names(0).drop(5)
+          //            if(src.names(0)==name)
+          //              println("toto")}
           src.union(target)
+        }
     val connectedComp: Iterable[Iterable[T]] = paquets(visitedL)
     /** generators are instructions group which contains generators. */
     val (groupWithGenerator, groupWithoutGenerator) = connectedComp.partition(a => overlap(a, toSet(allGenerators)))
@@ -179,7 +184,7 @@ trait DagSetInput[T <: DagNode[T] with Union[T] with SetOutput[T]] extends Dag[T
 
   /**
    *
-   * @param rewrite    each instruction into one instruction, preserve generators
+   * @param rewrite    rewrites each instruction into one instruction, preserve generators
    * @param otherInstr more instructions to be be added
    * @return New Dag with rewritten instructions, with  updated inputneighbors.
    */
@@ -195,7 +200,9 @@ trait DagSetInput[T <: DagNode[T] with Union[T] with SetOutput[T]] extends Dag[T
    * @param rewrite    each instruction is rewritten into O,1, or several instruction, preserve generators
    * @param otherInstr more instructions to be be added
    * @return New Dag with rewritten instructions, with  updated inputneighbors.
-   */
+   *         we are not sure wether rewriting of generators produces only generators
+   *         TODO in fact it is not true when creating zone DAG
+   **/
   def propagate(rewrite: T => List[T], otherInstr: List[T] = List()): Dag[T] = {
     val newGenerators = (allGenerators).flatMap(rewrite)
     val newNonGenerators = nonGenerators.flatMap(rewrite)
@@ -207,7 +214,10 @@ trait DagSetInput[T <: DagNode[T] with Union[T] with SetOutput[T]] extends Dag[T
    *
    * @param rewrite    each instruction is rewritten into O,1, or several instruction
    * @param otherInstr more instructions to be be added
-   * @return New Dag with rewritten instructions. order is reversed with respect to propagate
+   * @return New Dag with rewritten instructions.
+   *         dag's instructions are visited in reverse order
+   *         since they are stored in reversed order
+   *         they end up being visited in the natural order
    */
   def propagateReverse(rewrite: T => T, otherInstr: List[T] = List()): Dag[T] = {
     val newNonGenerators = nonGenerators.reverse.map(rewrite).reverse

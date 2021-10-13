@@ -9,6 +9,7 @@ import dataStruc.Align._
 import compiler.Constraint._
 import compiler.Circuit.{iTabSymb2, _}
 import compiler.repr._
+import dataStruc.Dag
 
 import scala.collection.{mutable, _}
 import scala.reflect.ClassTag
@@ -100,11 +101,13 @@ object ASTL {
   def anticlock[S1 <: S, S2 <: S, S2new <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S1, S2new]], n: repr[R]): Clock[S1, S2, S2new, R] = Clock[S1, S2, S2new, R](arg, dir = false)
 
 
-  //Build a transfer, just like v,e,f, however specify a diffent Simplicial field for each component.
+  //Build a transfer, just like v,e,f, however specify a diffent Simplicial field for each component; used for substraction.
   def sendv[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, V]], n: repr[R]): Send[S1, V, R] = {
-    assert(args.length == 6 / args.head.locus.density); Send[S1, V, R](args);
+    assert(args.length == 6 / args.head.locus.density);
+    Send[S1, V, R](args);
   } //TODO check the length of args
-  // def sende[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, E]], n: repr[R]) = Send[S1, E, R](args) ;
+  def sende[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, E]], n: repr[R]) = Send[S1, E, R](args);
+
   //  def sendf[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, F]], n: repr[R]) = Send[S1, F, R](args) ;
 
   //def castB2R[L<:Locus,R<:I]( arg: AST[L,B] )(implicit m : repr[L])  = Unop[L,B,R] (castB2RN[R],arg );
@@ -146,6 +149,9 @@ object ASTL {
   def subESI[S2 <: S](arg: ASTLt[T[E, S2], SI])(implicit m: repr[E]): ASTLt[E, SI] =
     Redop[E, S2, SI]((subSI, Intof[SI](0)), arg, m, repr.nomSI).asInstanceOf[ASTLt[E, SI]]
 
+  def addESI[S2 <: S](arg: ASTLt[T[E, S2], SI])(implicit m: repr[E]): ASTLt[E, SI] =
+    Redop[E, S2, SI]((addSI, Intof[SI](0)), arg, m, repr.nomSI).asInstanceOf[ASTLt[E, SI]]
+
   /** minR has two implementations depending if the integers to be compared are signed or unsigned. */
   def minR[S1 <: S, S2 <: S, R <: I](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): ASTLt[S1, R] =
     if (arg.ring == SI()) Redop[S1, S2, SI]((minSI, Intof[SI](0)), arg.asInstanceOf[ASTLt[T[S1, S2], SI]], m, repr.nomSI).asInstanceOf[ASTLt[S1, R]]
@@ -153,7 +159,8 @@ object ASTL {
 
   /** Delayed uses a trick found on the net, to have a call by name, together with a case class necessary to make the match */
   def delayedL[L <: Locus, R <: Ring](_arg: => ASTLt[L, R])(implicit m: repr[(L, R)]): ASTLt[L, R] = {
-    lazy val delayed = _arg; new Delayed[(L, R)](() => delayed) with ASTLt[L, R]
+    lazy val delayed = _arg;
+    new Delayed[(L, R)](() => delayed) with ASTLt[L, R]
   }
 
   def cond[L <: Locus, R <: I](b: ASTLt[L, B], arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] =
@@ -236,11 +243,23 @@ object ASTL {
  *          I've put the type locus + ring as part of  the case construct's fields, so that it becomes very easy to copy
  */
 sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) extends ASTLt[L, R] {
+  override def isRedop =
+    this.asInstanceOf[ASTL[_, _]] match {
+      case Redop(op, _, _, _) => true
+      case _ => false
+    }
+
+  def opRedop =
+    this.asInstanceOf[ASTL[_, _]] match {
+      case Redop(op, _, _, _) => op
+      case _ => throw new Exception("tried to take op of nonredo")
+    }
+
   override def toString: String =
     this.asInstanceOf[ASTL[_, _]] match {
       //  case Layer(s, _)                 => "Layer " + this.name + ":" + locus.toString.charAt(0) + "-" + ring.toString.charAt(0)
-     case Binop(op, _, _, _, _) => op.namef
-     case Coonst(cte, _, _) => "Const" + cte.toString + locus.toString.charAt(0) + "_" + ring.toString.substring(0, ring.toString.length() - 2);
+      case Binop(op, _, _, _, _) => op.namef
+      case Coonst(cte, _, _) => "Const" + cte.toString + locus.toString.charAt(0) + "_" + ring.toString.substring(0, ring.toString.length() - 2);
 
       //  case Multop(op, args,_,_)      => op.toString
       case Unop(op, _, _, _) => op.namef
@@ -259,7 +278,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
   /**
    * @param id rewritting procedure
    * @return ASTL obtained by applying the rewriting recursively
-   *         No  override, because signagure is distinct from AST's propagate */
+   *         No  override, because signature is distinct from AST's propagate */
   def propagateASTL(id: rewriteASTLt[L, R]): ASTL[L, R] = {
     def id2[L3 <: Locus, R3 <: Ring]: rewriteASTLt[L3, R3] = d => id(d.asInstanceOf[ASTLt[L, R]]).asInstanceOf[ASTLt[L3, R3]] //introduit des variables libres
     val newD = this.asInstanceOf[ASTLg] match {
@@ -287,7 +306,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
    * and one of the two operands has not enough bits.
    *
    */
-  override def bitIfy(cur: DataProg[_, InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
+  override def bitIfy(cur: DataProg[InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
     val nbitB = immutable.HashMap.empty[AST[_], Int] //stores the bit number of an ASTB expression
     val nbitP = mutable.HashMap.empty[Param[_], Int] //virgin, to retrieve the nbits computed for the param.
     val result = this match {
@@ -328,6 +347,12 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
     case _ => super.justConcats
   }
 
+  def redOpSeq(m: Machine, zones: Dag[Zone], tZone: Map[String, Zone]) = this.asInstanceOf[ASTLg] match {
+    case Redop(op, a, _, _) =>
+      val expUnfolded = a.unfoldTransfer(m)
+      val u = 0
+  }
+
   override def unfoldSimplic(m: Machine): ArrAst = {
     val r = rpart(mym.asInstanceOf[repr[(L, R)]])
     val s = this.locus.asInstanceOf[S]
@@ -336,22 +361,33 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case Broadcast(_, _, _) => throw new RuntimeException("Broadcast creates   a transfer type")
       case Send(_) => throw new RuntimeException("Broadcast creates   a transfer type")
       case Transfer(_, _, _) => throw new RuntimeException("Transfer creates   a transfer type")
-      case Unop(op, a, _, _)  => a.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m).map(new Call1(op.asInstanceOf[Fundef1[Any, R]], _)(r) with ASTBt[R])
+      case Unop(op, a, _, _) => a.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m).map(
+        new Call1(op.asInstanceOf[Fundef1[Any, R]], _)(r) with ASTBt[R])
       case Binop(op, a, a2, _, _) => a.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m).zip(a2.unfoldSimplic(m)).map({
         case (c, c2) => new Call2(op.asInstanceOf[Fundef2[Any, Any, R]], c, c2)(r) with ASTBt[R].asInstanceOf[ASTBg]
       })
       case Redop(op, a, _, _) =>
-        def reduce(as: Array[ASTBt[R]], opred: redop[R]) = as.toList.tail.foldLeft(as(0))(new Call2(opred._1, _, _)(r) with ASTBt[R])
-        a.unfoldTransfer(m).map((x: ArrAst) => reduce(x.asInstanceOf[Array[ASTBt[R]]], op.asInstanceOf[redop[R]])).asInstanceOf[ArrAst]
+
+        /**
+         * creates several call of opred
+         */
+        def reduceEncapsulated(as: Array[ASTBt[R]], opred: redop[R]) =
+          as.toList.tail.foldLeft(as(0))(new Call2(opred._1, _, _)(r) with ASTBt[R])
+
+        a.unfoldTransfer(m).map((x: ArrAst) =>
+          reduceEncapsulated(x.asInstanceOf[Array[ASTBt[R]]], op.asInstanceOf[redop[R]])).asInstanceOf[ArrAst]
+
       case Clock(_, _) => throw new RuntimeException("Clock creates    a transfer type")
 
-      case Sym(_, _, _, _)     => throw new RuntimeException("Sym creates  a transfer type")
+      case Sym(_, _, _, _) => throw new RuntimeException("Sym creates  a transfer type")
     }
     //read and Call treated in ASTLt.
 
   }
-  override def unfoldTransfer(m: Machine): ArrArrAst = {
-    val T(s1, des) = this.locus; val l2 = this.locus.sufx.length
+
+  override def unfoldTransfer(m: Machine): ArrArrAstBg = {
+    val T(s1, des) = this.locus;
+    val l2 = this.locus.sufx.length
     this.asInstanceOf[ASTLg] match {
       case Coonst(cte, _, _) => Array.fill(s1.sufx.length, l2)(cte)
       case Broadcast(a, _, _) => a.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m).map(Array.fill(l2)(_))
@@ -393,41 +429,53 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
    * @return tree with some id being replaced by shifted version,
    *         cycle constraint, instruction setting the shifted version, alignement with respect to used variables.
    */
-  override def align(r: Result): ASTLt[L, R] = {
+  override def align(r: Result, tt: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
     val newExp = this.asInstanceOf[ASTLg] match { //read and Call treated in ASTLt.
       case Coonst(_, _, _) => this
       case Broadcast(arg, _, _) => r.algn = r.algn.map { case (k, v) => k -> arg.locus.proj }; this //does not depend on v, because v is constant
-      case e@Send(args) => val newArgs = args.map(_.align(r)) //collects results in $r
+      case e@Send(args) => val newArgs = args.map(_.align(r, tt)) //collects results in $r
         r.algn = r.algn.map { case (k, v) => k -> args.head.locus.proj } //does not depend on v, because v is constant
         e.copy(args = newArgs)(lpart(e.mym), rpart(e.mym))
       case e@Transfer(arg, _, _) =>
         val T(s1, s2) = arg.locus;
         val t = hexPermut((s1, s2));
-        val newArg = arg.align(r);
+        val newArg = arg.align(r, tt);
         r.c = permute(r.c, t, e.locus);
         r.algn = composeAll2(t, r.algn)
         e.copy(arg = newArg)
-      case e@Unop(_, arg, _, _) => e.copy(arg = arg.align(r))
+      case e@Unop(_, arg, _, _) => e.copy(arg = arg.align(r, tt))
       case e@Binop(_, arg, arg2, _, _) =>
-        var newArg = arg.align(r)
-        val algn = r.algn
-        val newArg2 = arg2.align(r)
+        var newArg = arg.align(r, tt)
+        val algn: Map[String, Array[Int]] = r.algn
+        var newArg2 = arg2.align(r, tt)
         val k = algn.keys.toSet.intersect(r.algn.keys.toSet);
         assert(k.size <= 1, " more than one to aligne !")
-        if (k.nonEmpty && !(algn(k.head) sameElements r.algn(k.head))) { //k is the aux defined by an instr which will have to use two registers.
-          val e = k.head //here we assume that there is a single input variable
-          val perm = compose(invert(algn(e)), r.algn(e))
-          val shiftedE = "shift" + e
+        if (k.nonEmpty && !(algn(k.head) sameElements r.algn(k.head))) {
+          //k is the aux defined by an instr which will have to use two registers.
+          val nome: String = k.head //here we assume that there is a single input variable
+          val perm = compose(invert(algn(nome)), r.algn(nome))
+          val shiftedE = "shift" + nome
           r.c = intersect(r.c, Some(Cycle(perm, locus.asInstanceOf[TT])))
-          val shiftInstr = ShiftInstr(shiftedE, e, perm)
-          r.si += e -> shiftInstr //TODO le alignperm de shiftInstr on peut le faire ensuite!
-          r.algn += shiftedE -> algn(e)
-          newArg = newArg.replaceBy(e, shiftedE)
+
+          //  val shiftInstr = ShiftInstr(shiftedE, e, perm)
+          //val repr = arg.mym.asInstanceOf[repr[(L, R)]]
+          val repr = new repr(tt(nome).t) // asInstanceOf[repr[(L, R)]]
+          val read = new Read(nome)(repr) with ASTLt[L, R] //not used at the end!
+
+          //  val shiftInstr = Affect(shiftedE, arg) //we shift the clock in order to obtain the right correspondance
+          val shiftInstr = Affect(shiftedE, read) //we shift the clock in order to obtain the right correspondance
+          // between shif and shifted
+          //TODO le alignperm de shiftInstr on le fait ensuite!
+          //    shiftInstr.alignPerm=perm
+          r.si += nome -> shiftInstr
+          r.algn += shiftedE -> algn(nome)
+          //newArg = newArg.replaceBy(nome, shiftedE)
+          newArg2 = newArg2.replaceBy(nome, shiftedE)
         }
         e.copy(arg = newArg, arg2 = newArg2)
-      case e@Redop(_, arg, _, _) => e.copy(arg = arg.align(r))
+      case e@Redop(_, arg, _, _) => e.copy(arg = arg.align(r, tt))
       case e@Clock(arg, dir) =>
-        val newArg = arg.align(r)
+        val newArg = arg.align(r, tt)
         val T(_, des) = this.locus;
         val T(_, src) = arg.locus;
         val trigo = !dir;
@@ -437,7 +485,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
           r.algn = composeAll2(atr, r.algn)
         }
         e.copy(arg = newArg)(lpart(e.mym), rpart(e.mym))
-      case e@Sym(arg, _, _, _) => val newArg = arg.align(r)
+      case e@Sym(arg, _, _, _) => val newArg = arg.align(r, tt)
         val T(_, des) = this.locus;
         val T(s1, src) = arg.locus;
         val atr = rotPerm(s1 match { case E() => 1 case F() => if (src < des) 1 else 2 case V() => 3 });

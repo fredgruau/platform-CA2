@@ -9,17 +9,17 @@ import scala.collection.immutable.{HashMap, HashSet}
 
 /**
  *
- * @param root              instruction representing the zone
- * @param schedule          constraint to be met for node to be foldable
- * @param partitionnedIn    for each input zone, gives the associated partition.
- * @param nonPartitionnedIn Edge without partition
+ * @param root               instruction representing the zone
+ * @param constraintSchedule constraint to be met for node to be foldable
+ * @param partitionnedIn     for each input zone, gives the associated partition.
+ * @param nonPartitionnedIn  Edge without partition
  */
 class Zone(val root: Affect[_],
            val instrs: Iterable[Affect[_]],
 
            /** Constraint for folding. it is progressively refined, until after picking
             * whereby only one single schedule is left to be followed */
-           var schedule: Constraint,
+           var constraintSchedule: Constraint,
 
            /** stores partition constraints towards adjacent zones (input and output neighbors?) indexed by their name  */
            var partitionnedIn: HashMap[String, Partition],
@@ -57,7 +57,7 @@ class Zone(val root: Affect[_],
   def usedVars: HashSet[String] = toSet(partitionnedIn.keySet.toList).union(nonPartitionnedIn)
 
   /** true if the several scalar registers encoding the locus can be coalesced into a single machine register */
-  var folded: Boolean = !schedule.empty;
+  var folded: Boolean = !constraintSchedule.empty;
 
   /** true for transfer zone */
   def isTransfer = locus.isTransfer
@@ -66,7 +66,7 @@ class Zone(val root: Affect[_],
   override def toString: String = {
     checkInvariant;
     " ***********Node " + name + (if (!folded) " not" else "") + " folded" +
-      " constr:  " + schedule +
+      " constr:  " + constraintSchedule +
       " IN-edges: [" + inputNeighbors.map(_.name) + "]" +
       " OUT-edges: [" + outputNeighbors.map(_.name) + "]" + "\n" +
       instrs.toList.mkString("")
@@ -90,29 +90,31 @@ class Zone(val root: Affect[_],
 
 
   /**
-   * if this is a  non-vertex SCC,
+   * if THIS is a non-vertex SCC,( simplicial zone)
    * Intersect input AND OUTPUT neighbor TCC's constraint with  partition constraint.
    * if neighbors which where foldable remains foldable,
    * we try to fold the SCC:
    * we propagate the neighbor TCC's constraint through the partition, to the SCC
    * and check that the resulting schedule is non-empty
+   * TODO we should also try to fold SCC even if some TCC are not folded, and then propagate the resulting constraint to the Tcc.
+   *
    */
   def setFoldConstrSimplicial(): Unit =
     if (locus == E() || locus == F()) {
       val partNeighbors = neighbors.filter(z => partitionned(z) && z.folded) //zone V are filtered out.
       /** new schedule for neighboring transfer zones, */
-      val newSched = partNeighbors.map((z: Zone) => z.schedule.intersect(partitionnedInOut(z.name)))
+      val newSched = partNeighbors.map((z: Zone) => z.constraintSchedule.intersect(partitionnedInOut(z.name)))
       if (!noneIsEmpty(newSched))
         folded = false
       else { // if one is empty, we renounce, transfer zone 's priority of folding
         // is higher than simplicial zone.
-        var myNewSched = schedule
+        var myNewSched = constraintSchedule
         for ((z, c) <- (partNeighbors zip newSched))
           myNewSched = myNewSched.intersect(propagate(partitionnedInOut(z.name), c))
         if (myNewSched.empty) folded = false else {
           folded = true;
-          schedule = myNewSched;
-          for ((z, c) <- (partNeighbors zip newSched)) z.schedule = c
+          constraintSchedule = myNewSched;
+          for ((z, c) <- (partNeighbors zip newSched)) z.constraintSchedule = c
         }
       }
     }
@@ -126,11 +128,14 @@ class Zone(val root: Affect[_],
    * */
   def pick() = if (folded) {
     val foldedInNeighbors = inputNeighbors.filter(_.folded) //we consider only folded neighbors.
-    val propagateConstr = foldedInNeighbors.map((z: Zone) => propagate(partitionnedInOut(z.name), z.schedule))
-    val newConstr = Constraint.intersect(schedule :: propagateConstr, schedule.locus)
+    // TODO why not consider all neighors to determine a schedule for everybody even unfolded zones
+    val propagateConstr = foldedInNeighbors.map((z: Zone) => propagate(partitionnedInOut(z.name), z.constraintSchedule))
+    val newConstr = Constraint.intersect(constraintSchedule :: propagateConstr, constraintSchedule.locus)
     if (newConstr.empty) folded = false
-    else schedule = newConstr.pick()
+    else constraintSchedule = newConstr.pick()
   }
+
+  def pickedSchedule = constraintSchedule.schedules.head
 }
 
 object Zone {

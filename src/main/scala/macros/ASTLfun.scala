@@ -14,11 +14,15 @@ object ASTLfun {
   /**From an IntV, computes the gradient sign, and the delta to be added to make it a distance  */
   val slopeDeltaDef: Fundef1[(V, SI), ((T[E, V], B), (V, SI))] = {
     //val x:IntV= p[V, SI]("dis")
-    val x = p[V, SI]("dis")
-    val tepred = transfer(e(x))
-    val g = subESI(tepred)
+    val d = p[V, SI]("dis")
+    val s: InteV = sende(List(d, d, d, -d, -d, -d))
+    // val tepred = transfer(e(x))
+    val tepred = transfer(s)
+    //   val g: ASTLt[E, SI] = subESI(tepred)
+    val g: ASTLt[E, SI] = addESI(tepred)
     val grad: IntvE = sendv(List(g, -g))
-    //val grad: IntvE = tepred - sym(tepred) //TODO should use opp to make only one subtraction, we need to adress selectively the two neighbors of an edge.
+    //val grad: IntvE = tepred - sym(tepred)
+    // TODO should use opp to make only one subtraction, we need to adress selectively the two neighbors of an edge.
     val slope: BoolvE = gt(grad)
 
     val delta: IntV = minR(transfer(sign(grad + -2)))
@@ -27,7 +31,7 @@ object ASTLfun {
     tepred.setName("tepred");
     slope.setName("slope");
     delta.setName("delta"); //vortex.setName("vortex")
-    Fundef1("boolgrad", Coons(slope, delta), x)
+    Fundef1("boolgrad", Coons(slope, delta), d)
   }
 
   /**Calls boolgrad, and separate the two results.  */

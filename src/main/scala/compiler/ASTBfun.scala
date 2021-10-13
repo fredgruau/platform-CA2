@@ -13,27 +13,63 @@ object ASTBfun {
 
   private def p[R <: Ring](name: String)(implicit n: repr[R]) = new Param[R](name) with ASTBt[R]
 
-  val negB: Fundef1R[B] = { val xb = p[B]("xb"); Fundef1("negB", Neg(xb), xb) }
-  val negI: Fundef1R[UISI] = { val xi = p[UISI]("xi"); Fundef1("negI", Mapp1(xi, negB), xi) }
-  val orB: Fundef2R[B] = { val (xb, yb) = (p[B]("xb"), p[B]("yb")); Fundef2("orB", Or(xb, yb), xb, yb) }
-  val orI: Fundef2R[UISI] = { val (x, y) = (p[UISI]("x"), p[UISI]("y")); Fundef2("orI", Mapp2(x, y, orB), x, y) }
-  val andB: Fundef2R[B] = { val (xb, yb) = (p[B]("xb"), p[B]("yb")); Fundef2("andB", And(xb, yb), xb, yb) }
-  val andI: Fundef2R[UISI] = { val (x, y) = (p[UISI]("x"), p[UISI]("y")); Fundef2("andI", Mapp2(x, y, andB), x, y) }
-  val xorB: Fundef2R[B] = { val (xb, yb) = (p[B]("xb"), p[B]("yb")); Fundef2("xorB", Xor(xb, yb), xb, yb) }
-  val xorI: Fundef2R[UISI] = { val (x, y) = (p[UISI]("x"), p[UISI]("y")); Fundef2("xorI", Mapp2(x, y, xorB), x, y) }
-   val carry: Fundef3R[B] = { val (xb, yb, zb) = (p[B]("x"), p[B]("y"), p[B]("z")); Fundef3("carry", (xb & yb) | (zb & (xb | yb)), xb, yb, zb) }
-  val minSI: Fundef2R[SI] = { val (xsi, ysi) = (p[SI]("xsi"), p[SI]("ysi")); Fundef2("minSI", Mapp2(xsi, ysi, xorB), xsi, ysi) } //TODO a faire correct en utilisant gt.
-  val subSI: Fundef2R[SI] = { val (xsi, ysi) = (p[SI]("xsi"), p[SI]("ysi")); Fundef2("subSI",ysi-xsi, xsi, ysi) } //could be done in a symetric way using xor, but takes more gates and more registers.
-  val minUI: Fundef2R[UI] = { val (xui, yui) = (p[UI]("xui"), p[UI]("yui")); Fundef2("minUI", Mapp2(xui, yui, xorB), xui, yui) } //TODO a faire correct en utilisant .
+   val negB: Fundef1R[B] = {
+     val xb = p[B]("xb"); Fundef1("negB", Neg(xb), xb)
+   }
+   val negI: Fundef1R[UISI] = {
+     val xi = p[UISI]("xi"); Fundef1("negI", Mapp1(xi, negB), xi)
+   }
+   val orB: Fundef2R[B] = {
+     val (xb, yb) = (p[B]("xb"), p[B]("yb")); Fundef2("orB", Or(xb, yb), xb, yb)
+   }
+   val orI: Fundef2R[UISI] = {
+     val (x, y) = (p[UISI]("x"), p[UISI]("y")); Fundef2("orI", Mapp2(x, y, orB), x, y)
+   }
+   val andB: Fundef2R[B] = {
+     val (xb, yb) = (p[B]("xb"), p[B]("yb")); Fundef2("andB", And(xb, yb), xb, yb)
+   }
+   val andI: Fundef2R[UISI] = {
+     val (x, y) = (p[UISI]("x"), p[UISI]("y")); Fundef2("andI", Mapp2(x, y, andB), x, y)
+   }
+   val xorB: Fundef2R[B] = {
+     val (xb, yb) = (p[B]("xb"), p[B]("yb")); Fundef2("xorB", Xor(xb, yb), xb, yb)
+   }
+   val xorI: Fundef2R[UISI] = {
+     val (x, y) = (p[UISI]("x"), p[UISI]("y")); Fundef2("xorI", Mapp2(x, y, xorB), x, y)
+   }
+   val carry: Fundef3R[B] = {
+     val (xb, yb, zb) = (p[B]("x"), p[B]("y"), p[B]("z")); Fundef3("carry", (xb & yb) | (zb & (xb | yb)), xb, yb, zb)
+   }
+   val minSI: Fundef2R[SI] = {
+     val (xsi, ysi) = (p[SI]("xsi"), p[SI]("ysi")); Fundef2("minSI", Mapp2(xsi, ysi, xorB), xsi, ysi)
+   } //TODO a faire correct en utilisant gt.
+   val subSI: Fundef2R[SI] = {
+     val (xsi, ysi) = (p[SI]("xsi"), p[SI]("ysi")); Fundef2("subSI", ysi - xsi, xsi, ysi)
+   } //could be done in a symetric way using xor, but takes more gates and more registers.
+   val addSI: Fundef2R[SI] = {
+     val (xsi, ysi) = (p[SI]("xsi"), p[SI]("ysi")); Fundef2("addSI", ysi - xsi, xsi, ysi)
+   } //could be done in a symetric way using xor, but takes more gates and more registers.
+   val minUI: Fundef2R[UI] = {
+     val (xui, yui) = (p[UI]("xui"), p[UI]("yui")); Fundef2("minUI", Mapp2(xui, yui, xorB), xui, yui)
+   } //TODO a faire correct en utilisant .
 
-  //(orI.asInstanceOf[Fundef2[R, R, R]], False[R]
-  type redop[R <: Ring] = (Fundef2R[R], ASTBt[R])
-  def orRedop[R<:Ring](implicit n:repr[R]):redop[R]={if(n.name.isInstanceOf[I]) (orI.asInstanceOf[Fundef2[R, R, R]],Intof[UISI](-1).asInstanceOf[ASTB[R]])
-    else(orB.asInstanceOf[Fundef2[R, R, R]],Boolof(false).asInstanceOf[ASTB[R]]) }
- def andRedop[R<:Ring](implicit n:repr[R]):redop[R]={if(n.name.isInstanceOf[I]) (andI.asInstanceOf[Fundef2[R, R, R]],Intof[UISI](-1).asInstanceOf[ASTB[R]])
-    else(andB.asInstanceOf[Fundef2[R, R, R]],Boolof(false).asInstanceOf[ASTB[R]]) }
-  def xorRedop[R<:Ring](implicit n:repr[R]):redop[R]={if(n.name.isInstanceOf[I]) (xorI.asInstanceOf[Fundef2[R, R, R]],Intof[UISI](0).asInstanceOf[ASTB[R]])
-    else(xorB.asInstanceOf[Fundef2[R, R, R]],Boolof(false).asInstanceOf[ASTB[R]]) }
+   //(orI.asInstanceOf[Fundef2[R, R, R]], False[R]
+   type redop[R <: Ring] = (Fundef2R[R], ASTBt[R])
+
+   def orRedop[R <: Ring](implicit n: repr[R]): redop[R] = {
+     if (n.name.isInstanceOf[I]) (orI.asInstanceOf[Fundef2[R, R, R]], Intof[UISI](-1).asInstanceOf[ASTB[R]])
+     else (orB.asInstanceOf[Fundef2[R, R, R]], Boolof(false).asInstanceOf[ASTB[R]])
+   }
+
+   def andRedop[R <: Ring](implicit n: repr[R]): redop[R] = {
+     if (n.name.isInstanceOf[I]) (andI.asInstanceOf[Fundef2[R, R, R]], Intof[UISI](-1).asInstanceOf[ASTB[R]])
+     else (andB.asInstanceOf[Fundef2[R, R, R]], Boolof(false).asInstanceOf[ASTB[R]])
+   }
+
+   def xorRedop[R <: Ring](implicit n: repr[R]): redop[R] = {
+     if (n.name.isInstanceOf[I]) (xorI.asInstanceOf[Fundef2[R, R, R]], Intof[UISI](0).asInstanceOf[ASTB[R]])
+     else (xorB.asInstanceOf[Fundef2[R, R, R]], Boolof(false).asInstanceOf[ASTB[R]])
+   }
   
   val andLBtoR: Fundef2[B, UISI, UISI] = { val (xb, y) = (p[B]("xb"), p[UISI]("y"))
     Fundef2( "andLBtoR", Mapp1(y, {val yb = p[B]("yb");  Fundef1("toto",xb & yb,yb )}    ), xb, y) }

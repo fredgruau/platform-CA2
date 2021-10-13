@@ -1,11 +1,8 @@
 package dataStruc
 
+import compiler.Instr
 import dataStruc.Align._
 
-trait Union2[T] {
-  private var parent: Union2[T] = this
-  def root: Union2[T] = if (parent == this) parent else { parent = parent.root; parent } // "compressing path towards the root."
-}
 trait Union[T<:Union[T]] {   self:T =>
   private var rank = 0
   def aligned=false;
@@ -90,19 +87,29 @@ trait Align[T<:Align[T]] extends Union[T] {
  }
 
 object Align {
- /** Computes T2 o T1 */
+  /** Computes T2 o T1 */
   def compose(T1: Seq[Int], T2: Seq[Int]): Array[Int] = // T1.map(T2(_))
-  {if(T1==null||T2==null) return null
-    val r =   new Array[Int](6)
-    for (i <- 0 to T1.length-1) r(i) = T2(T1(i))
+  {
+    if (T1 == null || T2 == null) return null
+    val taille = math.min(T1.length, T2.length)
+    val r = new Array[Int](taille)
+    for (i <- 0 to taille - 1) r(i) = T2(T1(i))
+    r
+  }
+
+  def compose2(T1: Seq[Int], T2: Seq[Instr]): Array[Instr] = // T1.map(T2(_))
+  {
+    if (T1 == null || T2 == null) return null
+    val r = new Array[Instr](6)
+    for (i <- 0 to T1.length - 1) r(i) = T2(T1(i))
     r
   }
 
 
   //def antecedant(T1: Seq[Int], T2: Seq[Int])
-  def isPermutation(t: Array[Int] ):Boolean={
-    val l=t.toList.sortWith(_ < _)
-    return l==List(0,1,2,3,4,5);
+  def isPermutation(t: Array[Int]): Boolean = {
+    val l = t.toList.sortWith(_ < _)
+    return l == List(0, 1, 2, 3, 4, 5);
   }
 
  /* def invert(t: Array[Int]): Array[Int] = {

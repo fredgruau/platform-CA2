@@ -1,22 +1,33 @@
 package compiler
+
+import compiler.AST.Read
+import compiler.ASTBfun.ASTBg
+
 import scala.collection.{Iterator, Seq}
 
-/**The 9 locus. Three simplicial locus: V for vertex, E for edge, F for face, */
+/** The 9 locus. Three simplicial locus: V for vertex, E for edge, F for face, */
 sealed abstract class Locus {
-  /**suffix of variable names representing simplicial types */
+  /** suffix of variable names representing simplicial types */
   val sufx: Array[String]
+
   /** arity is the locus's arity */
   def lessufx: Array[String]
+
   def isTransfer = false
+
   def density: Int = if (isTransfer) 6 else sufx.length
 
-  /**encodes a neutral permutation with the right number of elements. */
+  def fanout = 6 / density
+
+  /** suffix distinguishing the associated scalars encoding the spatial locus */
+  def deploy(n: String): Array[String]
+
+  /** encodes a neutral permutation with the right number of elements. */
   lazy val neutral: Array[Int] = Array.range(0, density) //we put lazy otherwise pb in initialization order
 }
 abstract class S extends Locus with Ordered[S] {
-
+  override def deploy(n: String): Array[String] = sufx.map(n + "$" + _)
   /** number of neighbor when doing a reduction */
-  def fanout=6/density
   def propagateFrom(s: Array[Int], c: Array[Int]): Option[Array[Int]]
   def compare(that: S): Int = { toString.compareTo(that.toString) }
   /** defines which components are regrouped upon partitionning a transfer variable */
@@ -38,6 +49,8 @@ abstract class S extends Locus with Ordered[S] {
 }
 final case class V() extends S {
   val sufx  = Array("")
+
+  override def deploy(n: String) = Array(n)
   val proj: Array[Int] = Array(0, 0, 0, 0, 0, 0); val card = 0; val cardSucc = 0
   def propagateFrom(s: Array[Int], c: Array[Int]): Option[Array[Int]] = None
   /** how to project a schedule, useless for V */
@@ -78,10 +91,15 @@ abstract class TT extends Locus{
 
 /** T stands for Transfer, and uses two simplicial locus. The first is the simplicial. T[V,E] corresponds to  eV  */
 final case class T[+S1 <: S, +S2 <: S](from: S1, to: S2) extends TT {
+  override def deploy(n: String) =
+    from.sufx.map((suf1: String) => sufx.map(n + "$" + suf1 + _).toList).toList.flatten.toArray
+
   override def isTransfer = true
-  def arity2=from.density
+
+  def arity2 = from.density
+
   /** Suffix distinguishing   tlocus attached to the same slocus. for edge it is just a number, for face we distinguishes 3 angles;
-   * for vertices there is 6 choices which do not have the same name for fV and eV*/
+   * for vertices there is 6 choices which do not have the same name for fV and eV */
   val sufx: Array[String] = from match {
     case V() => to match {
       case E() => Array("w", "nw", "ne", "e", "se", "sw")
@@ -104,10 +122,17 @@ final case class T[+S1 <: S, +S2 <: S](from: S1, to: S2) extends TT {
 }
 object Locus {
 
-  /**add one (resp. two) suffixes to the variable names, for simplicial (resp. tranfer) variable */
+  /**
+   *
+   * @param n name spatial field
+   * @param l locus of n
+   * @return list of name of corresponding scalar fields
+   *         obtained by adding  one (resp. two) suffixes to n,
+   */
+
 
   def deploy(n: String, l: Locus): List[String] = l match {
-    case s: S      => s.sufx.map(n + "$" + _).toList
+    case s: S => s.sufx.map(n + "$" + _).toList
     case T(s1, _) => s1.sufx.map((suf1: String) => l.sufx.map(n + "$" + suf1 + _).toList).toList.flatten
   }
 

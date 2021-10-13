@@ -47,7 +47,7 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
       case Read(s) => s
       case Param(s) => "Param " + s
       // case f: Fundef[_]      => "Fundef " + f.namef + " of param " + f.p.map(p => p.nameP).foldLeft("")(_ + ", " + _)
-      case c: Call[_] => "Call " + c.f.namef + " "
+      case c: Call[_] => "Call " + c.f.namef + " " + mym.name
       case Heead(_) => "head"
       case Taail(_) => "tail"
       case Coons(_, _) => "cons"
@@ -87,40 +87,6 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
     else this.propagate(rewrite)
   }
 
-  //
-  //  def nbit(cur: ProgData1[_], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): AST[T] = {
-  //    val newthis = this.propagate((d: AST[T]) => d.nbit(cur, nbitLB, tSymb, newFuns))
-  //    nbitLB += (newthis -> newthis.newNbitAST(nbitLB, tSymb, newFuns))
-  //    newthis.setName(this.name);
-  //    newthis
-  //  }
-
-  /*  /**
-     * * @param cur The current programm
-     * * @param nbitLB Stores number of bits of subfields.
-     * * @param tSymb The symbol table with number of bits
-     * * @param newFuns Functions generated
-     * * @return Expression rewritten so as to include Extend where necessary.
-     *
-     */
-    def bitIfy(cur: DataProg[_, InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[DataProg[_, InfoNbit[_]]]): AST[T] = {
-      val newthis = this.propagate((d: AST[T]) => d.bitIfy(cur, nbitLB, tSymb, newFuns))
-      nbitLB += (newthis -> newthis.newNbitAST2(nbitLB, tSymb, newFuns))
-      newthis.setName(this.name);
-      newthis
-    }*/
-
-
-  //
-  //  /** Compute the number of bits needed, using  mutable structures, that have  been previously updated. */
-  //  def newNbitAST(nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): Int = this.asInstanceOf[AST[_]] match {
-  //    //   case Heead(a)          => List(nbitLB(a).head)
-  //    //  case Taail(a)          => nbitLB(a).tail
-  //    case Param(s) => tSymb(s).nb
-  //    case Read(s) => tSymb(s).nb
-  //    //  case Coons(a, b)       => nbitLB(a).head :: nbitLB(b) //for ((k,v)<-nbitLB) println( k.toStringTree)     println( b.toStringTree)
-  //  }
-
   /**
    * @param id1 a bijection betwee AST
    * @return recreates the whole structure   to avoid   side-effect. because we build List, using Coons, Heead, Taail,
@@ -137,7 +103,9 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
       case e@Heead(a) => e.copy(arg = id2(a))(e.mym) //{ e.substitute(a,id2(a));e }//{e.arg = id2(a);e} //
       case e@Taail(a) => e.copy(arg = id2(a))(e.mym)
       case e@Coons(a, a2) => e.copy(arg = id2(a), arg2 = id2(a2))(e.mym)
-      case e@Call1(_, a) => e.copy(arg = id2(a))(e.mym)
+      case e@Call1(_, a) =>
+        val toto = e.copy(arg = id2(a))(e.mym)
+        toto
       case e@Call2(_, a, a2) => e.copy(arg = id2(a), arg2 = id2(a2))(e.mym)
       case e@Call3(_, a, a2, a3) => e.copy(arg = id2(a), arg2 = id2(a2), arg3 = id2(a3))(e.mym)
     };

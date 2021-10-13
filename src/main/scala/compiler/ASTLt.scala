@@ -5,6 +5,7 @@ import compiler.ASTL._
 import compiler.repr._
 import compiler.Circuit._
 import scala.collection._
+import ASTBfun.ASTBg
 
 
 /**
@@ -21,7 +22,7 @@ import scala.collection._
  * @param si   shift instruction
  * @param algn alignement on input variables
  */
-class Result(var c: Option[Constraint], var si: iTabSymb2[ShiftInstr], var algn: iTabSymb2[Array[Int]]) {}
+class Result(var c: Option[Constraint], var si: iTabSymb2[Affect[_]], var algn: iTabSymb2[Array[Int]]) {}
 
 object Result {
   def apply() = new Result(None, immutable.HashMap.empty, immutable.HashMap.empty)
@@ -34,6 +35,11 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
   def ring: R = mym.name._2
 
   def extendMe(n: Int): ASTLt[L, R] = ASTL.extend(n, this)(new repr(locus), new repr(ring))
+
+  def isRedop: Boolean = this match {
+    case a: ASTL[L, R] => a.isRedop
+    case _ => false
+  }
 
   /**
    * Important to specify that the L,R type of AST nodes is preserved, for type checking consistency
@@ -80,7 +86,6 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
     }
     newD.asInstanceOf[ASTLt[L, R]]
   }
-
 
   /**
    *
@@ -138,7 +143,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
    * * @return Expression rewritten so as to include Extend where necessary.
    *
    */
-  def bitIfy(cur: DataProg[_, InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
+  def bitIfy(cur: DataProg[InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
     val newThis: ASTLt[L, R] = this.propagate((d: AST[(L, R)]) => d.asInstanceOf[ASTLt[L, R]].bitIfy(cur, nbitLB, tSymb))
     nbitLB += (newThis -> newThis.newNbitAST(nbitLB, tSymb))
     newThis.setName(this.name);
@@ -154,7 +159,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
   def redExpr = List.empty[AST[_]]
 
 
-  def align(r: Result): ASTLt[L, R] = this.asInstanceOf[AST[_]] match {
+  def align(r: Result, t: TabSymb[InfoNbit[_]]): ASTLt[L, R] = this.asInstanceOf[AST[_]] match {
     case Read(s) => r.algn = immutable.HashMap(s -> locus.neutral); this
     case Param(s) => r.algn = immutable.HashMap(s -> locus.neutral); this
     case l: Layer2[_] => ; this
@@ -181,20 +186,21 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
     // case t: Layer2[_] =>
     case Read(s) =>
       val r = rpart(mym.asInstanceOf[repr[(L, R)]])
-      this.locus.sufx.map((suf: String) => new Read[R](s + "$" + suf)(r) with ASTBt[R].asInstanceOf[ASTBt[_ <: Ring]])
+      this.locus.deploy(s).map(new Read[R](_)(r) with ASTBt[R].asInstanceOf[ASTBg])
     case l: Layer2[_] => //TODO faut générer des load pas des read
       val s = l.name
       val r = rpart(mym.asInstanceOf[repr[(L, R)]])
-      this.locus.sufx.map((suf: String) => new Read[R](s + "$" + suf)(r) with ASTBt[R].asInstanceOf[ASTBt[_ <: Ring]])
+      this.locus.deploy(s).map(new Read[R](_)(r) with ASTBt[R].asInstanceOf[ASTBg])
 
     case _ => throw new RuntimeException("unfoldSpace act only on Reads  for ASTL ")
   }
 
-  def unfoldTransfer(m: Machine): ArrArrAst = this.asInstanceOf[AST[_]] match {
+  def unfoldTransfer(m: Machine): ArrArrAstBg = this.asInstanceOf[AST[_]] match {
     case Read(s) =>
       val T(s1, _) = this.locus;
       val r = rpart(mym.asInstanceOf[repr[(L, R)]])
-      s1.sufx.map((suf1: String) => this.locus.sufx.map((suf2: String) => new Read(s + "$" + suf1 + suf2)(r) with ASTBt[R].asInstanceOf[ASTBt[_ <: Ring]]))
+      s1.sufx.map((suf1: String) => this.locus.sufx.map((suf2: String) =>
+        new Read(s + "$" + suf1 + suf2)(r) with ASTBt[R].asInstanceOf[ASTBg]))
     case _ => throw new RuntimeException("unfoldSpace act only on Reads for ASTLt ")
   }
 

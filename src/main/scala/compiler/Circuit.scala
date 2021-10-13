@@ -37,30 +37,30 @@ abstract class Circuit[L <: Locus, R <: Ring](override val p: Param[_]*) extends
   def compile2(m: Machine): Unit = {
     body = computeRoot //we pretend that the circuit is a function which returns compute Root
 
-    val prog1: DataProg[_, InfoType[_]] = DataProg(this);
+    val prog1: DataProg[InfoType[_]] = DataProg(this);
     print(prog1)
     val prog2 = prog1.treeIfy();
-    print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
+    // print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
     val prog3 = prog2.procedurIfy();
-    print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
-    val prog4: DataProg[_, InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
+    //  print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
-    print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
-    val prog5: DataProg[_, InfoNbit[_]] = prog4.macroIfy();
+    val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
+    //print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
-    // print("55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n"+prog5 + "\n\n")
+    val prog5: DataProg[InfoNbit[_]] = prog4.macroIfy();
+    print("55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
+    val prog6 = prog5.unfoldSpace(m);
+    print("8___________88___________88___________88___________88___________88___________8\n" + prog6 + "\n\n")
+    //print("7777777777777777777777777777777777777777777777777777777\n"+prog7 + "\n\n")
+    /*
+    */
 
-    val prog7 = prog5.unfoldSpace(m);
-    print(prog7)
-    // print("7777777777777777777777777777777777777777777777777777777\n"+prog7 + "\n\n")
-    val prog6: DataProg[_, InfoNbit[_]] = prog5.foldRegister(0)
-    /* */
   }
 }
 
 /**
- * contains singletons uses trhoughout the compilation.
+ * ontains singletons uses trhoughout the compilation.
  */
 object Circuit {
   /**
@@ -95,13 +95,13 @@ object Circuit {
    * The cardinal of first array is 1,2,3 for V,F,E,  */
   type ArrAst = Array[ASTBg]
   /** spatial unfolding of an ASTL of "transfer type" creates an array of array of ASTB. The cardinal of first array is 1,2,3 for V,F,E, the seconds array is 6,3,2  */
-  type ArrArrAst = Array[Array[ASTBg]]
+  type ArrArrAstBg = Array[Array[ASTBg]]
   /**
    * The only place where a machine differs from another is when compiling the transfer function,
    * it is parameterised by One function for each pair of simplicial type.
    * Type of input is transfer(src,des) type of output is transfer(des,src) , where "src" is first S, and "des" is second S
    */
-  type Machine = (S, S, ArrArrAst) => ArrArrAst
+  type Machine = (S, S, ArrArrAstBg) => ArrArrAstBg
   /** correspondance between suffix and index */
   val order: HashMap[String, Int] = immutable.HashMap("w" -> 0, "nw" -> 1, "ne" -> 2, "e" -> 3, "se" -> 4, "sw" -> 5,
     "wn" -> 0, "n" -> 1, "en" -> 2, "es" -> 3, "s" -> 4, "ws" -> 5,
@@ -113,7 +113,7 @@ object Circuit {
   val transfers: List[(S, S)] = List((V(), E()), (E(), V()), (V(), F()), (F(), V()), (E(), F()), (F(), E()))
 
   /** generates an input array */
-  def inAr(s1: S, s2: S): ArrArrAst = {
+  def inAr(s1: S, s2: S): ArrArrAstBg = {
     var i = -1;
     def nameInt = {
       i += 1;
@@ -129,7 +129,7 @@ object Circuit {
    * so that all the shift and delay gets applied on d1 (up), so that the same computation is applied
    * on d2 and ad2, when the vE fields is obtain by a broadcast followed by a transfer.
    */
-  val hexagon: Machine = (src: S, des: S, t: ArrArrAst) => {
+  val hexagon: Machine = (src: S, des: S, t: ArrArrAstBg) => {
     implicit val scalarType: repr[_ <: Ring] = t(0)(0).mym;
     src match {
       case V() => des match {
@@ -167,5 +167,6 @@ object Circuit {
     };
     r
   })
+  print(hexPermut)
 }
 

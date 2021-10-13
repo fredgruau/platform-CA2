@@ -24,6 +24,7 @@ class Dist2(val source: BoolV) extends Layer2[(V, SI)](3) with ASTLt[V, SI] {
   val tslope = transfer(slope)
   val temp: BoolfV = clock(tslope)
   val temp2: BoolfV = anticlock(tslope)
+ // val vortex: BoolF = andR(transfer(xor(temp, temp2)));
   val vortex: BoolF = andR(transfer(xor(temp, temp2)));
   vortex.setName("vortex")
   // val test= vortex |   andR(transfer(temp5)) ;  slope.bugif(test)
