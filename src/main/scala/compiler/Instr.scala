@@ -1,7 +1,8 @@
 package compiler
 
 import compiler.AST._
-import compiler.ASTBfun.redop
+import compiler.ASTB.Tminus1
+import compiler.ASTBfun.{ASTBg, redop}
 import compiler.InfoType._
 import compiler.Instr._
 import compiler.Locus.{deploy, _}
@@ -16,6 +17,9 @@ import scala.collection.immutable.HashSet
 
 /** Instruction used within the compiler, call, affect. Dag and Union allows to defined ConnectedComp  */
 abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Instr] {
+  def detm1ise(muName: String): Instr = if (names(0) != muName) this else new Affect(muName, exps(0).asInstanceOf[ASTBt[Ring]].detm1ise)
+
+
   /**
    *
    * @param x instruction input neighbor of  this
@@ -71,6 +75,8 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
 
   /** @return the locus of expressions, for affectation. */
   def locus: Option[Locus] = None
+
+  def ring: Option[Ring] = None
 
   def isV = locus.get == V()
 
@@ -169,7 +175,7 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
 
   // TabSymb[InfoNbit[_]]
   /** we add one (resp. two) suffixes, for simplicial (resp. transfer) variables  */
-  def unfoldSpace(m: Machine, tSymb: TabSymb[InfoNbit[_]], zones: Dag[Zone], tZone: Map[String, Zone]): List[Instr] =
+  def unfoldSpace(m: Machine, tSymb: TabSymb[InfoNbit[_]]): List[Instr] =
     this match {
       case Affect(v, exp) => // println(exp.toStringTree) ;
         val exp2 = exp.asInstanceOf[ASTLt[_, _]]
@@ -263,6 +269,20 @@ case class ShiftInstr(name: String, shifted: String, perm: Array[Int]) extends I
 
 //todo on aurait pas du prendre de case class pour affect ou callProc.
 case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
+
+  def addParamR(tSymbVar: TabSymb[InfoNbit[_]]): List[Instr] = {
+    if (tSymbVar(name).k == ParamR() && isRedop) {
+      val newName = name + "R"
+      tSymbVar.addOne(newName, tSymbVar(name))
+      tSymbVar.addOne(name, tSymbVar(name).macroFieldise)
+      val t = tSymbVar(name)
+      val newAffect = Affect(newName, readLR(name, exp.mym.asInstanceOf[repr[(Locus, Ring)]]))
+      List(this, newAffect)
+
+    }
+    else List(this)
+  }
+
   /**
    *
    * @param dagZones
@@ -305,6 +325,12 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
     case _ => None
   }
 
+  /** @return if instruction is ASTLt, returns the locus */
+  override def ring: Option[Ring] = exp match {
+    case a: ASTLt[_, _] => Some(a.ring)
+    case _ => None
+  }
+
   override def locus2: Option[Ring] = exp match {
     case a: ASTBt[_] => Some(a.ring)
     case _ => None
@@ -313,22 +339,15 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
   override def isTransfer: Boolean = exp.asInstanceOf[ASTLt[_, _]].locus.isInstanceOf[TT] // || exp.isInstanceOf[Red2[_,_,_]]
   override def propagate(id1: rewriteAST2): Instr = Affect(name, id1(exp))
 
-  def coalesc(newName: iTabSymb2[String]): Affect[_] =
+  def coalesc(newName: iTabSymb[String]): Affect[_] =
     Affect(if (!newName.contains(name)) name else newName(name), exp.asInstanceOf[ASTBt[_]].coalesc(newName))
 
   /**
-   * @param cs
+   *
+   * @param cs conxtraints for cycle
+   * @param t  updated with new symbols
+   * @return aligned instruction, together with shift affect
    */
-  /* def align(cs: TabSymb[Constraint]): Affect[_] = {
-     val r = Result()
-     val newExp = exp.asInstanceOf[ASTLt[_, _]].align(r)
-     val newAffect = Affect(name, newExp)
-     newAffect.alignPerm = r.algn
-     if (r.c != None)
-       cs.addOne(name -> r.c.get)
-     newAffect
-   }*/
-
   def align(cs: TabSymb[Constraint], t: TabSymb[InfoNbit[_]]): List[Instr] = {
     val r = Result()
     val newExp = exp.asInstanceOf[ASTLt[_, _]].align(r, t)
@@ -339,7 +358,7 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
       cs.addOne(name -> r.c.get)
       result = r.si.values.toList
     }
-    newAffect :: result
+    newAffect :: result //We return  also the shift-affect instruction
   }
 }
 
@@ -363,15 +382,17 @@ object Instr {
   def isSysInstr(f: String) = f.size > 2 && sysInstr.contains(f.substring(0, 3))
 
   /** @param i instruction
-   * @return i.asInstanceOf[Affect[_]] */
+   * @return i.asInstanceOf[Affect[_]]*/
   def a(i: Instr): Affect[_] = i.asInstanceOf[Affect[_]]
 
   def readLR(s: String, m: repr[(Locus, Ring)]) = new Read(s)(m) with ASTLt[Locus, Ring]
 
   def readR(s: String, m: repr[Ring]) = new Read(s)(m) with ASTBt[Ring]
 
-  def reduceR(a1: ASTBt[Ring], a2: ASTBt[Ring], opred: redop[Ring], m: repr[Ring]) =
-    new Call2(opred._1, a1, a2)(m: repr[Ring]) with ASTBt[Ring]
+  def tm1R(e: ASTBt[Ring], m: repr[Ring]) = new Tminus1(e)(m) with ASTBt[Ring]
+
+  def reduceR(a1: ASTBg, a2: ASTBg, opred: redop[Ring], m: repr[Ring]) =
+    new Call2(opred._1, a1, a2)(m) with ASTBt[Ring]
 
 
   /** utility used to align instruction when printed */

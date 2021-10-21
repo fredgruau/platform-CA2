@@ -1,14 +1,18 @@
 package compiler
 
 import compiler.AST.{Call1, Call2, Call3, Fundef1, Fundef2, Fundef3, Read}
-import compiler.ASTB.rewriteASTBt
-import compiler.Circuit.iTabSymb2
+import compiler.ASTB.{Tminus1, rewriteASTBt}
+import compiler.Circuit.{iTabSymb, iTabSymb2}
 
 /** Identifies AST corresponding to int or bool, excludes those obtained with cons */
 trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
   self: AST[R] =>
   def ring: R = mym.name
 
+  def detm1ise: ASTBt[R] = this match {
+    case Tminus1(e) => e
+    case _ => this
+  } //throw new Exception("it does not begin by tm1, and it should")}
   /** sinon y a une erreur du compilo scala empty modifier. */
   val u = 3;
   val v = 3
@@ -18,7 +22,7 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
    * @param newName correspondance towards scalar names
    * @return same tree except target is replaced by src   */
 
-  def coalesc(newName: iTabSymb2[String]): ASTBt[R] = {
+  def coalesc(newName: iTabSymb[String]): ASTBt[R] = {
     val rewrite: rewriteASTBt[R] = (d: ASTBt[R]) => d.coalesc(newName)
     val newD: ASTBt[R] = this match {
       case a: ASTB[R] => a.propagateASTB(rewrite)

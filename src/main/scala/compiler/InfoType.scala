@@ -32,6 +32,8 @@ object InfoType {
  * @tparam T toto
  */
 class InfoNbit[+T](override val t: T, override val k: VarKind, val nb: Int) extends InfoType(t, k) {
+  def macroFieldise: InfoNbit[_] = new InfoNbit(t, MacroField(), nb)
+
   /**
    *
    * @return same info except we drop the locus and the type is ring

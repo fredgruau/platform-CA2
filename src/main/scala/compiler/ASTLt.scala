@@ -19,7 +19,7 @@ import ASTBfun.ASTBg
 /**
  *
  * @param c    a possible cycle constraint
- * @param si   shift instruction
+ * @param si   new affect instructions for shift
  * @param algn alignement on input variables
  */
 class Result(var c: Option[Constraint], var si: iTabSymb2[Affect[_]], var algn: iTabSymb2[Array[Int]]) {}

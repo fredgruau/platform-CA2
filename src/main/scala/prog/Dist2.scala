@@ -24,14 +24,14 @@ class Dist2(val source: BoolV) extends Layer2[(V, SI)](3) with ASTLt[V, SI] {
   val tslope = transfer(slope)
   val temp: BoolfV = clock(tslope)
   val temp2: BoolfV = anticlock(tslope)
- // val vortex: BoolF = andR(transfer(xor(temp, temp2)));
-  val vortex: BoolF = andR(transfer(xor(temp, temp2)));
+  // val vortex: BoolF = andR(transfer(xor(temp, temp2)));
+  val vortex: BoolF = andR(transfer(xor(temp, temp2))); //faudrait en faire une marco
   vortex.setName("vortex")
   // val test= vortex |   andR(transfer(temp5)) ;  slope.bugif(test)
   // ceci provoque bien l'erreur attendue java.lang.RuntimeException: Debug exp is allzero=>not usable for compute
   //ca montre que debug ne peut etre réutilisé.
   bugif2(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
-  val next: ASTLt[V, SI] = this + cond(source, sign(-this), delta)
+  val next: ASTLt[V, SI] = this + cond(source, sign(-this), delta) //faudrait en faire une marco qui prends delta, source et dist et renvoie distNext
   // val temp: BoolfV = xorR2(transfer(slope)) ;  val vortex: BoolF = orR(transfer(temp));   bugif(vortex);
   render2(slope)
 }

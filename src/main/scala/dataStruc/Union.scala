@@ -105,6 +105,14 @@ object Align {
     r
   }
 
+  def compose3[A](T1: Seq[Int], T2: Array[A]): Array[A] = // le bon
+  {
+    if (T1 == null || T2 == null) return null
+    val r = T2.clone()
+    for (i <- 0 to T1.length - 1) r(i) = T2(T1(i))
+    r
+  }
+
 
   //def antecedant(T1: Seq[Int], T2: Seq[Int])
   def isPermutation(t: Array[Int]): Boolean = {
@@ -112,12 +120,12 @@ object Align {
     return l == List(0, 1, 2, 3, 4, 5);
   }
 
- /* def invert(t: Array[Int]): Array[Int] = {
-    //assert(isPermutation(t))
-    val r =  new Array[Int](t.length)
-    for (i <- 0 to t.length-1) r(t(i)) = i
-    r
-  }*/
+  /* def invert(t: Array[Int]): Array[Int] = {
+     //assert(isPermutation(t))
+     val r =  new Array[Int](t.length)
+     for (i <- 0 to t.length-1) r(t(i)) = i
+     r
+   }*/
   def invert(t: Seq[Int]): Array[Int] = {
     //assert(isPermutation(t))
     val r =  new Array[Int](t.length)

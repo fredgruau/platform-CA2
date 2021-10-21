@@ -108,7 +108,6 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
       throw new RuntimeException("a name is reused two times or we want to rewrite a read")
     val repr = represent
     val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.treeIfy(toBeReplaced, repr)
-    //val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.treeIfy(toBeReplaced, repr)
     /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
     val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.treeIfy((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
 
@@ -122,6 +121,27 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
     propagateUnit(rewrite, newAffect) //computes input and output neighbors
   }
 
+  def affectIfy2(toBeReplaced: AstPred): DagInstr = { //TODO faire un seul appel pour éviter de reconstuire le DAG plusieurs fois
+    /** reads are removed from toBeReplaced to not generatre x=x */
+    val toBeRepl: List[AST[_]] = dagAst.visitedL.filter(a => toBeReplaced(a) && isNotRead(a));
+
+    toBeRepl.map(_.setNameIfNull());
+    if (toSet(toBeRepl).size < toBeRepl.size) //since name are given by hand we check that no two names are equals
+      throw new RuntimeException("a name is reused two times or we want to rewrite a read")
+    val repr = represent
+    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.treeIfy(toBeReplaced, repr)
+    /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
+    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.treeIfy((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
+
+    /** rewrite recursviely the affect expression. we use this slightly modified dedagExclude instead of dedagRewrite
+     * to not generatre x=x  */
+    val affectExpList = toBeRepl.map(deDagExclude)
+
+    /** returns the newly generated affect instruction */
+    newAffect = affectExpList.map((e: AST[_]) => Affect(e.name, e))
+    val rewrite: Instr => Instr = (i: Instr) => i.propagate(deDagRewrite)
+    propagateUnit(rewrite, newAffect) //computes input and output neighbors
+  }
   /**
    * @return set of AST which are used twice within those instruction to be replaced by an affectation
    *         we must also add up usage from callProc instruction

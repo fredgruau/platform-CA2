@@ -9,14 +9,6 @@ import compiler.Circuit.iTabSymb2
 import scala.collection._
 import scala.language.implicitConversions
 
-sealed class Ring //j'appelle cela Ring parceque ca a une structure d'anneau avec or et and.
-class I extends Ring //le type entier n'etends pas boolean, car OR,AND,XOR ne sont pas defini pour les entiers.
-final case class B() extends Ring //le type boolean
-final case class UI() extends I //unsigned int
-final case class SI() extends I //signed int
-final case class UISI() extends I
-final case class UISIB() extends Ring
-
 /**
  * node of Abstract Syntax Tree corresponding to an arithmetic field  boolean, integer (signed or unsigned)
  * We wish to be able to preserve covariance of R we couldnot because of progpageASTB.

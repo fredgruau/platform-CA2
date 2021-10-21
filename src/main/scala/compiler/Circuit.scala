@@ -52,10 +52,7 @@ abstract class Circuit[L <: Locus, R <: Ring](override val p: Param[_]*) extends
 
     val prog6 = prog5.unfoldSpace(m);
     print("8___________88___________88___________88___________88___________88___________8\n" + prog6 + "\n\n")
-    //print("7777777777777777777777777777777777777777777777777777777\n"+prog7 + "\n\n")
-    /*
-    */
-
+    val prog7 = prog6.treeIfy2();
   }
 }
 
@@ -135,9 +132,9 @@ object Circuit {
       case V() => des match {
         case E() => /*eV->vE*/
           val Array(e, ne, nw, w, sw, se) = t(0)
-          Array(Array(shiftL(Tminus1(w)), Tminus1(e)), Array(Tminus1(se), nw), Array(shiftL(Tminus1(sw)), ne))
+          Array(Array(Tminus1(shiftL(w)), Tminus1(e)), Array(Tminus1(se), nw), Array(Tminus1(shiftL(sw)), ne))
         case F() => /*fV->vF*/
-          val Array(ne, n, nw, sw, s, se) = t(0); Array(Array(n, Tminus1(sw), Tminus1(se)), Array(shiftL(Tminus1(s)), ne, shiftL(nw)))
+          val Array(ne, n, nw, sw, s, se) = t(0); Array(Array(n, Tminus1(sw), Tminus1(se)), Array(Tminus1(shiftL(s)), ne, shiftL(nw)))
       }
       case E() =>
         val Array(Array(h1, h2), Array(d1, d2), Array(ad1, ad2)) = t; //common to vE and fE

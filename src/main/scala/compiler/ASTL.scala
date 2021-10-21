@@ -58,15 +58,22 @@ object ASTL {
     val next: ASTLt[L, R]
   }
 
+  def rotR[T](seq: Seq[T], i: Int): Seq[T] = {
+    val size = seq.size
+    seq.drop(size - (i % size)) ++ seq.take(size - (i % size))
+  }
+
   def rotL[T](a: Array[T])(implicit m: ClassTag[T]): Array[T] = a.drop(1) :+ a(0)
 
   def rotR[T](a: Array[T])(implicit m: ClassTag[T]): Array[T] = a(a.length - 1) +: a.take(a.length - 1)
 
-  def rotR[T](a: Array[T], jump: Int)(implicit m: ClassTag[T]): Array[T] = Array.concat(a.drop(jump), a.take(jump))
+  //def rotR[T](a: Array[T], jump: Int)(implicit m: ClassTag[T]): Array[T] = Array.concat(a.drop(jump), a.take(jump))
 
   def rot[T](a: Array[T], dir: Boolean)(implicit m: ClassTag[T]): Array[T] = if (dir) rotR(a) else rotL(a) //dir=True correspond to trigonometric order
   def rotPerm(dec: Int): Array[Int] = {
-    val r = new Array[Int](6); for (i <- 0 to 5) r(i) = (i + dec) % 6; r
+    val r = new Array[Int](6);
+    for (i <- 0 to 5) r(i) = (i + dec) % 6;
+    r
   }
 
   def composeAll(p: Array[Int], t: iTabSymb[Array[Int]]): Map[String, Array[Int]] = t.map { case (k, v) => k -> compose(p, v) }
@@ -252,7 +259,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
   def opRedop =
     this.asInstanceOf[ASTL[_, _]] match {
       case Redop(op, _, _, _) => op
-      case _ => throw new Exception("tried to take op of nonredo")
+      case _ => throw new Exception("tried to take op of nonredop")
     }
 
   override def toString: String =

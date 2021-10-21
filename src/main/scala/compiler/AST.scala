@@ -16,6 +16,8 @@ import Circuit.AstPred
  * @tparam T type of the expression
  * @param m parameter used to compute this type. */
 abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named {
+
+
   val mym: repr[T] = m //if type of mym is set to repr[_] this allow covariance even if repr is not covariant
   /** system instruction can be associated to any spatial field, so as to be latter retrievable from the compiling method. */
 
@@ -31,23 +33,13 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
     }
 
 
-  //def symbolsNoLayer: HashSet[String] = symbols.filter(!isLayer(_))
-
-
-  //
-  //  /** predicate to insert affectation for the procedurise step. */
-  //  def isCoons: Boolean = this match {
-  //    case Taail(_) | Heead(_) | Call1(_, _) | Call2(_, _, _) | Call3(_, _, _, _) => true;
-  //    case _ => false
-  //  }
-
   override def toString: String =
 
     this.asInstanceOf[AST[_]] match {
       case Read(s) => s
       case Param(s) => "Param " + s
       // case f: Fundef[_]      => "Fundef " + f.namef + " of param " + f.p.map(p => p.nameP).foldLeft("")(_ + ", " + _)
-      case c: Call[_] => "Call " + c.f.namef + " " + mym.name
+      case c: Call[_] => "Call " + c.f.namef + " " // + mym.name
       case Heead(_) => "head"
       case Taail(_) => "tail"
       case Coons(_, _) => "cons"
@@ -55,21 +47,6 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
       case l: Layer2[_] => "Layer2 " + this.name + ":" + mym.name
       case _ => throw new RuntimeException("merdouille")
   }
-
-  /*  /**
-     * @param usedTwice  dags which are used twice, or which need to be affected for some other reason.
-     * @param repr: representant of the equivalence class with respect to equal on case class hierarchy
-     * @param replaced: map encoding a substitution.
-     * @return the Dag where expression used more than once are replaced by read.
-     */
-    def deDag(usedTwice: immutable.HashSet[AST[_]], repr: Map[AST[_], AST[_]], replaced: Map[AST[_], AST[_]]): AST[T] = {
-      if (usedTwice.contains(this)) new Read[T](repr(this).name)(mym.asInstanceOf[repr[T]]) else if (replaced.contains(this)) replaced(this).asInstanceOf[AST[T]].deDag(usedTwice, repr, replaced)
-      else this match {
-        case Param(_) => throw new RuntimeException("bordel de merde") //; new Read[T](repr(this).name)(mym.asInstanceOf[repr[T]])
-        case _ => this.propagate((d: AST[T]) => d.deDag(usedTwice, repr, replaced))
-      }
-    }*/
-
   /**
    * Transform a Dag of AST into a forest of trees, removes the delayed.
    * Important to specify that the L,R type of AST nodes is preserved, for type checking consistency
@@ -112,17 +89,6 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
     newD.setName(this.name);
     newD.asInstanceOf[AST[T]]
   }
-
-
-  //  /**   Compute alignement with respect to input variables, and also constraint, given that v is the variable if we make a reduction */
-  //  //def align(cs:TabConstr,v:String):iTabSymb[Array[Int]]= throw new RuntimeException("align must be applied on ASTLtonly ")
-  //   /**True if "this" is a call to a fun2, whose first arg is a Tminus1 */
-  //  def firstArgDelayed(muInstr:iTabSymb[List[Affect[_]]] ):Boolean=this match{
-  //    case Call2(_, Read(s), _) =>
-  //      val Array(rad,suf)=   s.split("\\$") //on separe le radical du suffixe
-  //      muInstr(rad)(order(suf)) .exp.isInstanceOf[ASTB.Tminus1[_]]
-  //    case _ => false
-  //  }
 
 
 }
