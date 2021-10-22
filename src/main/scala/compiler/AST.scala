@@ -39,7 +39,7 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
       case Read(s) => s
       case Param(s) => "Param " + s
       // case f: Fundef[_]      => "Fundef " + f.namef + " of param " + f.p.map(p => p.nameP).foldLeft("")(_ + ", " + _)
-      case c: Call[_] => "Call " + c.f.namef + " " // + mym.name
+      case c: Call[_] => "Call " + c.f.namef + " " //  + mym.name
       case Heead(_) => "head"
       case Taail(_) => "tail"
       case Coons(_, _) => "cons"
@@ -47,9 +47,11 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
       case l: Layer2[_] => "Layer2 " + this.name + ":" + mym.name
       case _ => throw new RuntimeException("merdouille")
   }
+
   /**
    * Transform a Dag of AST into a forest of trees, removes the delayed.
-   * Important to specify that the L,R type of AST nodes is preserved, for type checking consistency
+   * Treefy must be written for AST because At the start, we use Coons which are AST expression not being ASTLt[L,R]
+   * * Important to specify that the L,R type of AST nodes is preserved, for type checking consistency
    * Surprisingly, when building ASTL explicitely, we need to drop the fact that the type is preserved, and go from ASTL[L,R] to ASTLg
    * Transform a Dag of AST into a forest of trees, removes the delayed.
    * *

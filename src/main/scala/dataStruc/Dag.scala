@@ -1,10 +1,12 @@
 package dataStruc
 
+import compiler.Circuit.iTabSymb
 import compiler.{AST, Instr}
 import dataStruc.DagInstr.setInputAndOutputNeighbor
 import dataStruc.DagNode.paquets
+
 import scala.collection.{mutable, _}
-import scala.collection.immutable.HashSet
+import scala.collection.immutable.{HashMap, HashSet}
 /**
  * Node of a Directed Acyclic Graph (DAG)
  * getCycle is used to test the absence of cycles
@@ -140,7 +142,7 @@ trait SetInput[T <: SetInput[T]] {
   var inputNeighbors: List[T] = List.empty;
 
   /** names of variables modified by instruction. */
-  def usedVars: immutable.HashSet[String]
+  def usedVars(considerShift: Boolean = true): immutable.HashSet[String]
 
   def names: List[String]
   def isShift = (names.nonEmpty) && names(0).startsWith("shift")
@@ -183,6 +185,39 @@ trait DagSetInput[T <: DagNode[T] with Union[T] with SetOutput[T]] extends Dag[T
   }
 
   /**
+   * insert instructions at the right place
+   *
+   * @param otherInstr instruction factorizing code
+   */
+  private def insertVisitedL(otherInstr: List[T]) = {
+    var res: List[T] = List.empty
+    var nbUser: HashMap[T, Int] = HashMap.empty ++ otherInstr.map((instr: T) => (instr -> instr.outputNeighbors.size)) //compte les output
+    for (instr <- visitedL) {
+      res ::= instr
+      for (other <- instr.inputNeighbors) {
+        if (nbUser.contains(other)) {
+          nbUser += (other -> (nbUser(other) - 1))
+          if (nbUser(other) == 0)
+            res ::= other
+        }
+      }
+    }
+    visitedL = res.reverse
+  }
+
+  /**
+   *
+   * @param rewrite    each instruction is rewritten into O,1, or several instruction, preserve generators
+   * @param otherInstr more instructions to be be added
+   * @return Like propagate instead we work only on visitedL, because we want to keep the schedule.
+   **/
+  def propagateUnit2(rewrite: T => T, otherInstr: List[T] = List()) = {
+    visitedL = visitedL.map(rewrite)
+    setInputAndOutputNeighbor(visitedL ::: otherInstr, false)
+    insertVisitedL(otherInstr)
+  }
+
+  /**
    *
    * @param rewrite    rewrites each instruction into one instruction, preserve generators
    * @param otherInstr more instructions to be be added
@@ -209,6 +244,7 @@ trait DagSetInput[T <: DagNode[T] with Union[T] with SetOutput[T]] extends Dag[T
     setInputAndOutputNeighbor(newGenerators ::: newNonGenerators ::: otherInstr)
     new Dag(newGenerators)
   }
+
 
   /**
    *

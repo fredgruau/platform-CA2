@@ -114,14 +114,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
     newThis
   }
 
-  //
-  //  /** @param nbitLB : computes the #bit of all the ASTL sub expressions, there can be several.   */
-  //  override def nbit(cur: ProgData1[_], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[ProgData2]): ASTLt[L, R] = {
-  //    val newThis = this.propagate((d: AST[(L, R)]) => d.nbit(cur, nbitLB, tSymb, newFuns))
-  //    nbitLB += (newThis -> newThis.newNbitAST(nbitLB, tSymb, newFuns))
-  //    newThis.setName(this.name);
-  //    newThis //.asInstanceOf[ASTLt[L, R]]
-  //  }
+
   /**
    * @param nbitLB Stores number of bits of subfields.
    * @param tSymb  The symbol table with number of bits

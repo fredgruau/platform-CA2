@@ -234,7 +234,7 @@ case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) exte
    *
    * @return variables name used by the instruction
    */
-  def usedVars: HashSet[String] = exps.map(_.symbolsExcepLayers).foldLeft(immutable.HashSet.empty[String])(_ | _)
+  def usedVars(considerShift: Boolean = true): HashSet[String] = exps.map(_.symbolsExcepLayers).foldLeft(immutable.HashSet.empty[String])(_ | _)
 
   override def isTransfer: Boolean =
     throw new RuntimeException("test isTransfer is done only in macro, which do not have CallProc instr. ")
@@ -260,7 +260,7 @@ case class ShiftInstr(name: String, shifted: String, perm: Array[Int]) extends I
   override def isTransfer: Boolean = true
 
   /** names of variables modified by instruction. */
-  override def usedVars: HashSet[String] = HashSet(shifted)
+  override def usedVars(considerShift: Boolean = true): HashSet[String] = HashSet(shifted)
 
   override def names: List[String] = List(name)
 
@@ -313,8 +313,8 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
     case None => ""
   }
 
-  def usedVars: HashSet[String] = {
-    if (isShift) HashSet.empty
+  def usedVars(considerShift: Boolean = true): HashSet[String] = {
+    if (isShift && considerShift) HashSet.empty
     else exp.symbolsExcepLayers
   }
 

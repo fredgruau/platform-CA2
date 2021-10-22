@@ -3,9 +3,11 @@ package dataStruc
 import compiler.Circuit.{AstPred, TabSymb, iTabSymb}
 import compiler.{AST, Affect, CallProc, InfoNbit, InfoType, Instr}
 import compiler.AST.{isNotRead, rewriteAST2}
-import scala.collection.immutable.HashSet
+
+import scala.collection.immutable.{HashMap, HashSet}
 import scala.collection.{Iterable, immutable, mutable}
 import DagInstr.setInputAndOutputNeighbor
+import compiler.ASTBfun.ASTBg
 import dataStruc.DagNode.paquets
 
 object DagInstr {
@@ -33,15 +35,16 @@ object DagInstr {
    * due to the specifics of our scheduling algorithm
    * * */
 
-  def setInputNeighbor[T <: SetInput[T]](instrs: List[T]) = {
+  def setInputNeighbor[T <: SetInput[T]](instrs: List[T], considerShiftt: Boolean = true) = {
     /** map each variable to the instructions which define that variable */
     val defs = defby(instrs) //= immutable.HashMap.empty ++ instrs.flatMap(a => a.names.map(_ -> a)) //FIXME ne pas mettre les updates
     /** variable which are shifted **/
+    //    print(instrs)
     val shifted: HashSet[String] = HashSet() ++ instrs.filter(_.isShift).flatMap(a => a.names).map(_.drop(5))
     for (instr <- instrs) {
-      var usedVars = instr.usedVars
+      var usedVars = instr.usedVars(considerShiftt)
       //  if(instr.names.nonEmpty && shifted(instr.names(0))) usedVars=usedVars+("shift"+instr.names(0))//rajoute shiftToto dans usedVar ToTO
-      if (instr.isShift) usedVars = usedVars + instr.names(0).drop(5) //rajoute Toto dans usedVar shiftToTO
+      if (instr.isShift && considerShiftt) usedVars = usedVars + instr.names(0).drop(5) //rajoute Toto dans usedVar shiftToTO
 
       instr.inputNeighbors = List.empty[T] ++ usedVars.filter(defs.contains(_)).map(defs(_))
     }
@@ -56,8 +59,8 @@ object DagInstr {
   }
 
   /** Compute  input neighbor of instruction $i$ as affectation which set a  variables used by $i$ */
-  def setInputAndOutputNeighbor[T <: SetOutput[T]](instrs: List[T]) = {
-    setInputNeighbor(instrs)
+  def setInputAndOutputNeighbor[T <: SetOutput[T]](instrs: List[T], considerShift: Boolean = true) = {
+    setInputNeighbor(instrs, considerShift)
     setOutputNeighbors(instrs)
   }
 }
@@ -110,37 +113,33 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
     val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.treeIfy(toBeReplaced, repr)
     /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
     val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.treeIfy((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
-
     /** rewrite recursviely the affect expression. we use this slightly modified dedagExclude instead of dedagRewrite
      * to not generatre x=x  */
     val affectExpList = toBeRepl.map(deDagExclude)
-
     /** returns the newly generated affect instruction */
     newAffect = affectExpList.map((e: AST[_]) => Affect(e.name, e))
     val rewrite: Instr => Instr = (i: Instr) => i.propagate(deDagRewrite)
     propagateUnit(rewrite, newAffect) //computes input and output neighbors
   }
 
-  def affectIfy2(toBeReplaced: AstPred): DagInstr = { //TODO faire un seul appel pour éviter de reconstuire le DAG plusieurs fois
+  def affectIfy2(toBeReplaced: AstPred) = {
     /** reads are removed from toBeReplaced to not generatre x=x */
     val toBeRepl: List[AST[_]] = dagAst.visitedL.filter(a => toBeReplaced(a) && isNotRead(a));
-
     toBeRepl.map(_.setNameIfNull());
     if (toSet(toBeRepl).size < toBeRepl.size) //since name are given by hand we check that no two names are equals
       throw new RuntimeException("a name is reused two times or we want to rewrite a read")
-    val repr = represent
-    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.treeIfy(toBeReplaced, repr)
+    val repr: Map[AST[_], String] = represent2(toBeRepl)
+    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.asInstanceOf[ASTBg].treeIfy2(toBeReplaced, repr)
     /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
-    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.treeIfy((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
-
-    /** rewrite recursviely the affect expression. we use this slightly modified dedagExclude instead of dedagRewrite
+    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.asInstanceOf[ASTBg].treeIfy2((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
+    /** the folowing call rewrites recursively the affect expression. we use this slightly modified dedagExclude instead of dedagRewrite
      * to not generatre x=x  */
     val affectExpList = toBeRepl.map(deDagExclude)
 
     /** returns the newly generated affect instruction */
     newAffect = affectExpList.map((e: AST[_]) => Affect(e.name, e))
     val rewrite: Instr => Instr = (i: Instr) => i.propagate(deDagRewrite)
-    propagateUnit(rewrite, newAffect) //computes input and output neighbors
+    propagateUnit2(rewrite, newAffect) //computes input and output neighbors
   }
   /**
    * @return set of AST which are used twice within those instruction to be replaced by an affectation
@@ -163,12 +162,23 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
   /**
    * @return returns a unique  name for each AST,
    *         necessary because distinct AST can be equals  when compared as case class hierarchie
+   *         generate silly names systematically.
+   */
+  private def represent2(newExp: List[AST[_]]): Map[AST[_], String] = {
+    val res: HashMap[AST[_], String] = HashMap.empty ++ newExp.map((e: AST[_]) => (e -> e.name))
+    res
+  }
+
+  /**
+   * @return returns a unique  name for each AST,
+   *         necessary because distinct AST can be equals  when compared as case class hierarchie
    *         tries to find real name instead of created name with "aux_"
    *         For this purpose, visite the expression of the instructions, for they can differ.
    */
   private def represent: Map[AST[_], String] = {
     def bestof2Name(s: String, s2: String): String = {
-      val i = 1; if (s.startsWith("_aux")) s2 else s
+      val i = 1;
+      if (s.startsWith("_aux")) s2 else s
     }
 
     var bestName = immutable.HashMap.empty[AST[_], String]
@@ -178,8 +188,11 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
         x.name
       else bestof2Name(bestName(x), x.name)
 
-    for (instr <- visitedL) for (x <- instr.exps) bestName += (x -> newName(x)) //on récupére des noms!!
-    for (x <- dagAst.visitedL) bestName += (x -> newName(x))
+    for (instr <- visitedL)
+      for (x <- instr.exps)
+        bestName += (x -> newName(x)) //on récupére des noms!!
+    for (x <- dagAst.visitedL)
+      bestName += (x -> newName(x))
     bestName
     // immutable.HashMap.empty[AST[_], AST[_]] ++ dagAst.visitedL.map(x => x -> x)
   }

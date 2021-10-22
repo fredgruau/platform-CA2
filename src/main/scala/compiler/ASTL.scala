@@ -369,7 +369,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case Send(_) => throw new RuntimeException("Broadcast creates   a transfer type")
       case Transfer(_, _, _) => throw new RuntimeException("Transfer creates   a transfer type")
       case Unop(op, a, _, _) => a.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m).map(
-        new Call1(op.asInstanceOf[Fundef1[Any, R]], _)(r) with ASTBt[R])
+        new Call1(op.asInstanceOf[Fundef1[Any, R]], _)(r) with ASTBt[R].asInstanceOf[ASTBg])
       case Binop(op, a, a2, _, _) => a.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m).zip(a2.unfoldSimplic(m)).map({
         case (c, c2) => new Call2(op.asInstanceOf[Fundef2[Any, Any, R]], c, c2)(r) with ASTBt[R].asInstanceOf[ASTBg]
       })

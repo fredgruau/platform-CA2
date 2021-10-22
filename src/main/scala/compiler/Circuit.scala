@@ -51,8 +51,10 @@ abstract class Circuit[L <: Locus, R <: Ring](override val p: Param[_]*) extends
     print("55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog6 = prog5.unfoldSpace(m);
-    print("8___________88___________88___________88___________88___________88___________8\n" + prog6 + "\n\n")
+    //print("unfoldSpaceunfoldSpaceunfoldSpaceunfoldSpaceunfoldSpaceunfoldSpaceunfoldSpace\n" + prog6 + "\n\n")
     val prog7 = prog6.treeIfy2();
+    print("treefy2treefy2treefy2treefy2treefy2treefy2treefy2treefy2treefy2treefy2treefy2\n" + prog6 + "\n\n")
+
   }
 }
 
