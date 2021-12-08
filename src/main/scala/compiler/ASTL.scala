@@ -83,7 +83,7 @@ object ASTL {
   import scala.language.implicitConversions
 
   /** Allows to consider false and true as occurence of ASTLs */
-  implicit def fromBool[L <: Locus](d: Boolean)(implicit m: repr[L]): ASTLt[L, B] = Coonst(Boolof(d), m, repr.nomB)
+  implicit def fromBool[L <: Locus](d: Boolean)(implicit m: repr[L]): ASTLt[L, B] = Coonst(if (d == True()) True() else False(), m, repr.nomB)
 
   /** Allows to consider integers as occurence of ASTLs */
   implicit def fromInt[L <: Locus, R <: I](d: Int)(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = Coonst(Intof(d)(n), m, n)
@@ -123,21 +123,34 @@ object ASTL {
   //def unop[L <: Locus, Ri <: Ring, Ro <: Ring](f: Fundef1[Ri, Ro])(implicit m: repr[L], n: repr[Ro]) = (arg1: ASTLt[L, Ri]) => Unop[L, Ri, Ro](f, arg1, m, n)
   def sign[L <: Locus](arg1: ASTLt[L, SI])(implicit m: repr[L]): ASTLt[L, SI] = Unop[L, SI, SI](ASTBfun.sign, arg1, m, nomSI)
 
-  def halve[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = Unop[L, R, R](halveB.asInstanceOf[Fundef1[R, R]], arg1, m, n)
 
+  //todo desUISIfy
+  def halve[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = Unop[L, R, R](
+    halveB.asInstanceOf[Fundef1[R, R]], arg1, m, n)
+
+  //todo desUISIfy
   def orScanRight[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, R] = Unop[L, R, R](halveB.asInstanceOf[Fundef1[R, R]], arg1, m, n)
 
-  def gt[L <: Locus](arg1: ASTLt[L, SI])(implicit m: repr[L]): Unop[L, SI, B] = Unop[L, SI, B](elt(-1).asInstanceOf[Fundef1[SI, B]], arg1, m, repr.nomB); //-1 will be taken modulo nbit.
-  def notNull[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, B] = Unop[L, R, B](notNullB.asInstanceOf[Fundef1[R, B]], arg1, m, repr.nomB)
+  //todo desUISIfy
+  def lt[L <: Locus](arg1: ASTLt[L, SI])(implicit m: repr[L]): Unop[L, SI, B] =
+    Unop[L, SI, B](ltSI1.asInstanceOf[Fundef1[SI, B]], arg1, m, repr.nomB); //-1 will be taken modulo nbit.
+
+  //todo desUISIfy
+  def notNull[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, B] = Unop[L, R, B](neqSI.asInstanceOf[Fundef1[R, B]], arg1, m, repr.nomB)
 
   /** Instead of casting boolean to integer,  we define a logical and taking an int and a  bool */
-  def andLB2R[L <: Locus, R <: I](arg1: ASTLt[L, B], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Binop[L, B, R, R] = Binop[L, B, R, R](andLBtoR.asInstanceOf[Fundef2[B, R, R]], arg1, arg2, m, n)
-
-  def elem[L <: Locus, R <: I](i: Int, arg: ASTLt[L, R])(implicit m: repr[L], n: repr[B]): Unop[L, R, B] = Unop[L, R, B](elt(i).asInstanceOf[Fundef1[R, B]], arg, m, n)
+  def andLB2R[L <: Locus, R <: I](arg1: ASTLt[L, B], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Binop[L, B, R, R] =
+    Binop[L, B, R, R](andLBtoRUISI(arg2.ring).asInstanceOf[Fundef2[B, R, R]], arg1, arg2, m, n)
 
   def concat2[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[I]): ASTL[L, I] = Binop(concat2f.asInstanceOf[Fundef2[R1, R2, I]], arg1, arg2, m, n)
 
-  def extend[L <: Locus, R <: Ring](i: Int, arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, R] = Unop[L, R, R](ASTBfun.extend(i).asInstanceOf[Fundef1[R, R]], arg, m, n)
+  /** @param i final number of bit   */
+  def extend[L <: Locus, R <: Ring](i: Int, arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, R] =
+    Unop[L, R, R](ASTBfun.extend[R](i).asInstanceOf[Fundef1[R, R]], arg, m, n)
+
+  def elem[L <: Locus, R <: I](i: Int, arg: ASTLt[L, R])(implicit m: repr[L], n: repr[B]): Unop[L, R, B] =
+    Unop[L, R, B](eltUISI(arg.ring, i).asInstanceOf[Fundef1[R, B]], arg, m, n)
+
 
   //def concat[L <: Locus, R <: I](arg1: Seq[ASTLtrait[L, R]])(implicit m: repr[L], n: repr[R]) = Multop2[L, R, R](concatN, arg1,m,n);
   // def orR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]) = Redop[S1, S2, R]((orI.asInstanceOf[Fundef2[R, R, R]], False[R]), arg, m, n);
@@ -159,6 +172,7 @@ object ASTL {
   def addESI[S2 <: S](arg: ASTLt[T[E, S2], SI])(implicit m: repr[E]): ASTLt[E, SI] =
     Redop[E, S2, SI]((addSI, Intof[SI](0)), arg, m, repr.nomSI).asInstanceOf[ASTLt[E, SI]]
 
+
   /** minR has two implementations depending if the integers to be compared are signed or unsigned. */
   def minR[S1 <: S, S2 <: S, R <: I](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): ASTLt[S1, R] =
     if (arg.ring == SI()) Redop[S1, S2, SI]((minSI, Intof[SI](0)), arg.asInstanceOf[ASTLt[T[S1, S2], SI]], m, repr.nomSI).asInstanceOf[ASTLt[S1, R]]
@@ -173,41 +187,50 @@ object ASTL {
   def cond[L <: Locus, R <: I](b: ASTLt[L, B], arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] =
     andLB2R[L, R](b, arg1) | andLB2R(~b, arg2)
 
+  def condOld[L <: Locus, R <: I](b: ASTLt[L, B], arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] =
+    andLB2R[L, R](b, arg1) | andLB2R(~b, arg2)
+
   /**
    * computes an int with a single non zero bit which is the highest rank for which operand's bit is one if operand is null, output O.
    * this is an example of boolean function with a reused value: orScanRight.
    */
   def mstb[L <: Locus, R <: I](arg1: ASTL[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = {
-    val y: ASTL[L, R] = orScanRight[L, R](arg1); y ^ halve(y)
+    val y: ASTL[L, R] = orScanRight[L, R](arg1);
+    y ^ halve(y)
   }
 
   def or[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg1.ring match {
     case B() => Binop(orB, arg1.asInstanceOf[ASTLt[L, B]], arg2.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
-    case _ => Binop(orI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
+    case _ => Binop(orUISI(arg1.ring).asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
   }).asInstanceOf[ASTL[L, R]]
 
   def and[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg1.ring match {
     case B() => Binop(andB, arg1.asInstanceOf[ASTLt[L, B]], arg2.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
-    case _ => Binop(andI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
+    case _ => Binop(andUISI(arg1.ring).asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
   }).asInstanceOf[ASTL[L, R]]
 
   def xor[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg1.ring match {
+
     case B() => Binop(xorB, arg1.asInstanceOf[ASTLt[L, B]], arg2.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
-    case _ => Binop(xorI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
+    case _ => Binop(xorUISI(arg1.ring).asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
   }).asInstanceOf[ASTL[L, R]]
 
   def neg[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg.ring match {
     case B() => Unop(negB, arg.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
-    case _ => Unop(negI.asInstanceOf[Fundef1[R, R]], arg, m, n)
+    case _ => Unop(negSI.asInstanceOf[Fundef1[R, R]], arg, m, n)
   }).asInstanceOf[ASTL[L, R]]
 
-  def opp[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, SI, SI] = Unop[L, SI, SI](oppSI, arg.asInstanceOf[ASTLt[L, SI]], m, repr.nomSI)
+  def opp[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, SI, SI] =
+    Unop[L, SI, SI](oppSI, arg.asInstanceOf[ASTLt[L, SI]], m, repr.nomSI)
 
   //{ ASTL.Unop(opp.asInstanceOf[Fundef1[R, SI]], this, m, repr.nomSI) }
 
 
   /** uses a fixed val addUISI, and let the compiler believe that this val has the appropriate expected  type R=UI or R=SI  */
-  def add[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = Binop(addUISI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
+  def add[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = {
+    Binop(addUISI(n.name).asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
+  }
+
 
   type ASTLtG = ASTLt[_ <: Locus, _ <: Ring]
   type IntV = ASTLt[V, SI];
@@ -252,7 +275,7 @@ object ASTL {
 sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) extends ASTLt[L, R] {
   override def isRedop =
     this.asInstanceOf[ASTL[_, _]] match {
-      case Redop(op, _, _, _) => true
+      case Redop(_, _, _, _) => true
       case _ => false
     }
 
@@ -303,7 +326,6 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
     newD.asInstanceOf[ASTL[L, R]]
   }
 
-
   /**
    * * @param cur The current programm
    * * @param nbitLB Stores number of bits of subfields.
@@ -320,9 +342,9 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case Binop(op, a, a2, l2, r2) => //BINOP needs more work, because it triggers possible insertion of a new node "extend";
         var anew = a.bitIfy(cur, nbitLB, tSymb);
         var a2new = a2.bitIfy(cur, nbitLB, tSymb)
-        //we start evaluation of binop by adding the number of bits of the arguments
+        //we start evaluation of binop by adding the number of bits of the parameters
         val startnbitB = nbitB + (op.p1 -> nbitLB(anew)) + (op.p2 -> nbitLB(a2new))
-        val nbitResult = ASTB.nBitR(startnbitB, op.arg, nbitP) //retrieves the number of bit computed from the call to the ASTBfun.
+        val nbitResult = ASTB.nBitR(startnbitB, op.arg, nbitP, null) //retrieves the number of bit computed from the call to the ASTBfun.
         if (nbitP.contains(op.p1)) anew = anew.extendMe(nbitP(op.p1))
         if (nbitP.contains(op.p2)) a2new = a2new.extendMe(nbitP(op.p2))
         val newthis = Binop(op, anew, a2new, l2, r2)
@@ -334,8 +356,8 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         def newNbit() = nbitLB(newthis.asInstanceOf[Singleton[AST[_]]].arg) //the nbit value of the arg is stored in nbitLB
         nbitLB += newthis -> (newthis.asInstanceOf[ASTL[_, _]] match {
           // case l:Layer[_,_] =>  l.nbit
-          case Coonst(cte, _, _) => ASTB.nBitR(nbitB, cte, nbitP)
-          case Unop(op, _, _, _) => ASTB.nBitR(nbitB + (op.p1 -> newNbit()), op.arg, nbitP)
+          case Coonst(cte, _, _) => ASTB.nBitR(nbitB, cte, nbitP, null)
+          case Unop(op, _, _, _) => ASTB.nBitR(nbitB + (op.p1 -> newNbit()), op.arg, nbitP, null)
           case Redop(_, _, _, _) | Clock(_, _) | Transfer(_, _, _) | Broadcast(_, _, _) | Sym(_, _, _, _) => newNbit()
           case Send(_) => nbitLB(newthis.asInstanceOf[Neton[AST[_]]].args.head)
           //FIXME for the concat redop, the number of bit must take into account the arity (2,3, or 6)
@@ -416,11 +438,13 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         val atr = a.unfoldTransfer(m)
         if ((src < des) ^ dir) atr else atr.map(rot(_, trigo))
       case Sym(a, _, _, _) =>
-        val T(s1, src) = a.locus; val atr = a.unfoldTransfer(m).map(rotR(_)); s1 match {
-          case V() => atr.map(rotR(_)).map(rotR(_))//throw new RuntimeException("sym not defined on V in the general case")
+        val T(s1, src) = a.locus;
+        val atr = a.unfoldTransfer(m).map(rotR(_));
+        s1 match {
+          case V() => atr.map(rotR(_)).map(rotR(_)) //throw new RuntimeException("sym not defined on V in the general case")
           case E() => atr // la composée de deux rotation est une rotation simple qui est aussi une permutation pour E.
           case F() => if (src < des) atr else atr.map(rotR(_)) //we follow trigonometric, the composition of tree anticlock  must add one rotation, if not(src<des).
-      }
+        }
       //read and Call treated in ASTLt.
     }
   }
@@ -504,155 +528,11 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
     newExp.asInstanceOf[ASTL[L, R]]
   }
 
-  /* /**
-    *
-    * @return tree with some id being replaced by shifted version,
-    *         cycle constraint, instruction setting the shifted version, alignement with respect to used variables.
-    */
-   override def align2: (ASTLg, Option[Constraint], iTabSymb2[ShiftInstr], iTabSymb2[Array[Int]]) =
-     this.asInstanceOf[ASTLg] match { //read and Call treated in ASTLt.
-       case Coonst(_, _, _) => (this, None, immutable.HashMap.empty, immutable.HashMap.empty)
-       case Broadcast(arg, _, _) =>
-         val toto = arg.align2;
-         val tree = toto._1;
-         val algn = toto._4
-         (tree.asInstanceOf[ASTLg], None, immutable.HashMap.empty, algn.map { case (k, _) => k -> arg.locus.proj }) //does not depend on v, because v is constant
-       case e@Send(args) => {
-         var newArgs = List[ASTLt[S, Ring]]()
-         var aligns: iTabSymb2[Array[Int]] = immutable.HashMap.empty[String, Array[Int]]
-         for (arg <- args) {
-           val toto = arg.align2
-           val tree = toto._1
-           val algn = toto._4
-           newArgs = tree.asInstanceOf[ASTLt[S, Ring]] :: newArgs
-           aligns ++= algn.map({ case (k, _) => k -> arg.locus.proj }) //Todo we could have the same pb has in binop here.
-         }
-         (e.copy(args = newArgs)(lpart(e.mym), rpart(e.mym)), None, immutable.HashMap.empty, aligns)
-       }
-       case e@Transfer(arg, _, _) =>
-         val T(s1, s2) = arg.locus;
-         val t = hexPermut((s1, s2));
-         val toto = arg.align2
-         val tree = toto._1
-         val algn = toto._4
-         val c = toto._2
-         val instrs = toto._3
-         (e.copy(arg = tree.asInstanceOf[ASTLt[T[S, S], Ring]]), permute(c, t, e.locus), instrs, composeAll2(t, algn))
-       case e@Unop(_, arg, _, _) => val toto = arg.align2
-         val tree = toto._1
-         val algn = toto._4
-         val c = toto._2
-         val instrs = toto._3
-         (e.copy(arg = tree.asInstanceOf[ASTLt[Locus, Ring]]), c, instrs, algn)
+  override def cost(): Cost = {
+    this.asInstanceOf[ASTLg] match { //read and Call treated in ASTLt.
+      case Coonst(_, _, _) => Cost(0, true, true)
 
-       case e@Binop(_, arg, arg2, _, _) =>
-         //We compute the cycle  constraint here, because we can
-         val toto = arg.align2
-         val tree = toto._1
-         val algn = toto._4
-         val c = toto._2
-         val instrs = toto._3
-         var newTree = tree
-         val toto2 = arg2.align2
-         val tree2 = toto2._1
-         val algn2 = toto2._4
-         val c2 = toto2._2
-         val instrs2 = toto2._3
-         var c3 = intersect(c, c2)
-         var newInstr = instrs ++ instrs2
-         var newAlign = algn ++ algn2 //arg2 has priority over arg if re-use
-         val k = algn.keys.toSet.intersect(algn2.keys.toSet)
-         if (k.nonEmpty) { //k is the aux defined by an instr which will have to use two registers.
-           val e = k.head //here we assume that there is a single input variable
-           assert(k.size == 1, " more than one to aligne !")
-           if (!(algn(e) sameElements algn2(e))) {
-             val perm = compose(invert(algn(e)), algn2(e))
-             val shiftedE = "shift" + e
-             c3 = intersect(c3, Some(Cycle(perm, locus.asInstanceOf[TT])))
-             val shiftInstr = ShiftInstr(shiftedE, e, perm)
-             newInstr += e -> shiftInstr //TODO le align perm on peut le faire ensuite!
-             newAlign += shiftedE -> algn(e)
-             newTree = tree.replaceBy(e, shiftedE)
-           }
-         }
-         (e.copy(arg = newTree.asInstanceOf[ASTLt[Locus, Ring]], arg2 = tree2.asInstanceOf[ASTLt[Locus, Ring]]), c3, newInstr, newAlign)
+    }
+  }
 
-       case Redop(_, arg, _, _) => //we compute a constraint, that is implicitely, the constraint to be checked for partitionning the Reduction.
-         val (_, c, instrs, algn) = arg.align2
-         (this, c, instrs, algn) //Redop is done in 6 instruction that will be scheduled according to the alignemet of its operand.
-       //note that here, the expression has a simplicial type, thus, the alignement is not used to compute an alignement to a root,
-       //it will be used to schedule the 6 redop operations. we will have to compose with the alignement to the root of the reduced transfer variable.
-       case e@Clock(arg, dir) =>
-         val toto = arg.align2
-         val tree = toto._1
-         val algn = toto._4
-         val c = toto._2
-         val instrs = toto._3
-         val T(_, des) = this.locus;
-         val T(_, src) = arg.locus;
-         val trigo = !dir;
-         val atr = rotPerm(if (trigo) 1 else 5) //faudrait vérifier is c'est pas le contraire
-         val newTree = e.copy(arg = tree.asInstanceOf[ASTLt[T[S, S], Ring]])(lpart(e.mym), rpart(e.mym))
-         if ((src < des) ^ dir) (newTree, c, instrs, algn)
-         else (newTree, permute(c, atr, arg.locus), instrs, composeAll2(atr, algn))
-       case e@Sym(arg, _, _, _) =>
-         val toto = arg.align2
-         val tree = toto._1
-         val algn = toto._4
-         val c = toto._2
-         val instrs = toto._3
-         val newTree = e.copy(arg = tree.asInstanceOf[ASTLt[T[S, S], Ring]])
-         val T(_, des) = this.locus;
-         val T(s1, src) = arg.locus;
-         val atr = rotPerm(s1 match { case E() => 1 case F() => if (src < des) 1 else 2 case V() => 3 })
-         (newTree, permute(c, atr, arg.locus), instrs, composeAll2(atr, algn))
-       /* case l: Layer2[_, _] => immutable.HashMap(l.name -> l.locus.neutral)
-        */
-
-     }
-
-   /**
-    *
-    * @param cs
-    * @param v
-    * @return
-    */
-   override def align(cs: TabConstr, v: String): iTabSymb[Array[Int]] = {
-     this.asInstanceOf[ASTLg] match { //read and Call treated in ASTLt.
-       case Coonst(_, _, _) => immutable.HashMap()
-       case Broadcast(arg, _, _) => arg.align(cs, v).map { case (k, _) => k -> arg.locus.proj } //does not depend on v, because v is constant
-       case Send(args) => immutable.HashMap.empty ++ args.flatMap(a => a.align(cs, v).map { case (k, _) => k -> a.locus.proj }) //we can make  a union because does not depend on v
-       case Transfer(arg, _, _) =>
-         val T(s1, s2) = arg.locus; val t = hexPermut((s1, s2)); composeAll(t, arg.align(cs, v))
-       case Unop(_, arg, _, _) => arg.align(cs, v)
-       case Binop(_, arg, arg2, _, _) =>
-         //be compute the constraint cycle here, because we can
-         val a1 = arg.align(cs, v);
-         val a2 = arg2.align(cs, v)
-         val k = a1.keys.toSet.intersect(a2.keys.toSet)
-         if (k.nonEmpty) { //k is the aux defined by an instr which will have to use two registers.
-           val e = k.head //here we assume that there is a single input variable
-           if (!(a1(e) sameElements a2(e)))
-             cs += v -> Cycle(compose(invert(a1(e)), a2(e)), locus.asInstanceOf[TT]);
-         }
-         a1 ++ a2 //arg2 has priority over arg if non equal
-       case Redop(_, arg, _, _) => //we compute a constraint, that is implicitely, the constraint to be checked for partitionning the Reduction.
-
-         arg.align(cs, v) //Redop is done in 6 instruction that will be scheduled according to the alignemet of its operand.
-       //note that here, the expression has a simplicial type, thus, the alignement is not used to compute an alignement to a root,
-       //it will be used to schedule the 6 redop operations. we will have to compose with the alignement to the root of the reduced transfer variable.
-
-
-       case Clock(arg, dir) =>
-         val T(_, des) = this.locus;
-         val T(_, src) = arg.locus;
-         val trigo = !dir;
-         val atr = rotPerm(if (trigo) 1 else 5) //faudrait vérifier is c'est pas le contraire
-         if ((src < des) ^ dir) arg.align(cs, v) else composeAll(atr, arg.align(cs, v))
-       case Sym(arg, _, _, _) =>
-         val T(_, des) = this.locus; val T(s1, src) = arg.locus; val atr = rotPerm(s1 match { case E() => 1 case F() => if (src < des) 1 else 2 case V() => 3 }); composeAll(atr, arg.align(cs, v))
-       case l: Layer[_, _] => immutable.HashMap(l.name -> l.locus.neutral)
-     }
-   }*/
 }
-

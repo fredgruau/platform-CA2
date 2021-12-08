@@ -11,8 +11,10 @@ object ASTLfun {
 
   // @TODO we should not import compiler._, and find a way to use parameter with IntV rather than [V,SI]
   def p[L <: Locus, R <: Ring](name: String)(implicit n: repr[L], m: repr[R]) = new Param[(L, R)](name) with ASTLt[L, R]
-  /**From an IntV, computes the gradient sign, and the delta to be added to make it a distance  */
-  val slopeDeltaDef: Fundef1[(V, SI), ((T[E, V], B), (V, SI))] = {
+
+  /** From an IntV, computes the gradient sign, and the delta to be added to make it a distance
+   * */
+  val slopeDeltaDef: Fundef1[(V, SI), ((T[V, E], B), (V, SI))] = {
     //val x:IntV= p[V, SI]("dis")
     val d = p[V, SI]("dis")
     val s: InteV = sende(List(d, d, d, -d, -d, -d))
@@ -23,7 +25,7 @@ object ASTLfun {
     val grad: IntvE = sendv(List(g, -g))
     //val grad: IntvE = tepred - sym(tepred)
     // TODO should use opp to make only one subtraction, we need to adress selectively the two neighbors of an edge.
-    val slope: BoolvE = gt(grad)
+    val slope: BooleV = transfer(lt(grad))
 
     val delta: IntV = minR(transfer(sign(grad + -2)))
     //val temp: BoolfV = xorR2(tslope )
@@ -34,7 +36,9 @@ object ASTLfun {
     Fundef1("boolgrad", Coons(slope, delta), d)
   }
 
-  /**Calls boolgrad, and separate the two results.  */
-  def slopeDelta(d: IntV): (BoolvE, IntV) = { val r =   Call1(slopeDeltaDef, d) ; (new Heead(r) with BoolvE, new Taail(r) with IntV) }
+  /** Calls boolgrad, and separate the two results.  */
+  def slopeDelta(d: IntV): (BooleV, IntV) = {
+    val r = Call1(slopeDeltaDef, d); (new Heead(r) with BooleV, new Taail(r) with IntV)
+  }
 
 }

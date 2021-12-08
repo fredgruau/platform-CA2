@@ -1,10 +1,11 @@
 package compiler
+
 import compiler.AST._
 import dataStruc.{DagNode, Named}
-import compiler.Circuit._
+import Circuit.{AstPred, TabSymb, _}
+
 import scala.collection._
 import scala.collection.immutable.HashSet
-import Circuit.AstPred
 
 /**
  * Represent a field using an Abstract Syntax Tree using
@@ -16,6 +17,12 @@ import Circuit.AstPred
  * @tparam T type of the expression
  * @param m parameter used to compute this type. */
 abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named {
+  def leaves(): List[AST[_]] =
+    if (inputNeighbors.isEmpty) List(this)
+    else inputNeighbors.flatMap(_.leaves())
+
+
+  def forwardName() = inputNeighbors.head.name = name
 
 
   val mym: repr[T] = m //if type of mym is set to repr[_] this allow covariance even if repr is not covariant
@@ -33,13 +40,26 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
     }
 
 
+  /**
+   * OBSOLETE  I keep it here because of the  interesting implementation
+   *
+   * @param t stores how many times a parameter is used.
+   * @return
+   */
+  def paramUsed(t: TabSymb[Int]): Unit =
+    this match {
+      case Param(s) => if (t.contains(s)) t.addOne(s -> (t(s) + 1)) else t.addOne(s -> 1)
+      case _ => inputNeighbors.map(_.paramUsed(t))
+    }
+
   override def toString: String =
 
     this.asInstanceOf[AST[_]] match {
-      case Read(s) => s
+      case Read(s) => s //+ mym.name
       case Param(s) => "Param " + s
       // case f: Fundef[_]      => "Fundef " + f.namef + " of param " + f.p.map(p => p.nameP).foldLeft("")(_ + ", " + _)
-      case c: Call[_] => "Call " + c.f.namef + " " //  + mym.name
+      case c: Call[_] =>
+        "Call " + c.f.namef + " " //  + mym.name
       case Heead(_) => "head"
       case Taail(_) => "tail"
       case Coons(_, _) => "cons"
@@ -60,11 +80,14 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
    * @param repr      : representant of the equivalence class with respect to equal on case class hierarchy
    * @return the AST where expression used more than once are replaced by read.
    */
+
   def treeIfy(usedTwice: AstPred, repr: Map[AST[_], String]): AST[T] = {
-    val rewrite = (d: AST[T]) => d.treeIfy(usedTwice, repr)
+    val rewrite = (d: AST[T]) => d.preTreeIfy(usedTwice, repr)
     if (usedTwice(this)) new Read[T](repr(this))(mym.asInstanceOf[repr[T]])
     else this.propagate(rewrite)
   }
+
+  def preTreeIfy(usedTwice: AstPred, repr: Map[AST[_], String]): AST[T] = treeIfy(usedTwice, repr)
 
   /**
    * @param id1 a bijection betwee AST
@@ -92,15 +115,18 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
     newD.asInstanceOf[AST[T]]
   }
 
+  def isNotTm1Read: Boolean = if (isInstanceOf[ASTBt[_]]) asInstanceOf[ASTBt[_]].isNotTm1Read else true
 
 }
 
 object AST {
   def isLayer(str: String) = str.charAt(0) == 'l' && str.charAt(1) == 'l'
   val isNotRead: AstPred = {
-    case AST.Read(which) => false;
+    case AST.Read(_) => false;
     case _ => true
   }
+
+
   val isCons: AstPred = {
     case Taail(_) | Heead(_) | Call1(_, _) | Call2(_, _, _) | Call3(_, _, _, _) => true;
     case _ => false

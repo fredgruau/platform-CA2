@@ -54,7 +54,7 @@ class Zone(val root: Affect[_],
    *
    * @return input zones's names
    */
-  def usedVars(considerShift: Boolean = true): HashSet[String] = toSet(partitionnedIn.keySet.toList).union(nonPartitionnedIn)
+  def usedVars(): HashSet[String] = toSet(partitionnedIn.keySet.toList).union(nonPartitionnedIn)
 
   /** true if the several scalar registers encoding the locus can be coalesced into a single machine register */
   var folded: Boolean = !constraintSchedule.empty;

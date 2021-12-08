@@ -31,7 +31,6 @@ object repr {
   implicit val nomR: repr[Ring] = new repr[Ring](new Ring())
   implicit val nomSI: repr[SI] = new repr[SI](SI())
   implicit val nomUI: repr[UI] = new repr[UI](UI())
-  // implicit val nomI = new repr[I](new I()); //nomI is not declared has implicit, otherwise it would offer ambiguous implicit values.
  implicit val nomUISI: repr[UISI] = new repr[UISI](UISI()); //nomI is not declared  as implicit, otherwise it would offer ambiguous implicit values.
  implicit val nomUISIB: repr[UISIB] = new repr[UISIB](UISIB()); //nomI is not declared  as implicit, otherwise it would offer ambiguous implicit values.
  implicit val nomToto: repr[Int] = new repr[Int](33); //used when we do not care anymore.

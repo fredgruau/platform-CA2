@@ -20,8 +20,8 @@ class Dist2(val source: BoolV) extends Layer2[(V, SI)](3) with ASTLt[V, SI] {
    val next =    pred + extend(3, cond(source, sign(- pred) , minR(transfer(sign( grad - 2 ) ))))
 //  val nextOld = delayedL(  pred | cond(source, - pred  , minR(transfer( grad   ))))
    */
-  val (slope, delta) = slopeDelta(this)
-  val tslope = transfer(slope)
+  val (tslope, delta) = slopeDelta(this)
+  // val tslope = transfer(slope)
   val temp: BoolfV = clock(tslope)
   val temp2: BoolfV = anticlock(tslope)
   // val vortex: BoolF = andR(transfer(xor(temp, temp2)));
@@ -33,7 +33,7 @@ class Dist2(val source: BoolV) extends Layer2[(V, SI)](3) with ASTLt[V, SI] {
   bugif2(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
   val next: ASTLt[V, SI] = this + cond(source, sign(-this), delta) //faudrait en faire une marco qui prends delta, source et dist et renvoie distNext
   // val temp: BoolfV = xorR2(transfer(slope)) ;  val vortex: BoolF = orR(transfer(temp));   bugif(vortex);
-  render2(slope)
+  render2(tslope)
 }
 
 /** returns a constant layer. */

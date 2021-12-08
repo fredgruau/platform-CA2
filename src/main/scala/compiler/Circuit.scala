@@ -38,22 +38,34 @@ abstract class Circuit[L <: Locus, R <: Ring](override val p: Param[_]*) extends
     body = computeRoot //we pretend that the circuit is a function which returns compute Root
 
     val prog1: DataProg[InfoType[_]] = DataProg(this);
-    print(prog1)
+    // print(prog1)
     val prog2 = prog1.treeIfy();
     // print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
     val prog3 = prog2.procedurIfy();
-    //  print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
+    // print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
     val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
     //print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
     val prog5: DataProg[InfoNbit[_]] = prog4.macroIfy();
-    print("55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
+
+    print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog6 = prog5.unfoldSpace(m);
-    //print("unfoldSpaceunfoldSpaceunfoldSpaceunfoldSpaceunfoldSpaceunfoldSpaceunfoldSpace\n" + prog6 + "\n\n")
-    val prog7 = prog6.treeIfy2();
-    print("treefy2treefy2treefy2treefy2treefy2treefy2treefy2treefy2treefy2treefy2treefy2\n" + prog6 + "\n\n")
+
+    //print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
+
+    val prog7 = prog6.treeIfy(false); //this will again generates new affect treefy=dedagify
+    //print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
+
+    val prog7bis = prog7.simplify(); //this will remove id which are read only once.
+    print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
+
+    val prog8 = prog7.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
+    print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
+
+    //val prog9 = prog7.unfoldInt();  //this will again generates new intermediate affect
+    //print("unfold777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
   }
 }
@@ -127,30 +139,33 @@ object Circuit {
    * diagonal (d1,d2) and antidiagonla (ad1,ad2) are oriented
    * so that all the shift and delay gets applied on d1 (up), so that the same computation is applied
    * on d2 and ad2, when the vE fields is obtain by a broadcast followed by a transfer.
+   * voir commentaire du code sur l'emplacement des tm1s par rapports au shift, faudra gérer cela de facon un peu plus général
    */
+
+  import ASTB.tm1
   val hexagon: Machine = (src: S, des: S, t: ArrArrAstBg) => {
     implicit val scalarType: repr[_ <: Ring] = t(0)(0).mym;
     src match {
       case V() => des match {
         case E() => /*eV->vE*/
           val Array(e, ne, nw, w, sw, se) = t(0)
-          Array(Array(Tminus1(shiftL(w)), Tminus1(e)), Array(Tminus1(se), nw), Array(Tminus1(shiftL(sw)), ne))
+          Array(Array(tm1(shiftL(w)), tm1(e)), Array(tm1(se), nw), Array(shiftL(tm1(sw)), ne)) //ici on pousse les tm1s vers la fin pour factoriser les tm1 dans transfer(broadcast) de V vers vE
         case F() => /*fV->vF*/
-          val Array(ne, n, nw, sw, s, se) = t(0); Array(Array(n, Tminus1(sw), Tminus1(se)), Array(Tminus1(shiftL(s)), ne, shiftL(nw)))
+          val Array(ne, n, nw, sw, s, se) = t(0); Array(Array(n, tm1(sw), tm1(se)), Array(tm1(shiftL(s)), ne, shiftL(nw)))
       }
       case E() =>
         val Array(Array(h1, h2), Array(d1, d2), Array(ad1, ad2)) = t; //common to vE and fE
         des match {
           case V() => /*vE->eV*/
-            Array(Array(h2, Tminus1(ad2), Tminus1(shiftR(d2)), shiftR(h1), shiftR(ad1), d1))
+            Array(Array(h2, tm1(ad2), tm1(shiftR(d2)), shiftR(h1), shiftR(ad1), d1)) //ici au contraire on met tm1 au début pour factoriser les tm1 dans reduce(broadcast de vE vers V
           case F() => /*fE->eF*/
-            Array(Array(Tminus1(h2), Tminus1(ad1), Tminus1(d1)), Array(h1, Tminus1(shiftL(ad2)), Tminus1(d2)))
+            Array(Array(tm1(h2), tm1(ad1), tm1(d1)), Array(h1, tm1(shiftL(ad2)), tm1(d2)))
         }
       case F() => des match {
         case V() => /*vF->fV*/
-          val Array(Array(dp, db1, db2), Array(up, ub1, ub2)) = t; Array(Array(Tminus1(shiftR(ub1)), Tminus1(dp), Tminus1(shiftR(ub2))), Array(shiftR(db1), shiftR(up), db2))
+          val Array(Array(dp, db1, db2), Array(up, ub1, ub2)) = t; Array(Array(tm1(shiftR(ub1)), tm1(dp), tm1(shiftR(ub2))), Array(shiftR(db1), shiftR(up), db2))
         case E() => /*eF->fE*/
-          val Array(Array(db, ds1, ds2), Array(ub, us1, us2)) = t; Array(Array(Tminus1(ub), db), Array(ds2, us2), Array(ds1, shiftR(us1)))
+          val Array(Array(db, ds1, ds2), Array(ub, us1, us2)) = t; Array(Array(tm1(ub), db), Array(ds2, us2), Array(ds1, shiftR(us1)))
       }
     }
   }

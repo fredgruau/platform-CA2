@@ -9,7 +9,7 @@ import compiler.ASTL._
  * and it is guaranteed that
  * unsigned (resp. signed) are combined with unsigned (resp. signed) and produce unsigned (resp. signed)
  */
-trait MyOp[L <: Locus, R <: Ring] {
+trait MyAstlOp[L <: Locus, R <: Ring] {
   this: ASTLt[L, R] =>
   /*
    * In order to obtain covariance, we would need to introduc types L,U
@@ -19,6 +19,7 @@ trait MyOp[L <: Locus, R <: Ring] {
    * }; res.asInstanceOf[ASTL[L, U]]    }
    */
   def |(that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = or(this, that)
+
   def &(that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = and(this, that)
   def ^(that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = xor(this, that)
   def unary_~(implicit m: repr[L], n: repr[R]): ASTL[L, R] = neg(this)

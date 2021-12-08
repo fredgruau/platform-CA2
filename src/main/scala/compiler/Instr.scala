@@ -1,7 +1,7 @@
 package compiler
 
 import compiler.AST._
-import compiler.ASTB.Tminus1
+import compiler.ASTB.{Elt, Reduce, Tminus1}
 import compiler.ASTBfun.{ASTBg, redop}
 import compiler.InfoType._
 import compiler.Instr._
@@ -13,11 +13,28 @@ import dataStruc.Align.{compose, invert}
 
 import scala.language.postfixOps
 import scala.collection._
-import scala.collection.immutable.HashSet
+import scala.collection.immutable.{HashMap, HashSet}
 
 /** Instruction used within the compiler, call, affect. Dag and Union allows to defined ConnectedComp  */
 abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Instr] {
+
+  protected def show(x: Option[Locus]) = x match {
+    case Some(s) => "" + s
+    case None => ""
+  }
+
+  protected def show2(x: Option[Ring]) = x match {
+    case Some(s) => "" + s
+    case None => ""
+  }
+
+  def toString(tabu: Int): String
+
+  def genCode(i: Int, gen: CodeGen, env: HashMap[String, ASTBt[B]]): ASTBt[B] = null
+
   def detm1ise(muName: String): Instr = if (names(0) != muName) this else new Affect(muName, exps(0).asInstanceOf[ASTBt[Ring]].detm1ise)
+
+  def detm1iseR: Instr = new Affect(names(0), exps(0).asInstanceOf[ASTBt[Ring]].detm1iseR)
 
 
   /**
@@ -198,6 +215,7 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
   def locus2: Option[Ring] = None
 }
 
+
 /**
  * call of a procedure,
  * where several parameters can be passed by result.
@@ -225,6 +243,8 @@ case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) exte
   /**
    * @return string shows the results being affected simultaneously
    */
+  override def toString(tabu: Int): String = " " * tabu + pad(names.mkString(","), 25 - tabu) + "<-" + p + "(" + exps.map(_.toStringTree).mkString(" ") + ")\n"
+
   override def toString: String = pad(names.mkString(","), 25) + "<-" + p + "(" + exps.map(_.toStringTree).mkString(" ") + ")\n"
 
 
@@ -234,7 +254,8 @@ case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) exte
    *
    * @return variables name used by the instruction
    */
-  def usedVars(considerShift: Boolean = true): HashSet[String] = exps.map(_.symbolsExcepLayers).foldLeft(immutable.HashSet.empty[String])(_ | _)
+  def usedVars(): HashSet[String] = exps.map(_.symbolsExcepLayers).foldLeft(immutable.HashSet.empty[String])(_ | _)
+
 
   override def isTransfer: Boolean =
     throw new RuntimeException("test isTransfer is done only in macro, which do not have CallProc instr. ")
@@ -260,15 +281,57 @@ case class ShiftInstr(name: String, shifted: String, perm: Array[Int]) extends I
   override def isTransfer: Boolean = true
 
   /** names of variables modified by instruction. */
-  override def usedVars(considerShift: Boolean = true): HashSet[String] = HashSet(shifted)
+  override def usedVars(): HashSet[String] = HashSet(shifted)
 
   override def names: List[String] = List(name)
 
   // override def namesDefined: List[String] = List(shifted)
+  override def toString(tabu: Int): String = "toto"
 }
+
+
+/** allows to remove tm1s by storing latter. */
+case class Store(name: String, delay: Int, exp: AST[_]) extends Instr {
+  override def toString(tabu: Int): String = " " * tabu + pad(name, 25 - tabu) + "Store " + exp.toStringTree + show(locus) + show2(locus2) + "\n"
+
+  override def exps: List[AST[_]] = List(exp)
+
+  override def names: List[String] = List(name)
+
+  override def propagate(id1: rewriteAST2): Instr = Store(name, delay, id1(exp))
+
+  override def isTransfer: Boolean = throw new Exception("not defined on Store")
+
+  override def usedVars(): HashSet[String] = exp.symbolsExcepLayers
+
+}
+
 
 //todo on aurait pas du prendre de case class pour affect ou callProc.
 case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
+
+  def toStoreDetmise(): Store = {
+    val e = exp.asInstanceOf[ASTBg]
+    if (e.isTm1)
+      Store(name, 1, e.detm1ise)
+    else
+      Store(name, 0, e)
+  }
+
+  override def toString(tabu: Int): String = " " * tabu + pad(name, 25 - tabu) + "<-  " + exp.toStringTree + show(locus) + show2(locus2) +
+    (if (alignPerm.isEmpty) "" else alignPerm.map({ case (k, v) => " aligned on: " + k + " with: " + v.toList + ";  " })) + "\n"
+
+  override def toString: String =
+    pad(name, 25) + "<-  " + exp.toStringTree + show(locus) + show2(locus2) +
+      (if (alignPerm.isEmpty) "" else alignPerm.map({ case (k, v) => " aligned on: " + k + " with: " + v.toList + ";  " })) + "\n"
+
+  /** Computes the max of integer length take in the input */
+  def maxBitSize(t: iTabSymb[InfoNbit[_]]): Int = {
+    var res: Int = 0
+    for (read <- usedVars)
+      res = Math.max(res, t(read).nb)
+    return res
+  }
 
   def addParamR(tSymbVar: TabSymb[InfoNbit[_]]): List[Instr] = {
     if (tSymbVar(name).k == ParamR() && isRedop) {
@@ -300,22 +363,13 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
   val names = List(name);
   val namesDefined = List(name);
 
-  override def toString: String = pad(name, 25) + "<-  " + exp.toStringTree + show(locus) + show2(locus2) +
-    (if (alignPerm.isEmpty) "" else alignPerm.map({ case (k, v) => " aligned on: " + k + " with: " + v.toList + ";  " })) + "\n"
 
-  private def show(x: Option[Locus]) = x match {
-    case Some(s) => "" + s
-    case None => ""
-  }
-
-  private def show2(x: Option[Ring]) = x match {
-    case Some(s) => "" + s
-    case None => ""
-  }
-
-  def usedVars(considerShift: Boolean = true): HashSet[String] = {
-    if (isShift && considerShift) HashSet.empty
-    else exp.symbolsExcepLayers
+  def usedVars(): HashSet[String] = {
+    // if (isShift && considerShift) HashSet(names(0).drop(5))//HashSet.empty
+    if (isShift && this.isInstanceOf[Affect[_]] && !this.name.contains('$'))
+      HashSet(names(0).drop(5)) //HashSet.empty
+    else
+    exp.symbolsExcepLayers
   }
 
 
@@ -360,9 +414,22 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
     }
     newAffect :: result //We return  also the shift-affect instruction
   }
+
+  override def genCode(i: Int, gen: CodeGen, env: HashMap[String, ASTBt[B]]): ASTBt[B] = {
+    val sufx = if (gen.isBool(name)) "" else "" + i
+    exp.asInstanceOf[ASTBg].codeGen(i, gen, name + sufx, env)
+    //   exp.asInstanceOf[ASTBg].codeGen(i,gen,name+(if(exp.asInstanceOf[ASTBg].ring==B())""else i),env)
+
+  }
+
+
 }
 
 object Instr {
+
+  val isBoolean = (r: Instr) => a(r).exp.asInstanceOf[ASTBg].ring == B()
+
+
   val sysInstr = HashSet("ret", "bug", "sho", "mem")
 
   /**
@@ -388,8 +455,6 @@ object Instr {
   def readLR(s: String, m: repr[(Locus, Ring)]) = new Read(s)(m) with ASTLt[Locus, Ring]
 
   def readR(s: String, m: repr[Ring]) = new Read(s)(m) with ASTBt[Ring]
-
-  def tm1R(e: ASTBt[Ring], m: repr[Ring]) = new Tminus1(e)(m) with ASTBt[Ring]
 
   def reduceR(a1: ASTBg, a2: ASTBg, opred: redop[Ring], m: repr[Ring]) =
     new Call2(opred._1, a1, a2)(m) with ASTBt[Ring]
@@ -417,7 +482,8 @@ object Instr {
    * @param tSymb
    * @return add one (resp. two) suffixes to the variable names, for simplicial (resp. tranfer) variable
    */
-  private def deploy(n: String, tSymb: TabSymb[InfoNbit[_]]): List[String] = Locus.deploy(n, tSymb(n).t.asInstanceOf[(_ <: Locus, _)] _1)
+  private def deploy(n: String, tSymb: TabSymb[InfoNbit[_]]): List[String] =
+    Locus.deploy(n, tSymb(n).t.asInstanceOf[(_ <: Locus, _)] _1)
 
 
   /**

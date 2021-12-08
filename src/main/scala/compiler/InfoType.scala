@@ -3,7 +3,13 @@ package compiler
 import compiler.Circuit.TabSymb
 import compiler.VarKind.MacroField
 
-/** The most elementary info stored in symbol table: type and kind */
+/**
+ * The most elementary info stored in symbol table: type and kind
+ *
+ * @param t spatial type of integer
+ * @param k
+ * @tparam T
+ */
 class InfoType[+T](val t: T, val k: VarKind) {
   override def toString: String = t.toString + " " + k.toString
 
@@ -13,9 +19,17 @@ class InfoType[+T](val t: T, val k: VarKind) {
 
   def ring: Ring = repr.rpart(repr1.asInstanceOf[repr[(_ <: compiler.Locus, _ <: compiler.Ring)]]).name
 
+  def locusOption: Option[Locus] = t match {
+    case u@(_, _) => Some(u._1.asInstanceOf[Locus]) //if the type is a locus, the first is the locus
+    case _ => None
+  }
+
+
 }
 
 object InfoType {
+  val sIntInfoNbit = new InfoNbit(SI(), MacroField(), 3)
+
   def apply(e: AST[_], k: VarKind): InfoType[_] = new InfoType(e.mym.name, k)
 
   def addSymb(t: TabSymb[InfoType[_]], e: AST[_], k: VarKind): t.type = t += e.name -> InfoType(e, k)
@@ -23,6 +37,9 @@ object InfoType {
   def addSymbL(t: TabSymb[InfoType[_]], e: AST[_], k: VarKind): t.type = t += "l" + e.name -> InfoType(e, k)
 }
 
+object InfoNbit {
+
+}
 /**
  * info stored in symbol table, after computing nbit: type and kind and nbit
  *
@@ -34,25 +51,33 @@ object InfoType {
 class InfoNbit[+T](override val t: T, override val k: VarKind, val nb: Int) extends InfoType(t, k) {
   def macroFieldise: InfoNbit[_] = new InfoNbit(t, MacroField(), nb)
 
-  /**
-   *
-   * @return same info except we drop the locus and the type is ring
-   */
-  def scalarify: InfoNbit[Ring] = {
+  /** @return same info except we drop the locus and the type is ring   */
+  def scalarify = this
+
+  /*  : InfoNbit[Ring] = {
     new InfoNbit(ring, k, nb)
-  }
+  }*/
 
   /**
    *
    * @param b
    * @return like scalarify, except that ifNeeded, it will generate a MacroField instead of ParamDfield, for redop;   */
-  def regifyIf(b: Boolean): InfoNbit[Ring] =
-    new InfoNbit(ring, if (!b) k else MacroField(), nb)
+  def regifyIf(b: Boolean) =
+    new InfoNbit(t, if (!b) k else MacroField(), nb)
 
   val u = 2;
 
   override def toString: String = super.toString + " " + nb
 }
+
+/** information which will later allows to know wether we can pipeline through this class , when unfolding int */
+case class Cost(nbTmpVar: Int, pipIn: Boolean, pipOut: Boolean)
+
+class InfoPlusCost[+T](override val t: T, override val k: VarKind, override val nb: Int, val cost: Cost)
+  extends InfoNbit(t, k, nb) {
+
+}
+
 
 /** OBSOLETE
  * add the possibility to represent an equivalence class.

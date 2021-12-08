@@ -4,6 +4,7 @@ import compiler.AST._
 import compiler.ASTL._
 import compiler.repr._
 import compiler.Circuit._
+
 import scala.collection._
 import ASTBfun.ASTBg
 
@@ -28,18 +29,21 @@ object Result {
   def apply() = new Result(None, immutable.HashMap.empty, immutable.HashMap.empty)
 }
 
-trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOpInt2[L, R] {
+trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlOp[L, R] with MyOpInt2[L, R] {
   self: AST[(L, R)] =>
   def locus: L = mym.name._1
 
   def ring: R = mym.name._2
 
-  def extendMe(n: Int): ASTLt[L, R] = ASTL.extend(n, this)(new repr(locus), new repr(ring))
+  def extendMe(n: Int): ASTLt[L, R] =
+    ASTL.extend[L, R](n, this)(new repr(locus), new repr(ring))
 
-  def isRedop: Boolean = this match {
-    case a: ASTL[L, R] => a.isRedop
-    case _ => false
-  }
+  def isRedop: Boolean = false
+
+  /* this match {
+   case a: ASTL[L, R] => a.isRedop
+   case _ => false
+ }*/
 
   /**
    * Important to specify that the L,R type of AST nodes is preserved, for type checking consistency
@@ -61,12 +65,13 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
         case l: Layer2[_] => new Read[(L, R)](DataProg.lify(repr(this)))(mym) with ASTLt[L, R]
         case Read(_) => this //throw new RuntimeException("Deja dedagifié!")
         case Delayed(arg) => //arg.asInstanceOf[ASTLt[L, R]].propagate(rewrite)
-          arg().asInstanceOf[ASTLt[L, R]].treeIfy(usedTwice, repr) //the useless delayed node is supressed
-
+          arg().asInstanceOf[ASTLt[L, R]].treeIfy(usedTwice, repr /* + (arg()->name)*/) //the useless delayed node is supressed
         case _ => this.propagate((d: AST[(L, R)]) => d.treeIfy(usedTwice, repr))
       }
     }
-    newD.setName(repr(this));
+    if (repr.contains(this))
+      newD.setName(repr(this))
+    //else throw new Exception("no name"));
     newD.asInstanceOf[ASTLt[L, R]]
   }
 
@@ -162,17 +167,16 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
   /** Only read node are non ASTL nodes and are treated in ASTLt. */
   def unfoldSpace(m: Machine): List[ASTBt[_]] =
     this.asInstanceOf[AST[_]] match {
-      case Read(s) =>
-        val r = rpart(mym.asInstanceOf[repr[(L, R)]])
-        Locus.deploy(s, this.locus).map(new Read(_)(r) with ASTBt[R])
-      //      case l: Layer2[_] =>
-      //        val r = rpart(mym.asInstanceOf[repr[(L, R)]])
-      //        Locus.deploy("totoLayer", this.locus).map(new Read(_)(r) with ASTBt[R])
+      /*    case Read(s) => //this part is in fact only used in expression passed to callProc which are allways reads could be factorized
+            val r = rpart(mym.asInstanceOf[repr[(L, R)]])
+            Locus.deploy(s, this.locus).map(new Read(_)(r) with ASTBt[R])
+      */
 
-      case _ => this.locus match {
-        case _: S => this.unfoldSimplic(m).toList
-        case T(_, _) => this.unfoldTransfer(m).map(_.toList).toList.flatten
-      }
+      case _ =>
+        this.locus match {
+          case _: S => this.unfoldSimplic(m).toList
+          case T(_, _) => this.unfoldTransfer(m).map(_.toList).toList.flatten
+        }
     }
 
   def unfoldSimplic(m: Machine): ArrAst = this.asInstanceOf[AST[_]] match {
@@ -197,4 +201,16 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyOp[L, R] with MyOp
     case _ => throw new RuntimeException("unfoldSpace act only on Reads for ASTLt ")
   }
 
+  /** analyse the ASTL to produce its cost"s information */
+  def cost(): Cost = {
+    this.asInstanceOf[AST[_]] match {
+      // case t: Layer2[_] =>
+      case Read(s) => Cost(0, true, true)
+
+      case _ => throw new RuntimeException("unfoldSpace act only on Reads  for ASTL ")
+
+    }
+
+
+  }
 }

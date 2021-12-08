@@ -5,6 +5,6 @@ class I extends Ring //le type entier n'etends pas boolean, car OR,AND,XOR ne so
 final case class B() extends Ring //le type boolean
 final case class UI() extends I //unsigned int
 final case class SI() extends I //signed int
-final case class UISI() extends I
+final case class UISI() extends I //both signe and unsigned
 
 final case class UISIB() extends Ring
