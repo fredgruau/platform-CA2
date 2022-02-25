@@ -1,10 +1,11 @@
 package compiler
 
-import compiler.AST._
-import compiler.ASTB._
-import compiler.ASTBfun._
-import compiler.ASTL.neg
-/**Defines boolean operations to be applied on ASTLtrait, also applicable between two integer*/
+import AST._
+import ASTB._
+import ASTBfun._
+import ASTL.neg
+
+/** Defines boolean operations to be applied on ASTLtrait, also applicable between two integer */
 trait MyOpIntB[+R <: Ring] {
   this: ASTBt[R] =>
   def +[U >: R <: I](that: ASTBt[U])(implicit n: repr[U]): ASTBt[U] =
@@ -64,9 +65,15 @@ trait MyOpB[+R <: Ring] {
     res.asInstanceOf[ASTBt[R]]
   }
 
+
+  /** we allow and between a boolean and an integer */
   def &[U >: R <: Ring](that: ASTBt[U])(implicit n: repr[U]): ASTBt[U] = {
     val res = ring match {
-      case B() => ASTB.addAnd(this.asInstanceOf[ASTBt[B]], that.asInstanceOf[ASTBt[B]])
+      case B() =>
+        that.ring match {
+          case B() => ASTB.addAnd(this.asInstanceOf[ASTBt[B]], that.asInstanceOf[ASTBt[B]])
+          case SI() => new Call2(andLBtoRSI.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
+        }
       case _ => new Call2(andUISI(ring).asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
     };
     res.asInstanceOf[ASTBt[R]]

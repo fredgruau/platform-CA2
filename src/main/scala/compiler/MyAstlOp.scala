@@ -1,6 +1,6 @@
 package compiler
 
-import compiler.ASTL._
+import ASTL._
 /**
  * Defines boolean operations to be applied on ASTLtrait, also applicable between two integer
  * Internally, within ASTB integers without consideration for Unsigned, or Signed are used,

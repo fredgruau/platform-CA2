@@ -1,6 +1,6 @@
 package compiler
 
-import compiler.Constraint.{AllConstr, Cycle, Partition, Schedules}
+import Constraint.{AllConstr, Cycle, Partition, Schedules}
 import org.scalatest.FunSuite
 
 import scala.collection.immutable.{ArraySeq, HashSet}

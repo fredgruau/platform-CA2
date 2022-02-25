@@ -1,7 +1,7 @@
 package compiler
 
-import compiler.AST.{Call1, _}
-import compiler.ASTB.{Elt, _}
+import AST.{Call1, _}
+import ASTB.{Elt, _}
 
 /** Contains the code of logical function
  * ACHTUNGACHTUNGACHTUNGACHTUNG FUNCTIONS ARE HERE DEFINED AS VAL, IT IS IMPORTANT THAT

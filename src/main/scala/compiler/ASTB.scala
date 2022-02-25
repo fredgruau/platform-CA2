@@ -1,10 +1,10 @@
 package compiler
 
-import compiler.AST.{Doubleton, _}
-import compiler.ASTB.{ParOp, _}
-import compiler.ASTBfun._
-import compiler.ASTL.rewriteASTLt
-import compiler.Circuit.{AstPred, TabSymb, iTabSymb2}
+import AST.{Doubleton, _}
+import ASTB.{ParOp, _}
+import ASTBfun._
+import ASTL.rewriteASTLt
+import Circuit.{AstPred, TabSymb, iTabSymb2}
 
 import scala.collection._
 import scala.collection.immutable.{HashMap, HashSet}

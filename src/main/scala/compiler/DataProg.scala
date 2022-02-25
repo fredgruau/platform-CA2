@@ -2,18 +2,19 @@ package compiler
 
 import ASTB._
 import dataStruc.Align.{compose, invert}
-import compiler.AST.{Call, Fundef, Layer2, Read, isCons, isNotRead}
-import compiler.Circuit.{AstField, AstPred, Machine, TabSymb, iTabSymb, iTabSymb2, listOf, newFunName}
-import compiler.VarKind.{LayerField, MacroField, ParamD, ParamDR, ParamR, StoredField}
+import AST.{Call, Fundef, Layer2, Read, isCons, isNotRead}
+import Circuit.{AstField, AstPred, Machine, TabSymb, iTabSymb, iTabSymb2, listOf, newFunName}
+import VarKind.{LayerField, MacroField, ParamD, ParamDR, ParamR, StoredField}
 import dataStruc.{Align, Dag, DagInstr, toSet}
 import dataStruc.DagInstr.{defby, setInputNeighbor}
 import Instr.{a, affectizeReturn}
-import compiler.ASTB.Tminus1
-import compiler.ASTBfun.{ASTBg, Fundef2R, redop}
-import compiler.ASTL.ASTLg
+import ASTB.Tminus1
+import ASTBfun.{ASTBg, Fundef2R, redop}
+import ASTL.ASTLg
 
 import scala.collection.{Iterable, IterableOnce, Set, immutable, mutable}
 import scala.collection.immutable.{HashMap, HashSet}
+import scala.language.postfixOps
 
 object DataProg {
   /** pring a map on several small lines, instead of one big line */
@@ -84,6 +85,14 @@ object DataProg {
       case (k, v) ⇒ k -> DataProg(v)
     }, t2, f.p.toList.map("p" + _.name), List())
   }
+
+  def nbSpace(u: Option[Locus]) = u match {
+    case None => 2
+    case Some(V()) => 0
+    case Some(E()) => 3
+    case Some(F()) => 5
+    case Some(T(_, _)) => 9
+  }
 }
 
 /**
@@ -109,25 +118,22 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
 
   override def toString: String = {
-    def nbSpace(u: Option[Locus]) = u match {
-      case None => 2
-      case Some(V()) => 0
-      case Some(E()) => 3
-      case Some(F()) => 5
-      case Some(T(_, _)) => 9
-    }
 
-    def nbSpace2(str: List[String]) = if (str.nonEmpty) nbSpace(tSymbVarSafe(str(0)).locusOption) else 1
+    /** returns the number of space tabulation at which to start display the instruction.  */
+    def nbSpace2(str: List[String]) = if (str.nonEmpty) DataProg.nbSpace(tSymbVarSafe(str(0)).locusOption) else 1
 
     val instrs = dagis.visitedL.reverse //if (coales.isEmpty) .map(_.asInstanceOf[Affect[_]].coalesc(coales))
     val instrPrint = instrs.map((i: Instr) =>
-      i.toString(nbSpace2(i.names))).mkString("")
+      i.toString(nbSpace2(i.names)) + "\n").mkString("")
     (if (isLeafCaLoop) "leaf CA loop: " else "main ") + paramD.mkString(" ") + "=>" + paramR.mkString(" ") + "\n" +
       // (if (coales.isEmpty) dagis else dagis )+//.visitedL.map(_.asInstanceOf[Affect[_]].coalesc(coales)).reverse
       "there is now " + dagis.visitedL.length + "instructions\n" +
       instrPrint +
       tSymbVar.size + " variables:\n " +
-      tSymbVar.toList.grouped(4).map(_.mkString("-")).mkString("\n") + "\n\n\n" + listOf(funs).mkString("\n \n  ")
+      tSymbVar.toList.grouped(4).map(_.mkString("-")).mkString("\n") + "\n\n" +
+      (if (coales.isEmpty) "" else coales.toList.grouped(4).map(_.mkString("-")).mkString("\n")) +
+      listOf(funs).mkString("\n \n  ") +
+      "\n\n\n"
   }
 
   /** add new symbol created through affectize */
@@ -935,10 +941,12 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
      */
     def weSend(l: Locus, linput: Locus, i: String): Boolean =
       if (!l.isTransfer && linput.isTransfer) //We have a reduction op
-
-         if (defI(i).isFolded(tZone))
-        (muI2(i).size - 1) % l.fanout == 0
-      else (muI2(i).size == 1)
+      {
+        if (defI(i).isFolded(tZone))
+          (muI2(i).size - 1) % l.fanout == 0
+        else (muI2(i).size == 1)
+      }
+      else true
 
 
     /**
@@ -975,147 +983,245 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
   def coalesc2(str: String) = coales.getOrElse(str, str)
 
+  /** if an id x is used a single time, remplace read(x) by its expression.
+   * This applies in particular, for transfer happenning just before reduction */
+  def simplify(): DataProg[InfoType[_]] = {
+    val nInstrBeforeSimplif = dagis.visitedL.size
+    val p = this.asInstanceOf[DataProg[InfoType[_]]]
+    val newTsymbar = p.tSymbVar
+    if (isLeafCaLoop) {
+      val uO: List[Instr] = p.dagis.usedOnce()
+      val uOnames1: Predef.Set[String] = uO.map(_.names(0)).toSet
+      val uOnames = checkIfRedefined(uOnames1)
+      var defs: Map[String, Instr] = defby(dagis.visitedL)
+      val newVisitedL = dagis.visitedL.reverse.map((f: Instr) =>
+        if (f.inputNeighbors.map(_.names(0)).toSet.intersect(uOnames).nonEmpty) //f contains some read to be replaced
+        {
+          val a = new Affect(f.names(0), defs(f.names(0)).exps(0).asInstanceOf[ASTBt[_]].simplify(uOnames, defs))
+          defs = (defs + (f.names(0) -> a)) // we update the defs as it might be reused on the fly when we replace a read in an expression which itself will replace another read.      a
+          a
+        }
+        else f
+      )
+      dagis.visitedL = newVisitedL.reverse.filter((i: Instr) => !uOnames.contains(i.names(0))) //removes the now useless instructions
+      DagInstr.setInputAndOutputNeighbor(dagis.visitedL)
+      val nameStillUsed = p.dagis.visitedL.flatMap(_.names).toSet.diff(uOnames)
+      val coalescedStillUsed = nameStillUsed.map((str: String) => coales.getOrElse(str, str))
+      for (str <- newTsymbar.keys) //we remove from the table the now useless symbols
+        if (!coalescedStillUsed.contains(str) && !(newTsymbar(str).k == ParamD()))
+          newTsymbar.remove(str)
+      //dagis.visitedL.map(_.asInstanceOf[Affect[_]].correctName())
+      if (dagis.visitedL.size < nInstrBeforeSimplif) simplify() //simplification can enable more simplification!
+
+    }
+    new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.simplify }, newTsymbar, paramD, paramR, coales)
+  }
+
+
+  /** computes a map reInsertionC(nom) if defined it is instruction that should be moved before nom->exp
+   * tm1 of an exression using many variables R1<-tm1(exp(R2,... Rn)
+   * Rule C; when going towards first instruction, meet one and exactly one affectation for each Ri, i>1, without R1 being used
+   * When going towards last instruction, no redefinition of any of the RI
+   * R2,..RN  are defined a single time globally we identify that by checking that is not a key of coales.
+   * Algo: we maintain the set of Ris still to be met, we also keep the original set.
+   * */
+  private def movesOfRuleC(instrs: List[Instr]) = {
+    var reInsertionC: HashMap[String, String] = HashMap()
+    var toBeMet: HashMap[String, Set[String]] = HashMap()
+
+    //it suffices to start by a tm1 (we consider  a simple property) and have name not coalesced
+    def checkRuleC(i: Instr, used: Set[String]) = (
+      i.exps(0).asInstanceOf[ASTBg].isTm1 && used.intersect(coales.keys.toSet).isEmpty)
+
+    for (instr <- instrs) {
+      var nom = instr.names(0)
+      val u: Set[String] = instr.usedVars()
+      if (checkRuleC(instr, u)) {
+        toBeMet = toBeMet + (nom -> u)
+      }
+      for (m <- toBeMet) {
+        if (u.contains(m._1))
+          toBeMet -= m._1 //case closed negatively
+        if (m._2.contains(nom)) {
+          if (toBeMet(m._1).contains((nom))) {
+            val newToBeMet = toBeMet(m._1) - nom
+            if (newToBeMet.isEmpty) {
+              toBeMet -= m._1 //case closed positively
+              reInsertionC += (nom -> m._1) //record sucess and where to move
+            }
+            else toBeMet += (m._1 -> newToBeMet)
+          }
+        }
+      }
+    }
+    reInsertionC
+  }
+
+  /**
+   *
+   * @param reInsertion target is name of instruction to be moved; source is name of instruction where to insert
+   * @param instrs
+   * @return
+   */
+  private def detmANDmove(reInsertion: Map[String, String], instrs: List[Instr]) = {
+    var tobeMoved: iTabSymb[Instr] = HashMap()
+    instrs.flatMap(
+      (instr: Instr) => {
+        val nom = instr.names(0)
+        if (reInsertion.values.toSet.contains(nom)) {
+          tobeMoved += (nom -> instr.detm1iseR);
+          List()
+        }
+        else {
+          var resu = List(instr)
+          if (reInsertion.keys.toSet.contains(nom))
+            resu ::= tobeMoved(reInsertion(nom))
+          resu.reverse
+        }
+
+      })
+  }
+
+  /** sub expression of $e$ with tm1s inside */
+  private def tm1s(e: AST[_]) = {
+    val d = new Dag[AST[_]](List(e))
+    d.visitedL.filter(_.asInstanceOf[ASTBt[_]].isTm1)
+  }
+
+  /** returns instruction with a single tm1 of the form tm1(variable) */
+  private def instrsWithaTm1Reg(instrs: List[Instr]) = {
+    var result: HashMap[String, String] = HashMap()
+    for (instr <- instrs) {
+      val theTm1s = tm1s(instr.exps(0))
+      if (theTm1s.size > 1) throw new Exception("Dammed, there is two possible tm1 for this affect")
+      for (e <- theTm1s)
+        e.inputNeighbors(0) match {
+          case r@Read(_) =>
+            if (result.contains(instr.names(0))) throw new Exception("there is two possible tm1(Rx) for this R1")
+            result += (instr.names(0) -> r.which)
+          case _ =>
+        }
+    }
+    result
+  }
+
+  /**
+   * @return tm1 of a single register R1<-exp ...tm1(R2),
+   *         //rule A    if R2 is not affected before the instruction ==> the tm1 is simply supressed.
+   *         // rule B   if R1 is not affected before the instruction
+   *         //      and R2 is not affected after the instruction, until last R1's use ==> move the instruction after last R1's use
+   * @param candReg
+   * @param instrs
+   */
+  private def ruleAandB(candReg: Map[String, String], instrs: List[Instr]) = {
+    var candA = candReg.keys.toSet //candidR1.keys.toSet //candidate for simplest rule
+    var candB = candA //candidate for the second a bit more complex rule
+    /** target identifies last instr using source */
+    var lastUse: HashMap[String, String] = HashMap()
+    /** register which should be redefined */
+    var beforeDef: HashSet[String] = HashSet()
+    var live: HashSet[String] = HashSet()
+    val candBCoalesc = candB.map(coalesc2(_))
+    for (instr <- instrs) {
+      val nom = instr.names(0)
+      if (beforeDef.contains(nom))
+        candB -= nom //R1 is re-defined before
+      for (r1 <- beforeDef.intersect(candA))
+        if (coalesc2(nom) == coalesc2(candReg(r1))) //r2 is redefined before definition of r1         }
+        candA -= r1
+      val newUsed = instr.usedVars().map(coalesc2(_))
+      for (nowUsed <- newUsed.diff(live))
+        if (!lastUse.contains(nowUsed))
+          lastUse += (nowUsed -> nom)
+      live = live.union(candBCoalesc.intersect(newUsed)) //live is a set of coalesced
+      for (r1 <- candB)
+        if (
+          live.contains(coalesc2(r1)) && //R1 will be used
+            coalesc2(nom) == coalesc2(candReg(r1))) //after R2 is redefined (now)
+        candB -= r1
+
+      if (candA.contains(nom)) { //we just pass the definition candA is still equal to its original value
+        live -= coalesc2(nom)
+        beforeDef += nom
+      }
+    }
+    candB = candB.diff(candA) //candidates veryfying A and B are hanled as A
+    def pred(s: (String, String)) = candB.contains(s._1) //we need a map for candB to know where to move.
+    val reInsertionB = lastUse.filter(pred).map(_ swap) //allows to reuse move
+    (candA, reInsertionB)
+  }
+
   /** tm1 operator are normaly supressed by adding registers, nevertheless, different rules can be applied to avoid the cost
-   * of adding register: adding a store instruction , moving the instruction forward or backward. */
+   * of adding register:  , juste removing the tm1 (rule A)
+   * moving the instruction forward (rule B) or backward.(rule C) *adding a store instruction (rule D) */
   def detm1Ify(): DataProg[InfoType[_]] = {
     def isParamR(str: String) = tSymbVarSafe(str).k == ParamR()
-
-    /** sub expression of $e$ with tm1s inside */
-    def tm1s(e: AST[_]) = {
-      val d = new Dag[AST[_]](List(e))
-      d.visitedL.filter(_.asInstanceOf[ASTBt[_]].isTm1)
-    }
 
     val p = this.asInstanceOf[DataProg[InfoType[_]]]
     if (isLeafCaLoop) {
 
-      //tm1 of a single register R1<-exp ...tm1(R2),
-      //rule A    if R2 is not affected before the instruction ==> the tm1 is simply supressed.
-      // rule B   if R1 is not affected before the instruction
-      //      and R2 is not affected after the instruction, until last R1's use ==> move the instruction after last R1's use
-
 
       //computes candidates R1s and their associated R2
-      var candidR1: HashMap[String, String] = HashMap()
+
       /** lastUse(x)=instruction where x was used last if x is in cand2, x=exp should be inserted after lastuse(x) */
-      var lastUse: HashMap[String, String] = HashMap()
 
-      for (instr <- p.dagis.visitedL) {
-        for (e <- tm1s(instr.exps(0)))
-          e.inputNeighbors(0) match {
-            case r@Read(_) =>
-              if (candidR1.contains(instr.names(0))) throw new Exception("there is two possible tm1(R2) for this R1")
-              candidR1 += (instr.names(0) -> r.which)
-            case _ =>
-          }
-      }
+      /*     var candidR1: HashMap[String, String] = HashMap()
+           for (instr <- p.dagis.visitedL) {
+             for (e <- tm1s(instr.exps(0)))
+               e.inputNeighbors(0) match {
+                 case r@Read(_) =>
+                   if (candidR1.contains(instr.names(0))) throw new Exception("there is two possible tm1(R2) for this R1")
+                   candidR1 += (instr.names(0) -> r.which)
+                 case _ =>
+               }
+           }*/
+      val candReg = instrsWithaTm1Reg(p.dagis.visitedL)
+      /*      var candA = candReg.keys.toSet//candidR1.keys.toSet //candidate for simplest rule
+            var candB = candA //candidate for the second a bit more complex rule
+            /** register which should be redefined */
+            var beforeDef: HashSet[String] = HashSet()
+            var live: HashSet[String] = HashSet()
+            val candBCoalesc = candB.map(coalesc2(_))
+            for (instr <- p.dagis.visitedL) {
+              val nom = instr.names(0)
+              if (beforeDef.contains(nom))
+                candB -= nom //R1 is re-defined before
+              for (r1 <- beforeDef.intersect(candA))
+                if (coalesc2(nom) == coalesc2(candidR1(r1))) //r2 is redefined before definition of r1         }
+                candA -= r1
+              val newUsed = instr.usedVars().map(coalesc2(_))
+              for (nowUsed <- newUsed.diff(live))
+                if (!lastUse.contains(nowUsed))
+                  lastUse += (nowUsed -> nom)
+              live = live.union(candBCoalesc.intersect(newUsed)) //live is a set of coalesced
+              for (r1 <- candB)
+                if (
+                  live.contains(coalesc2(r1)) && //R1 will be used
+                    coalesc2(nom) == coalesc2(candidR1(r1))) //after R2 is redefined (now)
+                candB -= r1
 
-      var cand1 = candidR1.keys.toSet //candidate for simplest rule
-      var cand2 = cand1 //candidate for the second a bit more complex rule
-      var beforeDef: HashSet[String] = HashSet()
-      var live: HashSet[String] = HashSet()
-      val cand2Coalesc = cand2.map(coalesc2(_))
-      for (instr <- p.dagis.visitedL) {
-        val nom = instr.names(0)
-        if (beforeDef.contains(nom))
-          cand2 -= nom //R1 defined before
-        for (r1 <- beforeDef.intersect(cand1))
-          if (coalesc2(nom) == coalesc2(candidR1(r1))) //r2 is redefined before definition of r1         }
-          cand1 -= r1
-        val newUsed = instr.usedVars().map(coalesc2(_))
-        for (nowUsed <- newUsed.diff(live))
-          if (!lastUse.contains(nowUsed))
-            lastUse += (nowUsed -> nom)
-        live = live.union(cand2Coalesc.intersect(newUsed)) //live is a set of coalesced
-        for (r1 <- cand2)
-          if (
-            live.contains(coalesc2(r1)) && //R1 will be used
-              coalesc2(nom) == coalesc2(candidR1(r1))) //after R2 is redefined (now)
-          cand2 -= r1
-
-        if (cand1.contains(nom)) { //we pass the definition
-          live -= coalesc2(nom)
-          beforeDef += nom
-        }
-      }
-      var reinsertionPoint: HashSet[String] = HashSet()
-      var tobeMoved: iTabSymb[Instr] = HashMap()
-      cand2 = cand2.diff(cand1) //candidates through 1 are more easy to handle
-      var res: List[Instr] = List()
-      //we now  remove tm1s, and move instructions from cand2
-
-
-      p.dagis.visitedL = p.dagis.visitedL.reverse.flatMap(
-        (instr: Instr) => {
-          val nom = instr.names(0)
-          if (cand1.contains(nom)) List(instr.detm1iseR)
-          else if (cand2.contains(nom)) {
-            tobeMoved += (nom -> instr.detm1iseR)
-            reinsertionPoint += lastUse(nom)
-            List()
-          } //to be reinserted later
-          else if (reinsertionPoint.contains(nom)) {
-            var resu = List(instr) //todo check that instr has not tm1 itself!
-            for (n <- cand2)
-              if (lastUse(n) == nom)
-                resu ::= tobeMoved(n)
-            resu.reverse
-          }
-          else List(instr)
-        }
-      )
-      p.dagis.visitedL = p.dagis.visitedL.reverse
-
-      //tm1 of an exression using many variables R1<-tm1(exp(R2,... Rn)
-      //Rule C; go towards first instruction, meet one and exactly one affectation for each Ri, i>1, without R1 being used
-      //Algo: we maintain the set of Ris still to be met, we also keep the original set.
-      var reInsertionC: HashMap[String, String] = HashMap()
-      var stillToBeMet: HashMap[String, Set[String]] = HashMap()
-      var toBeMet: HashMap[String, Set[String]] = HashMap()
-
-      def checkRuleC(i: Instr) = i.exps(0).asInstanceOf[ASTBg].isTm1
-
-      for (instr <- p.dagis.visitedL) {
-        var nom = instr.names(0)
-        val u: Set[String] = instr.usedVars()
-        if (checkRuleC(instr)) {
-          toBeMet = toBeMet + (nom -> u)
-          stillToBeMet = stillToBeMet + (nom -> u)
-        }
-
-        for (m <- toBeMet) {
-          if (u.contains(m._1))
-            toBeMet -= m._1 //case closed negatively
-          if (m._2.contains(nom))
-            if (stillToBeMet(m._1).contains((nom))) {
-              val newToBeMet = stillToBeMet(m._1) - nom
-              if (newToBeMet.isEmpty) {
-                toBeMet -= m._1 //case closed positively
-                reInsertionC += (nom -> m._1) //record sucess and where to move
+              if (candA.contains(nom)) { //we just pass the definition candA is still equal to its original value
+                live -= coalesc2(nom)
+                beforeDef += nom
               }
-              else stillToBeMet += (m._1 -> newToBeMet)
             }
-            else
-              toBeMet -= m._1 //case closed negatively
-        }
-      }
 
-      tobeMoved = HashMap()
-      p.dagis.visitedL = p.dagis.visitedL.flatMap(
-        (instr: Instr) => {
-          val nom = instr.names(0)
-          if (reInsertionC.values.toSet.contains(nom)) {
-            tobeMoved += (nom -> instr.detm1iseR);
-            List()
-          }
-          else {
-            var resu = List(instr)
-            if (reInsertionC.keys.toSet.contains(nom))
-              resu ::= tobeMoved(reInsertionC(nom))
-            resu.reverse
-          }
+            candB = candB.diff(candA) //candidates veryfying A and B are hanled as A
 
-        })
+            */
+      val (candA, reInsertionB) = ruleAandB(candReg, p.dagis.visitedL)
+
+      //we now  remove tm1s, from candA
+      p.dagis.visitedL = p.dagis.visitedL.map(
+        (instr: Instr) => if (candA.contains(instr.names(0))) instr.detm1iseR else instr
+      )
+
+      //we now  remove tm1s, and move instructions from candB
+      p.dagis.visitedL = detmANDmove(reInsertionB, p.dagis.visitedL.reverse).reverse
+
+
+      val reInsertionC = movesOfRuleC(p.dagis.visitedL)
+      p.dagis.visitedL = detmANDmove(reInsertionC, p.dagis.visitedL)
 
       //Rule D;  replace affect (paramD,tm1(exp) by store(paramD,-1,exp)
       p.dagis.visitedL = p.dagis.visitedL.map((instr: Instr) =>
@@ -1124,7 +1230,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         else instr
       )
 
-      //we now proceed to standard detmify through creation of new registers which means new affectation.
+      //for the tm1 that could not be supressed we now proceed to standard detmify through creation of new registers which means new affectation.
       val toBeRepl: Set[AST[_]] = toSet(p.dagis.dagAst.visitedL.filter(_.asInstanceOf[ASTBt[_]].isTm1)) //we could filter out more stuff because it consumes register and registers are a precious ressourcefor(e<-toBeRepl)
       //we check that there is no tm1 in tm1
       for (e <- toBeRepl) {
@@ -1171,50 +1277,16 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     result
   }
 
-  /** if an id x is used a single time, remplace read(x) by its expression.
-   * This applies in particular, for transfer happenning just before reduction */
-  def simplify(): DataProg[InfoType[_]] = {
-    val nInstrBeforeSimplif = dagis.visitedL.size
-    val p = this.asInstanceOf[DataProg[InfoType[_]]]
-    val newTsymbar = p.tSymbVar
-    if (isLeafCaLoop) {
-      val uO: List[Instr] = p.dagis.usedOnce()
-      val uOnames1: Predef.Set[String] = uO.map(_.names(0)).toSet
-      val uOnames = checkIfRedefined(uOnames1)
-      var defs: Map[String, Instr] = defby(dagis.visitedL)
-      val newVisitedL = dagis.visitedL.reverse.map((f: Instr) =>
-        if (f.inputNeighbors.map(_.names(0)).toSet.intersect(uOnames).nonEmpty) //f contains some read to be replaced
-        {
-          val a = new Affect(f.names(0), defs(f.names(0)).exps(0).asInstanceOf[ASTBt[_]].simplify(uOnames, defs))
-          defs = (defs + (f.names(0) -> a)) // we update the defs as it might be reused on the fly when we replace a read in an expression which itself will replace another read.      a
-          a
-        }
-        else f
-      )
-      dagis.visitedL = newVisitedL.reverse.filter((i: Instr) => !uOnames.contains(i.names(0))) //removes the now useless instructions
-      DagInstr.setInputAndOutputNeighbor(dagis.visitedL)
-      val nameStillUsed = p.dagis.visitedL.flatMap(_.names).toSet.diff(uOnames)
-      val coalescedStillUsed = nameStillUsed.map((str: String) => coales.getOrElse(str, str))
-      for (str <- newTsymbar.keys) //we remove from the table the now useless symbols
-        if (!coalescedStillUsed.contains(str))
-          newTsymbar.remove(str)
 
-      if (dagis.visitedL.size < nInstrBeforeSimplif)
-        simplify() //simplification can enable more simplification!
-    }
-    new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.simplify }, newTsymbar, paramD, paramR, coales)
-  }
-
-
-  def unfoldInt(): DataProg[InfoNbit[_]] = {
+  def unfoldInt(): DataProg[InfoNbit[_]] = { //todo faut rajouter les stores et peut etre des affect pour marquer la difference
     val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
     if (isLeafCaLoop) {
       val cod = new CodeGen(p.tSymbVar, coales)
       for (inst <- dagis.visitedL.reverse) {
-        val res = cod.codeGen(inst.asInstanceOf[Affect[ASTBg]])
+        val res = cod.codeGen(inst)
         val res2 = res.map(_.map(_.toStringTree).mkString("|_____|"))
         println("________________\n" + res2.mkString("\n"))
-        print(cod.constant)
+        //print(cod.constant)
       }
 
 

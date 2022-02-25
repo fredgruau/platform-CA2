@@ -1,6 +1,6 @@
 package compiler
 
-import compiler.AST._
+import AST._
 import dataStruc.{DagNode, Named}
 import Circuit.{AstPred, TabSymb, _}
 

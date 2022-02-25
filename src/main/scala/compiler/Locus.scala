@@ -1,7 +1,7 @@
 package compiler
 
-import compiler.AST.Read
-import compiler.ASTBfun.ASTBg
+import AST.Read
+import ASTBfun.ASTBg
 
 import scala.collection.{Iterator, Seq}
 

@@ -1,8 +1,9 @@
 package compiler
+
 import ASTB.toBinary
-import compiler.ASTB._
-import compiler.ASTBfun._
-import compiler.Circuit.{TabSymb, iTabSymb}
+import ASTB._
+import ASTBfun._
+import Circuit.{TabSymb, iTabSymb}
 import org.scalatest.FunSuite
 
 import scala.collection.immutable.HashMap

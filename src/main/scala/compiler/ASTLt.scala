@@ -1,9 +1,9 @@
 package compiler
 
-import compiler.AST._
-import compiler.ASTL._
-import compiler.repr._
-import compiler.Circuit._
+import AST._
+import ASTL._
+import repr._
+import Circuit._
 
 import scala.collection._
 import ASTBfun.ASTBg

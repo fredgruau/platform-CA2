@@ -1,10 +1,10 @@
 package compiler
 
-import compiler.AST.{Call1, Call2, Call3, Delayed, Fundef1, Fundef2, Fundef3, Layer2, Param, Read}
-import compiler.ASTB.{And, Dir, Extend, False, Intof, Mapp2, Or, ParOp, Scan1, Scan2, Tminus1, True, Xor, nbitCte, rewriteASTBt}
-import compiler.ASTBfun.{ASTBg, Fundef2R}
-import compiler.ASTL.rewriteASTLt
-import compiler.Circuit.{AstPred, TabSymb, iTabSymb, iTabSymb2}
+import AST.{Call1, Call2, Call3, Delayed, Fundef1, Fundef2, Fundef3, Layer2, Param, Read}
+import ASTB.{And, Dir, Extend, False, Intof, Mapp2, Or, ParOp, Scan1, Scan2, Tminus1, True, Xor, nbitCte, rewriteASTBt}
+import ASTBfun.{ASTBg, Fundef2R}
+import ASTL.rewriteASTLt
+import Circuit.{AstPred, TabSymb, iTabSymb, iTabSymb2}
 
 import scala.collection.{Map, immutable, mutable}
 import scala.collection.immutable.{HashMap, HashSet}
@@ -28,7 +28,9 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
       case u@Param(_) => env(u.nameP)
       case Read(x) =>
         if (gen.tablePipelined.contains(x)) {
-          if (gen.evaluated(x) * gen.step > i * gen.step) throw new Exception("when a map is combined with a scan with initused, the scan must comes first for pipelining to work!!")
+          if (gen.evaluated(x) * gen.step > i * gen.step)
+            throw new Exception("when a map is combined with a scan with initused, the scan must comes first for pipelining to work!!")
+          //with initused, it is the map which will first read the pipelined array, the scan will not.
           if (gen.evaluated(x) * gen.step < i * gen.step) { //means that we have not yet compiled x's pipelined expression
             gen.evaluated += (x -> i) //register the fact that yes now we 'll compile it
             val newExp = gen.tablePipelined(x).exps(0).asInstanceOf[ASTBg].codeGen(i, gen, null, env) //compiles it
@@ -39,10 +41,10 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
             gen.readWithConst(x)
         }
         else {
-          assert(gen.tSymbVar.contains(x) || Named.isTmp(x) || gen.tSymbVar.contains(gen.coalesc(x)), "could not find" + x) //x has to be a register generated during spatial unfolding
+          assert(gen.tSymbVar.contains(x) || Named.isTmp(x) ||
+            gen.tSymbVar.contains(gen.coalescSafe(x)), "could not find" + x) //x has to be a register generated during spatial unfolding
           //it could also be a temporary arithmetic variable generated for a previous loop
-          val sufx = if (gen.isBool(x)) "" else "" + i
-          gen.readWithConst(x + sufx)
+          gen.readWithConst(gen.addSufx(x, i))
           //new Read(x+sufx)(repr(B())) with ASTBt[ B ]
         }
     }
@@ -90,7 +92,9 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
 
 
   /** return the direction if there is one */
-  def dir1: Option[Dir] = if (isInstanceOf[ParOp[_]]) Some(asInstanceOf[ParOp[_]].dirNarrowed) else None
+  def dir1: Option[Dir] = if (isInstanceOf[ParOp[_]]) Some(asInstanceOf[ParOp[_]].dirNarrowed)
+  else if (isInstanceOf[Read[_]]) Some(Both())
+  else None
 
   /**
    *
@@ -192,16 +196,17 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
     this match {
       case a: ASTB[R] => a.propagateASTB(rewrite)
       case _ => this.asInstanceOf[AST[_]] match {
-        case Read(x) =>
-          if (usedOnce.contains(x))
-            defs(x).exps(0).asInstanceOf[ASTBt[R]]
+        case r@Read(x) =>
+          if (usedOnce.contains(x)) {
+            val newr = defs(x).exps(0).asInstanceOf[ASTBt[R]]
+            newr.name = r.name
+            newr
+          }
           else this
         case Call1(f, a) => new Call1(f.asInstanceOf[Fundef1[Any, R]], a.asInstanceOf[ASTBg].simplify(usedOnce, defs))(mym) with ASTBt[R]
         case Call2(f, a, a2) => new Call2(f.asInstanceOf[Fundef2[Any, Any, R]],
           a.asInstanceOf[ASTBg].simplify(usedOnce, defs),
           a2.asInstanceOf[ASTBg].simplify(usedOnce, defs))(mym) with ASTBt[R]
-
-
       }
     }
   }

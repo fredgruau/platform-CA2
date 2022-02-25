@@ -1,11 +1,10 @@
 package compiler
 
-import compiler.AST.{Call2, Read, isNotRead}
-import compiler.ASTB.{AffBool, Elt, ParOp, Reduce, Scan1, Scan2, eltRed, fromBoolB}
-import compiler.ASTBfun.{ASTBg, minSI}
-import compiler.Circuit.{TabSymb, iTabSymb}
+import AST.{Call2, Read, isNotRead}
+import ASTB.{AffBool, Elt, ParOp, Reduce, Scan1, Scan2, eltRed, fromBoolB}
+import ASTBfun.{ASTBg, minSI}
+import Circuit.{TabSymb, iTabSymb}
 import dataStruc.DagInstr
-
 import scala.collection.{immutable, mutable}
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.collection.mutable.ArrayBuffer
@@ -18,6 +17,19 @@ import scala.collection.mutable.ArrayBuffer
  *                 todo do not use this class to compute the number of bit in nbitR
  **/
 class CodeGen(val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String] = HashMap.empty) {
+  def addSufx(x: String, i: Int) = {
+    val sufx = if (isBool(x)) ""
+    else {
+      if (i == -1) {
+        val u = isBool(x)
+        throw new Exception("indice -1")
+      }
+
+      "#" + i
+    }
+    x + sufx
+  }
+
   /** evaluated(x)=i iff pipelined affectation x<-exp has been done for itération i. */
   var evaluated: iTabSymb[Int] = null
   var pipelined: Set[Instr] = HashSet()
@@ -41,6 +53,8 @@ class CodeGen(val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String] 
 
   def tryRead(name: String): Option[ASTBt[B]] = if (constant.contains(name)) Some(fromBoolB(constant(name))) else None
 
+  def coalescSafe(str: String) = coalesc.getOrElse(str, str)
+
   /** use of constant map alllows to fold constant */
   def readWithConst(name: String): ASTBt[B] =
     if (constant.contains(name)) fromBoolB(constant(name))
@@ -48,11 +62,8 @@ class CodeGen(val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String] 
 
   /** boolean variable do not get an integer sufx added */
   def isBool(s: String): Boolean =
-    if (tSymbVar.contains(s)) {
-      val sy: InfoNbit[_] = tSymbVar(s)
-      sy.t == B()
-    }
-    else if (coalesc.contains(s)) tSymbVar(coalesc(s)).t == B()
+    if (tSymbVar.contains(s)) tSymbVar(s).ringSafe == B()
+    else if (coalesc.contains(s)) tSymbVar(coalesc(s)).ringSafe == B()
     else if (tableAllAffect.contains((s))) tableAllAffect(s).exps(0).asInstanceOf[ASTBg].ring == B()
     else if (tablePipelined.contains((s))) true
     else if (constant.contains(s)) true
@@ -76,6 +87,7 @@ class CodeGen(val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String] 
    * @return an association of each variable to an integer corresponding to a variable used for arithmetic
    *         the required number  of such cells is simply the map size
    *         The algo follows a generic allocation strategy; reusable in other circumstances.
+   *         todo turn this generic
    */
   def allocateInt(usedVars: List[(HashSet[String], HashSet[String])]): iTabSymb[Int] = {
     var res: HashMap[String, Int] = HashMap()
@@ -117,7 +129,7 @@ class CodeGen(val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String] 
 
 
   /** computes the number of times a variable is used outside scan */
-  def pipelineUseOutisdeScans(loop: List[Instr], tablePipelined: iTabSymb[Instr]): iTabSymb[Int] = {
+  def pipelineUseOutsideScans(loop: List[Instr], tablePipelined: iTabSymb[Instr]): iTabSymb[Int] = {
     var res: iTabSymb[Int] = HashMap()
 
     def update(value: AST[_]): Unit = {
@@ -139,7 +151,6 @@ class CodeGen(val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String] 
     res
   }
 
-
   /**
    * transform an integer affectation into a list of pure boolean affectations
    * updates many global variables to be consulted, including the symbol table which allows to computes bit size
@@ -147,11 +158,13 @@ class CodeGen(val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String] 
    *
    * @return each List of the list can be computed in parallel
    */
-  def codeGen(inst: Affect[ASTBg]): List[List[ASTBt[B]]] = {
-    val exp = inst.exp.asInstanceOf[ASTBg]
+  var loops: Seq[List[Instr]] = null
+  var ploops: List[Lop] = List() //collects generated data for later printing
+  def codeGen(inst: Instr): List[List[ASTBt[B]]] = {
+    val exp = inst.exps(0).asInstanceOf[ASTBg]
     val decall = exp.deCallify(env, tSymbVar)
-    //println(decall.toStringTree)
-    val af = Affect(inst.name, decall) //reconstruit l'affectation sans les calls
+    //println("\n"+decall.toStringTree)
+    val af = Affect(inst.names(0), decall) //reconstruit l'affectation sans les calls
     val dagi = new DagInstr(List(af))
     dagi.dagAst.addGenerators(List(decall)) //add all subtree of mapscan to dags
     val iT1: collection.Set[AST[_]] = dagi.inputTwice.filter(isNotRead)
@@ -163,7 +176,7 @@ class CodeGen(val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String] 
     toBeRepl.map(_.setNameIfNull3());
     val dagis = dagi.affectIfy(toBeReplaced) //it is possible that some of the subtrees have "Both()" as direction
     //println(dagis)
-    val loops: Seq[List[Instr]] = dagis.packetize4ASTB(Instr.isBoolean).reverse //distribute all the affectation in parallel loops
+    loops = dagis.packetize4ASTB(Instr.isBoolean).reverse //distribute all the affectation in parallel loops
     //println(loops)
     var codeNloop = List[List[ASTBt[B]]]()
     var code1loop = List[ASTBt[B]]()
@@ -176,10 +189,12 @@ class CodeGen(val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String] 
       val affects: List[Instr] = dagis.sup(loop)
       tableAllAffect ++= affects.map((is: Instr) => is.names(0) -> is)
       val dir1 = ASTB.dir2(affects(0))
-      if (dir1 == None) { //affectation has to be boolean
+      if (dir1 == None) { //affectation has to be boolean, if dir1 is both we see indexes -1 appearing
         assert(affects.size == 1) //boolean affectation are singleton class
-        assert(loop.size == 1) //they do not make use of integers so no pipeline
-        code1loop = List(affects(0).genCode(-1, this, env)) //that is already a final boolean instruction but we may need to fold constant
+        assert(nbitLoop(affects) == 1) //they do not make use of integers so no pipeline
+        code1loop = List(affects(0).codGen(-1, this, env)) //we put -1 to trigger an error should it not be boolean.
+        // that is already a final boolean instruction but we may need to fold constant
+        ploops ::= new Lop(None, 1, affects, List(), code1loop.asInstanceOf[List[AffBool]])
       }
       else {
         dir = dir1.get //is the loop leftwared or rightward,
@@ -201,15 +216,13 @@ class CodeGen(val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String] 
         }
         else throw new Exception("direction should have been narrowed to Left or right")
         evaluated = new HashMap[String, Int]() ++ pipelined.map(_.names(0) -> (init - step)) //ce sont des compteurs mis à zéro
-
-        pipeUs = pipelineUseOutisdeScans(loop, tablePipelined)
+        pipeUs = pipelineUseOutsideScans(loop, tablePipelined)
         var i = init
         do {
           for (af <- affects) {
-            val newAf = af.genCode(i, this, env)
+            val newAf = af.codGen(i, this, env)
             code1loop = newAf.affBoolify().reverse ::: code1loop //affBoolify will remove uncessary calculation when elt is applied
-            //the reverse it to maintain the same order which has been reverse in this way of computation with list
-
+            //the reverse's goal is to maintain the same order which had been reverse in this way of computation with list
           }
           i = i + step
         }
@@ -218,6 +231,7 @@ class CodeGen(val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String] 
       val names: (HashSet[String], HashSet[String]) = ASTB.tmpNames(code1loop)
       //  println(names)
       codeNloop = code1loop.reverse :: codeNloop
+      ploops ::= new Lop(Some(dir), bitSize, affects, pipelined.toList, code1loop.reverse.asInstanceOf[List[AffBool]])
       liveVars ::= names
     }
     val coalescTable: iTabSymb[String] = allocateInt(liveVars).map((x: (String, Int)) => (x._1 -> ("r" + x._2)))

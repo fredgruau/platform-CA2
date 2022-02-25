@@ -1,8 +1,8 @@
 package compiler
 
-import compiler.AST.Layer2
-import compiler.ASTL.{IntV, delayedL}
-import compiler.Circuit.hexagon
+import AST.Layer2
+import ASTL.{IntV, delayedL}
+import Circuit.hexagon
 import macros.ASTLfun.p
 import org.scalatest.FunSuite
 import prog.TestDist2

@@ -1,14 +1,14 @@
 package compiler
 
-import compiler.AST._
-import compiler.ASTB.{Elt, Reduce, Tminus1}
-import compiler.ASTBfun.{ASTBg, redop}
-import compiler.InfoType._
-import compiler.Instr._
-import compiler.Locus.{deploy, _}
-import compiler.VarKind._
+import AST._
+import ASTB.{AffBool, Elt, Reduce, Tminus1}
+import ASTBfun.{ASTBg, redop}
+import InfoType._
+import Instr._
+import Locus.{deploy, _}
+import VarKind._
 import dataStruc.{Align, Dag, DagInstr, DagNode, SetInput, SetOutput}
-import compiler.Circuit._
+import Circuit._
 import dataStruc.Align.{compose, invert}
 
 import scala.language.postfixOps
@@ -30,7 +30,7 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
 
   def toString(tabu: Int): String
 
-  def genCode(i: Int, gen: CodeGen, env: HashMap[String, ASTBt[B]]): ASTBt[B] = null
+  def codGen(i: Int, gen: CodeGen, env: HashMap[String, ASTBt[B]]): ASTBt[B] = null
 
   def detm1ise(muName: String): Instr = if (names(0) != muName) this else new Affect(muName, exps(0).asInstanceOf[ASTBt[Ring]].detm1ise)
 
@@ -292,7 +292,7 @@ case class ShiftInstr(name: String, shifted: String, perm: Array[Int]) extends I
 
 /** allows to remove tm1s by storing latter. */
 case class Store(name: String, delay: Int, exp: AST[_]) extends Instr {
-  override def toString(tabu: Int): String = " " * tabu + pad(name, 25 - tabu) + "Store " + exp.toStringTree + show(locus) + show2(locus2) + "\n"
+  override def toString(tabu: Int): String = " " * tabu + pad(name, 25 - tabu) + "Store" + delay + " " + exp.toStringTree + show(locus) + show2(locus2) + "\n"
 
   override def exps: List[AST[_]] = List(exp)
 
@@ -307,8 +307,29 @@ case class Store(name: String, delay: Int, exp: AST[_]) extends Instr {
 }
 
 
+/** allows to remove tm1s by storing latter. */
+case class Loop(names: List[String], exps: List[AffBool]) extends Instr {
+  override def toString(tabu: Int): String = exps.map(
+    " " * tabu + pad(names.reduce(_ + "," + _), 25 - tabu) + _ + "\n").mkString("\n")
+
+  override def propagate(id1: rewriteAST2): Instr = throw new Exception("not to be implemented")
+
+  override def isTransfer: Boolean = throw new Exception("not defined on Loop")
+
+  override def usedVars(): HashSet[String] = HashSet() //todo
+}
+
 //todo on aurait pas du prendre de case class pour affect ou callProc.
 case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
+
+  def correctName(): Unit = {
+    val nameE = exp.name
+    if (nameE != name)
+      exp.name = name
+    // if (name.startsWith("ll"))    throw new Exception("ll is a reserved prefix, do not use it please")
+
+  }
+
 
   def toStoreDetmise(): Store = {
     val e = exp.asInstanceOf[ASTBg]
@@ -323,7 +344,7 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
 
   override def toString: String =
     pad(name, 25) + "<-  " + exp.toStringTree + show(locus) + show2(locus2) +
-      (if (alignPerm.isEmpty) "" else alignPerm.map({ case (k, v) => " aligned on: " + k + " with: " + v.toList + ";  " })) + "\n"
+      (if (alignPerm.isEmpty) "" else alignPerm.map({ case (k, v) => " aligned on: " + k + " with: " + v.toList + ";  " }))
 
   /** Computes the max of integer length take in the input */
   def maxBitSize(t: iTabSymb[InfoNbit[_]]): Int = {
@@ -415,10 +436,8 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
     newAffect :: result //We return  also the shift-affect instruction
   }
 
-  override def genCode(i: Int, gen: CodeGen, env: HashMap[String, ASTBt[B]]): ASTBt[B] = {
-    val sufx = if (gen.isBool(name)) "" else "" + i
-    exp.asInstanceOf[ASTBg].codeGen(i, gen, name + sufx, env)
-    //   exp.asInstanceOf[ASTBg].codeGen(i,gen,name+(if(exp.asInstanceOf[ASTBg].ring==B())""else i),env)
+  override def codGen(i: Int, gen: CodeGen, env: HashMap[String, ASTBt[B]]): ASTBt[B] = {
+    exp.asInstanceOf[ASTBg].codeGen(i, gen, gen.addSufx(name, i), env)
 
   }
 

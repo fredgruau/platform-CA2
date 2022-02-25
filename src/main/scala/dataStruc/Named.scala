@@ -34,7 +34,7 @@ object Named {
 
   def OkToUseForName(s: String): Boolean = !doNotUse.contains(s);
   {
-    doNotUseForName(List("arg", "arg2"))
+    doNotUseForName(List("arg", "arg2", "body", "op"))
   }
 }
 
@@ -49,6 +49,7 @@ trait Named {
   def setNameIfNull() = {
     if (name == null) name = "_aux" + Named.getCompteur
   }
+
 
   def setNameIfNull3() = {
     if (name == null) name = "_t" + Named.getCompteur3 + "$"

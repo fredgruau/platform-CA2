@@ -1,7 +1,7 @@
 package compiler
 
-import compiler.Circuit.TabSymb
-import compiler.VarKind.MacroField
+import Circuit.TabSymb
+import VarKind.MacroField
 
 /**
  * The most elementary info stored in symbol table: type and kind
@@ -15,16 +15,21 @@ class InfoType[+T](val t: T, val k: VarKind) {
 
   val repr1 = new repr(t)
 
-  def locus: Locus = repr.lpart(repr1.asInstanceOf[repr[(_ <: compiler.Locus, _ <: compiler.Ring)]]).name
+  def locus: Locus = repr.lpart(repr1.asInstanceOf[repr[(_ <: Locus, _ <: Ring)]]).name
 
-  def ring: Ring = repr.rpart(repr1.asInstanceOf[repr[(_ <: compiler.Locus, _ <: compiler.Ring)]]).name
+  def ring: Ring = repr.rpart(repr1.asInstanceOf[repr[(_ <: Locus, _ <: Ring)]]).name
 
+  /** in some cases (i.e. creation of affectation, there is no obvious locus associated to the variable. */
   def locusOption: Option[Locus] = t match {
-    case u@(_, _) => Some(u._1.asInstanceOf[Locus]) //if the type is a locus, the first is the locus
-    case _ => None
+    case u@(_, _) => Some(u._1.asInstanceOf[Locus]) //if the type is a couple, the first is the locus
+    case _ => None //if not,it's only a ring, because the locus could not be computed
   }
 
-
+  /** when unfolding , some scalar have a locus, and some not */
+  def ringSafe: Ring = t match {
+    case u@(_, _) => u._2.asInstanceOf[Ring] //if the type is a locus, the first is the locus
+    case _ => t.asInstanceOf[Ring]
+  }
 }
 
 object InfoType {

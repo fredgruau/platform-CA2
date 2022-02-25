@@ -1,9 +1,9 @@
 package compiler
 
-import compiler.AST._
-import compiler.ASTB.{Tminus1, shiftL, shiftR}
-import compiler.ASTBfun.ASTBg
-import compiler.Circuit._
+import AST._
+import ASTB.{Tminus1, shiftL, shiftR}
+import ASTBfun.ASTBg
+import Circuit._
 
 import scala.collection._
 import scala.collection.immutable.HashMap
@@ -42,29 +42,29 @@ abstract class Circuit[L <: Locus, R <: Ring](override val p: Param[_]*) extends
     val prog2 = prog1.treeIfy();
     // print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
     val prog3 = prog2.procedurIfy();
-    // print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
+    //print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
     val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
     //print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
     val prog5: DataProg[InfoNbit[_]] = prog4.macroIfy();
 
-    print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
+    //print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog6 = prog5.unfoldSpace(m);
 
-    //print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
+    // print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
 
     val prog7 = prog6.treeIfy(false); //this will again generates new affect treefy=dedagify
     //print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
     val prog7bis = prog7.simplify(); //this will remove id which are read only once.
-    print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
+    //print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
-    val prog8 = prog7.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
+    val prog8 = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
     print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
-    //val prog9 = prog7.unfoldInt();  //this will again generates new intermediate affect
+    val prog9 = prog8.unfoldInt(); //this will again generates new intermediate affect
     //print("unfold777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
   }

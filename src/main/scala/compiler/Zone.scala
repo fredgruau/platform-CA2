@@ -1,8 +1,8 @@
 package compiler
 
-import compiler.Circuit.TabSymb
-import compiler.Constraint.{Partition, empty, noneIsEmpty, propagate}
-import compiler.Instr.a
+import Circuit.TabSymb
+import Constraint.{Partition, empty, noneIsEmpty, propagate}
+import Instr.a
 import dataStruc.{DagNode, SetInput, toSet, SetOutput}
 import scala.collection.Iterable
 import scala.collection.immutable.{HashMap, HashSet}

@@ -1,6 +1,6 @@
 package compiler
 
-import compiler.Constraint._
+import Constraint._
 import dataStruc.Align._
 
 

@@ -1,14 +1,14 @@
 package compiler
 
 import com.sun.xml.internal.bind.v2.runtime.reflect.opt.Const
-import compiler.AST._
-import compiler.ASTB._
-import compiler.ASTBfun._
-import compiler.ASTL._
+import AST._
+import ASTB._
+import ASTBfun._
+import ASTL._
 import dataStruc.Align._
-import compiler.Constraint._
-import compiler.Circuit.{iTabSymb2, _}
-import compiler.repr._
+import Constraint._
+import Circuit.{iTabSymb2, _}
+import repr._
 import dataStruc.Dag
 
 import scala.collection.{mutable, _}

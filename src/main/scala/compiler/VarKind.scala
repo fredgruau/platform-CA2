@@ -1,6 +1,6 @@
 package compiler
 
-import compiler.VarKind._
+import VarKind._
 
 sealed class VarKind {
   def needStored: Boolean = this match {

@@ -109,7 +109,8 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
 
     if (toSet(toBeRepl).size < toBeRepl.size) //since name are given by hand we check that no two names are equals
     throw new RuntimeException("a name is reused two times or we want to rewrite a read")
-    val repr = represent //2(toBeRepl)
+    val repr = represent(toBeRepl)
+
     val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.preTreeIfy(toBeReplaced, repr)
     /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
     val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.preTreeIfy((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
@@ -138,7 +139,7 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
   def deTm1fy(toBeRepl: Set[ASTBt[_]]): DagInstr = { //TODO faire un seul appel pour éviter de reconstuire le DAG plusieurs fois
     toBeRepl.map(_.setNameTm1());
     //  toBeRepl.map(_.forwardName()) //that's because we will remove tm1
-    val repr = represent //2(toBeRepl)
+    val repr = represent(toBeRepl.toList) //2(toBeRepl)
     val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.preTreeIfy(toBeRepl.asInstanceOf[Set[AST[_]]], repr)
     /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
     val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.preTreeIfy((e2: AST[_]) => (toBeRepl(e2.asInstanceOf[ASTBt[_]]) && (e2 != e)), repr)
@@ -205,13 +206,26 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
     res
   }
 
+  /** verifies that distinct trees get distinct names */
+  def checkDistinctName(bestName: HashMap[AST[_], String]) = {
+    if (bestName.values.toSet.size < bestName.keys.toSet.size) {
+      for ((x, y) <- bestName)
+        println(y + " is the name of " + x.toStringTree)
+      println("______________________________________________________________________________________________________________")
+      throw new Exception("there are distinct trees with identical names, " +
+        "probably due to over agressing search for meaningfull names," +
+        "complete the list of forbidden names in OkToUseForName in named.scala"
+      )
+    }
+  }
+
   /**
    * @return returns a unique  name for each AST, and subAst, for which a name exists.
    *         necessary because distinct AST can be equals  when compared as case class hierarchie
    *         tries to find real name instead of created name with "aux_"
    *         For this purpose, visite the expression of the instructions, for they can differ.
    */
-  private def represent: Map[AST[_], String] = {
+  private def represent(newExp: List[AST[_]]): Map[AST[_], String] = {
     /**
      * selects the best name between two options
      *
@@ -236,23 +250,24 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
      * @return new best name
      */
     def newName(x: AST[_]) = {
-      if (x.name.startsWith("shift"))
-        throw new Exception("shift is a reserved prefix, do not use it please")
-      if (x.name.startsWith("ll"))
-        throw new Exception("ll is a reserved prefix, do not use it please")
+      if (x.name.startsWith("shift")) throw new Exception("shift is a reserved prefix, do not use it please")
+      if (x.name.startsWith("ll")) throw new Exception("ll is a reserved prefix, do not use it please")
       if (!bestName.contains(x))
         x.name
       else bestof2Name(bestName(x), x.name)
     }
 
-    for (instr <- visitedL)
-      for (x <- instr.exps)
-        if (x.name != null)
-          bestName += (x -> newName(x)) //on récupére des noms!!
-    for (x <- dagAst.visitedL)
+    for (x <- newExp)
       if (x.name != null)
         bestName += (x -> newName(x))
-
+    /* for (instr <- visitedL)
+       for (x <- instr.exps)
+         if (x.name != null)
+           bestName += (x -> newName(x)) //on récupére des noms!!
+     for (x <- dagAst.visitedL)
+       if (x.name != null)
+         bestName += (x -> newName(x))*/
+    checkDistinctName(bestName)
     bestName
   }
 

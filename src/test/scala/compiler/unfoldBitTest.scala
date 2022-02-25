@@ -1,10 +1,10 @@
 package compiler
 
-import compiler.AST.Call2
-import compiler.ASTB._
-import compiler.ASTBfun._
-import compiler.Circuit.{TabSymb, iTabSymb}
-import compiler.VarKind.MacroField
+import AST.Call2
+import ASTB._
+import ASTBfun._
+import Circuit.{TabSymb, iTabSymb}
+import VarKind.MacroField
 import dataStruc.{Dag, DagInstr}
 import org.scalatest.FunSuite
 
@@ -23,7 +23,8 @@ class unfoldBitTest extends FunSuite {
   /////////////////////////////////////////////////////////////////////////
   val env2 = HashMap.empty[String, List[ASTBt[B]]]
   val infoo = new InfoNbit(SI(), MacroField(), 3)
-  val tsymb: TabSymb[InfoNbit[_]] = mutable.HashMap("toto" -> infoo, "tata" -> infoo)
+  val infoo2 = new InfoNbit(SI(), MacroField(), 2)
+  val tsymb: TabSymb[InfoNbit[_]] = mutable.HashMap("toto" -> infoo, "tata" -> infoo, "sign" -> infoo2, "tutu" -> infoo2)
   val m2 = Intof[SI](-2);
   val zero = Extend(3, Intof[SI](0))
   /* test("IntOf") {
@@ -38,6 +39,7 @@ class unfoldBitTest extends FunSuite {
     assert(toto.unfoldBit(env2, tsymb).map(_.asInstanceOf[Read[_]].which) == List("toto0", "toto1", "toto2"))
   }*/
   val tata = new Read[SI]("tata") with ASTBt[SI]
+  val sign2 = new Read[SI]("sign") with ASTBt[SI]
   val totoa = tata | toto
   /*test("pure symbol") {
     assert((totoa.unfoldBit(env2, tsymb)).map(_.toStringTree).toString ==
@@ -74,11 +76,14 @@ class unfoldBitTest extends FunSuite {
   val negnegm2e = (~negm2e) ()(new repr(SI()))
   val totogt = toto < tata
 
+  val signtotom2 = new Call1(sign, totom2) with ASTBt[SI]
+  val testMinSign = new Call2(minSI, signtotom2, sign2) with ASTBt[SI]
   test("codeGen") {
     val cod = new CodeGen(tsymb)
-    // autre test effectués -toto totop1 (tata+toto) (tata-toto) (tata<=toto) (twoWays) -toto abs m2e signm2e lemin signMin totom2 totogt
-    val res = cod.codeGen(new Affect("tutu", signtata).asInstanceOf[Affect[ASTBg]])
+    // autre test effectués -toto totop1 (tata+toto) (tata-toto) (tata<=toto) (twoWays) -toto abs m2e signm2e lemin signMin totom2 totogt signtata
+    val res = cod.codeGen(new Affect("tutu", totogt).asInstanceOf[Affect[ASTBg]])
     val res2 = res.map(_.map(_.toStringTree).mkString("|_____|"))
+    println(cod.loops)
     println("________________\n" + res2.mkString("\n"))
     print(cod.constant)
   }
