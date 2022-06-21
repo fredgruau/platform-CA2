@@ -6,7 +6,7 @@ import AST.{Call, Fundef, Layer2, Read, isCons, isNotRead}
 import Circuit.{AstField, AstPred, Machine, TabSymb, iTabSymb, iTabSymb2, listOf, newFunName}
 import VarKind.{LayerField, MacroField, ParamD, ParamDR, ParamR, StoredField}
 import dataStruc.{Align, Dag, DagInstr, toSet}
-import dataStruc.DagInstr.{defby, setInputNeighbor}
+import dataStruc.Dag.{defby3, setInputNeighbor3}
 import Instr.{a, affectizeReturn}
 import ASTB.Tminus1
 import ASTBfun.{ASTBg, Fundef2R, redop}
@@ -397,7 +397,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         newtSymbVar += n -> new InfoNbit(old.t, if (!needStored(n)) MacroField() else if (fparamDwithoutR.contains(n)) ParamDR() else ParamR(), old.nb)
       }
 
-      setInputNeighbor(pureAffect.toList.asInstanceOf[List[Instr]]) // when using a data parameter in paramD,
+      setInputNeighbor3(pureAffect.toList.asInstanceOf[List[Instr]]) // when using a data parameter in paramD,
       // we should not include the instructions which were computing those parameter
       val newDagis = new DagInstr(fparamR) //instructions computing results are the roots.
       val newDataProg = new DataProg(newDagis, mutable.HashMap.empty, newtSymbVar, fparamDwithoutR, fparamRname).treeIfyParam()
@@ -571,11 +571,11 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       return new DataProg(DagInstr(muI.reverse), funs2, tSymbScalar, paramD.flatMap(deploy(_)), paramR.flatMap(deploy(_)))
     }
     val dagis1bis = addParamRtoDagis(dagis) //add a new paramR after redop which is done in a  macroField todo avoid recomputing the whole dag
-    val (dagis2: DagInstr, z) = zones(dagis1bis) //the computation of zones introduces shifted variables
+    val (dagis2: DagInstr, z: Dag[Zone]) = zones(dagis1bis) //the computation of zones introduces shifted variables
     // therefore it must be done before muInstructions
     val muI = muInstr(m, dagis2) //TODO inspect muI's tm1 to refine constraints so as to fold vortex
     z.visitedL.reverse.map(_.pick()) //pick is done starting from the first instruction
-    val tZone: Map[String, Zone] = DagInstr.defby(z.visitedL)
+    val tZone: Map[String, Zone] = defby3(z.visitedL)
     // print(tZone)
     val defI: Map[String, Instr] = dagis2.defby
     val (muI2, tSymbScalar, coalesc) = permuteAndFixScheduledMu(muI, dagis2, tZone, defI) // revisit muI 's'reduce when reduced exression is folded
@@ -993,7 +993,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       val uO: List[Instr] = p.dagis.usedOnce()
       val uOnames1: Predef.Set[String] = uO.map(_.names(0)).toSet
       val uOnames = checkIfRedefined(uOnames1)
-      var defs: Map[String, Instr] = defby(dagis.visitedL)
+      var defs: Map[String, Instr] = defby3(dagis.visitedL)
       val newVisitedL = dagis.visitedL.reverse.map((f: Instr) =>
         if (f.inputNeighbors.map(_.names(0)).toSet.intersect(uOnames).nonEmpty) //f contains some read to be replaced
         {
@@ -1004,7 +1004,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         else f
       )
       dagis.visitedL = newVisitedL.reverse.filter((i: Instr) => !uOnames.contains(i.names(0))) //removes the now useless instructions
-      DagInstr.setInputAndOutputNeighbor(dagis.visitedL)
+      Dag.setInputAndOutputNeighbor3(dagis.visitedL)
       val nameStillUsed = p.dagis.visitedL.flatMap(_.names).toSet.diff(uOnames)
       val coalescedStillUsed = nameStillUsed.map((str: String) => coales.getOrElse(str, str))
       for (str <- newTsymbar.keys) //we remove from the table the now useless symbols

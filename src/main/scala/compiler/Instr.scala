@@ -7,7 +7,7 @@ import InfoType._
 import Instr._
 import Locus.{deploy, _}
 import VarKind._
-import dataStruc.{Align, Dag, DagInstr, DagNode, SetInput, SetOutput}
+import dataStruc.{Align, Dag, DagInstr, DagNode, SetOutput}
 import Circuit._
 import dataStruc.Align.{compose, invert}
 

@@ -16,48 +16,8 @@ object DagInstr {
 
   implicit def DagInstrtoDagInstr(d: Dag[Instr]): DagInstr = new DagInstr(d.allGenerators)
 
-  /**
-   *
-   * @param instrs data to organize into a dag, using strings.
-   *               it needs not be instructions
-   *               only names and usedVar need to be defined
-   * @tparam T
-   * Compute inputNeighbor which defines a  Dag of instructions,
-   * an input neighbor is an affectation which set a used variable
-   * exept for an instruction of the form shifttoto=toto
-   * which will be input neighbor to the instructionn defining toto
-   * toto will be included in shsissfttoto's used var
-   * it will be apperently scheduled later but in fact not because
-   * ending up having a higher priority, let it be scheduled earlier
-   * due to the specifics of our scheduling algorithm
-   * * */
 
-  def setInputNeighbor[T <: SetInput[T]](instrs: List[T]) = {
-    /** map each variable to the instructions which define that variable */
-    val defs = defby(instrs) //= immutable.HashMap.empty ++ instrs.flatMap(a => a.names.map(_ -> a)) //FIXME ne pas mettre les updates
-    /** variable which are shifted **/
 
-    for (instr <- instrs) {
-      var usedVars = instr.usedVars()
-      // if (instr.isShift && considerShiftt) usedVars = usedVars + instr.names(0).drop(5) //rajoute Toto dans usedVar shiftToTO
-
-      instr.inputNeighbors = List.empty[T] ++ usedVars.filter(defs.contains(_)).map(defs(_))
-    }
-  }
-
-  def defby[T <: SetInput[T]](instrs: List[T]) = immutable.HashMap.empty ++ instrs.flatMap(a => a.names.map(_ -> a))
-
-  def setOutputNeighbors[T <: SetOutput[T]](instrs: List[T]) = {
-    for (a <- instrs)
-      for (b <- a.inputNeighbors)
-        b.outputNeighbors = a :: b.outputNeighbors;
-  }
-
-  /** Compute  input neighbor of instruction $i$ as affectation which set a  variables used by $i$ */
-  def setInputAndOutputNeighbor[T <: SetOutput[T]](instrs: List[T]) = {
-    setInputNeighbor(instrs)
-    setOutputNeighbors(instrs)
-  }
 }
 
 /**
@@ -72,7 +32,7 @@ object DagInstr {
  **/
 class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
   extends Dag[Instr](generators) //reconstruct the whole Dag
-    with DagSetInput[Instr] {
+    with DagOutputUnion[Instr] {
 
   def imposeSchedule(scheduled: List[Instr]) = {
     visitedL = scheduled.reverse
@@ -80,7 +40,8 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
 
   override def toString: String = visitedL.reverse.mkString("")
 
-  def defby = DagInstr.defby(visitedL)
+  //def defby = DagInstr.defby(visitedL)
+  def defby = Dag.defby3(visitedL)
 
   /**
    * newly generated affect instructions. to be accessed later to complete the symbolTable, as nonGenerators

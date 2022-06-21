@@ -3,7 +3,7 @@ package compiler
 import Circuit.TabSymb
 import Constraint.{Partition, empty, noneIsEmpty, propagate}
 import Instr.a
-import dataStruc.{DagNode, SetInput, toSet, SetOutput}
+import dataStruc.{DagNode, toSet, SetOutput}
 import scala.collection.Iterable
 import scala.collection.immutable.{HashMap, HashSet}
 
@@ -26,7 +26,7 @@ class Zone(val root: Affect[_],
 
            /** list names of input adjacent zones with no partition constraints   */
            var nonPartitionnedIn: HashSet[String])
-  extends DagNode[Zone] with SetInput[Zone] with SetOutput[Zone] {
+  extends DagNode[Zone] with SetOutput[Zone] {
 
   def checkInvariant = {
     if (partitionnedIn.keys.size + nonPartitionnedIn.size != inputNeighbors.size)

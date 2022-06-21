@@ -39,7 +39,7 @@ trait Union[T<:Union[T]] {   self:T =>
 }
 
 
-/** adds the possiblity  to compute an alignement to the root, while computing the root*/
+/** adds the possiblity  to compute an alignement to the root, while computing the root of a union */
 trait Align[T<:Align[T]] extends Union[T] {
   self: T =>
   /** implements alignement with respect to neighbor */
