@@ -86,7 +86,7 @@ final case class F() extends S {
 abstract class TT extends Locus{
   def arity2:Int
   def les6sufx: Array[String]
-  def lessufx=les6sufx
+  def lessufx: Array[String] = les6sufx
 }
 
 /** T stands for Transfer, and uses two simplicial locus. The first is the simplicial. T[V,E] corresponds to  eV  */

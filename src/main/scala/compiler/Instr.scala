@@ -7,7 +7,7 @@ import InfoType._
 import Instr._
 import Locus.{deploy, _}
 import VarKind._
-import dataStruc.{Align, Dag, DagInstr, DagNode, SetOutput}
+import dataStruc.{Align, Dag, DagInstr, DagNode, WiredInOut}
 import Circuit._
 import dataStruc.Align.{compose, invert}
 
@@ -16,7 +16,7 @@ import scala.collection._
 import scala.collection.immutable.{HashMap, HashSet}
 
 /** Instruction used within the compiler, call, affect. Dag and Union allows to defined ConnectedComp  */
-abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Instr] {
+abstract class Instr extends DagNode[Instr] with Align[Instr] with WiredInOut[Instr] {
 
   protected def show(x: Option[Locus]) = x match {
     case Some(s) => "" + s
@@ -106,9 +106,9 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
     if (alignPerm.isEmpty)
       null
     else if (alignPerm.contains(n.names.head)) //n is a used var of this, so "this" is an element of n.neighbor,
-      alignPerm(n.names.head) //neighborAligned(n.names(0))  is an alignement from "this" to n,
+    alignPerm(n.names.head) //neighborAligned(n.names(0))  is an alignement from "this" to n,
     else if (n.alignPerm.contains(names.head)) //ca doit etre le contraire, i.e. this is a used var of n. we find an alignement from n to "this", we must invert
-      Align.invert(n.alignPerm(names.head))
+    Align.invert(n.alignPerm(names.head))
     else throw new RuntimeException(" Not find alignement ")
   }
 
@@ -147,7 +147,7 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
           for (r <- res ::: c.args.toList.map(_.name))
             if (t(r).k == MacroField()) t += r -> new InfoType(t(r).t, StoredField()); // register the fact that results must be stored.
 
-          List(CallProc(c.f.namef, res, c.args.toList))
+          List(CallProc(c.f.name, res, c.args.toList))
         case Taail(_) | Heead(_) => List() //we do not need those any more.
         case _ => List(this)
       }
@@ -172,20 +172,20 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with SetOutput[Ins
     case CallProc(f, names, exps) =>
       val newexps = exps.map(_.asInstanceOf[ASTLt[_, _]].bitIfy(cur, nbitLB, tSymb))
       val nbitarg = newexps.map(a => nbitLB(a)) //.toList.flatten
-      val newnamef = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _)
+      val newname = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _)
 
       //  if (f.size>2 && sysInstr.contains(f.substring(0,3)))
       if (isSysInstr(f))
       //there is not code to be generated for system calls
-        CallProc(f, names, newexps).asInstanceOf[Instr]
+      CallProc(f, names, newexps).asInstanceOf[Instr]
       else {
-        if (!newFuns.contains(newnamef))
-          newFuns += (newnamef -> cur.funs(f).bitIfy(nbitarg))
+        if (!newFuns.contains(newname))
+          newFuns += (newname -> cur.funs(f).bitIfy(nbitarg))
         // re-creates the code of f, taking into account nbitarg.
-        val fprog = newFuns(newnamef)
+        val fprog = newFuns(newname)
         val nbitResult = fprog.paramR.map(s => fprog.tSymbVar(s).nb) //we get the number of bits of results
         (names zip nbitResult).foreach { sn => tSymb += sn._1 -> new InfoNbit(cur.tSymbVar(sn._1).t, cur.tSymbVar(sn._1).k, sn._2) }
-        CallProc(newnamef, names, newexps).asInstanceOf[Instr]
+        CallProc(newname, names, newexps).asInstanceOf[Instr]
       }
   }
 
@@ -235,7 +235,6 @@ case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) exte
   // override def namesDefined: List[String] = if() List()
   /**
    * for bug and show we will add the name of the motherLayer to the name of the call
-   *
    * @param motherLayer : Layer to which the bug or the show is attached
    */
   def preciseName(motherLayer: String) = p += motherLayer
@@ -527,7 +526,7 @@ object Instr {
     }
     //recursive call because a function can returns several results grouped  together using Coons()
     e match {
-      case Coons(e1, e2) => process(e1) ::: affectizeReturn(tsymb, paramD, e2)
+      case Cons(e1, e2) => process(e1) ::: affectizeReturn(tsymb, paramD, e2)
       case _ => process(e)
     }
   }

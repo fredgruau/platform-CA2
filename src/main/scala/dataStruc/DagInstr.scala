@@ -1,8 +1,8 @@
 package dataStruc
 
-import compiler.Circuit.{AstPred, TabSymb, iTabSymb}
+import compiler.Circuit.{TabSymb, iTabSymb}
 import compiler.{AST, ASTBt, Affect, CallProc, CodeGen, InfoNbit, InfoType, Instr}
-import compiler.AST.{Call1, Read, isNotRead, rewriteAST2}
+import compiler.AST.{AstPred, Call1, Read, isNotRead, rewriteAST2}
 
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.collection.{Iterable, immutable, mutable}
@@ -32,7 +32,7 @@ object DagInstr {
  **/
 class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
   extends Dag[Instr](generators) //reconstruct the whole Dag
-    with DagOutputUnion[Instr] {
+    with DagWired[Instr] {
 
   def imposeSchedule(scheduled: List[Instr]) = {
     visitedL = scheduled.reverse
@@ -41,7 +41,7 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
   override def toString: String = visitedL.reverse.mkString("")
 
   //def defby = DagInstr.defby(visitedL)
-  def defby = Dag.defby3(visitedL)
+  def defby = WiredInOut.defby(visitedL)
 
   /**
    * newly generated affect instructions. to be accessed later to complete the symbolTable, as nonGenerators
@@ -72,9 +72,9 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
     throw new RuntimeException("a name is reused two times or we want to rewrite a read")
     val repr = represent(toBeRepl)
 
-    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.preTreeIfy(toBeReplaced, repr)
+    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.treeIfy(toBeReplaced, repr)
     /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
-    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.preTreeIfy((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
+    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.treeIfy((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
     /** rewrite recursviely the affect expression so   as to insert read in them if necessary. we use this slightly modified dedagExclude instead of dedagRewrite
      * to not generatre x=x  */
     val affectExpList: List[AST[_]] = toBeRepl.map(deDagExclude)
@@ -101,9 +101,9 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
     toBeRepl.map(_.setNameTm1());
     //  toBeRepl.map(_.forwardName()) //that's because we will remove tm1
     val repr = represent(toBeRepl.toList) //2(toBeRepl)
-    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.preTreeIfy(toBeRepl.asInstanceOf[Set[AST[_]]], repr)
+    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.treeIfy(toBeRepl.asInstanceOf[Set[AST[_]]], repr)
     /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
-    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.preTreeIfy((e2: AST[_]) => (toBeRepl(e2.asInstanceOf[ASTBt[_]]) && (e2 != e)), repr)
+    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.treeIfy((e2: AST[_]) => (toBeRepl(e2.asInstanceOf[ASTBt[_]]) && (e2 != e)), repr)
     /** rewrite recursively the affect expression. we use this slightly modified dedagExclude instead of dedagRewrite
      * to not generatre x=x  */
     val affectExpList: List[AST[_]] = toBeRepl.map(deDagExclude).toList
@@ -120,11 +120,8 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
    * @return set of AST which are used twice within those instruction to be replaced by an affectation
    *         we must also add up usage from callProc instruction
    */
-  def inputTwice: collection.Set[AST[_]] = {
-    val l: collection.Set[AST[_]] = dagAst.inputTwice(visitedL.flatMap(_.exps))
-    //  print(l)
-    l
-  }
+  def inputTwice: collection.Set[AST[_]] = dagAst.inputTwice(visitedL.flatMap(_.exps))
+
 
   /** returns instructions defining a variable used once */
   def usedOnce(): List[Instr] = {

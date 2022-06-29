@@ -1,10 +1,10 @@
 package compiler
 
-import AST.{Call1, Call2, Call3, Delayed, Fundef1, Fundef2, Fundef3, Layer2, Param, Read}
+import AST.{Call1, Call2, Call3, Delayed, Fundef1, Fundef2, Fundef3, Layer, Param, Read, AstPred}
 import ASTB.{And, Dir, Extend, False, Intof, Mapp2, Or, ParOp, Scan1, Scan2, Tminus1, True, Xor, nbitCte, rewriteASTBt}
 import ASTBfun.{ASTBg, Fundef2R}
 import ASTL.rewriteASTLt
-import Circuit.{AstPred, TabSymb, iTabSymb, iTabSymb2}
+import Circuit.{TabSymb, iTabSymb, iTabSymb2}
 
 import scala.collection.{Map, immutable, mutable}
 import scala.collection.immutable.{HashMap, HashSet}
@@ -174,7 +174,7 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
       case a: ASTB[R] => a.propagateASTB(rewrite)
       case _ => this.asInstanceOf[AST[_]] match {
         case Param(_) => new Read[R]("p" + repr(this))(mym) with ASTBt[R]
-        case l: Layer2[_] => new Read[R](DataProg.lify(repr(this)))(mym) with ASTBt[R]
+        case l: Layer[_] => new Read[R](AST.lify(repr(this)))(mym) with ASTBt[R]
         case Read(_) => this //throw new RuntimeException("Deja dedagifié!")
         case Delayed(arg) => //arg.asInstanceOf[ASTLt[L, R]].propagate(rewrite)
           arg().asInstanceOf[ASTBt[R]].treeIfy(usedTwice, repr) //the useless delayed node is supressed
@@ -182,8 +182,6 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
         case Call2(f, a, a2) => new Call2(f.asInstanceOf[Fundef2[Any, Any, R]],
           a.asInstanceOf[ASTBg].treeIfy(usedTwice, repr),
           a2.asInstanceOf[ASTBg].treeIfy(usedTwice, repr))(mym) with ASTBt[R]
-
-
       }
     }
     newD.setName(if (repr.contains(this)) repr(this) else this.name);

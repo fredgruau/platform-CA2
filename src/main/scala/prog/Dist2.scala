@@ -2,13 +2,13 @@ package prog
 
 //import compiler.ASTB._
 
-import compiler.AST.Layer2
+import compiler.AST.Layer
 import compiler.ASTL._
 import compiler.Circuit.hexagon
 import compiler._
 import macros.ASTLfun._
 
-class Dist2(val source: BoolV) extends Layer2[(V, SI)](3) with ASTLt[V, SI] {
+class Dist2(val source: BoolV) extends Layer[(V, SI)](3) with ASTLt[V, SI] {
   val level: BoolV = elem(2, this);
   //render2(level)
   /*
@@ -30,14 +30,14 @@ class Dist2(val source: BoolV) extends Layer2[(V, SI)](3) with ASTLt[V, SI] {
   // val test= vortex |   andR(transfer(temp5)) ;  slope.bugif(test)
   // ceci provoque bien l'erreur attendue java.lang.RuntimeException: Debug exp is allzero=>not usable for compute
   //ca montre que debug ne peut etre réutilisé.
-  bugif2(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
+  bugif(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
   val next: ASTLt[V, SI] = this + cond(source, sign(-this), delta) //faudrait en faire une marco qui prends delta, source et dist et renvoie distNext
   // val temp: BoolfV = xorR2(transfer(slope)) ;  val vortex: BoolF = orR(transfer(temp));   bugif(vortex);
-  render2(tslope)
+  show(tslope)
 }
 
 /** returns a constant layer. */
-class ConstLayer2[L <: Locus, R <: Ring](nbit: Int)(implicit m: repr[L], n: repr[R]) extends Layer2[(L, R)](nbit) with ASTLt[L, R] {
+class ConstLayer2[L <: Locus, R <: Ring](nbit: Int)(implicit m: repr[L], n: repr[R]) extends Layer[(L, R)](nbit) with ASTLt[L, R] {
   val next: ASTLt[L, R] = delayedL(~this) //yes
 }
 
@@ -50,7 +50,7 @@ class TestDist2 extends Circuit[V, SI](Dist2.myInput) {
 
 //[SI](-2,3)
 /** Builds a cycle in the DAG */
-class CycleLayer2(nbit: Int)(implicit m: repr[V]) extends Layer2[(V, SI)](nbit) with ASTLt[V, SI] {
+class CycleLayer2(nbit: Int)(implicit m: repr[V]) extends Layer[(V, SI)](nbit) with ASTLt[V, SI] {
   lazy val x: IntV = next + pred.asInstanceOf[ASTLt[V, SI]]
   val next: ASTLt[V, SI] = delayedL(x)
 }

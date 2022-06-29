@@ -21,7 +21,7 @@ import scala.collection.immutable.HashMap
  * both 1D and 2D compilation can be linked, as far as offset computation goes.
  * In turns, the 1D CA takes input output fields produced by the host, on a single cell (or on four corners)
  */
-abstract class Circuit[L <: Locus, R <: Ring](override val p: Param[_]*) extends AST.Fundef[(L, R)]("main", null, p: _*) {
+abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(L, R)]("main", null, p: _*) {
   /** to be defined in the circuit for collecting all the nodes participating in usefull computation,   "abstract def" because known latter */
   def computeRoot: ASTLt[L, R]
 
@@ -40,6 +40,7 @@ abstract class Circuit[L <: Locus, R <: Ring](override val p: Param[_]*) extends
     val prog1: DataProg[InfoType[_]] = DataProg(this);
     // print(prog1)
     val prog2 = prog1.treeIfy();
+    //
     // print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
     val prog3 = prog2.procedurIfy();
     //print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
@@ -62,7 +63,7 @@ abstract class Circuit[L <: Locus, R <: Ring](override val p: Param[_]*) extends
     //print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
     val prog8 = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
-    print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
+    // print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
     val prog9 = prog8.unfoldInt(); //this will again generates new intermediate affect
     //print("unfold777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
@@ -95,7 +96,6 @@ object Circuit {
 
   def newFunName2(): String = "_aux" + getCompteur
 
-  type AstPred = AST[_] => Boolean
   type TabSymb[T] = mutable.HashMap[String, T]
   type AstField[T] = mutable.HashMap[AST[_], T]
   type TabConstr = TabSymb[Constraint]

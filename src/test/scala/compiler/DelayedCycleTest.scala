@@ -1,6 +1,6 @@
 package compiler
 
-import AST.Layer2
+import AST.Layer
 import ASTL.{IntV, delayedL}
 import Circuit.hexagon
 import macros.ASTLfun.p
@@ -16,7 +16,7 @@ class DelayedCycleTest extends FunSuite {
 
 //[SI](-2,3)
 /** Builds a cycle in the DAG */
-class CycleLayer2(nbit: Int)(implicit m: repr[V]) extends Layer2[(V, SI)](nbit) with ASTLt[V, SI] {
+class CycleLayer2(nbit: Int)(implicit m: repr[V]) extends Layer[(V, SI)](nbit) with ASTLt[V, SI] {
   //The DFS algo of DAG visite all Delayed node recursively as soon as they are created, because
   //the delayed expression is an input of the Delayed node
   lazy val x: IntV = next + pred.asInstanceOf[ASTLt[V, SI]]

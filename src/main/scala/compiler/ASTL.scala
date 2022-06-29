@@ -1,6 +1,5 @@
 package compiler
 
-import com.sun.xml.internal.bind.v2.runtime.reflect.opt.Const
 import AST._
 import ASTB._
 import ASTBfun._
@@ -10,7 +9,7 @@ import Constraint._
 import Circuit.{iTabSymb2, _}
 import repr._
 import dataStruc.Dag
-
+import dataStruc.DagNode._
 import scala.collection.{mutable, _}
 import scala.reflect.ClassTag
 
@@ -288,12 +287,12 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
   override def toString: String =
     this.asInstanceOf[ASTL[_, _]] match {
       //  case Layer(s, _)                 => "Layer " + this.name + ":" + locus.toString.charAt(0) + "-" + ring.toString.charAt(0)
-      case Binop(op, _, _, _, _) => op.namef
+      case Binop(op, _, _, _, _) => op.name
       case Coonst(cte, _, _) => "Const" + cte.toString + locus.toString.charAt(0) + "_" + ring.toString.substring(0, ring.toString.length() - 2);
 
       //  case Multop(op, args,_,_)      => op.toString
-      case Unop(op, _, _, _) => op.namef
-      case Redop(op, _, _, _) => "red" + op._1.namef
+      case Unop(op, _, _, _) => op.name
+      case Redop(op, _, _, _) => "red" + op._1.name
       case Clock(_, dir) => if (dir) "clock" else "anticlock"
       case e@Broadcast(_, _, _) => "Broadcast" + ("" + (e.locus.asInstanceOf[T[_, _]] match {
         case T(_, y) => y

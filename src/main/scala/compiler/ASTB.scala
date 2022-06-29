@@ -1,15 +1,15 @@
 package compiler
 
-import AST.{Doubleton, _}
+import dataStruc.DagNode._
 import ASTB.{ParOp, _}
 import ASTBfun._
 import ASTL.rewriteASTLt
-import Circuit.{AstPred, TabSymb, iTabSymb2}
+import Circuit.{TabSymb, iTabSymb2}
 
 import scala.collection._
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.language.implicitConversions
-
+import AST._
 
 /**
  * node of Abstract Syntax Tree corresponding to an arithmetic field  boolean, integer (signed or unsigned)
@@ -49,7 +49,7 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
         var newEnv = env + (op.p1.nameP -> x(0).asInstanceOf[ASTBt[B]].codeGen(i, gen, null, env))
         //we must add the second argument if it is present, as xb.
         if (x.size > 1)
-          newEnv = newEnv + (op.namef -> x(1).asInstanceOf[ASTBt[B]].codeGen(i, gen, null, env))
+          newEnv = newEnv + (op.name -> x(1).asInstanceOf[ASTBt[B]].codeGen(i, gen, null, env))
         op.arg.asInstanceOf[ASTBt[B]].codeGen(i, gen, null, newEnv)
       case Mapp2(x, y, op) => //il se peut quon rajute un affect et augmente la tsymb
         val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBt[B]].codeGen(i, gen, null, env)) +
@@ -153,11 +153,11 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
       case Or(x, y) => "|"
       case And(x, y) => "&"
       case Neg(x) => "!"
-      case Mapp1(op, x) => "Mapp1" + op.namef //+ mym.name
-      case Mapp2(x, y, op) => "Mapp2" + op.namef //+ mym.name
-      case Scan1(x, op, _, dir, _) => "Scan1" + op.namef + dir //+ mym.name
-      case Scan2(x, y, op, _, dir, _) => "Scan2" + op.namef + dir //+ mym.name
-      case Reduce(x, op, _) => "Red" + op.namef
+      case Mapp1(op, x) => "Mapp1" + op.name //+ mym.name
+      case Mapp2(x, y, op) => "Mapp2" + op.name //+ mym.name
+      case Scan1(x, op, _, dir, _) => "Scan1" + op.name + dir //+ mym.name
+      case Scan2(x, y, op, _, dir, _) => "Scan2" + op.name + dir //+ mym.name
+      case Reduce(x, op, _) => "Red" + op.name
       case Shift(x, right) => (if (right) ">>" else "<<")
       case Tminus1(x) => "tm1"
     }
@@ -239,7 +239,7 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
 
   override def isNotTm1Read =
     this match {
-      case Tminus1(x) => isNotRead(x)
+      case Tminus1(x) => AST.isNotRead(x)
       case _ => true
     }
 

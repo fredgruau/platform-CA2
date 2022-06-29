@@ -24,15 +24,18 @@ class  DagTest  extends FunSuite  with BeforeAndAfter{
   val n1 = new Node("n1");
   val n2 = new Node("n2");
   val n3 = new Node(List(n1, n2), "n3")
-  test("GetGreater") {
-    val (_, s) = DagNode.getGreater(List(n3)); assert(s === Set(n1, n2, n3))
+  test("addGreaterOfGenerators") {
+    //val (_, s) = DagNode.getGreater(List(n3)); assert(s === Set(n1, n2, n3))
+    val d = Dag[Node]()
+    val inputn3 = d.addGreaterOf(List(n3))
+    assert(inputn3.toSet === Set(n1, n2, n3))
   }
   val n4 = new Node("n4", n5) //list n5 sera évalué plus tard
   val n4bis: Node = new Node("n4bis", n4);
   lazy val n5 = new Node(List(n1, n4bis), "n5")
   val n6 = new Node("n6", n4bis)
   test("GetcycleDagSimple") {
-    assert(Dag.getCycle2(n4) match { case Some(c) => println("there is a cycle: " + c); true; case None => false })
+    assert(n4.getCycle match { case Some(c) => println("there is a cycle: " + c); true; case None => false })
   }
 
   val testCycle: Circuit[V, SI] = new Circuit[V, SI]() {

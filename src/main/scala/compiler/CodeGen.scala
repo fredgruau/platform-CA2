@@ -14,7 +14,7 @@ import scala.collection.mutable.ArrayBuffer
  *
  * @param tSymbVar needed to know the bit size and wether a variable is "arithmetic" or not
  * @param coalesc  if string is not found in tSymbvar, try to find coalesc(String)
- *                 todo do not use this class to compute the number of bit in nbitR
+ *                 todo:  do not use this class to compute the number of bit in nbitR
  **/
 class CodeGen(val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String] = HashMap.empty) {
   def addSufx(x: String, i: Int) = {
@@ -166,7 +166,7 @@ class CodeGen(val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String] 
     //println("\n"+decall.toStringTree)
     val af = Affect(inst.names(0), decall) //reconstruit l'affectation sans les calls
     val dagi = new DagInstr(List(af))
-    dagi.dagAst.addGenerators(List(decall)) //add all subtree of mapscan to dags
+    dagi.dagAst.addGreaterOf(List(decall)) //add all subtree of mapscan to dags
     val iT1: collection.Set[AST[_]] = dagi.inputTwice.filter(isNotRead)
     val iT = iT1.filter(ASTB.isNotMap1Read(iT1)) //we could filter out more stuff because it consumes register and registers are a precious ressource
     val redEltSet = dagi.dagAst.visitedL.filter(eltRed).toSet //affectify reduction because they will be executed as parallel loops

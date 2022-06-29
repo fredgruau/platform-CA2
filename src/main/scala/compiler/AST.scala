@@ -1,9 +1,8 @@
 package compiler
 
+import dataStruc.DagNode._
 import AST._
 import dataStruc.{DagNode, Named}
-import Circuit.{AstPred, TabSymb, _}
-
 import scala.collection._
 import scala.collection.immutable.HashSet
 
@@ -15,18 +14,19 @@ import scala.collection.immutable.HashSet
  * 2- the AST of arithmetic field(ASTB)
  *
  * @tparam T type of the expression
- * @param m parameter used to compute this type. */
+ * @param m implicit parameter used to compute this type. */
 abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named {
+  /**
+   *
+   * @return all the AST's leaves
+   */
   def leaves(): List[AST[_]] =
     if (inputNeighbors.isEmpty) List(this)
     else inputNeighbors.flatMap(_.leaves())
 
 
-  def forwardName() = inputNeighbors.head.name = name
-
-
-  val mym: repr[T] = m //if type of mym is set to repr[_] this allow covariance even if repr is not covariant
-  /** system instruction can be associated to any spatial field, so as to be latter retrievable from the compiling method. */
+  /** if type of mym is set to repr[_] this allow covariance even if repr is not covariant */
+  val mym: repr[T] = m
 
 
   /** Builds the set of symbols which are read
@@ -35,64 +35,65 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
     this match {
       case Read(s) => if (isLayer(s)) HashSet() else HashSet(s)
       case Param(s) => HashSet(s)
-      case l: Layer2[_] => HashSet() //HashSet(l.name)
+      case l: Layer[_] => HashSet() //HashSet(l.name)
       case _ => inputNeighbors.map(e => e.symbolsExcepLayers).foldLeft(HashSet.empty[String])((x, y) => x.union(y))
     }
 
+  /*
+    /**
+     * OBSOLETE  I keep it here because of the  interesting implementation
+     *
+     * @param t stores how many times a parameter is used.
+     * @return
+     */
 
+    def paramUsed(t: TabSymb[Int]): Unit =
+      this match {
+        case Param(s) => if (t.contains(s)) t.addOne(s -> (t(s) + 1)) else t.addOne(s -> 1)
+        case _ => inputNeighbors.map(_.paramUsed(t))
+      }
+  */
   /**
-   * OBSOLETE  I keep it here because of the  interesting implementation
    *
-   * @param t stores how many times a parameter is used.
-   * @return
+   * @return textual representation of tree
    */
-  def paramUsed(t: TabSymb[Int]): Unit =
-    this match {
-      case Param(s) => if (t.contains(s)) t.addOne(s -> (t(s) + 1)) else t.addOne(s -> 1)
-      case _ => inputNeighbors.map(_.paramUsed(t))
-    }
-
   override def toString: String =
-
     this.asInstanceOf[AST[_]] match {
       case Read(s) => s //+ mym.name
       case Param(s) => "Param " + s
       // case f: Fundef[_]      => "Fundef " + f.namef + " of param " + f.p.map(p => p.nameP).foldLeft("")(_ + ", " + _)
       case c: Call[_] =>
-        "Call " + c.f.namef + " " //  + mym.name
+        "Call " + c.f.name + " " //  + mym.name
       case Heead(_) => "head"
       case Taail(_) => "tail"
-      case Coons(_, _) => "cons"
+      case Cons(_, _) => "cons"
       case Delayed(arg) => "Delayed"
-      case l: Layer2[_] => "Layer2 " + this.name + ":" + mym.name
+      case l: Layer[_] => "Layer2 " + this.name + ":" + mym.name
       case _ => throw new RuntimeException("merdouille")
-  }
+    }
 
   /**
    * Transform a Dag of AST into a forest of trees, removes the delayed.
-   * Treefy must be written for AST because At the start, we use Coons which are AST expression not being ASTLt[L,R]
-   * * Important to specify that the L,R type of AST nodes is preserved, for type checking consistency
-   * Surprisingly, when building ASTL explicitely, we need to drop the fact that the type is preserved, and go from ASTL[L,R] to ASTLg
-   * Transform a Dag of AST into a forest of trees, removes the delayed.
+   * Treefy must be written for AST because  Coons are AST but not ASTLt[L,R]
+   * T is preserved, for type checking consistency
    * *
    *
    * @param usedTwice dags which are used twice, or which need to be affected for some other reason.
-   * @param repr      : representant of the equivalence class with respect to equal on case class hierarchy
-   * @return the AST where expression used more than once are replaced by read.
+   * @param idRepr    :id of representant of the equivalence class with respect to equal on case class hierarchy
+   * @return transformed AST where expression used more than once are replaced by read.
    */
 
-  def treeIfy(usedTwice: AstPred, repr: Map[AST[_], String]): AST[T] = {
-    val rewrite = (d: AST[T]) => d.preTreeIfy(usedTwice, repr)
-    if (usedTwice(this)) new Read[T](repr(this))(mym.asInstanceOf[repr[T]])
+  def treeIfy(usedTwice: AstPred, idRepr: Map[AST[_], String]): AST[T] = {
+    val rewrite: AST[T] => AST[T] = (d: AST[T]) => d.treeIfy(usedTwice, idRepr)
+    if (usedTwice(this)) new Read[T](idRepr(this))(mym.asInstanceOf[repr[T]])
     else this.propagate(rewrite)
   }
 
-  def preTreeIfy(usedTwice: AstPred, repr: Map[AST[_], String]): AST[T] = treeIfy(usedTwice, repr)
 
   /**
    * @param id1 a bijection betwee AST
    * @return recreates the whole structure   to avoid   side-effect. because we build List, using Coons, Heead, Taail,
-   *         the  Call can be of type AST and not ASTLt, as heead, and taail.  therefore we'd need to propagate on them
+   *         the  Call can be of type AST and not ASTLt, as heead, and taail.  therefore we need propagate on AST
    */
   def propagate(id1: rewriteAST[_]): AST[T] = {
     val id = id1.asInstanceOf[rewriteAST[T]] //if I put this type  bij2[T] directly for the parameter id1, it breaks covariance.
@@ -104,91 +105,67 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
 
       case e@Heead(a) => e.copy(arg = id2(a))(e.mym) //{ e.substitute(a,id2(a));e }//{e.arg = id2(a);e} //
       case e@Taail(a) => e.copy(arg = id2(a))(e.mym)
-      case e@Coons(a, a2) => e.copy(arg = id2(a), arg2 = id2(a2))(e.mym)
-      case e@Call1(_, a) =>
-        val toto = e.copy(arg = id2(a))(e.mym)
-        toto
+      case e@Cons(a, a2) => e.copy(arg = id2(a), arg2 = id2(a2))(e.mym)
+      case e@Call1(_, a) => e.copy(arg = id2(a))(e.mym)
       case e@Call2(_, a, a2) => e.copy(arg = id2(a), arg2 = id2(a2))(e.mym)
       case e@Call3(_, a, a2, a3) => e.copy(arg = id2(a), arg2 = id2(a2), arg3 = id2(a3))(e.mym)
-    };
-    newD.setName(this.name);
+    }
+    newD.setName(this.name)
     newD.asInstanceOf[AST[T]]
   }
+
 
   def isNotTm1Read: Boolean = if (isInstanceOf[ASTBt[_]]) asInstanceOf[ASTBt[_]].isNotTm1Read else true
 
 }
 
 object AST {
-  def isLayer(str: String) = str.charAt(0) == 'l' && str.charAt(1) == 'l'
+  /** Predicate on ASTs */
+  type AstPred = AST[_] => Boolean
+  /** Predicate on ASTs true when not read */
   val isNotRead: AstPred = {
     case AST.Read(_) => false;
     case _ => true
   }
-
-
+  /** Predicate on ASTs true for Cons related constructor */
   val isCons: AstPred = {
     case Taail(_) | Heead(_) | Call1(_, _) | Call2(_, _, _) | Call3(_, _, _, _) => true;
     case _ => false
   }
 
-  trait EmptyBag[T <: DagNode[T]] extends DagNode[T] {
-    def inputNeighbors: List[T] = List.empty;
-  }
+  def lify(name: String): String = "ll" + name
 
-  trait Singleton[T <: DagNode[T]] extends DagNode[T] {
-    def arg: T;
-
-    def inputNeighbors: List[T] = List(arg)
-  }
-
-  trait Doubleton[T <: DagNode[T]] extends DagNode[T] {
-    def arg: T;
-
-    def arg2: T;
-
-    def inputNeighbors: List[T] = List(arg, arg2)
-  }
-
-  trait Tripleton[T <: DagNode[T]] extends DagNode[T] {
-    def arg: T;
-
-    def arg2: T;
-
-    def arg3: T;
-
-    def inputNeighbors: List[T] = List(arg, arg2, arg3)
-  }
-
-  trait Neton[T <: DagNode[T]] extends DagNode[T] {
-    def args: List[T];
-
-    def inputNeighbors: List[T] = args
-  }
-
+  def isLayer(str: String): Boolean = str.charAt(0) == 'l' && str.charAt(1) == 'l'
 
   type rewriteAST[U] = AST[U] => AST[U]
   type rewriteAST2 = AST[_] => AST[_]
 
   /** There is not ASTLt type for Coons.  */
-  case class Coons[Thead, Ttail](arg: AST[Thead], arg2: AST[Ttail])(implicit n: repr[(Thead, Ttail)]) extends AST[(Thead, Ttail)] with Doubleton[AST[_]] //{ def setArg(a: AST[_]) = arg = a.asInstanceOf[AST[Thead]]; def setArg2(a: AST[_]) = arg2 = a.asInstanceOf[AST[Ttail]] }
+  case class Cons[Thead, Ttail](arg: AST[Thead], arg2: AST[Ttail])(implicit n: repr[(Thead, Ttail)]) extends AST[(Thead, Ttail)] with Doubleton[AST[_]] //{ def setArg(a: AST[_]) = arg = a.asInstanceOf[AST[Thead]]; def setArg2(a: AST[_]) = arg2 = a.asInstanceOf[AST[Ttail]] }
   case class Heead[Thead](arg: AST[(Thead, _)])(implicit n: repr[Thead]) extends AST[Thead] with Singleton[AST[_]] //{ def setArg(a: AST[_]) = arg = a.asInstanceOf[AST[Tuple2[Thead, _]]]; }
   case class Taail[Ttail](arg: AST[(_, Ttail)])(implicit n: repr[Ttail]) extends AST[Ttail] with Singleton[AST[_]] //{ def setArg(a: AST[_]) = arg = a.asInstanceOf[AST[Tuple2[_, Ttail]]]; }
-  abstract class Fundef[+T](val namef: String, var body: AST[_], val p: Param[_]*) extends Named //no need to store the type of f's body at the level of fundef
-  case class Fundef0[+To1](override val namef: String, arg: AST[To1]) extends Fundef[To1](namef, arg)
 
-  case class Fundef1[+Ti1, +To1](override val namef: String, arg: AST[To1], p1: Param[Ti1]) extends Fundef[To1](namef, arg, p1)
+  abstract class Fundef[+T](namef: String, var body: AST[_], val p: Param[_]*) extends Named {
+    name = namef
+  } //no need to store the type of f's body at the level of fundef
+  case class Fundef0[+To1](s: String, arg: AST[To1]) extends Fundef[To1](s, arg)
 
-  case class Fundef2[+Ti1, +Ti2, +To1](override val namef: String, arg: AST[To1], p1: Param[Ti1], p2: Param[Ti2]) extends Fundef[To1](namef, arg, p1, p2)
+  case class Fundef1[+Ti1, +To1](s: String, arg: AST[To1], p1: Param[Ti1]) extends Fundef[To1](s, arg, p1)
 
-  case class Fundef3[+Ti1, +Ti2, +Ti3, +To1](override val namef: String, arg: AST[To1], p1: Param[Ti1],
-                                             p2: Param[Ti2], p3: Param[Ti3]) extends Fundef[To1](namef, arg, p1, p2, p3)
+  case class Fundef2[+Ti1, +Ti2, +To1](s: String, arg: AST[To1], p1: Param[Ti1], p2: Param[Ti2]) extends Fundef[To1](s, arg, p1, p2)
+
+  case class Fundef3[+Ti1, +Ti2, +Ti3, +To1](s: String, arg: AST[To1], p1: Param[Ti1],
+                                             p2: Param[Ti2], p3: Param[Ti3]) extends Fundef[To1](s, arg, p1, p2, p3)
+
   //on peut pas utiliser fundefn, car faudrait savoir a l'avance le nombre de paramétres, pour maj l'environnement.
-  case class Fundefn[Ti1, To1](override val namef: String, arg: AST[To1], pn: Param[Ti1]*)(implicit n: repr[To1])
-    extends Fundef[To1](namef, arg, pn: _*)
-  case class Param[+T](nameP: String)(implicit n: repr[T]) extends AST[T] with EmptyBag[AST[_]] { name = nameP; }
+  //case class Fundefn[Ti1, To1](override val namef: String, arg: AST[To1], pn: Param[Ti1]*)(implicit n: repr[To1])  extends Fundef[To1](namef, arg, pn: _*)
+  case class Param[+T](nameP: String)(implicit n: repr[T]) extends AST[T] with EmptyBag[AST[_]] {
+    name = nameP;
+  }
+
   /** Replace call1, call2, call3, after the nbit stage */
   abstract class Call[T](val f: Fundef[T], val args: AST[_]*)(implicit n: repr[T]) extends AST[T]
+
   //final case class Multop[L <: Locus, R1 <: Ring, R2 <: Ring](op: Seq[ASTB[R1]] => ASTB[R2], var args: Seq[ASTLtrait[L, R1]], m: repr[L], n: repr[R2])
   //   extends ASTL[L, R2]()(repr.nomLR(m,n)) with Neton[AST[_]] { def setArgs(a: Seq[AST[_]]) = args = a.asInstanceOf[Seq[ASTLtrait[L, R1]]] }
   case class Call1[Ti1, To1](override val f: Fundef1[Ti1, To1], arg: AST[_ <: Ti1])(implicit n: repr[To1])
@@ -203,17 +180,22 @@ object AST {
   case class Read[T](which: String)(implicit m: repr[T]) extends AST[T]() with EmptyBag[AST[_]]
 
   /**
-   * The DFS algo of DAG visite recursively all Delayed node of an  AST  as soon as they are created, because
-   * the delayed expression is an input of the Delayed node.
+   * The Depth First Search  algo gathering DagNodes visits recursively all Delayed node of an  AST  as soon as they are created, because
+   * the delayed expression is an inputNeighbor of the Delayed node.
+   * Thereafter, treeIfy will remove them.
    *
    * @param _arg delayed expression   */
   case class Delayed[T](_arg: () => AST[T])(implicit m: repr[T]) extends AST[T]() with Singleton[AST[_]] {
-    lazy val arg: AST[_] = {
-      /* _arg().user+=this;*/ _arg()
-    }
+    lazy val arg: AST[_] = _arg()
   }
 
-  /** Delayed uses a trick found on the net, to have a call by name, together with a case class necessary to make the match */
+  /**
+   *
+   * @param _arg call by name
+   * @param m
+   * @tparam T
+   * @return Delayed AST noe"
+   */
   def delayed[T](_arg: => AST[T])(implicit m: repr[T]): AST[T] = {
     lazy val delayed = _arg;
     new Delayed[T](() => delayed)
@@ -222,7 +204,7 @@ object AST {
   //on se sert de DELAYED que dans ASTL, donc on va directement l'y mettre.
   //def delayed3[L<:Locus,R<:Ring](_arg: => AST[Tuple2[L,R]])(implicit m: repr[Tuple2[L,R]])   = { lazy val delayed4 = _arg with AST2[L,R];new Delayed(() => delayed4) }
 
-  trait Strate2[T] {
+  trait Strate[T] {
     val pred: AST[T];
     val next: AST[T]
   }
@@ -231,40 +213,34 @@ object AST {
    * @param nbit the number of bits
    * @tparam T
    * Unlike other constructors,  Layer is not defined as a case class,
-   * otherwise equality between any two layer of identical number of bits would allways hold
-   * Layer2 is an AST constructor, because it is used both in ASTL and ASTB
-   * it is used to also stores system instructions.
+   * otherwise equality would allways hold between any two layer of identical bit size
+   * Layer is an AST constructor, because it is used both in ASTL and ASTB
+   * it stores system instructions.
    **/
-  abstract class Layer2[T](val nbit: Int)(implicit m: repr[T]) extends AST[T]() with EmptyBag[AST[_]] with Strate2[T] {
-
+  abstract class Layer[T](val nbit: Int)(implicit m: repr[T]) extends AST[T]() with EmptyBag[AST[_]] with Strate[T] {
+    /** avoid a scala bug */
     val v = 1
     /** the value at t, which  is represented as  the layer itself. */
     val pred: AST[T] = this
-
-
+    /** system instruction for rendering,debuging,memorizing  can be associated to layers, so as to be latter retrieved during compilation */
+    private var sysInstr: List[CallProc] = List.empty;
 
     /** needed to visite the next fields */
     override def other: List[AST[_]] = next :: super.other
 
+    /** @param v field to be displayed   */
+    protected def show(v: AST[_]) = sysInstr ::= CallProc("show", List(), List(v))
 
-    /** system instruction can be associated to any spatial field, so as to be latter retrievable from the compiling method. */
-    private var sysInstr2: List[CallProc] = List.empty;
+    /** @param v field that should be false everywere unless a bug appears */
+    def bugif(v: AST[_]) = sysInstr ::= CallProc("bug", List(), List(v))
 
-    protected def render2(v: AST[_]) = sysInstr2 ::= CallProc("show", List(), List(v))
-
-    def bugif2(v: AST[_]) = sysInstr2 ::= CallProc("bug", List(), List(v))
-
-    /**
-     * nb callProc memo is re-created therefore its name is not precised
-     *
-     * @return
-     */
-
-    def systInstrs2: List[CallProc] = CallProc("memo", List(DataProg.lify(name)), List(next)) :: sysInstr2
-
-    // def systInstrs2: List[CallProc] = CallProc("memo", List(name), List(next)) :: sysInstr2
+    /** @return all the user system call, plus the memorized call which is automatically added
+     *          must be launched after seting names */
+    def systInstr: List[CallProc] = CallProc("memo", List(AST.lify(name)), List(next)) :: sysInstr
 
 
   }
+
+
 }
 

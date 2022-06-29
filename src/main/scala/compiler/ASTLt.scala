@@ -4,7 +4,7 @@ import AST._
 import ASTL._
 import repr._
 import Circuit._
-
+import dataStruc.DagNode._
 import scala.collection._
 import ASTBfun.ASTBg
 
@@ -40,37 +40,29 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlOp[L, R] with 
 
   def isRedop: Boolean = false
 
-  /* this match {
-   case a: ASTL[L, R] => a.isRedop
-   case _ => false
- }*/
 
   /**
-   * Important to specify that the L,R type of AST nodes is preserved, for type checking consistency
-   * Surprisingly, when building ASTL explicitely, we need to drop the fact that the type is preserved,
-   * and go from ASTL[L,R] to ASTLg
-   * Transform a Dag of AST into a forest of trees, removes the delayed.
-   *
-   * @return the Dag where expression used more than once are replaced by read.
-   *         generates ASTs such as READ that preserve the implementation of  ASTLscal by using "with"
-   */
-  override def treeIfy(usedTwice: AstPred, repr: Map[AST[_], String]): ASTLt[L, R] = {
-    val rewrite: rewriteASTLt[L, R] = (d: ASTLt[L, R]) => d.treeIfy(usedTwice, repr)
-    val newD: ASTLt[L, R] = if (usedTwice(this)) new Read[(L, R)](repr(this))(mym) with ASTLt[L, R]
+   * @return transformed tree  with preserved L,R type, for type checking consistency
+   *         where delayed are removed, and expression usedTwice are replaced by read.
+   *         generates ASTs such as READ, but implementing ASTLt by crating them using "with ASTLt"
+   *         transformation is applied on the whole tree, so subtree verifying usedTwice will form an independant family */
+  override def treeIfy(usedTwice: AstPred, idRepr: Map[AST[_], String]): ASTLt[L, R] = {
+    val rewrite: rewriteASTLt[L, R] = (d: ASTLt[L, R]) => d.treeIfy(usedTwice, idRepr)
+    val newD: ASTLt[L, R] = if (usedTwice(this)) new Read[(L, R)](idRepr(this))(mym) with ASTLt[L, R]
     else this match {
       case a: ASTL[L, R] =>
         a.propagateASTL(rewrite)
       case _ => this.asInstanceOf[AST[_]] match {
-        case Param(_) => new Read[(L, R)]("p" + repr(this))(mym) with ASTLt[L, R]
-        case l: Layer2[_] => new Read[(L, R)](DataProg.lify(repr(this)))(mym) with ASTLt[L, R]
+        case Param(_) => new Read[(L, R)]("p" + idRepr(this))(mym) with ASTLt[L, R]
+        case l: Layer[_] => new Read[(L, R)](AST.lify(idRepr(this)))(mym) with ASTLt[L, R]
         case Read(_) => this //throw new RuntimeException("Deja dedagifié!")
         case Delayed(arg) => //arg.asInstanceOf[ASTLt[L, R]].propagate(rewrite)
-          arg().asInstanceOf[ASTLt[L, R]].treeIfy(usedTwice, repr /* + (arg()->name)*/) //the useless delayed node is supressed
-        case _ => this.propagate((d: AST[(L, R)]) => d.treeIfy(usedTwice, repr))
+          arg().asInstanceOf[ASTLt[L, R]].treeIfy(usedTwice, idRepr /* + (arg()->name)*/) //the useless delayed node is supressed
+        case _ => this.propagate((d: AST[(L, R)]) => d.treeIfy(usedTwice, idRepr))
       }
     }
-    if (repr.contains(this))
-      newD.setName(repr(this))
+    if (idRepr.contains(this))
+      newD.setName(idRepr(this))
     //else throw new Exception("no name"));
     newD.asInstanceOf[ASTLt[L, R]]
   }
@@ -100,7 +92,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlOp[L, R] with 
   def propagate(g: rewriteAST[(L, R)]): ASTLt[L, R] = { //to allow covariance on R, second argument of bij2 is l
     val m = mym.asInstanceOf[repr[(L, R)]]
     val newThis = this.asInstanceOf[AST[_]] match {
-      case u: Layer2[_] => this
+      case u: Layer[_] => this
       case Read(_) => this
 
       case Param(_) => this
@@ -130,7 +122,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlOp[L, R] with 
     this.asInstanceOf[AST[_]] match {
       case Param(s) => tSymb(s).nb
       case Read(s) => tSymb(s).nb
-      case t: Layer2[_] => t.nbit
+      case t: Layer[_] => t.nbit
     }
 
   /**
@@ -160,7 +152,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlOp[L, R] with 
   def align(r: Result, t: TabSymb[InfoNbit[_]]): ASTLt[L, R] = this.asInstanceOf[AST[_]] match {
     case Read(s) => r.algn = immutable.HashMap(s -> locus.neutral); this
     case Param(s) => r.algn = immutable.HashMap(s -> locus.neutral); this
-    case l: Layer2[_] => ; this
+    case l: Layer[_] => ; this
   }
 
 
@@ -184,7 +176,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlOp[L, R] with 
     case Read(s) =>
       val r = rpart(mym.asInstanceOf[repr[(L, R)]])
       this.locus.deploy(s).map(new Read[R](_)(r) with ASTBt[R].asInstanceOf[ASTBg])
-    case l: Layer2[_] => //TODO faut générer des load pas des read
+    case l: Layer[_] => //TODO faut générer des load pas des read
       val s = l.name
       val r = rpart(mym.asInstanceOf[repr[(L, R)]])
       this.locus.deploy(s).map(new Read[R](_)(r) with ASTBt[R].asInstanceOf[ASTBg])

@@ -2,11 +2,11 @@ package compiler
 
 import ASTB._
 import dataStruc.Align.{compose, invert}
-import AST.{Call, Fundef, Layer2, Read, isCons, isNotRead}
-import Circuit.{AstField, AstPred, Machine, TabSymb, iTabSymb, iTabSymb2, listOf, newFunName}
+import AST.{Call, Fundef, Layer, Read, isCons, isNotRead, AstPred}
+import Circuit.{AstField, Machine, TabSymb, iTabSymb, iTabSymb2, listOf, newFunName}
 import VarKind.{LayerField, MacroField, ParamD, ParamDR, ParamR, StoredField}
-import dataStruc.{Align, Dag, DagInstr, toSet}
-import dataStruc.Dag.{defby3, setInputNeighbor3}
+import dataStruc.{Align, Dag, DagInstr, WiredInOut, toSet}
+import dataStruc.WiredInOut.{defby, setInputNeighbor}
 import Instr.{a, affectizeReturn}
 import ASTB.Tminus1
 import ASTBfun.{ASTBg, Fundef2R, redop}
@@ -18,9 +18,7 @@ import scala.language.postfixOps
 
 object DataProg {
   /** pring a map on several small lines, instead of one big line */
-  def string[T](t: TabSymb[T], s: String): String = t.toList.grouped(4).map(_.mkString(s)).mkString("\n") + "\n"
-
-  def lify(name: String): String = "ll" + name
+  private def string[T](t: TabSymb[T], s: String): String = t.toList.grouped(4).map(_.mkString(s)).mkString("\n") + "\n"
 
   /**
    * @param f function to be compiled
@@ -34,9 +32,14 @@ object DataProg {
    *         Variables with varKind paramD and Layer are created
    ***/
   def apply[T](f: Fundef[T]): DataProg[InfoType[_]] = {
-    def getLayers(l: List[AST[_]]) = l.collect { case la: Layer2[_] => la }
+    /**
+     *
+     * @param l list of newly visited  AST Nodes
+     * @return elements of $l which are layers.
+     */
+    def getLayers(l: List[AST[_]]) = l.collect { case la: Layer[_] => la }
 
-    def getSysInstr(l: List[AST[_]]): List[CallProc] = getLayers(l).flatMap(_.systInstrs2)
+    def getSysInstr(l: List[AST[_]]): List[CallProc] = getLayers(l).flatMap(_.systInstr)
 
     //TODO build the layer structure here, exploit that we have it!
     val dag: Dag[AST[_]] = Dag()
@@ -44,17 +47,16 @@ object DataProg {
      * It  is the  access point to all the AST nodes needed to compute the function.
      * We use a fake call to a macro called "return" to represent the function's code */
     val main = CallProc("return", List(), List(f.body))
-    var instrsCur = List(main) //instruction racine de tout
-    var layers: List[Layer2[_]] = List()
-    var callProcs: List[List[CallProc]] = List()
-    //as we add generators, we possibly get new call to Display debug or memorize
+    /** contains the current instructions to be explored for retrieving new DagNodes */
+    var instrsCur = List(main)
+    /** contains the current instructions to be explored for retrieving new DagNodes */
+    var layers: List[Layer[_]] = List()
+    //  var callProcs: List[List[CallProc]] = List()
+
     do try {
-      val l: List[Layer2[_]] = getLayers(dag.addGenerators(instrsCur.flatMap(_.exps)))
+      val l: List[Layer[_]] = getLayers(dag.addGreaterOf(instrsCur.flatMap(_.exps)))
       layers :::= l;
-      val callProc: List[List[CallProc]] = (l.map(_.systInstrs2)).toList
-      callProcs :::= callProc
-      // instrsCur = l.flatMap(_.systInstrs2) }
-      instrsCur = callProc.flatten
+      instrsCur = (l.flatMap(_.systInstr)) //as we add generators, we possibly get new call to Display debug or memorize
     }
     catch {
       case e@(_: dag.CycleException) =>
@@ -63,27 +65,20 @@ object DataProg {
         for (a <- e.cycle)
           print(a + (if (a.name != null) (a.name + "-") else "-"))
         throw new dag.CycleException(Vector.empty)
-
-    } while (!instrsCur.isEmpty)
+    }
+    while (!instrsCur.isEmpty)
 
     dataStruc.Name.setName(f, ""); //for ''grad'' to appear as a name, it should be a field of an object extending the fundef.
-    val funs: iTabSymb[Fundef[_]] = immutable.HashMap.empty ++ dag.visitedL.collect { case l: Call[_] => (l.f.namef, l.f) }
-    /** second  gathering of SysInstr which can access  the layer's name, because  setName has been called   */
+    val funs: iTabSymb[Fundef[_]] = immutable.HashMap.empty ++ dag.visitedL.collect { case l: Call[_] => (l.f.name, l.f) }
+    /** second  gathering of SysInstr which can now access  the layer's name, because  setName has been called   */
     val instrs = main :: getSysInstr(dag.visitedL)
+    /** Symbol table  */
     val t2: TabSymb[InfoType[_]] = mutable.HashMap.empty
-    // we will  store information about parameters, such as the number of bits. Therefore, we  store them in the symbol table.
-    t2 ++= f.p.toList.map(a => ("p" + a.name, InfoType(a, ParamD())))
-    // we will  store information about layers, such as the number of bits, displayfield, bugif fields.
-    // Therefore, we  store them in the symbol table.
-    //callProc memo is re-created therefore its  "precised" name is lost
-    for ((l, cps) <- (layers zip callProcs))
-      for (cp <- cps)
-        cp.preciseName(l.name)
-    t2 ++= layers.map(a => (lify(a.name), InfoType(a, LayerField(a.nbit))))
+    t2 ++= f.p.toList.map(a => ("p" + a.name, InfoType(a, ParamD()))) // stores parameters  in the symbol table.
+    t2 ++= layers.map(a => (AST.lify(a.name), InfoType(a, LayerField(a.nbit)))) // stores layers with bit size, in the symbol table.
 
-    new DataProg[InfoType[_]](new DagInstr(instrs, dag), funs.map {
-      case (k, v) ⇒ k -> DataProg(v)
-    }, t2, f.p.toList.map("p" + _.name), List())
+    new DataProg[InfoType[_]](new DagInstr(instrs, dag), funs.map { case (k, v) ⇒ k -> DataProg(v) },
+      t2, f.p.toList.map("p" + _.name), List())
   }
 
   def nbSpace(u: Option[Locus]) = u match {
@@ -99,21 +94,22 @@ object DataProg {
  * Contains the compiled data, and all the functions used to implement the stage of compilation:
  * treify, procedurify, bitify, macroify, foldRegister, unfoldSpace
  *
- * @param funs  the macros
  * @param dagis the dag of instructions stored in reversed order.
+ * @param funs  the macros
  * @tparam U type of the info stored
  * @param tSymbVar symbol table
  * @param paramD   names of data parameters, provides  an order on them
  * @param paramR   names of result parameters , provides  an order on them
+ * @param coalesc  coalesced form for identifiers which are regrouped.
  */
 class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataProg[U]], val tSymbVar: TabSymb[U],
-                                 val paramD: List[String], val paramR: List[String], val coales: iTabSymb[String] = HashMap.empty) {
+                                 val paramD: List[String], val paramR: List[String], val coalesc: iTabSymb[String] = HashMap.empty) {
 
   /** look up the symbol table if not found, take the coalesced form */
   def tSymbVarSafe(str: String) = {
-    if (!tSymbVar.contains(str) && (!coales.contains(str) || !tSymbVar.contains(coales(str))))
+    if (!tSymbVar.contains(str) && (!coalesc.contains(str) || !tSymbVar.contains(coalesc(str))))
       throw new Exception("on trouve pas " + str)
-    tSymbVar.getOrElse(str, tSymbVar(coales(str)))
+    tSymbVar.getOrElse(str, tSymbVar(coalesc(str)))
   }
 
 
@@ -131,7 +127,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       instrPrint +
       tSymbVar.size + " variables:\n " +
       tSymbVar.toList.grouped(4).map(_.mkString("-")).mkString("\n") + "\n\n" +
-      (if (coales.isEmpty) "" else coales.toList.grouped(4).map(_.mkString("-")).mkString("\n")) +
+      (if (coalesc.isEmpty) "" else coalesc.toList.grouped(4).map(_.mkString("-")).mkString("\n")) +
       listOf(funs).mkString("\n \n  ") +
       "\n\n\n"
   }
@@ -183,7 +179,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       updateTsymb(layerFields, StoredField()) //This is excepted for affectation of the form dist<-lldist,
     }
     else {
-      val g = new CodeGen(tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]], coales)
+      val g = new CodeGen(tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]], coalesc)
       updateTsymbNbit(macroFields, MacroField(), g)
       updateTsymbNbit(layerFields, StoredField(), g)
     }
@@ -191,7 +187,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     // the type of dist is set to storedLayer
     // paramD varkind  could  be replaced by Affect , but this should not happen because of the added letter 'p' for the parameter.
     // if a parameter is used two times, the generated affectation will generate a read without the 'p'
-    new DataProg(dagis2, funs.map { case (k, v) ⇒ k -> v.treeIfy(dagdag) }, tSymbVar, paramD, paramR, coales)
+    new DataProg(dagis2, funs.map { case (k, v) ⇒ k -> v.treeIfy(dagdag) }, tSymbVar, paramD, paramR, coalesc)
   }
 
   /** paramD read two times will be affectized we need to check than on loop-macro produced by macroified */
@@ -215,7 +211,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     val iT1 = iT2.filter(isNotReadOrParam) //we could filter out more stuff because it consumes register and registers are a precious ressource
     val iT = iT1.filter(_.isNotTm1Read)
     //val paramToBeRepl: List[AST[_]] = dagis.dagAst.visitedL.filter(isReadAndParam);
-    val paramToBeRepl: List[AST[_]] = dagis.visitedL.flatMap(_.exps(0).leaves()).filter(isReadAndParam); //we scan the leaves because if we scan dagAst, we will touch only a subset of lelves.
+    val paramToBeRepl: List[AST[_]] = dagis.visitedL.flatMap(_.exps(0).leaves()).filter(isReadAndParam); //we scan the leaves because if we scan dagAst, we will touch only a subset of leaves.
     paramToBeRepl.map(addpletter(_));
     val dagis2 = dagis.affectIfy(iT1, dagdag) //also replaces access to data parameters+layers by read
     //expression of the Affectation generated are stored in dagis.newAffect, they correspond precisely to nonGenerators.
@@ -233,7 +229,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       updateTsymb(layerFields, StoredField()) //This is excepted for affectation of the form dist<-lldist,
     }
     else {
-      val g = new CodeGen(tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]], coales)
+      val g = new CodeGen(tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]], coalesc)
       updateTsymbNbit(macroFields, MacroField(), g)
       updateTsymbNbit(layerFields, StoredField(), g)
     }
@@ -241,7 +237,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     // the type of dist is set to storedLayer
     // paramD varkind  could  be replaced by Affect , but this should not happen because of the added letter 'p' for the parameter.
     // if a parameter is used two times, the generated affectation will generate a read without the 'p'
-    new DataProg(dagis2, funs.map { case (k, v) ⇒ k -> v.treeIfy(dagdag) }, tSymbVar, paramD, paramR, coales)
+    new DataProg(dagis2, funs.map { case (k, v) ⇒ k -> v.treeIfy(dagdag) }, tSymbVar, paramD, paramR, coalesc)
   }
 
   /**
@@ -397,7 +393,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         newtSymbVar += n -> new InfoNbit(old.t, if (!needStored(n)) MacroField() else if (fparamDwithoutR.contains(n)) ParamDR() else ParamR(), old.nb)
       }
 
-      setInputNeighbor3(pureAffect.toList.asInstanceOf[List[Instr]]) // when using a data parameter in paramD,
+      setInputNeighbor(pureAffect.toList.asInstanceOf[List[Instr]]) // when using a data parameter in paramD,
       // we should not include the instructions which were computing those parameter
       val newDagis = new DagInstr(fparamR) //instructions computing results are the roots.
       val newDataProg = new DataProg(newDagis, mutable.HashMap.empty, newtSymbVar, fparamDwithoutR, fparamRname).treeIfyParam()
@@ -511,7 +507,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
      * and see if we can formulate the code differently so as to obtain a Dag
      * a Dag for zones simplifies a lot the comming picking phase
      */
-    val zoneDag: Dag[Zone] = dagis2.quotient2(proximity2, transform)
+    val zoneDag: Dag[Zone] = dagis2.quotient(proximity2, transform)
     zoneDag.visitedL.map(_.addPartitionOut()) //set partition constraints towards output neighbors
     //now we know if the TCC will fold, before we pick, we could try to further constrain the cycle so as to reuse
     //delayed variables in order to avoid introducing new registers
@@ -575,7 +571,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     // therefore it must be done before muInstructions
     val muI = muInstr(m, dagis2) //TODO inspect muI's tm1 to refine constraints so as to fold vortex
     z.visitedL.reverse.map(_.pick()) //pick is done starting from the first instruction
-    val tZone: Map[String, Zone] = defby3(z.visitedL)
+    val tZone: Map[String, Zone] = defby(z.visitedL)
     // print(tZone)
     val defI: Map[String, Instr] = dagis2.defby
     val (muI2, tSymbScalar, coalesc) = permuteAndFixScheduledMu(muI, dagis2, tZone, defI) // revisit muI 's'reduce when reduced exression is folded
@@ -981,7 +977,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     result.reverse
   }
 
-  def coalesc2(str: String) = coales.getOrElse(str, str)
+  def coalesc2(str: String) = coalesc.getOrElse(str, str)
 
   /** if an id x is used a single time, remplace read(x) by its expression.
    * This applies in particular, for transfer happenning just before reduction */
@@ -993,7 +989,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       val uO: List[Instr] = p.dagis.usedOnce()
       val uOnames1: Predef.Set[String] = uO.map(_.names(0)).toSet
       val uOnames = checkIfRedefined(uOnames1)
-      var defs: Map[String, Instr] = defby3(dagis.visitedL)
+      var defs: Map[String, Instr] = defby(dagis.visitedL)
       val newVisitedL = dagis.visitedL.reverse.map((f: Instr) =>
         if (f.inputNeighbors.map(_.names(0)).toSet.intersect(uOnames).nonEmpty) //f contains some read to be replaced
         {
@@ -1004,9 +1000,9 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         else f
       )
       dagis.visitedL = newVisitedL.reverse.filter((i: Instr) => !uOnames.contains(i.names(0))) //removes the now useless instructions
-      Dag.setInputAndOutputNeighbor3(dagis.visitedL)
+      WiredInOut.setInputAndOutputNeighbor(dagis.visitedL)
       val nameStillUsed = p.dagis.visitedL.flatMap(_.names).toSet.diff(uOnames)
-      val coalescedStillUsed = nameStillUsed.map((str: String) => coales.getOrElse(str, str))
+      val coalescedStillUsed = nameStillUsed.map((str: String) => coalesc.getOrElse(str, str))
       for (str <- newTsymbar.keys) //we remove from the table the now useless symbols
         if (!coalescedStillUsed.contains(str) && !(newTsymbar(str).k == ParamD()))
           newTsymbar.remove(str)
@@ -1014,7 +1010,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       if (dagis.visitedL.size < nInstrBeforeSimplif) simplify() //simplification can enable more simplification!
 
     }
-    new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.simplify }, newTsymbar, paramD, paramR, coales)
+    new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.simplify }, newTsymbar, paramD, paramR, coalesc)
   }
 
 
@@ -1031,7 +1027,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
     //it suffices to start by a tm1 (we consider  a simple property) and have name not coalesced
     def checkRuleC(i: Instr, used: Set[String]) = (
-      i.exps(0).asInstanceOf[ASTBg].isTm1 && used.intersect(coales.keys.toSet).isEmpty)
+      i.exps(0).asInstanceOf[ASTBg].isTm1 && used.intersect(coalesc.keys.toSet).isEmpty)
 
     for (instr <- instrs) {
       var nom = instr.names(0)
@@ -1241,12 +1237,12 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       val macroFields = dagis.newAffect.map(_.exp)
       // p.updateTsymb( macroFields, MacroField()) // when a variable is used twice it should be evaluated in a macro
 
-      val g = new CodeGen(tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]], coales)
+      val g = new CodeGen(tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]], coalesc)
       updateTsymbNbit(macroFields, MacroField(), g)
       val u = 1
 
     }
-    new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.detm1Ify() }, p.tSymbVar, paramD, paramR, coales)
+    new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.detm1Ify() }, p.tSymbVar, paramD, paramR, coalesc)
   }
 
   /** do not simplify variable $v$used once, if register (coalec) used for computing $v$ is redefined before $v$ is used */
@@ -1281,7 +1277,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   def unfoldInt(): DataProg[InfoNbit[_]] = { //todo faut rajouter les stores et peut etre des affect pour marquer la difference
     val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
     if (isLeafCaLoop) {
-      val cod = new CodeGen(p.tSymbVar, coales)
+      val cod = new CodeGen(p.tSymbVar, coalesc)
       for (inst <- dagis.visitedL.reverse) {
         val res = cod.codeGen(inst)
         val res2 = res.map(_.map(_.toStringTree).mkString("|_____|"))
@@ -1293,6 +1289,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     }
 
 
-    new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.unfoldInt() }, p.tSymbVar, paramD, paramR, coales)
+    new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.unfoldInt() }, p.tSymbVar, paramD, paramR, coalesc)
   }
 }
