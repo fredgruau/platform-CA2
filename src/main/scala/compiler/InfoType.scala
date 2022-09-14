@@ -21,13 +21,13 @@ class InfoType[+T](val t: T, val k: VarKind) {
 
   /** in some cases (i.e. creation of affectation, there is no obvious locus associated to the variable. */
   def locusOption: Option[Locus] = t match {
-    case u@(_, _) => if (u._1.isInstanceOf[Locus]) Some(u._1.asInstanceOf[Locus]) else None //if the type is a couple, the first is the locus
+    case u@(_, _) => if (u._1.isInstanceOf[Locus]) Some(u._1.asInstanceOf[Locus]) else None //if the type is a couple, the first is the locus unless it is cons
     case _ => None //if not,it's only a ring, because the locus could not be computed
   }
 
-  /** when unfolding , some scalar have a locus, and some not */
+  /** when unfolding , the ring is either the second component or the whole type */
   def ringSafe: Ring = t match {
-    case u@(_, _) => u._2.asInstanceOf[Ring] //if the type is a locus, the first is the locus
+    case u@(_, _) => u._2.asInstanceOf[Ring] //if the type is a couple the second is the ring
     case _ => t.asInstanceOf[Ring]
   }
 }
@@ -54,6 +54,7 @@ object InfoNbit {
  * @tparam T toto
  */
 class InfoNbit[+T](override val t: T, override val k: VarKind, val nb: Int) extends InfoType(t, k) {
+  /** sets varKind to macroField */
   def macroFieldise: InfoNbit[_] = new InfoNbit(t, MacroField(), nb)
 
   /** @return same info except we drop the locus and the type is ring   */

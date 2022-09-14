@@ -4,7 +4,7 @@ import AST._
 import ASTB._
 import ASTBfun._
 import ASTL._
-import dataStruc.Align._
+import dataStruc.Align2._
 import Constraint._
 import Circuit.{iTabSymb2, _}
 import repr._
@@ -15,7 +15,8 @@ import scala.reflect.ClassTag
 
 
 /**
- * At some point, we decided to store the type information for each distinct constructor, in order to have direct access to this info when copying the constructor,
+ * At some point, we decided to store the type information for each distinct constructor, in order to have direct access to this info
+ * when copying the constructor,
  * this enabled to enforce the covariance in L:Locus and R:Ring, which was intuitive and would therefore facilitate things later on.
  * but then we abandonned it, so we could come back to previous setting where type was not stored, and copied in case class copying (see ASTBs).
  */
@@ -307,7 +308,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
   /**
    * @param id rewritting procedure
    * @return ASTL obtained by applying the rewriting recursively
-   *         No  override, because signature is distinct from AST's propagate */
+   *         No  override, because name is distinct from AST's propagate */
   def propagateASTL(id: rewriteASTLt[L, R]): ASTL[L, R] = {
     def id2[L3 <: Locus, R3 <: Ring]: rewriteASTLt[L3, R3] = d => id(d.asInstanceOf[ASTLt[L, R]]).asInstanceOf[ASTLt[L3, R3]] //introduit des variables libres
     val newD = this.asInstanceOf[ASTLg] match {
@@ -326,39 +327,38 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
   }
 
   /**
-   * * @param cur The current programm
-   * * @param nbitLB Stores number of bits of subfields.
-   * * @param tSymb The symbol table with number of bits
-   * * @param newFuns Functions generated
-   * * @return Expression rewritten so as to include Extend, when binop operators are used,
-   * and one of the two operands has not enough bits.
+   * @param cur            The current programm
+   * @param expASTLbitSize Stores number of bits of sub expression.
+   * @param tSymb          The symbol table with number of bits of parameters and progressively upadated with variables
+   * @return Expression rewritten so as to include Extend, when binop operators are used,
+   *         and one of the two operands has not enough bits.
    *
    */
-  override def bitIfy(cur: DataProg[InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
-    val nbitB = immutable.HashMap.empty[AST[_], Int] //stores the bit number of an ASTB expression
-    val nbitP = mutable.HashMap.empty[Param[_], Int] //virgin, to retrieve the nbits computed for the param.
+  override def bitIfyAndExtend(cur: DataProg[InfoType[_]], expASTLbitSize: AstMap[Int], tSymb: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
+    val emptyAstMapInt = immutable.HashMap.empty[AST[_], Int] //stores the bit number of an ASTB expression
+    val nbitASTLParam = mutable.HashMap.empty[Param[_], Int] //collect the bit size that  the spatial param should have.
     val result = this match {
-      case Binop(op, a, a2, l2, r2) => //BINOP needs more work, because it triggers possible insertion of a new node "extend";
-        var anew = a.bitIfy(cur, nbitLB, tSymb);
-        var a2new = a2.bitIfy(cur, nbitLB, tSymb)
-        //we start evaluation of binop by adding the number of bits of the parameters
-        val startnbitB = nbitB + (op.p1 -> nbitLB(anew)) + (op.p2 -> nbitLB(a2new))
-        val nbitResult = ASTB.nBitR(startnbitB, op.arg, nbitP, null) //retrieves the number of bit computed from the call to the ASTBfun.
-        if (nbitP.contains(op.p1)) anew = anew.extendMe(nbitP(op.p1))
-        if (nbitP.contains(op.p2)) a2new = a2new.extendMe(nbitP(op.p2))
+      case Binop(op, a, a2, l2, r2) =>
+        //BINOP needs more work, because it triggers possible insertion of  "extend";
+        var anew = a.bitIfyAndExtend(cur, expASTLbitSize, tSymb); //process recursively subtree
+        var a2new = a2.bitIfyAndExtend(cur, expASTLbitSize, tSymb) //process recursively subtree
+        val nbitASTBParam = emptyAstMapInt + (op.p1 -> expASTLbitSize(anew)) + (op.p2 -> expASTLbitSize(a2new)) // bit size  of the parameters of the boolean function
+        val nbitResult: Int = ASTB.nbitExpAndParam(nbitASTBParam, op.arg, nbitASTLParam) //retrieves the number of bit computed from the call to the ASTB fonction
+        if (nbitASTLParam.contains(op.p1)) anew = anew.extendMe(nbitASTLParam(op.p1)) //extends first ASTL  parameter if the first ASTB param is desired to be extended
+        if (nbitASTLParam.contains(op.p2)) a2new = a2new.extendMe(nbitASTLParam(op.p2)) //extends second ASTL  parameter if the first ASTB param is desired to be extended
         val newthis = Binop(op, anew, a2new, l2, r2)
-        nbitLB += newthis -> nbitResult //the hashtable stores the number of bits of the newly computed tree.
+        expASTLbitSize += newthis -> nbitResult //Store the bitsize of the Binop
         newthis
-      case _ => //in all the other cases, no change is done on the AST, only  nbitLB is updated.
-        val newthis = this.propagateASTL((d: ASTLt[L, R]) => d.bitIfy(cur, nbitLB, tSymb))
+      case _ => //in all the other cases, no change is done on the AST, only  expASTLbitSize is updated.
+        val newthis = this.propagateASTL((d: ASTLt[L, R]) => d.bitIfyAndExtend(cur, expASTLbitSize, tSymb))
 
-        def newNbit() = nbitLB(newthis.asInstanceOf[Singleton[AST[_]]].arg) //the nbit value of the arg is stored in nbitLB
-        nbitLB += newthis -> (newthis.asInstanceOf[ASTL[_, _]] match {
+        def argBitSize() = expASTLbitSize(newthis.asInstanceOf[Singleton[AST[_]]].arg) //bit size of the arg if singleton
+        expASTLbitSize += newthis -> (newthis.asInstanceOf[ASTL[_, _]] match {
           // case l:Layer[_,_] =>  l.nbit
-          case Coonst(cte, _, _) => ASTB.nBitR(nbitB, cte, nbitP, null)
-          case Unop(op, _, _, _) => ASTB.nBitR(nbitB + (op.p1 -> newNbit()), op.arg, nbitP, null)
-          case Redop(_, _, _, _) | Clock(_, _) | Transfer(_, _, _) | Broadcast(_, _, _) | Sym(_, _, _, _) => newNbit()
-          case Send(_) => nbitLB(newthis.asInstanceOf[Neton[AST[_]]].args.head)
+          case Coonst(cte, _, _) => ASTB.nbitExpAndParam(emptyAstMapInt, cte, nbitASTLParam)
+          case Unop(op, _, _, _) => ASTB.nbitExpAndParam(emptyAstMapInt + (op.p1 -> argBitSize()), op.arg, nbitASTLParam)
+          case Redop(_, _, _, _) | Clock(_, _) | Transfer(_, _, _) | Broadcast(_, _, _) | Sym(_, _, _, _) => argBitSize() //bit size equals bit size of arg
+          case Send(_) => expASTLbitSize(newthis.asInstanceOf[Neton[AST[_]]].args.head)
           //FIXME for the concat redop, the number of bit must take into account the arity (2,3, or 6)
         })
         newthis

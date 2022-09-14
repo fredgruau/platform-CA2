@@ -1,7 +1,7 @@
 package dataStruc
 
 import compiler.Instr
-import dataStruc.Align._
+import dataStruc.Align2._
 
 import scala.collection.{Iterable, immutable, mutable}
 
@@ -31,7 +31,6 @@ trait Union[T <: Union[T]] {
   private var rank = 0
 
   def aligned = false;
-
 
   def root: T = if (parent == this) parent else {
     parent = parent.root; parent

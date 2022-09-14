@@ -5,8 +5,10 @@ import ASTL._
 import repr._
 import Circuit._
 import dataStruc.DagNode._
+
 import scala.collection._
 import ASTBfun.ASTBg
+import dataStruc.Named
 
 
 /**
@@ -17,6 +19,7 @@ import ASTBfun.ASTBg
  * ASTL's constructor uses ASTLtrait for children in order to incorporate AST's nodes.
  * ASTLt dentifies AST corresponding to int or bool, plus a locus, which excludes those obtained with cons
  */
+
 /**
  *
  * @param c    a possible cycle constraint
@@ -29,11 +32,14 @@ object Result {
   def apply() = new Result(None, immutable.HashMap.empty, immutable.HashMap.empty)
 }
 
-trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlOp[L, R] with MyOpInt2[L, R] {
+trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] with MyOpInt2[L, R] {
   self: AST[(L, R)] =>
   def locus: L = mym.name._1
 
   def ring: R = mym.name._2
+
+  /** @return tabulation for printing instructions returning type T */
+  override def tabulations = locus.tabul
 
   def extendMe(n: Int): ASTLt[L, R] =
     ASTL.extend[L, R](n, this)(new repr(locus), new repr(ring))
@@ -42,29 +48,30 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlOp[L, R] with 
 
 
   /**
+   * @param usedTwice dags which are used twice, or which need to be affected for some other reason.
+   * @param idRepr    :id of representant of the equivalence class with respect to equal on case class hierarchy
    * @return transformed tree  with preserved L,R type, for type checking consistency
    *         where delayed are removed, and expression usedTwice are replaced by read.
-   *         generates ASTs such as READ, but implementing ASTLt by crating them using "with ASTLt"
+   *         generates ASTs such as READ, but implementing ASTLt by creating them using "with ASTLt"
    *         transformation is applied on the whole tree, so subtree verifying usedTwice will form an independant family */
-  override def treeIfy(usedTwice: AstPred, idRepr: Map[AST[_], String]): ASTLt[L, R] = {
-    val rewrite: rewriteASTLt[L, R] = (d: ASTLt[L, R]) => d.treeIfy(usedTwice, idRepr)
+  override def setReadNode(usedTwice: AstPred, idRepr: Map[AST[_], String]): ASTLt[L, R] = {
     val newD: ASTLt[L, R] = if (usedTwice(this)) new Read[(L, R)](idRepr(this))(mym) with ASTLt[L, R]
     else this match {
       case a: ASTL[L, R] =>
-        a.propagateASTL(rewrite)
+        a.propagateASTL((d: ASTLt[L, R]) => d.setReadNode(usedTwice, idRepr))
       case _ => this.asInstanceOf[AST[_]] match {
         case Param(_) => new Read[(L, R)]("p" + idRepr(this))(mym) with ASTLt[L, R]
-        case l: Layer[_] => new Read[(L, R)](AST.lify(idRepr(this)))(mym) with ASTLt[L, R]
+        case l: Layer[_] => new Read[(L, R)](Named.lify(idRepr(this)))(mym) with ASTLt[L, R]
         case Read(_) => this //throw new RuntimeException("Deja dedagifié!")
         case Delayed(arg) => //arg.asInstanceOf[ASTLt[L, R]].propagate(rewrite)
-          arg().asInstanceOf[ASTLt[L, R]].treeIfy(usedTwice, idRepr /* + (arg()->name)*/) //the useless delayed node is supressed
-        case _ => this.propagate((d: AST[(L, R)]) => d.treeIfy(usedTwice, idRepr))
+          arg().asInstanceOf[ASTLt[L, R]].setReadNode(usedTwice, idRepr /* + (arg()->name)*/) //the useless delayed node is supressed
+        case _ => this.propagate((d: AST[(L, R)]) => d.setReadNode(usedTwice, idRepr))
       }
     }
     if (idRepr.contains(this))
       newD.setName(idRepr(this))
     //else throw new Exception("no name"));
-    newD.asInstanceOf[ASTLt[L, R]]
+    newD //.asInstanceOf[ASTLt[L, R]]
   }
 
   /**
@@ -118,7 +125,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlOp[L, R] with 
    * @return number of bits needed to store the expression this
    *         using  mutable structures, that have  been previously updated.n
    *         this is an arity 0 AST node*/
-  def newNbitAST(nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]]): Int =
+  def newNbitAST(nbitLB: AstMap[Int], tSymb: TabSymb[InfoNbit[_]]): Int =
     this.asInstanceOf[AST[_]] match {
       case Param(s) => tSymb(s).nb
       case Read(s) => tSymb(s).nb
@@ -133,13 +140,14 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlOp[L, R] with 
    * * @return Expression rewritten so as to include Extend where necessary.
    *
    */
-  def bitIfy(cur: DataProg[InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
-    val newThis: ASTLt[L, R] = this.propagate((d: AST[(L, R)]) => d.asInstanceOf[ASTLt[L, R]].bitIfy(cur, nbitLB, tSymb))
+  def bitIfyAndExtend(cur: DataProg[InfoType[_]], nbitLB: AstMap[Int], tSymb: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
+    val newThis: ASTLt[L, R] = this.propagate((d: AST[(L, R)]) => d.asInstanceOf[ASTLt[L, R]].bitIfyAndExtend(cur, nbitLB, tSymb))
     nbitLB += (newThis -> newThis.newNbitAST(nbitLB, tSymb))
     newThis.setName(this.name);
     newThis //.asInstanceOf[ASTLt[L, R]]
   }
 
+  /** @return true if the expression is only a concatenation of elements   */
   def justConcats: Boolean = this match {
     case _: EmptyBag[_] => true
     case _ => false

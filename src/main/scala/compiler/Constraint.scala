@@ -1,7 +1,7 @@
 package compiler
 
 import Constraint._
-import dataStruc.Align._
+import dataStruc.Align2._
 
 
 import scala.collection.immutable.{ArraySeq, HashSet}

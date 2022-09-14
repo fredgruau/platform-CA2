@@ -9,7 +9,7 @@ import ASTL._
  * and it is guaranteed that
  * unsigned (resp. signed) are combined with unsigned (resp. signed) and produce unsigned (resp. signed)
  */
-trait MyAstlOp[L <: Locus, R <: Ring] {
+trait MyAstlBoolOp[L <: Locus, R <: Ring] {
   this: ASTLt[L, R] =>
   /*
    * In order to obtain covariance, we would need to introduc types L,U

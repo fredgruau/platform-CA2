@@ -2,7 +2,7 @@ package dataStruc
 
 import compiler.Instr
 
-object Align {
+object Align2 {
   /** Computes T2 o T1 */
   def compose(T1: Seq[Int], T2: Seq[Int]): Array[Int] = // T1.map(T2(_))
   {
@@ -13,35 +13,27 @@ object Align {
     r
   }
 
-  def compose2(T1: Seq[Int], T2: Seq[Instr]): Array[Instr] = // T1.map(T2(_))
-  {
-    if (T1 == null || T2 == null) return null
-    val r = new Array[Instr](6)
+  /**
+   * generic version of compose
+   *
+   * @param T1 first array
+   * @param T2 second array
+   * @tparam A elements considered
+   * @return the composition T2 o T1
+   */
+  def compose2[A](T1: Seq[Int], T2: Array[A]): Array[A] = {
+    if (T1 == null || T2 == null) return null //may avoid problem
+    val r = T2.clone //easy way to define an Array[A]
     for (i <- 0 to T1.length - 1) r(i) = T2(T1(i))
     r
   }
 
-  def compose3[A](T1: Seq[Int], T2: Array[A]): Array[A] = // le bon
-  {
-    if (T1 == null || T2 == null) return null
-    val r = T2.clone()
-    for (i <- 0 to T1.length - 1) r(i) = T2(T1(i))
-    r
-  }
-
-
-  //def antecedant(T1: Seq[Int], T2: Seq[Int])
   def isPermutation(t: Array[Int]): Boolean = {
     val l = t.toList.sortWith(_ < _)
     return l == List(0, 1, 2, 3, 4, 5);
   }
 
-  /* def invert(t: Array[Int]): Array[Int] = {
-     //assert(isPermutation(t))
-     val r =  new Array[Int](t.length)
-     for (i <- 0 to t.length-1) r(t(i)) = i
-     r
-   }*/
+
   def invert(t: Seq[Int]): Array[Int] = {
     //assert(isPermutation(t))
     val r = new Array[Int](t.length)
@@ -50,10 +42,10 @@ object Align {
   }
 }
 
-import Align._
+import Align2._
 
 /** adds the possiblity  to compute an alignement to the root, while computing the root of a union */
-trait Align[T <: Align[T]] extends Union[T] {
+trait Align2[T <: Align2[T]] extends Union[T] {
   self: T =>
   /** implements alignement with respect to neighbor */
   def neighborAlign(n: T): Array[Int]
@@ -65,14 +57,14 @@ trait Align[T <: Align[T]] extends Union[T] {
    */
   override def reset = {
     super.reset;
-    alignToPar = Array.range(0, 6)
+    alignToPar = Array.range(0, 6) //at time t=0 parent = this
   }
 
   /** @return aligntoRoot(shedule) = rootschedule */
   def alignToRoot: Array[Int] =
     if (parent == this)
       Array.range(0, 6)
-    else Align.compose(alignToPar, parent.alignToRoot)
+    else Align2.compose(alignToPar, parent.alignToRoot)
 
   override def root: T = if (parent == this) this else {
     alignToPar = alignToRoot;

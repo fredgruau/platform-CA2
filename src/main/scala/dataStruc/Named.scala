@@ -2,18 +2,43 @@ package dataStruc
 
 import compiler.AST
 
-import scala.collection.mutable
+import scala.collection.immutable.HashMap
+import scala.collection.{immutable, mutable}
 
 object Named {
-  private var nameCompteur: Int = 0
+  def lify(s: String): String = "ll" + s
+
+  def pify(s: String): String = "p" + s
+
+  def isLayer(s: String): Boolean = s.charAt(0) == 'l' && s.charAt(1) == 'l'
+
+
+  private var compteurAux: Int = 0
   private var nameCompteur2: Int = 0
   private var nameCompteur3: Int = 0
 
+  /**
+   * contains different counters
+   */
+  private var compteurs: immutable.HashMap[String, Int] = HashMap()
+
   def isTmp(s: String) = s.startsWith("_t")
 
-  def getCompteur: Int = {
-    nameCompteur += 1;
-    nameCompteur
+
+  /**
+   *
+   * @param prefix name of compteur
+   * @return string obtained by appending integer to prefix, after having incremented counter
+   */
+  def getCompteur(prefix: String): Int = {
+    if (compteurs.contains(prefix)) compteurs = compteurs + (prefix -> (compteurs(prefix) + 1))
+    else compteurs = compteurs + (prefix -> 0)
+    compteurs(prefix)
+  }
+
+  def getCompteurAux: Int = {
+    compteurAux += 1;
+    compteurAux
   }
 
   def getCompteur2: Int = {
@@ -45,20 +70,22 @@ trait Named {
     name = value
   }
 
-  /** generates a unique name starting by "aux" for AST which do not a name yet  */
-  def setNameIfNull() = {
-    if (name == null) name = "_aux" + Named.getCompteur
+  def lify() = name = "ll" + name
+
+  def pify() = name = "p" + name
+
+  def isLayer: Boolean = name != null && name.charAt(0) == 'l' && name.charAt(1) == 'l'
+
+
+  /**
+   * generates a unique name starting by prefix for AST which do not a name yet
+   *
+   * @param prefix
+   */
+  def setNameIfNull(prefix: String) = {
+    if (name == null) name = prefix + Named.getCompteur(prefix)
   }
 
-
-  def setNameIfNull3() = {
-    if (name == null) name = "_t" + Named.getCompteur3 + "$"
-  }
-
-
-  def setNameTm1() = {
-    name = "_tmun" + Named.getCompteur2
-  }
 
   def addAfter(value: String) {
     name = name + value

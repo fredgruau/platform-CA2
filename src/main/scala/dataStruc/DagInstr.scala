@@ -8,6 +8,12 @@ import scala.collection.immutable.{HashMap, HashSet}
 import scala.collection.{Iterable, immutable, mutable}
 
 object DagInstr {
+  /**
+   *
+   * @param visitedL list of instructions, we want to make a dag of
+   * @param dag      the instructions expressions node, not obligatory can be specified as null, and will be recompiled if needed
+   * @return the dag is constructed, with the schedule preserved as supplied, (that would not be the case if we were giving only generators
+   */
   def apply(visitedL: List[Instr], dag: Dag[AST[_]] = null) = {
     val res = new DagInstr(List(), dag)
     res.imposeSchedule(visitedL)
@@ -22,7 +28,8 @@ object DagInstr {
 
 /**
  * When the dag 's element are instructions,
- * new method can be added, such as the affectify method
+ * new method can be added, mainly the affectify method
+ * an implicit transformation allows to turn a dag into a dagInstr, when  needed.
  *
  * @param generators generators which are callProc in {memo, show, bug}.
  * @param dag        the underlying dag of AST, if available
@@ -38,56 +45,64 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
     visitedL = scheduled.reverse
   }
 
-  override def toString: String = visitedL.reverse.mkString("")
+  override def toString: String = "there is " + visitedL.length + " instructions\n" +
+    visitedL.reverse.map((i: Instr) => i.toString() + "\n").mkString("")
 
   //def defby = DagInstr.defby(visitedL)
+
   def defby = WiredInOut.defby(visitedL)
 
   /**
    * newly generated affect instructions. to be accessed later to complete the symbolTable, as nonGenerators
+   * in topological order, from greater to lower, apply reverse in order to process.
    */
   var newAffect: List[Affect[_]] = null
 
   /**
    *
-   * @param toBeReplaced predicate true for AST node to be replaced
-   * @return   new DagInstr,  by replacing toBeReplaced nodes
-   *           *   by read expressions.
-   *           usage:    1-  with dedagify, for each AST nodes used more than once
+   * @param toBeReplaced    predicate true for AST node to be replaced
+   * @param scheduleMatters true is schedule must be preserved
+   * @return   new DagInstr,  by replacing toBeReplaced nodes by read nodes.
+   *           usage:    1-  with treeify, for each AST nodes used more than once
    *           2-   with procedurIfy, for expressions with head and tail, (e.isCoons)
    *           3-  with bitify, for effective data parameter in CallProc
-   *           this will thus include system instructions such as memo or show
+   *           4- for system call such as memo bugif or show
    *           - for memo it is not apropriate, because store could be directly made
-   *           - neither is it for debug because we want to spare this computation
-   *           - for show it is because displayed film are normally computed anyway
-   *           and returning the array allows to avoid making tests all the time in the macro
-   *           the test will be done a single time in the enclosing fun which is not a macro*
+   *           - neither is it for bugif because we want to be able to spare this computation
+   *           - for show it may be apropriate because displayed fields are normally computed anyway
+   *           using a variable allows to test  a single time wether to display or not,  for fields with arity > 1
+   *           we use the following prefix:
+   *           auxL pour Locus
+   *           auxC pour coons
+   *           auxB pour Bitify (could not identify occurence)
+   *           auxO pour redop
+   *           auxM pour macroisation
+   *           there is 10 instructions
    ***/
-  def affectIfy(toBeReplaced: AstPred, dagdag: Boolean = true): DagInstr = { //TODO faire un seul appel pour éviter de reconstuire le DAG plusieurs fois
-    /** reads are removed from toBeReplaced to not generatre x=x */
-    val toBeRepl: List[AST[_]] = dagAst.visitedL.filter(a => toBeReplaced(a) /*&& isNotRead(a)*/);
-    toBeRepl.map(_.setNameIfNull());
-
-    if (toSet(toBeRepl).size < toBeRepl.size) //since name are given by hand we check that no two names are equals
+  def affectIfy(toBeReplaced: AstPred, prefix: String, scheduleMatters: Boolean = false): DagInstr = { //TODO faire un seul appel pour éviter de reconstuire le DAG plusieurs fois
+    /** reads have already been removed from toBeReplaced to not generate x=x */
+    val toBeAffected: List[AST[_]] = dagAst.visitedL.filter(a => toBeReplaced(a) /*&& isNotRead(a)*/);
+    toBeAffected.map(_.setNameIfNull(prefix));
+    if (toSet(toBeAffected).size < toBeAffected.size) //since name are given manually we need to check that  names are distincts
     throw new RuntimeException("a name is reused two times or we want to rewrite a read")
-    val repr = represent(toBeRepl)
+    /** associate a unique id for each affectation that will be generated */
+    val repr: Map[AST[_], String] = represent(toBeAffected)
 
-    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.treeIfy(toBeReplaced, repr)
-    /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
-    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.treeIfy((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
-    /** rewrite recursviely the affect expression so   as to insert read in them if necessary. we use this slightly modified dedagExclude instead of dedagRewrite
-     * to not generatre x=x  */
-    val affectExpList: List[AST[_]] = toBeRepl.map(deDagExclude)
+    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.setReadNode(toBeReplaced, repr)
+    /** avoid generating x=x when  the affected expression is itself rewritten recursively */
+    val deDagExclude: rewriteAST2 = (e: AST[_]) => e.setReadNode((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
+    /** rewrite recursviely the affect expression so as to insert read in them where necessary.  */
+    val affectExpList: List[AST[_]] = toBeAffected.map(deDagExclude)
 
-    /** returns the newly generated affect instruction */
+    /** newly generated affectations */
     newAffect = affectExpList.map((e: AST[_]) => Affect(e.name, e))
     val rewrite: Instr => Instr = (i: Instr) => i.propagate(deDagRewrite) //replace the expression by a read(identifier)
-    if (dagdag) propagateUnit(rewrite, newAffect) //computes input and output neighbors
-    else {
-      propagateUnit2(rewrite, newAffect);
-      dag = null; //should be recomputed because the expressions have changed
-      this
-    }
+    if (scheduleMatters) {
+      propagateUnitKeepSchedule(rewrite, newAffect); dag = null; this
+    } //dagdag should be recomputed because the expressions have changed
+    else propagateUnitKeepGenerators(rewrite, newAffect) //computes input and output neighbors
+
+
   }
 
 
@@ -98,12 +113,12 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
    * @return
    */
   def deTm1fy(toBeRepl: Set[ASTBt[_]]): DagInstr = { //TODO faire un seul appel pour éviter de reconstuire le DAG plusieurs fois
-    toBeRepl.map(_.setNameTm1());
+    toBeRepl.map(_.setNameIfNull("tmun"));
     //  toBeRepl.map(_.forwardName()) //that's because we will remove tm1
     val repr = represent(toBeRepl.toList) //2(toBeRepl)
-    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.treeIfy(toBeRepl.asInstanceOf[Set[AST[_]]], repr)
+    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.setReadNode(toBeRepl.asInstanceOf[Set[AST[_]]], repr)
     /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
-    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.treeIfy((e2: AST[_]) => (toBeRepl(e2.asInstanceOf[ASTBt[_]]) && (e2 != e)), repr)
+    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.setReadNode((e2: AST[_]) => (toBeRepl(e2.asInstanceOf[ASTBt[_]]) && (e2 != e)), repr)
     /** rewrite recursively the affect expression. we use this slightly modified dedagExclude instead of dedagRewrite
      * to not generatre x=x  */
     val affectExpList: List[AST[_]] = toBeRepl.map(deDagExclude).toList
@@ -154,39 +169,16 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
     dag
   }
 
-  /**
-   * @return returns a unique  name for each AST,
-   *         necessary because distinct AST can be equals  when compared as case class hierarchie
-   *         generate silly names systematically.
-   */
-  private def represent2(newExp: List[AST[_]]): Map[AST[_], String] = {
-    val res: HashMap[AST[_], String] = HashMap.empty ++ newExp.map((e: AST[_]) => (e -> e.name))
-    res
-  }
-
-  /** verifies that distinct trees get distinct names */
-  def checkDistinctName(bestName: HashMap[AST[_], String]) = {
-    if (bestName.values.toSet.size < bestName.keys.toSet.size) {
-      for ((x, y) <- bestName)
-        println(y + " is the name of " + x.toStringTree)
-      println("______________________________________________________________________________________________________________")
-      throw new Exception("there are distinct trees with identical names, " +
-        "probably due to over agressing search for meaningfull names," +
-        "complete the list of forbidden names in OkToUseForName in named.scala"
-      )
-    }
-  }
 
   /**
-   * @return returns a unique  name for each AST, and subAst, for which a name exists.
-   *         necessary because distinct AST can be equals  when compared as case class hierarchie
-   *         tries to find real name instead of created name with "aux_"
-   *         For this purpose, visite the expression of the instructions, for they can differ.
+   * @param newExp expressions needing a name
+   * @return a map associating a unique  name
+   *         distinct AST can be equals  when compared as case class hierarchy,
+   *         hence the necessity of a key to remove ambiguity
+   *         The algo tries to find real name instead of created name with "aux_"
    */
   private def represent(newExp: List[AST[_]]): Map[AST[_], String] = {
     /**
-     * selects the best name between two options
-     *
      * @param s1 option 1
      * @param s2 option 2
      * @return best option
@@ -196,15 +188,13 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
       if (s1.startsWith("_aux")) s2 else s1
     }
 
-    /**
-     * record the best name find up till now for a given AST expression
-     */
+    /** record the best name find up till now for a given AST expression */
     var bestName = immutable.HashMap.empty[AST[_], String]
 
     /**
      * update the the best name find up till now for a given AST expression
      *
-     * @param x new candidate name
+     * @param x new AST to be named
      * @return new best name
      */
     def newName(x: AST[_]) = {
@@ -215,20 +205,22 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
       else bestof2Name(bestName(x), x.name)
     }
 
-    for (x <- newExp)
-      if (x.name != null)
-        bestName += (x -> newName(x))
-    /* for (instr <- visitedL)
-       for (x <- instr.exps)
-         if (x.name != null)
-           bestName += (x -> newName(x)) //on récupére des noms!!
-     for (x <- dagAst.visitedL)
-       if (x.name != null)
-         bestName += (x -> newName(x))*/
-    checkDistinctName(bestName)
+    /** verifies that distinct trees get distinct names */
+    def checkDistinctName(bestName: HashMap[AST[_], String]) = {
+      if (bestName.values.toSet.size < bestName.keys.toSet.size) {
+        for ((x, y) <- bestName)
+          println(y + " is the name of " + x.toStringTree)
+        println("______________________________________________________________________________________________________________")
+        throw new Exception("there are distinct trees with identical names, " +
+          "probably due to over agressing search for meaningfull names," +
+          "complete the list of forbidden names in OkToUseForName in named.scala"
+        )
+      }
+    }
+
+    for (x <- newExp) if (x.name != null) bestName += (x -> newName(x))
+    checkDistinctName(bestName);
     bestName
   }
-
-
 
 }

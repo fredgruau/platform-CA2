@@ -43,7 +43,7 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
   var allGenerators: List[T] = List() //TODO maintain nonGenerator together with allGenerator, and forget visitedL
   /** @return non maximal dag's element */
   def nonGenerators(): List[T] = {
-    val aG = HashSet.empty[AST[_]] ++ allGenerators
+    val aG = HashSet.empty[T] ++ allGenerators
     visitedL.filter(!aG.contains(_))
   }
 
@@ -55,8 +55,10 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
   /** the set version of visitedL */
   private var visitedS: HashSet[T] = HashSet()
   addGreaterOf(generators) //visits all the Dag's nodes
-  override def toString = allGenerators.map(_.toStringTree).mkString("\n")
+  def toStringOld = allGenerators.map(_.toStringTree).mkString("\n")
 
+  override def toString: String = // "there is " + visitedL.length + " DagNodes\n" +
+    visitedL.reverse.map((i: DagNode[T]) => i.toString()).mkString("")
 
   /**
    * add new generators to the Dag together with nodes which can be accessed from those.
@@ -115,22 +117,42 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
     toSet(visitedL.filter(e => nUser2.contains(e) && nUser2(e) > 1)) //retains elements whose multiplicity is >=2
   }
 
+  /**
+   * Adds attributes allowing to compute the union find algorithm
+   *
+   * @param elt
+   */
+  case class Wrap(elt: T) extends Union[Wrap]
 
   /**
-   * if DagNodes  extend union wecan apply the unionFind algorithme to compute connected components .
+   * we apply the unionFind algorithme to compute connected components .
    *
-   * @param p predicate which defines adjacence beetween DagNodes
+   * @param p   predicate which defines adjacence beetween DagNodes
+   * @param all mapping associating an element to its wrapping. itcan be provided by the calling environment, it it needs it
+   * @result map associating a root to its component
+   *         TODO redefinir a partir de indexed paquet
+   */
+  def indexedComponents(p: (T, T) => Boolean, all: Map[T, Wrap] = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))): Map[T, List[T]] = {
+
+    for (src <- visitedL)
+      for (target <- src.inputNeighbors)
+        if (p(src, target))
+          all(src).union(all(target)) //computes a common root for elements of one component
+    visitedL.groupBy(all(_).root.elt)
+  }
+
+
+  /**
+   * we apply the unionFind algorithme to compute connected components .
+   *
+   * @param p   predicate which defines adjacence beetween DagNodes
+   * @param all mapping associating an element to its wrapping. itcan be provided by the calling environment, it it needs it
    * @result List of dagNodes of each component, as an iterable of iterable
    */
-  def components2(p: (T, T) => Boolean): Iterable[List[T]] = {
-    case class Wrap(elt: T) extends Union[Wrap]
-    val all = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))
-    for (src <- visitedL) for (target <- src.inputNeighbors) if (p(src, target)) all(src).union(all(target)) //computes a common root for elements of one component
-    visitedL.groupBy(all(_).root).values
+  def components2(p: (T, T) => Boolean, all: Map[T, Wrap] = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))): Iterable[List[T]] = {
+    indexedComponents(p, all).values
   }
 
 }
-
-
 
 

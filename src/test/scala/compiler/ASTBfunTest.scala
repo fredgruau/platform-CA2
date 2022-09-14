@@ -8,14 +8,14 @@ import org.scalatest.FunSuite
 
 import scala.collection.immutable.HashMap
 
-/** Test the correct implementation of integer operation, by evaluating them */
-class ASTBtest extends FunSuite {
+/** Test the correct implementation of integer operation, by evaluating them on samll integers */
+class ASTBfunTest extends FunSuite {
   /** repeat last bits to reach the count of n. */
   def extend(n: Int, l: List[Boolean], v: Boolean) = l ::: List.fill(n - l.length)(v)
 
   def toInt(xs: List[Boolean]): Int = xs.foldRight(0)((x, y) => 2 * y + (if (x) 1 else 0))
 
-  // def toASTB(x: Boolean) = if (x) True() else False()
+  // def toASTB(x: Boolean) = if (x) true else false
   //def carryFromCode(x: Boolean, y: Boolean, z: Boolean) = eval(carry(toASTB(x), toASTB(y), toASTB(z)))
   // def fromASTB(x: Boolean, y: Boolean, z: Boolean, op: (ASTB[B], ASTB[B], ASTB[B]) => ASTB[B]) = eval(op(toASTB(x), toASTB(y), toASTB(z)));
   // def fromASTB(x: Boolean, y: Boolean, op: (ASTB[B], ASTB[B]) => ASTB[B]) = eval(op(toASTB(x), toASTB(y)));
@@ -105,11 +105,11 @@ class ASTBtest extends FunSuite {
   val trois = Intof[SI](3)
   val quatre = Intof[SI](4);
   test("quatre") {
-    assert(eval(quatre, env) == List(False(), False(), True(), False()))
+    assert(eval(quatre, env) == List(false, false, true, false))
   }
   val cinq = Intof[SI](5)
   test("cinq") {
-    assert(eval(cinq, env) == List(True(), False(), True(), False()))
+    assert(eval(cinq, env) == List(true, false, true, false))
   }
   test("Binary") {
     assert(toInt(toBinary(3, 5)) === 3)
@@ -122,49 +122,49 @@ class ASTBtest extends FunSuite {
   }
   val mquatre = -quatre
   test("mquatre") {
-    assert(eval(mquatre, env) == List(False(), False(), True(), True()))
+    assert(eval(mquatre, env) == List(false, false, true, true))
   }
   val cinqmquatre = cinq - quatre
   test("cinqmquatre") {
-    assert(eval(cinqmquatre, env) == List(True(), False(), False(), False()))
+    assert(eval(cinqmquatre, env) == List(true, false, false, false))
   }
 
   /*
 
     //test concat
     val zero = Intof[SI](0);  val mult8 =   trois :: zero :: zero :: zero
-    test("ConcatMultiply"){assert(eval(mult8,env)==List(  False(),False(), False(),True(), True(), False()))}
+    test("ConcatMultiply"){assert(eval(mult8,env)==List(  false,false, false,true, true, false))}
   */
 
   //testLT
   val quatrelt0 = new Call1(ltSI1, quatre) with ASTBt[B]
   test("quatre<0") {
-    assert(eval(quatrelt0, env) == List(False()))
+    assert(eval(quatrelt0, env) == List(false))
   }
 
   val cinqLtquatre = new Call2(ltSI2, cinq, quatre) with ASTBt[B]
   test("cinq<quatre") {
-    assert(eval(cinqLtquatre, env) == List(False()))
+    assert(eval(cinqLtquatre, env) == List(false))
   }
 
   //test andLbtoR
   val quatreBis = True().&(quatre)(repr.nomSI)
   val false4 = False().&(quatre)(repr.nomSI)
-  test("andLbtoRTrue()") {
-    assert(eval(quatreBis, env) == List(False(), False(), True(), False()))
+  test("andLbtoRtrue") {
+    assert(eval(quatreBis, env) == List(false, false, true, false))
   }
   test("andLbtoRfalse") {
-    assert(eval(false4, env) == List(False(), False(), False(), False()))
+    assert(eval(false4, env) == List(false, false, false, false))
   }
 
   //test cond et min
   val min4et5 = new Call2(minSI, quatre, cinq) with ASTBt[SI]
   val min5et4 = new Call2(minSI, cinq, quatre) with ASTBt[SI]
   test("cond et min") {
-    assert(eval(min4et5, env) == List(False(), False(), True(), False()))
+    assert(eval(min4et5, env) == List(false, false, true, false))
   }
   test("cond et min2") {
-    assert(eval(min5et4, env) == List(False(), False(), True(), False()))
+    assert(eval(min5et4, env) == List(false, false, true, false))
   }
 
   //test extend
@@ -177,8 +177,8 @@ class ASTBtest extends FunSuite {
 
   //test fonction booleennes simple
   test("Carry") {
-    assert(eval(Call3(carry, True(), True(), False()), env) === List(True()))
-    assert(eval(Call3(carry, True(), False(), False()), env) === List(False()))
+    assert(eval(Call3(carry, True(), True(), False()), env) === List(true))
+    assert(eval(Call3(carry, True(), False(), False()), env) === List(false))
   }
 
   //test operation booléenne
@@ -195,14 +195,14 @@ class ASTBtest extends FunSuite {
   /*
 
     val oneStar=new Call1(orScanRightB.asInstanceOf[Fundef1R[SI]], mult8) with ASTBt[SI]
-    test("orScanRight"){assert(eval(oneStar,env)==List( True(), True(), True() ,True(), True(), false))}
+    test("orScanRight"){assert(eval(oneStar,env)==List( true, true, true ,true, true, false))}
   */
 
 
   //fonction utilisées dans bitify
   test("nBitR") {
     val nbitP = scala.collection.mutable.HashMap.empty[Param[_], Int] //virgin, to retrieve the nbits computed for the param.
-    val n = nBitR(HashMap.empty[AST[_], Int], quatre, nbitP, null)
+    val n = nbitExpAndParam(HashMap.empty[AST[_], Int], quatre, nbitP)
     assert(n == 4)
   }
 

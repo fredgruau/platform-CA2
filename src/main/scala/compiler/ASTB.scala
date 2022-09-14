@@ -1,15 +1,16 @@
 package compiler
 
 import dataStruc.DagNode._
-import ASTB.{ParOp, _}
+import ASTB.{ParOp, affBoolConst, _}
 import ASTBfun._
 import ASTL.rewriteASTLt
-import Circuit.{TabSymb, iTabSymb2}
+import Circuit.{TabSymb, iTabSymb, iTabSymb2}
 
 import scala.collection._
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.language.implicitConversions
 import AST._
+import compiler.Packet.{BitLoop, BitNoLoop}
 
 /**
  * node of Abstract Syntax Tree corresponding to an arithmetic field  boolean, integer (signed or unsigned)
@@ -33,89 +34,112 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
   }
 
   /**
-   * simplifies the expression directly
    *
-   * @param gen contains a table to read number of bits or reads
-   * @param env contains a table of param's expression to also compute their number of bits
-   * @return compiled ASTBt */
-  override def codeGen(i: Int, gen: CodeGen, name: String, env: HashMap[String, ASTBt[B]]): ASTBt[B] = {
+   * @param nl   code generation state variables
+   * @param name name of variable being affected
+   * @param env  map or scan parameter's expression for index i
+   * @return The boolean affectation compiled fro "this"
+   */
+  override def boolExprNoIndex(nl: BitNoLoop, name: String, env: HashMap[String, ASTBt[B]]): ASTBt[B] = {
+    var name2 = name
+    val exp = this.asInstanceOf[AST[_]] match {
+      case Neg(x) => addNeg(x.boolExprNoIndex(nl, null, env))
+      case Xor(x, y) => addXor(x.boolExprNoIndex(nl, null, env), y.boolExprNoIndex(nl, null, env))
+      case Or(x, y) => addOr(x.boolExprNoIndex(nl, null, env), y.boolExprNoIndex(nl, null, env))
+      case And(x, y) => addAnd(x.boolExprNoIndex(nl, null, env), y.boolExprNoIndex(nl, null, env))
+      case Shift(e, b) => Shift(e.boolExprNoIndex(nl, null, env), b)
+      case Tminus1(e) => Tminus1(e.boolExprNoIndex(nl, null, env))
+      case _ => throw new Exception("there should be only pure boolean operators here")
+    }
+    affBoolConst(name2, exp, nl)
+  }
+
+  /**
+   *
+   * @param i    current loop index considered
+   * @param l    code generation state variables
+   * @param name name of variable being affected
+   * @param env  map or scan parameter's expression for index i
+   * @return The boolean affectation or boolean expression corresponding to the loop index
+   */
+  override def boolifyForIndexI(i: Int, l: BitLoop, name: String, env: HashMap[String, ASTBt[B]]): ASTBt[B] = {
     var name2 = name
     val exp = this.asInstanceOf[ASTBg] match {
-      case Neg(x) => addNeg(x.codeGen(i, gen, null, env))
-      case Xor(x, y) => addXor(x.codeGen(i, gen, null, env), y.codeGen(i, gen, null, env))
-      case Or(x, y) => addOr(x.codeGen(i, gen, null, env), y.codeGen(i, gen, null, env))
-      case And(x, y) => addAnd(x.codeGen(i, gen, null, env), y.codeGen(i, gen, null, env))
+      case Neg(x) => addNeg(x.boolifyForIndexI(i, l, null, env))
+      case Xor(x, y) => addXor(x.boolifyForIndexI(i, l, null, env), y.boolifyForIndexI(i, l, null, env))
+      case Or(x, y) => addOr(x.boolifyForIndexI(i, l, null, env), y.boolifyForIndexI(i, l, null, env))
+      case And(x, y) => addAnd(x.boolifyForIndexI(i, l, null, env), y.boolifyForIndexI(i, l, null, env))
       case Mapp1(op, x) =>
-        var newEnv = env + (op.p1.nameP -> x(0).asInstanceOf[ASTBt[B]].codeGen(i, gen, null, env))
+        var newEnv = env + (op.p1.nameP -> x(0).asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, env))
         //we must add the second argument if it is present, as xb.
         if (x.size > 1)
-          newEnv = newEnv + (op.name -> x(1).asInstanceOf[ASTBt[B]].codeGen(i, gen, null, env))
-        op.arg.asInstanceOf[ASTBt[B]].codeGen(i, gen, null, newEnv)
+          newEnv = newEnv + (op.name -> x(1).asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, env))
+        op.arg.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, newEnv)
       case Mapp2(x, y, op) => //il se peut quon rajute un affect et augmente la tsymb
-        val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBt[B]].codeGen(i, gen, null, env)) +
-          (op.p2.nameP -> y.asInstanceOf[ASTBt[B]].codeGen(i, gen, null, env))
-        op.arg.asInstanceOf[ASTBt[B]].codeGen(i, gen, null, newEnv)
+        val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, env)) +
+          (op.p2.nameP -> y.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, env))
+        op.arg.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, newEnv)
       case sc@Scan1(x, op: Fundef2R[B], v, _, initUsed) =>
-        if (gen.firstIter(i) && initUsed)
-          affBoolConst(sc.scanVar, v, gen)
+        if (l.firstIter(i) && initUsed)
+          affBoolConst(sc.scanVar, v, l)
         else {
           val firstArg =
-            if (gen.firstIter(i)) v
-            else gen.readWithConst(sc.scanVar)
+            if (l.firstIter(i)) v
+            else l.readWithConst(sc.scanVar)
           val iShifted = if (initUsed)
-            i - gen.step
+            i - l.step
           else i //takes into account the fact that scan's values are shifted
           val newEnv = env +
             (op.p1.nameP -> firstArg) +
-            (op.p2.nameP -> x.asInstanceOf[ASTBt[B]].codeGen(iShifted, gen, null, env))
-          val e = op.arg.asInstanceOf[ASTBt[B]].codeGen(i, gen, null, newEnv)
-          if (gen.lastIter(i)) e
-          else affBoolConst(sc.scanVar, e, gen)
+            (op.p2.nameP -> x.asInstanceOf[ASTBt[B]].boolifyForIndexI(iShifted, l, null, env))
+          val e = op.arg.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, newEnv)
+          if (l.lastIter(i)) e
+          else affBoolConst(sc.scanVar, e, l)
         }
       case sc@Scan2(x, y, op: Fundef3R[B], v, _, initUsed) =>
-        if (gen.firstIter(i) && initUsed)
-          affBoolConst(sc.scanVar, v, gen)
+        if (l.firstIter(i) && initUsed)
+          affBoolConst(sc.scanVar, v, l)
         else {
           val firstArg =
-            if (gen.firstIter(i)) v
-            else gen.readWithConst(sc.scanVar) //sc10 first value vaut zero
-          val iShifted = if (initUsed) i - gen.step else i //takes into account the fact that scan's values are shifted
+            if (l.firstIter(i)) v
+            else l.readWithConst(sc.scanVar) //sc10 first value vaut zero
+          val iShifted = if (initUsed) i - l.step else i //takes into account the fact that scan's values are shifted
           val newEnv = env +
             (op.p1.nameP -> firstArg) +
-            (op.p2.nameP -> x.asInstanceOf[ASTBt[B]].codeGen(iShifted, gen, null, env)) +
-            (op.p3.nameP -> y.asInstanceOf[ASTBt[B]].codeGen(iShifted, gen, null, env))
-          val e = op.arg.asInstanceOf[ASTBt[B]].codeGen(i, gen, null, newEnv)
-          if (gen.lastIter(i)) e
-          else affBoolConst(sc.scanVar, e, gen)
+            (op.p2.nameP -> x.asInstanceOf[ASTBt[B]].boolifyForIndexI(iShifted, l, null, env)) +
+            (op.p3.nameP -> y.asInstanceOf[ASTBt[B]].boolifyForIndexI(iShifted, l, null, env))
+          val e = op.arg.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, newEnv)
+          if (l.lastIter(i)) e
+          else affBoolConst(sc.scanVar, e, l)
         }
-      case Shift(e, b) => Shift(e.codeGen(i, gen, null, env), b)
-      case Tminus1(e) => Tminus1(e.codeGen(i, gen, null, env))
+      case Shift(e, b) => Shift(e.boolifyForIndexI(i, l, null, env), b)
+      case Tminus1(e) => Tminus1(e.boolifyForIndexI(i, l, null, env))
       case Elt(n, exp) =>
-        val newExp = exp.asInstanceOf[ASTBt[B]].codeGen(i, gen, null, env)
-        val indexElt = if (n == -1) gen.bitSize - 1 else n
+        val newExp = exp.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, env)
+        val indexElt = if (n == -1) l.loopSize - 1 else n
         if (i == indexElt) AffBool(name, newExp) else if (i != indexElt)
           name2 = null
         newExp
       case Reduce(exp, op, init) =>
-        val newExp = exp.asInstanceOf[ASTBt[B]].codeGen(i, gen, null, env)
+        val newExp = exp.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, env)
         name2 = name //we allways make an affectation
         val newRedExp =
-          if (gen.firstIter(i)) newExp
+          if (l.firstIter(i)) newExp
           else {
             val newEnv = env +
               (op.p1.nameP -> new Read(name)(repr(B)) with ASTBt[B]) +
               (op.p2.nameP -> newExp)
-            op.arg.asInstanceOf[ASTBt[B]].codeGen(i, gen, null, newEnv)
+            op.arg.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, newEnv)
           }
         newRedExp
       case ex@Extend(n: Int, exp: ASTBg) =>
-        val nbitExp = exp.nBit(gen, env)
+        val nbitExp = exp.nBit(l.tSymbVar, l.coalesc, env)
         var newExp: ASTBt[B] = null
-        if (i < nbitExp) newExp = exp.asInstanceOf[ASTBt[B]].codeGen(i, gen, null, env)
-        if (exp.mym.name == SI() && i == nbitExp - 1) affBoolConst(ex.scanVar, newExp, gen) //we store the sign bit
+        if (i < nbitExp) newExp = exp.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, env)
+        if (exp.mym.name == SI() && i == nbitExp - 1) affBoolConst(ex.scanVar, newExp, l) //we store the sign bit
         else if (i < nbitExp) newExp
         else if (exp.mym.name == UI()) ASTB.False()
-        else if (exp.mym.name == SI()) gen.readWithConst(ex.scanVar) // sign bit replicates
+        else if (exp.mym.name == SI()) l.readWithConst(ex.scanVar) // sign bit replicates
         else throw new Exception("extend bordel probably is UISI and we 'd need to know wether it is SI or UI")
       case exp@Intof(value: Int) =>
         val t = exp.mym.name.asInstanceOf[I];
@@ -123,15 +147,15 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
         val p = scala.math.pow(2, nbit).toInt;
         fromBoolB(toBinary(value + (if (value >= 0) 0 else p), nbit)(i))
       case co@Concat2(exp1, exp2) =>
-        val nbitExp1 = exp1.nBit(gen, env)
+        val nbitExp1 = exp1.nBit(l.tSymbVar, l.coalesc, env)
         //val nbitExp2=exp2.nBit(gen,env)
         if (i < nbitExp1)
-          exp1.asInstanceOf[ASTBt[B]].codeGen(i, gen, null, env)
+          exp1.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, env)
         else
-          exp2.asInstanceOf[ASTBt[B]].codeGen(i - nbitExp1, gen, null, env)
+          exp2.asInstanceOf[ASTBt[B]].boolifyForIndexI(i - nbitExp1, l, null, env)
 
     }
-    affBoolConst(name2, exp.asInstanceOf[ASTBt[B]], gen)
+    affBoolConst(name2, exp.asInstanceOf[ASTBt[B]], l)
   }
 
   override def deCallify(env: HashMap[String, ASTBg], ts: TabSymb[InfoNbit[_]]): ASTBg = {
@@ -281,14 +305,6 @@ object ASTB {
     def opposite = throw new Exception("Both has no opposite")
   }
 
-  /*
-    sealed class ParamUse
-    final case class SingleUse() extends ParamUse
-    final case class ToBeStored() extends ParamUse
-    class Pipelined extends ParamUse
-    case class PipelinedFirstUse() extends Pipelined
-    case class PipelinedOthertUse() extends Pipelined
-  */
 
 
   /** Communication Constructors, work for both Booleans and integers  */
@@ -312,25 +328,31 @@ object ASTB {
   implicit def toBoolB(d: ASTBt[B]): Boolean = if (d == True()) true else if (d == False()) false else
     throw new Exception("pas boolean")
 
-  def fromBoolB(d: Boolean): ASTBt[B] = if (d == true) True() else False()
+  /**
+   *
+   * @param b boolean to be read
+   * @return boolean as an ASTB instance
+   */
+  def fromBoolB(b: Boolean): ASTBt[B] = if (b == true) True() else False()
 
   final case class Xor(arg: ASTBt[B], arg2: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Doubleton[AST[_]] //{assert(y.nbit==x.nbit)}
   final case class And(arg: ASTBt[B], arg2: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Doubleton[AST[_]] //{assert(y.nbit==x.nbit)}
   final case class Or(arg: ASTBt[B], arg2: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Doubleton[AST[_]] //{assert(y.nbit==x.nbit)}
   final case class Neg(arg: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Singleton[AST[_]]
 
-  /** ¯Boolean Affectation are also expression */
+  /** ¯Boolean Affectation are also considered as  expression */
   final case class AffBool(nameb: String, arg: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Singleton[AST[_]]
 
   def affBool(nameb: String, arg: ASTBt[B]) = if (nameb == null) arg else AffBool(nameb, arg)
 
-  def affBoolConst(nameb: String, arg: ASTBt[B], g: CodeGen) =
+
+  def affBoolConst(nameb: String, arg: ASTBt[B], g: Packet): ASTBt[B] =
     if (arg.isConst) {
-      if (nameb != null) g.constant = g.constant + (nameb -> fromBoolB(arg));
+      if (nameb != null) g.constantTable.addOne(nameb -> fromBoolB(arg));
       arg
     } //we need to return the constant because it could be afected to other variable
     else {
-      if ((nameb != null) && (g.constant.contains(nameb))) g.constant = g.constant - nameb //variable are reused they can loose their status of bieng constant
+      if ((nameb != null) && (g.constantTable.contains(nameb))) g.constantTable.remove(nameb) //variable are reused they can loose their status of bieng constant
       if (nameb == null) arg else AffBool(nameb, arg)
     }
 
@@ -348,13 +370,23 @@ object ASTB {
     def scanVar = "_sc" + nb //fixme j'ai peur que si on apelle deux fois une fonction avec un scan on instancie deux fois le meme scanVar alors que il en faudrait deux distinctes
   }
 
+  /**
+   * An oprerator with outputStored must store its result. Reduce and Elt are such.
+   **/
+  trait OutputStored
+
+  /**
+   * An oprerator with inputStored must have its input stored, in order to be able to traverse it several time (binary encode)
+   **/
+  trait InputStored
+
   /** returns bit at position i, modulo nbit. Obs: -1 is the index of the last bit. */
-  case class Elt[R <: I](i: Int, arg: ASTBt[R])(implicit n: repr[B]) extends ParOp[B](Both()) with Singleton[AST[_]]
+  case class Elt[R <: I](i: Int, arg: ASTBt[R])(implicit n: repr[B]) extends ParOp[B](Both()) with Singleton[AST[_]] with OutputStored
 
-  case class Reduce[R <: I](arg: ASTBt[R], op: Fundef2R[B], init: ASTBt[B])(implicit n: repr[B]) extends ParOp[B](Both()) with Singleton[AST[_]]
+  case class Reduce[R <: I](arg: ASTBt[R], op: Fundef2R[B], init: ASTBt[B])(implicit n: repr[B]) extends ParOp[B](Both()) with Singleton[AST[_]] with OutputStored
 
 
-  val eltRed: AST[_] => Boolean = (x: AST[_]) => x.isInstanceOf[Reduce[_]] || x.isInstanceOf[Elt[_]]
+  val outputStored: AST[_] => Boolean = (x: AST[_]) => x.isInstanceOf[OutputStored]
 
 
   /** Integer Constructor */
@@ -418,74 +450,141 @@ object ASTB {
   /**
    * //TODO memoiser pour ne pas avoir a rappeler 40,000 fois add
    *
-   * @param nbit stores the number of bits of parameters
-   * @param d    the AST we want to know how many bits it has
-   * @param pm   memorizes change of parameter 's bit number if any
+   * @param nbitASTBParam    stores the number of bits of parameters which have been passed up to now
+   * @param d                the ASTB we want to know how many bits it has
+   * @param paramBitIncrease memorizes the increase of ASTB parameter's bit size
    * @return bit size of $d
    */
-  def nBitR(nbit: immutable.HashMap[AST[_], Int], d: AST[_], pm: mutable.HashMap[Param[_], Int], g: CodeGen): Int = {
-    /** register parames that needs to be extended, with more bits, because they are combined with Ints having more bits.  */
-    def levelup(x: AST[_], a1: Int, a2: Int): Unit = {
+  def nbitExpAndParam(nbitASTBParam: immutable.HashMap[AST[_], Int], d: AST[_], paramBitIncrease: mutable.HashMap[Param[_], Int]): Int = {
+    /**
+     * records in  paramBitIncrease, parameters that needs to be extended, because they are combined with Ints having more bits.
+     *
+     * @param x  should be a parameter of the boolean function??
+     * @param a1 computed bit size of parameter
+     * @param a2 computed bit size it should have
+     */
+    def increaseParamBitSize(x: AST[_], a1: Int, a2: Int): Unit = {
       if (a1 < a2) {
         x match {
-          case p: Param[_] => pm += (p -> a2);
-          case _ => throw new RuntimeException("pb bit number in ASTB")
+          case p: Param[_] => paramBitIncrease += (p -> a2);
+          case _ => throw new RuntimeException("we would like to increase the bit sizeof x but x is not a parameter")
         }
       }
-    } //if not a parameter ca bugge.
-    def maxim(x: AST[_], y: AST[_]): Int = {
-      val (nx, ny) = (nBitR(nbit, x, pm, g), nBitR(nbit, y, pm,g))
-      levelup(x, nx, ny);
-      levelup(y, ny, nx);
+    }
+
+    /**
+     *
+     * @param x first expression of scan2 or map2
+     * @param y second  expression of scan2 or map2
+     * @return compute the max bit size of both arguments while  applying  recursively recording of paramBitIncrease deeper down
+     */
+    def maxArgSize(x: AST[_], y: AST[_]): Int = {
+      val (nx, ny) = (nbitExpAndParam(nbitASTBParam, x, paramBitIncrease), nbitExpAndParam(nbitASTBParam, y, paramBitIncrease))
+      increaseParamBitSize(x, nx, ny);
+      increaseParamBitSize(y, ny, nx);
       math.max(nx, ny)
     }
 
     d match {
       case Intof(n) => nbitCte(n, d.mym.name.asInstanceOf[I])
-
-      //case BoolOf(_) => 1
       case True() | False() => 1
-      case Call1(f, e) => nBitR(nbit + (f.p1 -> nBitR(nbit, e, pm, g)), f.arg, pm, g)
-      case Call2(f, e, e2) => nBitR(nbit + (f.p1 -> nBitR(nbit, e, pm, g)) + (f.p2 -> nBitR(nbit, e2, pm, g)), f.arg, pm, g)
-      case e@Param(_) => nbit(e)
-      case Neg(x) => nBitR(nbit, x, pm, g)
+      case Call1(f, e) => nbitExpAndParam(nbitASTBParam + (f.p1 -> nbitExpAndParam(nbitASTBParam, e, paramBitIncrease)), f.arg, paramBitIncrease)
+      case Call2(f, e, e2) => nbitExpAndParam(nbitASTBParam + (f.p1 -> nbitExpAndParam(nbitASTBParam, e, paramBitIncrease)) + (f.p2 -> nbitExpAndParam(nbitASTBParam, e2, paramBitIncrease)), f.arg, paramBitIncrease)
+      case e@Param(_) => nbitASTBParam(e)
+      case Neg(x) => nbitExpAndParam(nbitASTBParam, x, paramBitIncrease)
       case Xor(_, _) => 1
       case Or(_, _) => 1
       case And(_, _) => 1
-      case Scan1(exp, _, _, _, initused) => nBitR(nbit, exp, pm, g) + (if (initused) 0 else 0)
-      case Scan2(exp, exp2, _, _, _, _) => maxim(exp, exp2)
+      case Scan1(exp, _, _, _, initused) => nbitExpAndParam(nbitASTBParam, exp, paramBitIncrease) + (if (initused) 0 else 0)
+      case Scan2(exp, exp2, _, _, _, _) => maxArgSize(exp, exp2)
       case Reduce(_, _, _) => 1 //FIXME doesnot work for the reduction with concat
-      case Mapp2(exp, exp2, _) => maxim(exp, exp2)
-      case Shift(e, _) => nBitR(nbit, e, pm, g)
-      case Tminus1(e) => nBitR(nbit, e, pm, g)
-      case Mapp1(_, expList) => nBitR(nbit, expList.head, pm, g)
+      case Mapp2(exp, exp2, _) => maxArgSize(exp, exp2)
+      case Shift(e, _) => nbitExpAndParam(nbitASTBParam, e, paramBitIncrease)
+      case Tminus1(e) => nbitExpAndParam(nbitASTBParam, e, paramBitIncrease)
+      case Mapp1(_, expList) => nbitExpAndParam(nbitASTBParam, expList.head, paramBitIncrease)
       //case MappBI(exp, exp2, opp)               => nBitR(nbit, exp2, pm)
       case Elt(_, _) => 1;
-      case Concat2(exp, exp2) => nBitR(nbit, exp2, pm, g) + nBitR(nbit, exp, pm, g) //
+      case Concat2(exp, exp2) => nbitExpAndParam(nbitASTBParam, exp2, paramBitIncrease) + nbitExpAndParam(nbitASTBParam, exp, paramBitIncrease) //
       case Extend(n, _) => n
-      case Read(x) =>
-        if (dataStruc.Named.isTmp(x) && g.tableAllAffect.contains(x))
-          nBitR(nbit, g.tableAllAffect(x).exps(0), pm, g)
-        else if (g.tableAllPipelined.contains(x))
-          nBitR(nbit, g.tableAllPipelined(x).exps(0), pm, g)
-        else if (g.tSymbVar.contains(x))
-          g.tSymbVar(x).nb
-        else if (g.coalesc.contains(x) && g.tSymbVar.contains(g.coalesc(x)))
-          g.tSymbVar(g.coalesc(x)).nb
-        else throw new Exception("where is " + x)
+      case Read(x) => throw new Exception("when a boolean expression is evaluated only Param are used, not read")
+
     }
   }
 
-  def dir2(t: Any) = t.asInstanceOf[Affect[_]].exp.asInstanceOf[ASTBg].dir1
+  /**
+   * same as nBitExpandParam, except it does not  memorizes the increase of ASTB parameter's bit size
+   *
+   * @param nbitASTBParam stores the number of bits of parameters which have been passed up to now
+   * @param d             the ASTB we want to know how many bits it has
+   * @param g             is set to null if not needed
+   * @return bit size of $d
+   */
+  def nbitExp2(nbitASTBParam: immutable.HashMap[AST[_], Int], d: AST[_], g: TabSymb[InfoNbit[_]], c: iTabSymb[String]): Int = {
+    /**
+     *
+     * @param x first expression of scan2 or map2
+     * @param y second  expression of scan2 or map2
+     * @return compute the max bit size of both arguments while  applying  recursively recording of paramBitIncrease deeper down
+     */
+    def maxArgSize(x: AST[_], y: AST[_]): Int = {
+      val (nx, ny) = (nbitExp2(nbitASTBParam, x, g, c), nbitExp2(nbitASTBParam, y, g, c))
+      math.max(nx, ny)
+    }
+
+    d match {
+      case Intof(n) => nbitCte(n, d.mym.name.asInstanceOf[I])
+      case True() | False() => 1
+      case Call1(f, e) => nbitExp2(nbitASTBParam + (f.p1 -> nbitExp2(nbitASTBParam, e, g, c)), f.arg, g, c)
+      case Call2(f, e, e2) => nbitExp2(nbitASTBParam + (f.p1 -> nbitExp2(nbitASTBParam, e, g, c)) + (f.p2 -> nbitExp2(nbitASTBParam, e2, g, c)), f.arg, g, c)
+      case e@Param(_) => nbitASTBParam(e)
+      case Neg(x) => nbitExp2(nbitASTBParam, x, g, c)
+      case Xor(_, _) => 1
+      case Or(_, _) => 1
+      case And(_, _) => 1
+      case Scan1(exp, _, _, _, initused) => nbitExp2(nbitASTBParam, exp, g, c) + (if (initused) 0 else 0)
+      case Scan2(exp, exp2, _, _, _, _) => maxArgSize(exp, exp2)
+      case Reduce(_, _, _) => 1 //FIXME doesnot work for the reduction with concat
+      case Mapp2(exp, exp2, _) => maxArgSize(exp, exp2)
+      case Shift(e, _) => nbitExp2(nbitASTBParam, e, g, c)
+      case Tminus1(e) => nbitExp2(nbitASTBParam, e, g, c)
+      case Mapp1(_, expList) => nbitExp2(nbitASTBParam, expList.head, g, c)
+      //case MappBI(exp, exp2, opp)               => nBitR(nbit, exp2, pm)
+      case Elt(_, _) => 1;
+      case Concat2(exp, exp2) => nbitExp2(nbitASTBParam, exp2, g, c) + nbitExp2(nbitASTBParam, exp, g, c) //
+      case Extend(n, _) => n
+      case Read(x) =>
+        if (g.contains(x)) g(x).nb
+        else if (c.contains(x) && g.contains(c(x))) g(c(x)).nb
+        else
+          throw new Exception("where is " + x + "?")
+    }
+  }
+
+
+  /**
+   *
+   * @param t instruction
+   * @return direction of instruction
+   */
+  def instrDirection(t: Any): Option[Dir] = t.asInstanceOf[Affect[_]].exp.asInstanceOf[ASTBg].dir1
 
   /** Binary code, LSB at head */
   def toBinary(n: Int, size: Int): List[Boolean] =
     if (size == 0) List() else (if (n % 2 == 1) true else false) :: toBinary(n / 2, size - 1)
 
-  /** Computes the names affected in the expression */
-  def tmpNames(code1loop: List[ASTBt[B]]): (HashSet[String], HashSet[String]) = {
-    def isTmp(s: String) = s != null && s.startsWith("_") && !s.startsWith("_aux")
+  /**
+   *
+   * @param s name of a variable
+   * @return true if that variable is a temporary variable introduced in the last stage of compilation.
+   */
+  def isTmp(s: String): Boolean = s != null && s.startsWith("_") && !s.startsWith("_aux")
 
+  /**
+   *
+   * @param code1loop binary code of a loop
+   * @return names defined in the expression , name used in the expression
+   */
+  def tmpNames(code1loop: List[ASTBt[B]]): (HashSet[String], HashSet[String]) = {
     var resRead = HashSet[String]()
     var resDef = HashSet[String]()
 
@@ -506,7 +605,6 @@ object ASTB {
       tmpNames(bInst)
     (resDef, resRead)
   }
-
 
   def isNotMap1Read(iT: collection.Set[AST[_]]): AstPred = {
     case Mapp1(_, x :: _) =>

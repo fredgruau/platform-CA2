@@ -1,7 +1,10 @@
 package dataStruc
 
-import scala.collection.immutable
-import scala.collection.immutable.HashMap
+import compiler.Circuit.iTabSymb
+
+import scala.collection.{immutable, mutable}
+import scala.collection.immutable.{HashMap, HashSet}
+import scala.collection.mutable.ArrayBuffer
 
 /** Explicitely stores  neighbors uses names to set them */
 trait WiredInOut[T <: WiredInOut[T]] extends DagNode[T] {
@@ -11,13 +14,11 @@ trait WiredInOut[T <: WiredInOut[T]] extends DagNode[T] {
   var inputNeighbors: List[T] = List.empty;
 
   /** names of variables read by instruction. */
-  def usedVars(): immutable.HashSet[String]
+  def usedVars(): Set[String]
 
   /** names of variables produced by instruction. */
   def names: List[String]
-
   def isShift = (names.nonEmpty) && names(0).startsWith("shift")
-
 }
 
 object WiredInOut {
@@ -65,4 +66,131 @@ object WiredInOut {
     setInputNeighbor(instrs)
     setOutputNeighbors(instrs)
   }
+
+  /**
+   *
+   * @param dagNodes List of Dag's elements
+   * @return returns the max element of the list, by filtering  out  elements who  have output Neighbors in the list
+   */
+  def sup2[T <: WiredInOut[T]](dagNodes: List[T]) = {
+    val s = dagNodes.toSet
+    dagNodes.filter(_.outputNeighbors.toSet.intersect(s).isEmpty)
+  }
+
+  /**
+   *
+   * @param packets defines and uses variables that need to be stored at some adresses
+   * @tparam T
+   * @return an Hashmap telling where to store each variables
+   */
+  def heap[T <: WiredInOut[T]](packets: List[T]): HashMap[String, Int] = {
+    /**
+     * adress (or register number) where a given variable will be stored,
+     */
+    var adress: HashMap[String, Int] = HashMap()
+    /**
+     * heap memory, for each integer adress, stores which variable is stored or wether it is empty
+     */
+    var memory: ArrayBuffer[String] = //new mutable.ArrayBuffer[String](20) //I minimize the proba that it will not be enough
+      mutable.ArrayBuffer.fill(20)(null)
+
+    /**
+     * @param valu new variables to be stored in memory
+     *             stores variables in memory, updates the mapping res
+     */
+    def place(valu: Set[String]): Unit = {
+      var value = valu
+      for (i <- 0 to memory.size - 1) {
+        if (value.isEmpty)
+          return
+        if (memory(i) == null) {
+          val e = value.head
+          memory(i) = e
+          value = value - e
+          adress = adress + (e -> i)
+        }
+      }
+      throw new Exception(" we need bigger memory")
+    }
+
+    /** remove the variables from memory */
+    def unPlace(value: Set[String]) = {
+      for (s <- value)
+        memory(adress(s)) = null
+    }
+
+    var liveVar: HashSet[String] = HashSet()
+    var liveVars: List[HashSet[String]] = List(liveVar) //strings contained in buffer
+    for (p <- packets.reverse) { //we compute live vars, starting from the end towards the beginning
+      liveVar = liveVar.union(p.usedVars()).diff(p.names.toSet)
+      liveVars ::= liveVar
+    }
+    place(liveVar)
+    for ((p, l) <- (packets zip liveVars.tail)) {
+      place(p.names.toSet)
+      unPlace(p.names.toSet.union(liveVar).diff(l)) //we keep only l in the memory
+      liveVar = l
+    }
+
+
+    adress
+  }
+
+  /**
+   *
+   * @param usedVars set of defined variable plus set of read variables, at each loop
+   * @return an association of each variable to an integer corresponding to a variable used for arithmetic
+   *         the required number  of such cells is simply the map size
+   *         The algo follows a generic allocation strategy; reusable in other circumstances.
+   *         todo turn this generic
+   */
+  def allocateInt(usedVars: List[(HashSet[String], HashSet[String])]): iTabSymb[Int] = {
+    /**
+     * adress (or register number) where a given variable will be stored,
+     */
+    var res: HashMap[String, Int] = HashMap()
+    /**
+     * heap memory, for each integer adress, stores which variable is stored or wether it is empty
+     */
+    var memory: ArrayBuffer[String] = //new mutable.ArrayBuffer[String](20) //I minimize the proba that it will not be enough
+      mutable.ArrayBuffer.fill(20)(null)
+
+    var liveVars: HashSet[String] = HashSet() //strings contained in buffer
+
+    /**
+     * @param valu new variables to be stored in memory
+     *             stores variables in memory, updates the mapping res
+     */
+    def place(valu: HashSet[String]): Unit = {
+      var value = valu
+      for (i <- 0 to memory.size - 1) {
+        if (value.isEmpty)
+          return
+        if (memory(i) == null) {
+          val e = value.head
+          memory(i) = e
+          value = value - e
+          res = res + (e -> i)
+        }
+      }
+      throw new Exception(" we need bigger memory")
+    }
+
+    /** remove the variables from memory */
+    def unPlace(value: HashSet[String]) = {
+      for (s <- value)
+        memory(res(s)) = null
+    }
+
+    for ((defined, read) <- usedVars) {
+      place(read diff liveVars) //adds new variables defined before, read for the last time
+      liveVars = liveVars.union(read)
+      place(defined diff liveVars) //newly defined variable d may be still in use after, we have to add them only if it was not the case
+      liveVars = liveVars diff defined //newly defined variable will surely not be used before their point of definition
+      unPlace(defined)
+    }
+    res
+  }
+
+
 }

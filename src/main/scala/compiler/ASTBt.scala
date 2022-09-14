@@ -1,6 +1,6 @@
 package compiler
 
-import AST.{Call1, Call2, Call3, Delayed, Fundef1, Fundef2, Fundef3, Layer, Param, Read, AstPred}
+import AST.{AstPred, Call1, Call2, Call3, Delayed, Fundef1, Fundef2, Fundef3, Layer, Param, Read}
 import ASTB.{And, Dir, Extend, False, Intof, Mapp2, Or, ParOp, Scan1, Scan2, Tminus1, True, Xor, nbitCte, rewriteASTBt}
 import ASTBfun.{ASTBg, Fundef2R}
 import ASTL.rewriteASTLt
@@ -10,6 +10,7 @@ import scala.collection.{Map, immutable, mutable}
 import scala.collection.immutable.{HashMap, HashSet}
 import Array._
 import ASTB._
+import compiler.Packet.{BitLoop, BitNoLoop}
 import dataStruc.Named
 
 /** Identifies AST corresponding to int or bool, excludes those obtained with cons */
@@ -18,39 +19,34 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
   def isConst = false
 
 
-  /** return the affbool that label subtrees neares to the root */
+  /** return the affbool that label subtrees nearest to the root */
   def affBoolify(): List[ASTBt[B]] = {
     inputNeighbors.flatMap(_.asInstanceOf[ASTBt[_]].affBoolify())
   }
 
-  def codeGen(i: Int, gen: CodeGen, name: String, env: HashMap[String, ASTBt[B]]): ASTBt[B] = {
+  /**
+   *
+   * @param i    current loop index considered
+   * @param l    code generation state variables
+   * @param name name of variable being affected
+   * @param env  map or scan parameter's expression for index i
+   * @return The boolean affectation or boolean expression corresponding to the loop index
+   */
+  def boolifyForIndexI(i: Int, l: BitLoop, name: String, env: HashMap[String, ASTBt[B]]): ASTBt[B] = {
     val exp = this.asInstanceOf[AST[_]] match {
       case u@Param(_) => env(u.nameP)
-      case Read(x) =>
-        if (gen.tablePipelined.contains(x)) {
-          if (gen.evaluated(x) * gen.step > i * gen.step)
-            throw new Exception("when a map is combined with a scan with initused, the scan must comes first for pipelining to work!!")
-          //with initused, it is the map which will first read the pipelined array, the scan will not.
-          if (gen.evaluated(x) * gen.step < i * gen.step) { //means that we have not yet compiled x's pipelined expression
-            gen.evaluated += (x -> i) //register the fact that yes now we 'll compile it
-            val newExp = gen.tablePipelined(x).exps(0).asInstanceOf[ASTBg].codeGen(i, gen, null, env) //compiles it
-            val s: String = if (gen.lastIter(i) && gen.pipeUs(x) == 1) null else x //for last iteration, a pipelined variable used once need not be stored,
-            affBoolConst(s, newExp, gen)
-          }
-          else
-            gen.readWithConst(x)
-        }
-        else {
-          assert(gen.tSymbVar.contains(x) || Named.isTmp(x) ||
-            gen.tSymbVar.contains(gen.coalescSafe(x)), "could not find" + x) //x has to be a register generated during spatial unfolding
-          //it could also be a temporary arithmetic variable generated for a previous loop
-          gen.readWithConst(gen.addSufx(x, i))
-          //new Read(x+sufx)(repr(B())) with ASTBt[ B ]
-        }
+      case Read(x) => l.readAtIndex(x, i, env)
     }
-    affBoolConst(name, exp, gen)
+    affBoolConst(name, exp, l)
   }
 
+  def boolExprNoIndex(nl: BitNoLoop, name: String, env: HashMap[String, ASTBt[B]]): ASTBt[B] = {
+    val exp = this.asInstanceOf[AST[_]] match {
+      case u@Param(_) => env(u.nameP)
+      case Read(x) => nl.read(x)
+    }
+    affBoolConst(name, exp, nl)
+  }
 
   def ring: R = mym.name
 
@@ -74,22 +70,6 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
   /** sinon y a une erreur du compilo scala empty modifier. */
   val u = 3;
   val v = 3
-  /*
-
-    def unfoldBit(env: HashMap[String, List[ASTBt[B]]],tabSymb:  TabSymb[InfoNbit[_]]): List[ASTBt[B]]=
-      this.asInstanceOf[AST[_]] match  {
-        case Read(x) =>range(0,tabSymb(x).nb).toList.map( (i:Int)=>(new Read[B](x+i)(new repr[B](B())) with ASTBt[B]).asInstanceOf[ASTBt[B]] )
-        case u @ Param(_)            => env(u.nameP)
-        case Call1(op, x)         =>
-          val newEnv= env + (op.p1.nameP -> x.asInstanceOf[ASTBg].unfoldBit(env,tabSymb))
-          op.arg.asInstanceOf[ASTBg].unfoldBit(newEnv ,tabSymb)
-        case Call2(op, x, y)         =>
-          val newEnv= env + (op.p1.nameP -> x.asInstanceOf[ASTBg].unfoldBit(env,tabSymb))+
-            (op.p2.nameP  -> y.asInstanceOf[ASTBg].unfoldBit(env,tabSymb))
-          op.arg.asInstanceOf[ASTBg].unfoldBit(newEnv ,tabSymb)
-      }
-  */
-
 
   /** return the direction if there is one */
   def dir1: Option[Dir] = if (isInstanceOf[ParOp[_]]) Some(asInstanceOf[ParOp[_]].dirNarrowed)
@@ -167,21 +147,21 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
    * @return the Dag where expression used more than once are replaced by read.
    *         generates ASTs such as READ that preserve the implementation of  ASTLscal by using "with"
    */
-  override def treeIfy(usedTwice: AstPred, repr: Map[AST[_], String]): ASTBt[R] = {
-    val rewrite: rewriteASTBt[R] = (d: ASTBt[R]) => d.treeIfy(usedTwice, repr)
+  override def setReadNode(usedTwice: AstPred, repr: Map[AST[_], String]): ASTBt[R] = {
+    val rewrite: rewriteASTBt[R] = (d: ASTBt[R]) => d.setReadNode(usedTwice, repr)
     val newD: ASTBt[R] = if (usedTwice(this)) new Read[R](repr(this))(mym) with ASTBt[R]
     else this match {
       case a: ASTB[R] => a.propagateASTB(rewrite)
       case _ => this.asInstanceOf[AST[_]] match {
         case Param(_) => new Read[R]("p" + repr(this))(mym) with ASTBt[R]
-        case l: Layer[_] => new Read[R](AST.lify(repr(this)))(mym) with ASTBt[R]
+        case l: Layer[_] => (new Read[R](Named.lify(repr(this)))(mym) with ASTBt[R])
         case Read(_) => this //throw new RuntimeException("Deja dedagifié!")
         case Delayed(arg) => //arg.asInstanceOf[ASTLt[L, R]].propagate(rewrite)
-          arg().asInstanceOf[ASTBt[R]].treeIfy(usedTwice, repr) //the useless delayed node is supressed
-        case Call1(f, a) => new Call1(f.asInstanceOf[Fundef1[Any, R]], a.asInstanceOf[ASTBg].treeIfy(usedTwice, repr))(mym) with ASTBt[R]
+          arg().asInstanceOf[ASTBt[R]].setReadNode(usedTwice, repr) //the useless delayed node is supressed
+        case Call1(f, a) => new Call1(f.asInstanceOf[Fundef1[Any, R]], a.asInstanceOf[ASTBg].setReadNode(usedTwice, repr))(mym) with ASTBt[R]
         case Call2(f, a, a2) => new Call2(f.asInstanceOf[Fundef2[Any, Any, R]],
-          a.asInstanceOf[ASTBg].treeIfy(usedTwice, repr),
-          a2.asInstanceOf[ASTBg].treeIfy(usedTwice, repr))(mym) with ASTBt[R]
+          a.asInstanceOf[ASTBg].setReadNode(usedTwice, repr),
+          a2.asInstanceOf[ASTBg].setReadNode(usedTwice, repr))(mym) with ASTBt[R]
       }
     }
     newD.setName(if (repr.contains(this)) repr(this) else this.name);
@@ -243,10 +223,18 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
   }
 
 
-  def nBit(gen: CodeGen, env: HashMap[String, ASTBt[B]]): Int = {
-    var paramBitSize = immutable.HashMap[AST[_], Int]()
-    paramBitSize = paramBitSize ++ env.map((f: (String, ASTBt[B])) => (Param(f._1)(repr(f._2.ring)) -> (f._2.nBit(gen, env))))
-    nBitR(paramBitSize, this, mutable.HashMap.empty[Param[_], Int], gen)
+  /**
+   * THIs is an Integer expression, as opposed to a boolean expression.
+   *
+   * @param t   symbolTable with bitsize
+   * @param env ""Contains expression of parameters ""
+   * @param c   coalesced registers
+   * @return the number of bits used by the expression
+   */
+  def nBit(t: TabSymb[InfoNbit[_]], c: iTabSymb[String], env: HashMap[String, ASTBt[B]]): Int = {
+    val paramBitSize = immutable.HashMap[AST[_], Int]() ++ //comutes the bit size of the parameters
+      env.map((f: (String, ASTBt[B])) => (Param(f._1)(repr(f._2.ring)) -> (f._2.nBit(t, c, env))))
+    nbitExp2(paramBitSize, this, t, c)
   }
 }
 

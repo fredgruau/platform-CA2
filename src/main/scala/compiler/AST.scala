@@ -28,12 +28,14 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
   /** if type of mym is set to repr[_] this allow covariance even if repr is not covariant */
   val mym: repr[T] = m
 
+  /** @return tabulation for printing instructions returning type T */
+  def tabulations = 2
 
   /** Builds the set of symbols which are read
    * do not consider layer, those represent memory cells to be loaded */
   def symbolsExcepLayers: immutable.HashSet[String] =
     this match {
-      case Read(s) => if (isLayer(s)) HashSet() else HashSet(s)
+      case Read(s) => if (Named.isLayer(s)) HashSet() else HashSet(s)
       case Param(s) => HashSet(s)
       case l: Layer[_] => HashSet() //HashSet(l.name)
       case _ => inputNeighbors.map(e => e.symbolsExcepLayers).foldLeft(HashSet.empty[String])((x, y) => x.union(y))
@@ -73,18 +75,16 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
     }
 
   /**
-   * Transform a Dag of AST into a forest of trees, removes the delayed.
-   * Treefy must be written for AST because  Coons are AST but not ASTLt[L,R]
-   * T is preserved, for type checking consistency
-   * *
+   * Treefy must be written also for AST because  Coons are AST but not ASTLt[L,R]
    *
    * @param usedTwice dags which are used twice, or which need to be affected for some other reason.
    * @param idRepr    :id of representant of the equivalence class with respect to equal on case class hierarchy
-   * @return transformed AST where expression used more than once are replaced by read.
-   */
+   * @return transformed tree  with preserved T type, for type checking consistency
+   *         where delayed are removed, and expression usedTwice are replaced by read.
+   *         transformation is applied on the whole tree, so subtree verifying usedTwice will form an independant family  */
 
-  def treeIfy(usedTwice: AstPred, idRepr: Map[AST[_], String]): AST[T] = {
-    val rewrite: AST[T] => AST[T] = (d: AST[T]) => d.treeIfy(usedTwice, idRepr)
+  def setReadNode(usedTwice: AstPred, idRepr: Map[AST[_], String]): AST[T] = {
+    val rewrite: AST[T] => AST[T] = (d: AST[T]) => d.setReadNode(usedTwice, idRepr)
     if (usedTwice(this)) new Read[T](idRepr(this))(mym.asInstanceOf[repr[T]])
     else this.propagate(rewrite)
   }
@@ -127,15 +127,16 @@ object AST {
     case AST.Read(_) => false;
     case _ => true
   }
+  val isRead: AstPred = {
+    case AST.Read(_) => true
+    case _ => false
+  }
   /** Predicate on ASTs true for Cons related constructor */
   val isCons: AstPred = {
     case Taail(_) | Heead(_) | Call1(_, _) | Call2(_, _, _) | Call3(_, _, _, _) => true;
     case _ => false
   }
 
-  def lify(name: String): String = "ll" + name
-
-  def isLayer(str: String): Boolean = str.charAt(0) == 'l' && str.charAt(1) == 'l'
 
   type rewriteAST[U] = AST[U] => AST[U]
   type rewriteAST2 = AST[_] => AST[_]
@@ -236,7 +237,7 @@ object AST {
 
     /** @return all the user system call, plus the memorized call which is automatically added
      *          must be launched after seting names */
-    def systInstr: List[CallProc] = CallProc("memo", List(AST.lify(name)), List(next)) :: sysInstr
+    def systInstr: List[CallProc] = CallProc("memo", List(Named.lify(name)), List(next)) :: sysInstr
 
 
   }

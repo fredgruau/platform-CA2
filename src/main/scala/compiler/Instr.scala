@@ -1,22 +1,21 @@
 package compiler
 
 import AST._
-import ASTB.{AffBool, Elt, Reduce, Tminus1}
+import ASTB.AffBool
 import ASTBfun.{ASTBg, redop}
-import InfoType._
 import Instr._
-import Locus.{deploy, _}
 import VarKind._
-import dataStruc.{Align, Dag, DagInstr, DagNode, WiredInOut}
+import dataStruc.{Align2, Dag, DagInstr, DagNode, WiredInOut}
 import Circuit._
-import dataStruc.Align.{compose, invert}
+import compiler.Packet.BitLoop
+import dataStruc.Align2.{compose, invert}
 
 import scala.language.postfixOps
-import scala.collection._
+import scala.collection.{mutable, _}
 import scala.collection.immutable.{HashMap, HashSet}
 
 /** Instruction used within the compiler, call, affect. Dag and Union allows to defined ConnectedComp  */
-abstract class Instr extends DagNode[Instr] with Align[Instr] with WiredInOut[Instr] {
+abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
 
   protected def show(x: Option[Locus]) = x match {
     case Some(s) => "" + s
@@ -28,14 +27,12 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with WiredInOut[In
     case None => ""
   }
 
-  def toString(tabu: Int): String
 
-  def codGen(i: Int, gen: CodeGen, env: HashMap[String, ASTBt[B]]): ASTBt[B] = null
+  def boolExprForIndexI(i: Int, gen: BitLoop, env: HashMap[String, ASTBt[B]]): ASTBt[B] = null //only defined for affect!
 
   def detm1ise(muName: String): Instr = if (names(0) != muName) this else new Affect(muName, exps(0).asInstanceOf[ASTBt[Ring]].detm1ise)
 
   def detm1iseR: Instr = new Affect(names(0), exps(0).asInstanceOf[ASTBt[Ring]].detm1iseR)
-
 
   /**
    *
@@ -46,17 +43,16 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with WiredInOut[In
 
   def unShifted = names(0).drop(5)
 
-  def myZone(tZone: Map[String, Zone]) = tZone(root.names.head)
+  def myZone2(tZone: Map[String, Zone], myRoot: Map[String, Instr]) = tZone(myRoot(names.head).names.head)
 
-  def isFolded(tZ: Map[String, Zone]) = myZone(tZ).folded
+  def isFolded2(tZ: Map[String, Zone], myRoot: Map[String, Instr]) = myZone2(tZ, myRoot).folded
 
-  def inputFolded(tZ: Map[String, Zone]) = inputNeighbors.head.isFolded(tZ)
+  def inputFolded2(tZ: Map[String, Zone], myRoot: Map[String, Instr]) = inputNeighbors.head.isFolded2(tZ, myRoot)
 
-  def mySchedule(tZ: Map[String, Zone]): Array[Int] = {
+  def mySchedule2(tZ: Map[String, Zone], myRoot: Map[String, Instr], align2Root: Map[String, Array[Int]]): Array[Int] = {
     // if(names(0)=="distTslope")     printf("jysuis\njysuis\njysuis\njysuis\njysuis\njysuis\njysuis\njysuis\njysuis\n")
-    val ps = myZone(tZ).pickedSchedule //schedule of root which is aux5 must be O51324
-    val a = alignToRoot //alignement to root must be 240513 for distTslope
-
+    val ps = myZone2(tZ, myRoot).pickedSchedule //schedule of root which is aux5 must be O51324
+    val a = align2Root(names.head) //alignement to root must be 240513 for distTslope
     val res = if (a != null) compose(ps, invert(a)) else null //must give 234501 will be null for shift instr
     res
   }
@@ -84,11 +80,13 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with WiredInOut[In
    */
   def propagate(id1: rewriteAST2): Instr
 
-  override def aligned = !alignPerm.isEmpty //faut se mefier, ca va pas marcher pour load?
+  def aligned = !alignPerm.isEmpty //faut se mefier, ca va pas marcher pour load?
 
 
   /** true for instruction part or Transfer Connected Components */
-  def isTransfer: Boolean
+  def isTransfer: Boolean = {
+    throw new RuntimeException("test isTransfer is done only in Affect instruction ")
+  }
 
   /** @return the locus of expressions, for affectation. */
   def locus: Option[Locus] = None
@@ -107,8 +105,8 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with WiredInOut[In
       null
     else if (alignPerm.contains(n.names.head)) //n is a used var of this, so "this" is an element of n.neighbor,
     alignPerm(n.names.head) //neighborAligned(n.names(0))  is an alignement from "this" to n,
-    else if (n.alignPerm.contains(names.head)) //ca doit etre le contraire, i.e. this is a used var of n. we find an alignement from n to "this", we must invert
-    Align.invert(n.alignPerm(names.head))
+    else if (n.alignPerm.contains(names.head)) //otherwise, it must be the opposite i.e. this is a used var of n. we find an alignement from n to "this", we invert
+    Align2.invert(n.alignPerm(names.head))
     else throw new RuntimeException(" Not find alignement ")
   }
 
@@ -158,20 +156,20 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with WiredInOut[In
 
   /**
    *
-   * @param cur     The current programm
-   * @param nbitLB  Stores number of bits of subfields.
-   * @param tSymb   The symbol table with number of bits
-   * @param newFuns Functions generated
+   * @param cur        The current programm
+   * @param expBitSize mutable map, Stores number of bits of sub expressions.
+   * @param tSymb      The symbol table with number of bits
+   * @param newFuns    Functions generated
    * @return The instructions rewritten so as to include Extend where necessary.
    */
-  def bitIfy(cur: DataProg[InfoType[_]], nbitLB: AstField[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[DataProg[InfoNbit[_]]]): Instr = this match {
+  def bitIfy(cur: DataProg[InfoType[_]], expBitSize: AstMap[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[DataProg[InfoNbit[_]]]): Instr = this match {
     case Affect(s, exp) =>
-      val newExp = exp.asInstanceOf[ASTLt[_, _]].bitIfy(cur, nbitLB, tSymb)
-      tSymb += s -> new InfoNbit(cur.tSymbVar(s).t, cur.tSymbVar(s).k, nbitLB(newExp));
+      val newExp = exp.asInstanceOf[ASTLt[_, _]].bitIfyAndExtend(cur, expBitSize, tSymb)
+      tSymb += s -> new InfoNbit(cur.tSymbVar(s).t, cur.tSymbVar(s).k, expBitSize(newExp));
       Affect(s, newExp).asInstanceOf[Instr]
     case CallProc(f, names, exps) =>
-      val newexps = exps.map(_.asInstanceOf[ASTLt[_, _]].bitIfy(cur, nbitLB, tSymb))
-      val nbitarg = newexps.map(a => nbitLB(a)) //.toList.flatten
+      val newexps = exps.map(_.asInstanceOf[ASTLt[_, _]].bitIfyAndExtend(cur, expBitSize, tSymb))
+      val nbitarg = newexps.map(a => expBitSize(a)) //.toList.flatten
       val newname = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _)
 
       //  if (f.size>2 && sysInstr.contains(f.substring(0,3)))
@@ -196,8 +194,8 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with WiredInOut[In
     this match {
       case Affect(v, exp) => // println(exp.toStringTree) ;
         val exp2 = exp.asInstanceOf[ASTLt[_, _]]
-        //processing redop separately
 
+        //processing redop separately
 
         exp2.locus match {
           case s: S => s.deploy(v).zip(exp2.unfoldSimplic(m)).map({ case (suf, e) => Affect(suf, e) }).toList
@@ -221,7 +219,7 @@ abstract class Instr extends DagNode[Instr] with Align[Instr] with WiredInOut[In
  * where several parameters can be passed by result.
  *
  * @param p     procedure's' name
- * @param names resutl's name
+ * @param names names of values produced by procedure.
  * @param exps  passed as data
  */
 case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) extends Instr {
@@ -239,12 +237,8 @@ case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) exte
    */
   def preciseName(motherLayer: String) = p += motherLayer
 
-  /**
-   * @return string shows the results being affected simultaneously
-   */
-  override def toString(tabu: Int): String = " " * tabu + pad(names.mkString(","), 25 - tabu) + "<-" + p + "(" + exps.map(_.toStringTree).mkString(" ") + ")\n"
 
-  override def toString: String = pad(names.mkString(","), 25) + "<-" + p + "(" + exps.map(_.toStringTree).mkString(" ") + ")\n"
+  override def toString: String = pad(names.mkString(","), 25) + "<-" + p + "(" + exps.map(_.toStringTree).mkString(" ") + ")"
 
 
   //override def toString: String = pad(names.foldLeft(" ")(_ + "," + _).substring(2), 25) + "<-" + p + "(" + exps.map(_.toStringTree).foldLeft(" ")(_ + " " + _) + ")\n"
@@ -255,9 +249,6 @@ case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) exte
    */
   def usedVars(): HashSet[String] = exps.map(_.symbolsExcepLayers).foldLeft(immutable.HashSet.empty[String])(_ | _)
 
-
-  override def isTransfer: Boolean =
-    throw new RuntimeException("test isTransfer is done only in macro, which do not have CallProc instr. ")
 
   override def propagate(id1: rewriteAST2): Instr = {
     val newInstr = CallProc(p, names, exps.map((a: AST[_]) => id1(a)))
@@ -284,14 +275,12 @@ case class ShiftInstr(name: String, shifted: String, perm: Array[Int]) extends I
 
   override def names: List[String] = List(name)
 
-  // override def namesDefined: List[String] = List(shifted)
-  override def toString(tabu: Int): String = "toto"
 }
 
 
 /** allows to remove tm1s by storing latter. */
 case class Store(name: String, delay: Int, exp: AST[_]) extends Instr {
-  override def toString(tabu: Int): String = " " * tabu + pad(name, 25 - tabu) + "Store" + delay + " " + exp.toStringTree + show(locus) + show2(locus2) + "\n"
+  override def toString(): String = pad(name, 25) + "Store" + delay + " " + exp.toStringTree + show(locus) + show2(locus2)
 
   override def exps: List[AST[_]] = List(exp)
 
@@ -299,7 +288,6 @@ case class Store(name: String, delay: Int, exp: AST[_]) extends Instr {
 
   override def propagate(id1: rewriteAST2): Instr = Store(name, delay, id1(exp))
 
-  override def isTransfer: Boolean = throw new Exception("not defined on Store")
 
   override def usedVars(): HashSet[String] = exp.symbolsExcepLayers
 
@@ -308,12 +296,10 @@ case class Store(name: String, delay: Int, exp: AST[_]) extends Instr {
 
 /** allows to remove tm1s by storing latter. */
 case class Loop(names: List[String], exps: List[AffBool]) extends Instr {
-  override def toString(tabu: Int): String = exps.map(
-    " " * tabu + pad(names.reduce(_ + "," + _), 25 - tabu) + _ + "\n").mkString("\n")
+  override def toString(): String = exps.map(pad(names.reduce(_ + "," + _), 25) + _ + "\n").mkString("\n")
 
   override def propagate(id1: rewriteAST2): Instr = throw new Exception("not to be implemented")
 
-  override def isTransfer: Boolean = throw new Exception("not defined on Loop")
 
   override def usedVars(): HashSet[String] = HashSet() //todo
 }
@@ -338,12 +324,12 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
       Store(name, 0, e)
   }
 
-  override def toString(tabu: Int): String = " " * tabu + pad(name, 25 - tabu) + "<-  " + exp.toStringTree + show(locus) + show2(locus2) +
-    (if (alignPerm.isEmpty) "" else alignPerm.map({ case (k, v) => " aligned on: " + k + " with: " + v.toList + ";  " })) + "\n"
+  override def toString: String = {
+    val tabu = exp.tabulations
+    " " * tabu + pad(name, 25 - tabu) + "<-  " + exp.toStringTree + show(locus) + show2(locus2)
+  }
 
-  override def toString: String =
-    pad(name, 25) + "<-  " + exp.toStringTree + show(locus) + show2(locus2) +
-      (if (alignPerm.isEmpty) "" else alignPerm.map({ case (k, v) => " aligned on: " + k + " with: " + v.toList + ";  " }))
+  //+(if (alignPerm.isEmpty) "" else alignPerm.map({ case (k, v) => " aligned on: " + k + " with: " + v.toList + ";  " }))
 
   /** Computes the max of integer length take in the input */
   def maxBitSize(t: iTabSymb[InfoNbit[_]]): Int = {
@@ -353,28 +339,26 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
     return res
   }
 
-  def addParamR(tSymbVar: TabSymb[InfoNbit[_]]): List[Instr] = {
+  /**
+   * for redop wich are also result parameters, we introduce an intermediate macroFields,
+   * toto<-reduce remains  toto<-reduce  but toto is now a macrofield
+   * and a suplementary affectation stores toto into totoR which is now the  paramR,
+   * this manipulation will spare memory read and writes todo avoid recomputing the whole dag
+   *
+   * @param tSymbVar mutable symbol table will be completed
+   * @return former instruction with macrofield, plus supplementary affectation
+   */
+  def insertMacroFieldbeforeReduceParamR(tSymbVar: TabSymb[InfoNbit[_]]): List[Instr] = {
     if (tSymbVar(name).k == ParamR() && isRedop) {
       val newName = name + "R"
       tSymbVar.addOne(newName, tSymbVar(name))
       tSymbVar.addOne(name, tSymbVar(name).macroFieldise)
-      val t = tSymbVar(name)
       val newAffect = Affect(newName, readLR(name, exp.mym.asInstanceOf[repr[(Locus, Ring)]]))
       List(this, newAffect)
-
-    }
-    else List(this)
+    } else List(this)
   }
 
-  /**
-   *
-   * @param dagZones
-   * @param zones zones indexed by names
-   * @return the zone to which the instruction belong
-   */
-  def myZone(dagZones: Dag[Zone], zones: iTabSymb2[Zone]) = zones(a(root).name)
 
-  //def isReducedOfFolded= exp.isInstanceOf[RedO]
   def exps = List(exp)
 
   def isRedop = exp.asInstanceOf[ASTL.ASTLg]
@@ -418,7 +402,7 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
 
   /**
    *
-   * @param cs conxtraints for cycle
+   * @param cs constraints for cycle
    * @param t  updated with new symbols
    * @return aligned instruction, together with shift affect
    */
@@ -435,11 +419,48 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
     newAffect :: result //We return  also the shift-affect instruction
   }
 
-  override def codGen(i: Int, gen: CodeGen, env: HashMap[String, ASTBt[B]]): ASTBt[B] = {
-    exp.asInstanceOf[ASTBg].codeGen(i, gen, gen.addSufx(name, i), env)
-
+  /**
+   * updates alignement
+   *
+   * @param cs store cycle constraints
+   * @param t  updated with new symbols for shift
+   * @return aligned instruction, together with shift affect
+   */
+  def align2(cs: TabSymb[Constraint], t: TabSymb[InfoNbit[_]], a: mutable.Map[(String, String), Array[Int]]): List[Instr] = {
+    val r = Result()
+    val newExp = exp.asInstanceOf[ASTLt[_, _]].align(r, t)
+    val newAffect = Affect(name, newExp)
+    newAffect.alignPerm = r.algn //to be removed
+    r.algn.map({ case (k, v) => a.addOne((name, k), v) })
+    var result: List[Instr] = List()
+    if (r.c != None) {
+      cs.addOne(name -> r.c.get)
+      result = r.si.values.toList
+    }
+    newAffect :: result //We return  also the shift-affect instruction
   }
 
+
+  /**
+   *
+   * @param inst an integer affectation, decomposed into independant packets
+   * @return a list of list of pure boolean affectations, each list is independant from the next with respect to pipelined variables
+   *         the affect of the inner list are printed on the same line,they correspond to the loop on index,
+   *         the number of lines is therefore equal to the number of independant paceai
+   *         updates several global variables :the symbol table  to computes bit size
+   */
+
+  /**
+   *
+   * @param i   current looop index considered. -1 if boolean and not integer
+   * @param gen contains all the info to produce the code
+   * @param env map or scan parameter's expression for index i
+   * @return The boolean affectation or boolean expression corresponding to the loop index
+   */
+  override def boolExprForIndexI(i: Int, gen: BitLoop, env: HashMap[String, ASTBt[B]]): ASTBt[B] = {
+    exp.asInstanceOf[ASTBg].boolifyForIndexI(i, gen, gen.addSufx(name, i) /*we pass the name of the boolean variable to be affected */ , env)
+
+  }
 
 }
 
@@ -451,16 +472,14 @@ object Instr {
   val sysInstr = HashSet("ret", "bug", "sho", "mem")
 
   /**
-   *
    * @return true for callProc that will not need to store their result in storedField, but instead are executed directly
+   *         this means in fact the "memo" callProc .memo will be replaced by affectation to paramR, when moved to macro
    **/
   def isProcessedInMacro(p: String) = p == "memo" //TODO programmer memo comme une sous classe de callProc
-  //|| p.startsWith("bug") we decide to keep call to bug outside macro
-  // memo will be replaced by affectation to paramR, when moved to macro
+  //|| p.startsWith("bug") we decided to keep call to bug outside loopCA
 
 
   /**
-   *
    * @param f name of a procedure
    * @return true if f is a system call
    */
@@ -470,8 +489,10 @@ object Instr {
    * @return i.asInstanceOf[Affect[_]]*/
   def a(i: Instr): Affect[_] = i.asInstanceOf[Affect[_]]
 
+  /** Generates a Read with a spatial type.*/
   def readLR(s: String, m: repr[(Locus, Ring)]) = new Read(s)(m) with ASTLt[Locus, Ring]
 
+  /** Generates a Read with a scalar type.*/
   def readR(s: String, m: repr[Ring]) = new Read(s)(m) with ASTBt[Ring]
 
   def reduceR(a1: ASTBg, a2: ASTBg, opred: redop[Ring], m: repr[Ring]) =
@@ -503,6 +524,14 @@ object Instr {
   private def deploy(n: String, tSymb: TabSymb[InfoNbit[_]]): List[String] =
     Locus.deploy(n, tSymb(n).t.asInstanceOf[(_ <: Locus, _)] _1)
 
+  private var nameCompteuraux = 0
+
+  def getCompteurAux: Int = {
+    nameCompteuraux += 1;
+    nameCompteuraux
+  }
+
+  private def newAux(): String = "_aux" + getCompteurAux
 
   /**
    *
@@ -518,7 +547,7 @@ object Instr {
      */
     def process(e: AST[_]): List[Affect[_]] = {
       val already = tsymb.contains(e.name)
-      val newName = if (!already || already && tsymb(e.name).k == MacroField()) e.name else newFunName2()
+      val newName = if (!already || already && tsymb(e.name).k == MacroField()) e.name else newAux()
       //we create another variable to return result, in case it is a layer.
       paramD += newName;
       tsymb += newName -> InfoType(e, ParamR())

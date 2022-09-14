@@ -1,17 +1,18 @@
 package compiler
 
-import AST.Read
-import ASTBfun.ASTBg
-
 import scala.collection.{Iterator, Seq}
 
 /** The 9 locus. Three simplicial locus: V for vertex, E for edge, F for face, */
 sealed abstract class Locus {
-  /** suffix of variable names representing simplicial types */
-  val sufx: Array[String]
+  /** @return where to print the variable of affect instructions, so that we can distinguish between S,E,F,T
+   */
+  def tabul: Int = this match {
+    case V() => 0
+    case E() => 3
+    case F() => 5
+    case T(_, _) => 9
+  }
 
-  /** arity is the locus's arity */
-  def lessufx: Array[String]
 
   def isTransfer = false
 
@@ -19,7 +20,14 @@ sealed abstract class Locus {
 
   def fanout = 6 / density
 
-  /** suffix distinguishing the associated scalars encoding the spatial locus */
+  /** suffix of variable names representing simplicial types arity is the locus's arity */
+  val sufx: Array[String]
+
+  /** generates allways 6 suffixe */
+  def lessufx: Array[String]
+
+  /** adds a suffix to a name in order to distinguish between the associated scalars encoding the spatial locus */
+
   def deploy(n: String): Array[String]
 
   /** encodes a neutral permutation with the right number of elements. */

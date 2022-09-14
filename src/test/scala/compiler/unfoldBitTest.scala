@@ -78,15 +78,15 @@ class unfoldBitTest extends FunSuite {
 
   val signtotom2 = new Call1(sign, totom2) with ASTBt[SI]
   val testMinSign = new Call2(minSI, signtotom2, sign2) with ASTBt[SI]
-  test("codeGen") {
+/*  test("codeGen") {
     val cod = new CodeGen(tsymb)
     // autre test effectués -toto totop1 (tata+toto) (tata-toto) (tata<=toto) (twoWays) -toto abs m2e signm2e lemin signMin totom2 totogt signtata
-    val res = cod.codeGen(new Affect("tutu", totogt).asInstanceOf[Affect[ASTBg]])
+    val res = cod.boolifyInstr(new Affect("tutu", totogt).asInstanceOf[Affect[ASTBg]])
     val res2 = res.map(_.map(_.toStringTree).mkString("|_____|"))
     println(cod.loops)
     println("________________\n" + res2.mkString("\n"))
-    print(cod.constant)
-  }
+    print(cod.isBoolConstant)
+  }*/
 
 
   test("slice") { //print((toto-tata).deCallify(env3, tsymb).toStringTree)

@@ -3,35 +3,47 @@ package compiler
 import Circuit.TabSymb
 import Constraint.{Partition, empty, noneIsEmpty, propagate}
 import Instr.a
-import dataStruc.{DagNode, toSet, WiredInOut}
-import scala.collection.Iterable
+import dataStruc.{DagNode, Schedule, WiredInOut, isIdentity, toSet}
+import scala.collection.{Iterable, Map}
 import scala.collection.immutable.{HashMap, HashSet}
 
 /**
  *
  * @param root               instruction representing the zone
- * @param constraintSchedule constraint to be met for node to be foldable
- * @param partitionnedIn     for each input zone, gives the associated partition.
- * @param nonPartitionnedIn  Edge without partition
+ * @param constraintSchedule constraint to be met for node to be foldable.it is progressively refined, until  picking one single schedule
+ * @param partitionnedIn     stores partition constraints towards adjacent zones (input and output neighbors?) indexed by their name
+ * @param vars               name of variable computed by instructions exept those of transfer zone, except those whose alingment is not id.
+ * @param nonPartitionnedIn  list names of input adjacent zones with no partition constraints
+ * @param nonIdAlignToRoot   alignement of  variable computed by transfer instructions, when it is not not identity.
  */
-class Zone(val root: Affect[_],
-           val instrs: Iterable[Affect[_]],
-
-           /** Constraint for folding. it is progressively refined, until after picking
-            * whereby only one single schedule is left to be followed */
-           var constraintSchedule: Constraint,
-
-           /** stores partition constraints towards adjacent zones (input and output neighbors?) indexed by their name  */
-           var partitionnedIn: HashMap[String, Partition],
-
-           /** list names of input adjacent zones with no partition constraints   */
-           var nonPartitionnedIn: HashSet[String])
+class Zone(val root: Affect[_], val instrs: Iterable[Affect[_]], var constraintSchedule: Constraint,
+           var partitionnedIn: HashMap[String, Partition], var nonPartitionnedIn: HashSet[String],
+           private val vars: Set[String], private val nonIdAlignToRoot: Map[String, Array[Int]])
   extends DagNode[Zone] with WiredInOut[Zone] {
 
   def checkInvariant = {
     if (partitionnedIn.keys.size + nonPartitionnedIn.size != inputNeighbors.size)
       throw new Exception("edge are either partitionned or not partitionned" +
         partitionnedIn.keys.size + "+" + nonPartitionnedIn.size + "!=" + neighbors.size)
+  }
+
+  /** prints  the locus, the variable synchronized (aligned with id) the variable aligned with a spécific permutation,
+   * whether it is folded, the current constraints, and the input and output edges to resp. variables used from computation done
+   * in input zone, , variable in output zone, whose computation is using  computation done in this zone; */
+  override def toString: String = {
+    val toStringLocus = if (isTransfer) "TT" else "" + locus
+
+    def toStringAlign = if (nonIdAlignToRoot.isEmpty) "" else (nonIdAlignToRoot.keys groupBy (nonIdAlignToRoot(_))).map({ case (k, v) => k.toSeq -> v }).mkString(",")
+
+    def toStringFolded = if (locus == V()) "" else ((if (!folded) " not" else "") + " folded")
+
+    def toStringConstr = if (locus == V()) "" else " constr:  " + constraintSchedule
+
+    checkInvariant;
+    "*****Zone " + toStringLocus + " {" + vars.mkString(",") + "}" + toStringAlign + toStringFolded + toStringConstr +
+      " IN-edges: [" + inputNeighbors.map(_.name) + "]" +
+      " OUT-edges: [" + outputNeighbors.map(_.name) + "]" + "\n"
+    //instrs.toList.mkString("")+ "\n"
   }
 
   /** Locus of root */
@@ -62,15 +74,7 @@ class Zone(val root: Affect[_],
   /** true for transfer zone */
   def isTransfer = locus.isTransfer
 
-  /** prints the name, the locus, whether it is folded, the current constraints, and the edges */
-  override def toString: String = {
-    checkInvariant;
-    " ***********Node " + name + (if (!folded) " not" else "") + " folded" +
-      " constr:  " + constraintSchedule +
-      " IN-edges: [" + inputNeighbors.map(_.name) + "]" +
-      " OUT-edges: [" + outputNeighbors.map(_.name) + "]" + "\n" +
-      instrs.toList.mkString("")
-  }
+
 
   var partitionnedInOut: HashMap[String, Partition] = HashMap()
 
@@ -139,13 +143,19 @@ class Zone(val root: Affect[_],
 }
 
 object Zone {
+
+  val id6: Array[Int] = Array(0, 1, 2, 3, 4, 5)
+
   /**
    * @param constraints cycle constrains computed during the align phase
    * @param instrs      instructions associated to the zone.
+   * @param myRoot      mapping a name to the root instruction
+   * @param align2root  alignement on root
    * @return a zone with partition computed towards input neighbors zone
    *
    */
-  def apply(constraints: TabSymb[Constraint], instrs: Iterable[Affect[_]]) = {
+  def apply(constraints: TabSymb[Constraint], instrs: Iterable[Affect[_]], alignPerm: Map[(String, String),
+    Array[Int]], align2root: dataStruc.Schedule, myRoot: Map[String, Affect[_]]) = {
     /**
      *
      * @param i      source instruction
@@ -160,17 +170,18 @@ object Zone {
       else Some(
         if (i.isTransfer) //$i2 is simplicial
         {
-          val partition: Constraint = Partition(i.alignPerm(a(iInput).name),
+          val partition: Constraint = Partition(alignPerm((i.names.head, a(iInput).name)),
             iInput.locus.get.asInstanceOf[S], i.locus.get.asInstanceOf[TT]) //constraint on i 's schedule
-          partition.permute(i.alignToRoot, i.root.locus.get).asInstanceOf[Partition]
+          partition.permute(align2root(a(i).name), (myRoot(i.names.head)).locus.get).asInstanceOf[Partition]
         } //expressed with respect to the root.
         else { // $i is simplicial, $i2 is transfer
           val slocus = iloc.asInstanceOf[S]
           val partition = Partition(slocus.proj, slocus, iInput.locus.get.asInstanceOf[TT]) //when doing a reduction,
           // the mapping from Tlocus to Slocus is constant, and determined by the slocus
-          partition.permute(iInput.alignToRoot, iInput.root.locus.get) //align on root
+          partition.permute(align2root(a(iInput).name), myRoot(iInput.names.head).locus.get) //align on root
         })
     }
+
 
     /**
      * @param i instruction visited
@@ -181,29 +192,42 @@ object Zone {
       if (ns.size != 1) return None
       val n = ns.head
       if (constraints.contains(n)) {
-        val c = Some(constraints(n).permute(i.alignToRoot, i.root.locus.get))
+        val c = Some(constraints(n).permute(align2root(i.names.head), myRoot(i.names.head).locus.get))
         c
       } else None
     }
 
-    val root: Affect[_] = a(instrs.head.root);
+    val root: Affect[_] = myRoot(instrs.head.name);
     val locus = root.locus.get
+    /** permutation constraints générée par les shift */
     val aC: List[Constraint] = instrs.flatMap(alignedConstr(_)).toList
-    val foldConstr = if (locus.isTransfer) Constraint.intersect(aC, locus)
-    else if (locus == V()) empty(V()) //Vertex Zone are not folded.
-    else Constraint.AllConstr(locus) //ya pas de contraintes générées sur les zones simpliciales
+    /** if satisfied, then zone can be folded */
+    val foldConstr =
+      if (locus.isTransfer) Constraint.intersect(aC, locus)
+      else if (locus == V()) empty(V()) //Vertex Zone are not folded.
+      else Constraint.AllConstr(locus) //pour le moment, ya pas de contraintes générées sur les zones simpliciales
     /** couple of instruction where the second on is an input of the first one, in a distinct zone     */
     val instrIntputInstr: Iterable[(Instr, Instr)] = instrs.flatMap((i: Instr) =>
-      i.inputNeighbors.filter((i2: Instr) => i2.root != root).map((i, _))) //we consider inputNeigbors in a distinct zone
+      i.inputNeighbors.filter((i2: Instr) => myRoot(i2.names.head) != root).map((i, _))) //we consider inputNeigbors in a distinct zone
     var partitionnedIn = HashMap.empty[String, Partition]
     var nonPartitionnedIn = HashSet.empty[String]
     for ((i, i2) <- instrIntputInstr) {
-      val name = a(i2.root).name; val p = partitionIn(i, i2)
+      val name = a(myRoot(i2.names.head)).name
+      val p = partitionIn(i, i2)
       if (p == None) nonPartitionnedIn = nonPartitionnedIn + name
       else partitionnedIn = partitionnedIn + (name -> p.get)
     }
-    new Zone(root, instrs, foldConstr, partitionnedIn, nonPartitionnedIn)
-  }
+    //compute synchronized variables
+    var nonIdAlignToRoot: HashMap[String, Array[Int]] = HashMap()
+    var vars: Set[String] = Set() ++ instrs.map(_.names.head)
+    if (locus.isTransfer) {
+      val (aligned, notAligned) = vars.partition((t: String) => isIdentity(align2root(t)))
+      vars = aligned
+      notAligned.map((t: String) => t + " " + align2root(t).mkString(":"))
+      nonIdAlignToRoot = HashMap() ++ notAligned.map((t: String) => t -> align2root(t))
+    }
 
+    new Zone(root, instrs, foldConstr, partitionnedIn, nonPartitionnedIn, vars, nonIdAlignToRoot)
+  }
 
 }

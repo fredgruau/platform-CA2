@@ -9,8 +9,9 @@ import scala.collection._
 import scala.collection.immutable.HashMap
 
 /**
- * Analysed by the compiler to produce a CA rule, a circuit is implemented like a function definition:
- * parameter corresponds to external generated fields input to  the CA
+ * a circuit is implemented like a function definition, whose body is temporary undefined, and will be set to computeRoot
+ * Analysed by the compiler to produce a CA rule,
+ * parameter corresponds to externally generated fields input to  the CA
  * they must be present in the memory, before the main loop is called.
  * return results are fields produced by the CA, to be used by an host.
  * they are in the memory after the main loop is called.
@@ -39,65 +40,52 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
 
     val prog1: DataProg[InfoType[_]] = DataProg(this);
     // print(prog1)
+
     val prog2 = prog1.treeIfy();
-    //
     // print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
     val prog3 = prog2.procedurIfy();
-    //print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
+    //  print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
     val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
     //print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
     val prog5: DataProg[InfoNbit[_]] = prog4.macroIfy();
-
     //print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
-    val prog6 = prog5.unfoldSpace(m);
+    val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
+    // print("addParamRtoDagis255555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
 
-    // print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
 
-    val prog7 = prog6.treeIfy(false); //this will again generates new affect treefy=dedagify
+    val prog6 = prog5bis.unfoldSpace(m);
+    //  print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
+
+    val prog7 = prog6.treeIfy(); //spatiall unfolding generates reused expression that need to be affected again
     //print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
     val prog7bis = prog7.simplify(); //this will remove id which are read only once.
-    //print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
+    //  print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
     val prog8 = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
-    // print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
+    //   print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
-    val prog9 = prog8.unfoldInt(); //this will again generates new intermediate affect
-    //print("unfold777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
+    //val prog9 = prog8.unfoldInt(); //this will again generates new intermediate affect
+    //print("unfold99999999999999999999999999999999999999999999999\n" + prog9 + "\n\n")
 
+    val prog10 = prog8.loopIfy()
+    // print(prog10)
+    val prog11 = prog10.unfoldInt()
+    print("\n" + prog11)
   }
 }
 
 /**
- * ontains singletons uses trhoughout the compilation.
+ * contains singletons uses trhoughout the compilation.
  */
 object Circuit {
-  /**
-   * @param t declared function, and macro
-   * @tparam T
-   * @return defined macro are sorted in last position.
-   */
-  def listOf[T](t: Map[String, T]): List[(String, T)] = {
-    val (anon, definedMacros) = t.partition((x: (String, T)) => x._1.startsWith("_fun"));
-    anon.toList ::: definedMacros.toList
-  }
 
-  private var nameCompteur = 0
-
-  def getCompteur: Int = {
-    nameCompteur += 1;
-    nameCompteur
-  }
-
-  def newFunName(): String = "_fun" + getCompteur
-
-  def newFunName2(): String = "_aux" + getCompteur
 
   type TabSymb[T] = mutable.HashMap[String, T]
-  type AstField[T] = mutable.HashMap[AST[_], T]
+  type AstMap[T] = mutable.HashMap[AST[_], T]
   type TabConstr = TabSymb[Constraint]
   type iTabSymb[T] = Map[String, T]
   type iTabSymb2[T] = immutable.HashMap[String, T];
@@ -123,16 +111,6 @@ object Circuit {
     "dob" -> 0, "dos1" -> 1, "dos2" -> 2, "upb" -> 3, "ups1" -> 4, "ups2" -> 5)
   val transfers: List[(S, S)] = List((V(), E()), (E(), V()), (V(), F()), (F(), V()), (E(), F()), (F(), E()))
 
-  /** generates an input array */
-  def inAr(s1: S, s2: S): ArrArrAstBg = {
-    var i = -1;
-    def nameInt = {
-      i += 1;
-      "" + i
-    };
-    def myp() = new Param[B](nameInt) with ASTBt[B];
-    Array.fill(s1.density)(Array.fill(6 / s1.density)(myp()))
-  }
 
   /**
    * The hexagon machine models communication according to the perfect hexagonal grid.
@@ -169,6 +147,18 @@ object Circuit {
       }
     }
   }
+
+  /** generates an input array */
+  def inAr(s1: S, s2: S): ArrArrAstBg = {
+    var i = -1;
+    def nameInt = {
+      i += 1;
+      "" + i
+    };
+    def myp() = new Param[B](nameInt) with ASTBt[B];
+    Array.fill(s1.density)(Array.fill(6 / s1.density)(myp()))
+  }
+
   /** automatically computes permutation implied by hexagon */
   val hexPermut: immutable.Map[(S, S), Array[Int]] = immutable.HashMap.empty ++ transfers.map((ss: (S, S)) => ss -> {
     val (s1, s2) = ss;
