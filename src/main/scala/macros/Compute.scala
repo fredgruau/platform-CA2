@@ -1,16 +1,17 @@
 package macros
 
 //import compiler._
+
 import compiler.AST._
 import compiler.ASTL._
 import compiler.ASTB._
-import compiler.{ASTLt, B, E, Locus, Ring, SI, T, UI, V, repr}
+import compiler.ASTBfun.{Fundef3R, p}
+import compiler._
+
 
 /** Contains the code of locus function used as a layer of  building blocks of small bits of spatial operators, compiled with optimal perf. */
-object ASTLfun {
+object Compute {
 
-  // @TODO we should not import compiler._, and find a way to use parameter with IntV rather than [V,SI]
-  def p[L <: Locus, R <: Ring](name: String)(implicit n: repr[L], m: repr[R]) = new Param[(L, R)](name) with ASTLt[L, R]
 
   /** From an IntV, computes the gradient sign, and the delta to be added to make it a distance
    * */
@@ -38,7 +39,47 @@ object ASTLfun {
 
   /** Calls boolgrad, and separate the two results.  */
   def slopeDelta(d: IntV): (BooleV, IntV) = {
-    val r = Call1(slopeDeltaDef, d); (new Heead(r) with BooleV, new Taail(r) with IntV)
+    val r = Call1(slopeDeltaDef, d);
+    (new Heead(r) with BooleV, new Taail(r) with IntV)
   }
+
+
+  /** Does only one or, which appear ridiciulously small for a macro, but that May avoid generating too many CaLoops */
+  val orVdef: Fundef2[(V, B), (V, B), (V, B)] = {
+    val b0 = p[V, B]("b0")
+    val b1 = p[V, B]("b1")
+    val r = b1 | b0
+    Fundef2("orV", r, b0, b1)
+  }
+
+  def orV(b0: BoolV, b1: BoolV): BoolV = new Call2(orVdef, b0, b1) with BoolV
+
+
+  val andVdef: Fundef2[(V, B), (V, B), (V, B)] = {
+    val b0 = p[V, B]("b0")
+    val b1 = p[V, B]("b1")
+    val r = b1 & b0
+    Fundef2("orV", r, b0, b1)
+  }
+
+  def andV(b0: BoolV, b1: BoolV): BoolV = new Call2(andVdef, b0, b1) with BoolV
+
+  val andEdef: Fundef2[(E, B), (E, B), (E, B)] = {
+    val b0 = p[E, B]("b0")
+    val b1 = p[E, B]("b1")
+    val r = b1 & b0
+    Fundef2("orV", r, b0, b1)
+  }
+
+  def andE(b0: BoolE, b1: BoolE): BoolE = new Call2(andEdef, b0, b1) with BoolE
+
+
+  val notEdef: Fundef1[(E, B), (E, B)] = {
+    val b0 = p[E, B]("b0")
+    val r = ~b0
+    Fundef1("notE", r, b0)
+  }
+
+  def notE(b0: BoolE): BoolE = new Call1(notEdef, b0) with BoolE
 
 }

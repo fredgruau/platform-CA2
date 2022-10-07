@@ -201,7 +201,7 @@ class ASTBfunTest extends FunSuite {
 
   //fonction utilisées dans bitify
   test("nBitR") {
-    val nbitP = scala.collection.mutable.HashMap.empty[Param[_], Int] //virgin, to retrieve the nbits computed for the param.
+    val nbitP = scala.collection.mutable.HashMap.empty[String, Int] //virgin, to retrieve the nbits computed for the param.
     val n = nbitExpAndParam(HashMap.empty[AST[_], Int], quatre, nbitP)
     assert(n == 4)
   }

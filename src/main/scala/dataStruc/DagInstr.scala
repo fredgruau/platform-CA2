@@ -1,7 +1,7 @@
 package dataStruc
 
 import compiler.Circuit.{TabSymb, iTabSymb}
-import compiler.{AST, ASTBt, Affect, CallProc, CodeGen, InfoNbit, InfoType, Instr}
+import compiler.{AST, ASTBt, Affect, CallProc, InfoNbit, InfoType, Instr}
 import compiler.AST.{AstPred, Call1, Read, isNotRead, rewriteAST2}
 
 import scala.collection.immutable.{HashMap, HashSet}
@@ -12,7 +12,9 @@ object DagInstr {
    *
    * @param visitedL list of instructions, we want to make a dag of
    * @param dag      the instructions expressions node, not obligatory can be specified as null, and will be recompiled if needed
-   * @return the dag is constructed, with the schedule preserved as supplied, (that would not be the case if we were giving only generators
+   * @return the dag is constructed, with the schedule preserved as supplied,
+   *         (that would not be the case if we were giving only generators
+   *         however, we loose the generators. Allgenerators is empty, so we should no longer use it to reconstruct the dag.
    */
   def apply(visitedL: List[Instr], dag: Dag[AST[_]] = null) = {
     val res = new DagInstr(List(), dag)
@@ -81,7 +83,12 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
    ***/
   def affectIfy(toBeReplaced: AstPred, prefix: String, scheduleMatters: Boolean = false): DagInstr = { //TODO faire un seul appel pour éviter de reconstuire le DAG plusieurs fois
     /** reads have already been removed from toBeReplaced to not generate x=x */
+    if (!scheduleMatters && allGenerators.isEmpty)
+      throw new Exception("if no schedule then dag is reconstructed from generator which should not be empty")
     val toBeAffected: List[AST[_]] = dagAst.visitedL.filter(a => toBeReplaced(a) /*&& isNotRead(a)*/);
+    if (toBeAffected.filter(AST.isRead(_)).nonEmpty)
+      if (false) //treeIfyParam does affect read, that is not cool
+      throw new Exception("we try to affectize read, that would generate silly cycles")
     toBeAffected.map(_.setNameIfNull(prefix));
     if (toSet(toBeAffected).size < toBeAffected.size) //since name are given manually we need to check that  names are distincts
     throw new RuntimeException("a name is reused two times or we want to rewrite a read")
@@ -108,25 +115,25 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
 
   /**
    *
-   * @param toBeRepl expression argument to a Tm1, they should be affectified and inserted at the right place which after
-   *                 the affectation that uses it and also after its reads are computed.
+   * @param tm1s expression argument to a Tm1, they should be affectified and inserted at the right place which after
+   *             the affectation that uses it and also after its reads are computed.
    * @return
    */
-  def deTm1fy(toBeRepl: Set[ASTBt[_]]): DagInstr = { //TODO faire un seul appel pour éviter de reconstuire le DAG plusieurs fois
-    toBeRepl.map(_.setNameIfNull("tmun"));
+  def affectizeTm1(tm1s: List[ASTBt[_]]): DagInstr = { //TODO faire un seul appel pour éviter de reconstuire le DAG plusieurs fois
+    tm1s.map(_.setNameIfNull("tmun")); //creates new registers
     //  toBeRepl.map(_.forwardName()) //that's because we will remove tm1
-    val repr = represent(toBeRepl.toList) //2(toBeRepl)
-    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.setReadNode(toBeRepl.asInstanceOf[Set[AST[_]]], repr)
+    val repr = represent(tm1s) //2(toBeRepl)
+    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.setReadNode(tm1s.toSet.asInstanceOf[Set[AST[_]]], repr) //replaces tm1s by read
     /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
-    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.setReadNode((e2: AST[_]) => (toBeRepl(e2.asInstanceOf[ASTBt[_]]) && (e2 != e)), repr)
+    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.setReadNode((e2: AST[_]) => (tm1s.toSet(e2.asInstanceOf[ASTBt[_]]) && (e2 != e)), repr)
     /** rewrite recursively the affect expression. we use this slightly modified dedagExclude instead of dedagRewrite
      * to not generatre x=x  */
-    val affectExpList: List[AST[_]] = toBeRepl.map(deDagExclude).toList
+    val affectExpList: List[AST[_]] = tm1s.map(deDagExclude).toList
 
     /** returns the newly generated affect instruction */
     newAffect = affectExpList.map((e: AST[_]) => Affect(e.name, e.asInstanceOf[ASTBt[_]].detm1ise))
     val rewrite: Instr => Instr = (i: Instr) => i.propagate(deDagRewrite)
-    propagateUnit3(rewrite, newAffect); //not apropriate
+    propagateUnit3(rewrite, newAffect);
     this
   }
 
@@ -200,8 +207,7 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
     def newName(x: AST[_]) = {
       if (x.name.startsWith("shift")) throw new Exception("shift is a reserved prefix, do not use it please")
       if (x.name.startsWith("ll")) throw new Exception("ll is a reserved prefix, do not use it please")
-      if (!bestName.contains(x))
-        x.name
+      if (!bestName.contains(x)) x.name
       else bestof2Name(bestName(x), x.name)
     }
 

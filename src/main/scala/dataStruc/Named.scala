@@ -59,7 +59,8 @@ object Named {
 
   def OkToUseForName(s: String): Boolean = !doNotUse.contains(s);
   {
-    doNotUseForName(List("arg", "arg2", "body", "op"))
+    //p1 is the name of the variable used for the parameter in funDef1, fuck it.
+    doNotUseForName(List("arg", "arg2", "body", "op", "p1", "p2", "p3", "p4"))
   }
 }
 

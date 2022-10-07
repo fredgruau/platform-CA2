@@ -34,7 +34,7 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
   /**
    *
    * @param outputStored property of nodes
-   * @return for each string s, usedBy(s) is the nearest set of node used by s, verifying outputStored
+   * @return for each string s, usedBy(s) is the nearest set of node used by s, verifying predicate outputStored
    */
   def usedBy(outputStored: (T) => Boolean): HashMap[String, Set[String]] = {
     var res: immutable.HashMap[String, Set[String]] = HashMap() ++ visitedL.map(x => x.names(0) -> Set()) //set initially empty?
@@ -51,7 +51,7 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
   /**
    *
    * @param outputStored property of nodes
-   * @return for each string s, isUsing(s) is the nearest set of node using s, verifying outputStored
+   * @return for each string s, isUsing(s) is the nearest set of node using s, verifying predicate outputStored
    */
   def isUsing(outputStored: (T) => Boolean): HashMap[String, Set[String]] = {
     var res: immutable.HashMap[String, Set[String]] = HashMap() ++ visitedL.map(x => x.names(0) -> Set()) //set initially empty?
@@ -65,144 +65,147 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
     res
   }
 
-  /**
-   * @param isBool predicate on instruction T, returns true if instruction is boolean
-   * @tparam T2
-   * @return packets as connected components, sorted topologically.
-   *         packets  are  either basic Boolean constructor OR, AND, XOR, NOT for boolean affectations
-   *         or boolean (Reduce,Elt constructor) or Affect produced by spatical unfolding, or pipelined integer
-   *         All the elements of one packet are to be executed in a single parallel loop
-   */
-  def packetize4ASTB[T2 <: DagNode[T2] with WiredInOut[T2]](isBool: (T) => Boolean): List[List[T]] = {
-    val wrap: Map[T, Wrap] = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))
-
-    /** cheks that all integer have compatible scanning directions */
-    def sameDirs(trial: T, s: List[T]): Boolean = {
-      val d = ASTB.instrDirection(trial)
-      for (out <- s) {
-        val d2 = ASTB.instrDirection(out)
-        if (d != d2
-          && d != Some(Both()) && d2 != Some(Both()) //if one dir is Both, it could be either Left or Right so no pb
-        ) return false
-      }
-      true
-    }
+  /*
 
     /**
-     * needs to access the root, therefore needs access to the all attribute of components
-     *
-     * @param s outneighbor towards which "this" should fused
-     * @return true if the element in the list can be fused . none of the boolean should be  used by an integer
-     **/
-    def canBeFused(s: List[T]): Boolean = {
-      val roots = s.map(wrap(_).root).toSet //for each output neighbor, representant of its  packet
-      val extendToEquivClass: Seq[T] = visitedL.filter((i: T) => roots.contains(wrap(i).root)) //elements which are in a packet of one output neighbor
-      val potentialPbs = extendToEquivClass.filter(isBool(_)) //we consider only the booleans among those
-      for (potentialPb: T <- potentialPbs) {
-        val possibleTarget = s.filter(wrap(_).root != wrap(potentialPb).root).toSet //consider outneighbors which belongs to a class distinct from the considered boolean
-        var exploreOut = HashSet(potentialPb)
-        var fail = false //will now expore transitively the output of each boolean
-        do {
-          exploreOut = exploreOut.flatMap(_.outputNeighbors)
-          fail = exploreOut.intersect(possibleTarget).nonEmpty //those cannot be produced in the same parallel loop
-        }
-        while (exploreOut.nonEmpty && (!fail))
-        if (fail) return false
-      };
-      true
-    }
-
-    /** true if dagnodes can be unioned with all its output neighbors$ */
-    val canBeUnionedToOutput = immutable.HashMap.empty[T, Boolean] ++ visitedL.map(
-      (x: T) => x -> (isBool(x) && canBeFused(x.outputNeighbors) && sameDirs(x, x.outputNeighbors)))
-
-    /** predicate defining connected component
-     *
-     * @param src    instruction creating a field $f
-     * @param target instruction using that field
-     * @return true if src and target should be in the same packet
+     * @param isBool predicate on instruction T, returns true if instruction is boolean
+     * @tparam T2
+     * @return packets as connected components, sorted topologically.
+     *         packets  are  either basic Boolean constructor OR, AND, XOR, NOT for boolean affectations
+     *         or boolean (Reduce,Elt constructor) or Affect produced by spatical unfolding, or pipelined integer
+     *         All the elements of one packet are to be executed in a single parallel loop
      */
-    def proximity(target: T, src: T): Boolean = canBeUnionedToOutput(src)
+    def packetize4ASTB[T2 <: DagNode[T2] with WiredInOut[T2]](isBool: (T) => Boolean): List[List[T]] = {
+      val wrap: Map[T, Wrap] = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))
 
-    val unsorted: Map[T, List[T]] = indexedComponents(proximity, wrap)
-
-    topologicSort2(unsorted, wrap) //turned out we had to reprogram
-  }
-
-
-  /**
-   * @param isBool predicate on instruction T, returns true if instruction is boolean
-   * @tparam T2
-   * @return packets as connected components, sorted topologically.
-   *         packets  are  either basic Boolean constructor OR, AND, XOR, NOT for boolean affectations
-   *         or boolean (Reduce,Elt constructor) or Affect produced by spatical unfolding, or pipelined integer
-   *         All the elements of one packet are to be executed in a single parallel loop
-   */
-  def packetize4ASTB2[T2 <: DagNode[T2] with WiredInOut[T2]](isBool: (T) => Boolean): List[List[T]] = {
-    val wrap: Map[T, Wrap] = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))
-
-    /** cheks that all integer have compatible scanning directions */
-    def sameDirs(trial: T, s: List[T]): Boolean = {
-      val d = ASTB.instrDirection(trial)
-      for (out <- s) {
-        val d2 = ASTB.instrDirection(out)
-        if (d != d2
-          && d != Some(Both()) && d2 != Some(Both()) //if one dir is Both, it could be either Left or Right so no pb
-        ) return false
+      /** cheks that all integer have compatible scanning directions */
+      def sameDirs(trial: T, s: List[T]): Boolean = {
+        val d = ASTB.instrDirection(trial)
+        for (out <- s) {
+          val d2 = ASTB.instrDirection(out)
+          if (d != d2
+            && d != Some(Both()) && d2 != Some(Both()) //if one dir is Both, it could be either Left or Right so no pb
+          ) return false
+        }
+        true
       }
-      true
+
+      /**
+       * needs to access the root, therefore needs access to the all attribute of components
+       *
+       * @param s outneighbor towards which "this" should fused
+       * @return true if the element in the list can be fused . none of the boolean should be  used by an integer
+       **/
+      def canBeFused(s: List[T]): Boolean = {
+        val roots = s.map(wrap(_).root).toSet //for each output neighbor, representant of its  packet
+        val extendToEquivClass: Seq[T] = visitedL.filter((i: T) => roots.contains(wrap(i).root)) //elements which are in a packet of one output neighbor
+        val potentialPbs = extendToEquivClass.filter(isBool(_)) //we consider only the booleans among those
+        for (potentialPb: T <- potentialPbs) {
+          val possibleTarget = s.filter(wrap(_).root != wrap(potentialPb).root).toSet //consider outneighbors which belongs to a class distinct from the considered boolean
+          var exploreOut = HashSet(potentialPb)
+          var fail = false //will now expore transitively the output of each boolean
+          do {
+            exploreOut = exploreOut.flatMap(_.outputNeighbors)
+            fail = exploreOut.intersect(possibleTarget).nonEmpty //those cannot be produced in the same parallel loop
+          }
+          while (exploreOut.nonEmpty && (!fail))
+          if (fail) return false
+        };
+        true
+      }
+
+      /** true if dagnodes can be unioned with all its output neighbors$ */
+      val canBeUnionedToOutput = immutable.HashMap.empty[T, Boolean] ++ visitedL.map(
+        (x: T) => x -> (isBool(x) && canBeFused(x.outputNeighbors) && sameDirs(x, x.outputNeighbors)))
+
+      /** predicate defining connected component
+       *
+       * @param src    instruction creating a field $f
+       * @param target instruction using that field
+       * @return true if src and target should be in the same packet
+       */
+      def proximity(target: T, src: T): Boolean = canBeUnionedToOutput(src)
+
+      val unsorted: Map[T, List[T]] = indexedComponents(proximity, wrap)
+
+      topologicSort2(unsorted, wrap) //turned out we had to reprogram
     }
 
-    /** cheks that all integer have compatible scanning directions */
-    def sameDir(t1: T, t2: T): Boolean = {
-      val d1 = ASTB.instrDirection(t1)
-      val d2 = ASTB.instrDirection(d1)
-      if (d1 != d2 && d1 != Some(Both()) && d2 != Some(Both()) //if one dir is Both, it could be either Left or Right so no pb
-      ) return false
-      true
-    }
 
     /**
-     * needs to access the root, therefore needs access to the all attribute of components
-     *
-     * @param s outneighbor towards which "this" should fused
-     * @return true if the element in the list can be fused . none of the boolean should be  used by an integer
-     **/
-    def canBeFused(s: List[T]): Boolean = {
-      val roots = s.map(wrap(_).root).toSet //for each output neighbor, representant of its  packet
-      val extendToEquivClass: Seq[T] = visitedL.filter((i: T) => roots.contains(wrap(i).root)) //elements which are in a packet of one output neighbor
-      val potentialPbs = extendToEquivClass.filter(isBool(_)) //we consider only the booleans among those
-      for (potentialPb: T <- potentialPbs) {
-        val possibleTarget = s.filter(wrap(_).root != wrap(potentialPb).root).toSet //consider outneighbors which belongs to a class distinct from the considered boolean
-        var exploreOut = HashSet(potentialPb)
-        var fail = false //will now expore transitively the output of each boolean
-        do {
-          exploreOut = exploreOut.flatMap(_.outputNeighbors)
-          fail = exploreOut.intersect(possibleTarget).nonEmpty //those cannot be produced in the same parallel loop
+     * @param isBool predicate on instruction T, returns true if instruction is boolean
+     * @tparam T2
+     * @return packets as connected components, sorted topologically.
+     *         packets  are  either basic Boolean constructor OR, AND, XOR, NOT for boolean affectations
+     *         or boolean (Reduce,Elt constructor) or Affect produced by spatical unfolding, or pipelined integer
+     *         All the elements of one packet are to be executed in a single parallel loop
+     */
+    def packetize4ASTB2[T2 <: DagNode[T2] with WiredInOut[T2]](isBool: (T) => Boolean): List[List[T]] = {
+      val wrap: Map[T, Wrap] = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))
+
+      /** cheks that all integer have compatible scanning directions */
+      def sameDirs(trial: T, s: List[T]): Boolean = {
+        val d = ASTB.instrDirection(trial)
+        for (out <- s) {
+          val d2 = ASTB.instrDirection(out)
+          if (d != d2
+            && d != Some(Both()) && d2 != Some(Both()) //if one dir is Both, it could be either Left or Right so no pb
+          ) return false
         }
-        while (exploreOut.nonEmpty && (!fail))
-        if (fail) return false
-      };
-      true
+        true
+      }
+
+      /** cheks that all integer have compatible scanning directions */
+      def sameDir(t1: T, t2: T): Boolean = {
+        val d1 = ASTB.instrDirection(t1)
+        val d2 = ASTB.instrDirection(d1)
+        if (d1 != d2 && d1 != Some(Both()) && d2 != Some(Both()) //if one dir is Both, it could be either Left or Right so no pb
+        ) return false
+        true
+      }
+
+      /**
+       * needs to access the root, therefore needs access to the all attribute of components
+       *
+       * @param s outneighbor towards which "this" should fused
+       * @return true if the element in the list can be fused . none of the boolean should be  used by an integer
+       **/
+      def canBeFused(s: List[T]): Boolean = {
+        val roots = s.map(wrap(_).root).toSet //for each output neighbor, representant of its  packet
+        val extendToEquivClass: Seq[T] = visitedL.filter((i: T) => roots.contains(wrap(i).root)) //elements which are in a packet of one output neighbor
+        val potentialPbs = extendToEquivClass.filter(isBool(_)) //we consider only the booleans among those
+        for (potentialPb: T <- potentialPbs) {
+          val possibleTarget = s.filter(wrap(_).root != wrap(potentialPb).root).toSet //consider outneighbors which belongs to a class distinct from the considered boolean
+          var exploreOut = HashSet(potentialPb)
+          var fail = false //will now expore transitively the output of each boolean
+          do {
+            exploreOut = exploreOut.flatMap(_.outputNeighbors)
+            fail = exploreOut.intersect(possibleTarget).nonEmpty //those cannot be produced in the same parallel loop
+          }
+          while (exploreOut.nonEmpty && (!fail))
+          if (fail) return false
+        };
+        true
+      }
+
+      /** true if dagnodes can be unioned wiht all its output neighbors$ */
+      val canBeUnionedToOutput = immutable.HashMap.empty[T, Boolean] ++ visitedL.map(
+        (x: T) => x -> (isBool(x) && canBeFused(x.outputNeighbors) && sameDirs(x, x.outputNeighbors)))
+
+      /** predicate defining connected component
+       *
+       * @param src    instruction creating a field $f
+       * @param target instruction using that field
+       * @return true if src and target should be in the same packet
+       */
+      def proximity(target: T, src: T): Boolean = canBeUnionedToOutput(src)
+
+      val unsorted: Map[T, List[T]] = indexedComponents(proximity, wrap)
+
+      topologicSort2(unsorted, wrap) //turned out we had to reprogram
     }
 
-    /** true if dagnodes can be unioned wiht all its output neighbors$ */
-    val canBeUnionedToOutput = immutable.HashMap.empty[T, Boolean] ++ visitedL.map(
-      (x: T) => x -> (isBool(x) && canBeFused(x.outputNeighbors) && sameDirs(x, x.outputNeighbors)))
-
-    /** predicate defining connected component
-     *
-     * @param src    instruction creating a field $f
-     * @param target instruction using that field
-     * @return true if src and target should be in the same packet
-     */
-    def proximity(target: T, src: T): Boolean = canBeUnionedToOutput(src)
-
-    val unsorted: Map[T, List[T]] = indexedComponents(proximity, wrap)
-
-    topologicSort2(unsorted, wrap) //turned out we had to reprogram
-  }
-
+  */
 
   /**
    *
@@ -293,6 +296,8 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
     val newGenerators = (allGenerators).map(rewrite)
     val newNonGenerators = nonGenerators.map(rewrite)
     WiredInOut.setInputAndOutputNeighbor(newGenerators ::: newNonGenerators ::: otherInstr)
+    if (newGenerators.isEmpty)
+      throw new Exception("les generateurs ont disparu!")
     new Dag(newGenerators) //reconstruit quand meme tout le Dag ca devrait assurer le bon ordre
   }
 
@@ -308,36 +313,67 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
   }
 
   /**
-   * we insert newId <-exp after the affectations that uses newId
-   * and after the affectation that defines variable used by newId
-   * After folding, the register used in exp may have change their value and
-   * todo we should chek that it is not the case.
+   * @param tm1Instrs instructions affecting a tm1 variable (set at the end of the preceding loop)
+   *                  they should be inserted within the existing instruction
+   *                  more precisely  we insert newId <-exp after the affectations that uses newId
+   *                  and ALSO after the affectation that defines variable used by newId
    *
-   * @param otherInstr
    */
-  private def insertAfterLastUsedAffect(otherInstr: List[T]) = {
-    var res: List[T] = List.empty
-    var nbUsed: HashMap[T, Int] = HashMap.empty ++ otherInstr.map((instr: T) => (instr -> (1 + instr.inputNeighbors.size))) //compte les output
-    val myBossToMe: HashMap[T, T] = HashMap.empty ++ otherInstr.map((instr: T) => (instr.outputNeighbors.head -> instr))
+  private def insertAfterLastUseWrite(tm1Instrs: List[T]) = {
 
-    for (instr <- visitedL.reverse) {
-      res ::= instr
-      if (myBossToMe.contains(instr)) { //we found the boss, the affectation using the tm1
-        val other = myBossToMe(instr)
-        nbUsed += (other -> (nbUsed(other) - 1))
-        if (nbUsed(other) == 0) //yes we can insert
-        res ::= other
-      }
-      for (other <- instr.outputNeighbors) {
-        if (nbUsed.contains(other)) {
-          nbUsed += (other -> (nbUsed(other) - 1))
-          if (nbUsed(other) == 0) //yes we can insert
-          res ::= other
-        }
-      }
+    var nbUsed: HashMap[T, Int] = HashMap.empty ++
+      //  otherInstr.map((instr: T) => (instr -> ( instr.outputNeighbors.size + instr.inputNeighbors.size))) //compte les output
+      // dans inputNeighbor faut enlever les instr qui mettent a jour un tm1,
+      // Faut compter juste les inputNeighbor qui sont pas dans otherInstr
+      tm1Instrs.map((instr: T) => (instr -> (instr.outputNeighbors.size + (instr.inputNeighbors.toSet.diff(tm1Instrs.toSet)).size))) //compte les output
+
+    val myUser: HashMap[T, T] = HashMap.empty ++ tm1Instrs.map((instr: T) => {
+      if (instr.outputNeighbors.size != 1) throw new Exception("we here assume there is a single user, which is true for tm1s")
+      instr.outputNeighbors.head -> instr
+    }) //we here assume there is a single user, which is true for tm1s
+
+    /** store the result which consits of the instructions together with the tm1Instr inserted */
+    var res: List[T] = List.empty
+
+    /**
+     *
+     * @param tm1Instr instructions affecting a tm1 variable (set at the end of the preceding loop)
+     *                 decrementx a counter in order to
+     *                 take into account the fact that we just met either an instruction that reads the variable
+     *                 produced by tm1Instr uor that produces a value used by tm1Instr
+     *                 when the counter reach 0, it means that tm1Instr can be inserted
+     */
+    def updateNbUsedAndInsert(tm1Instr: T): Unit = {
+      nbUsed += (tm1Instr -> (nbUsed(tm1Instr) - 1)) //on enregistre le fait que ont a vu passer l'output neighbor de l'instruction qu'on souhaite insérer
+      if (nbUsed(tm1Instr) == 0) //yes we can insert
+      {
+        res ::= tm1Instr; checkWriteAndRead(tm1Instr)
+      } //inserting one of the tm1s affectation can recusively trigger insertion of another of the tm1s affect
     }
 
-    visitedL = res
+    /**
+     *
+     * @param instr instruction just inserted  in the output res variable
+     *              checks if now, some tm1Instr can be inserted just after.
+     */
+    def checkWriteAndRead(instr: T): Unit = {
+      /* if (myUser.contains(instr))    //we found the boss, the affectation using the tm1
+             updateNbUsedAndInsert( myUser(instr))*/
+      for (tm1Instr <- instr.inputNeighbors.toSet.intersect(tm1Instrs.toSet))
+        updateNbUsedAndInsert(tm1Instr)
+      for (tm1Instr <- instr.outputNeighbors.toSet.intersect(tm1Instrs.toSet)) //we need also to scan the output neighbor for insertion
+        updateNbUsedAndInsert(tm1Instr)
+    }
+
+    for (instr: T <- visitedL.reverse) { //we iterate over each existing instructions and see which tm1Instr
+      // can be inserted after each instruction
+      res ::= instr
+      checkWriteAndRead(instr)
+    }
+    if (res.size != tm1Instrs.size + visitedL.size) //checks that the tm1Instrs have indeed been added to the the resulting new list of variables
+    throw new Exception("we failed to insert instruction for tmuns")
+    visitedL = res //now the result is the new list of instructions.
+
   }
 
 
@@ -350,8 +386,14 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
    *         in general  rewriting of generators may not produce  generators, for example, in the case of the zone dag
    **/
   def propagate(rewrite: T => List[T], otherInstr: List[T] = List()): Dag[T] = {
-    val newGenerators = (allGenerators).flatMap(rewrite)
-    val newNonGenerators = nonGenerators.flatMap(rewrite)
+    var newGenerators = (allGenerators).flatMap(rewrite)
+    var newNonGenerators = nonGenerators.flatMap(rewrite)
+    if (newGenerators.size == 0) //the return instruction was skipped
+    {
+      newGenerators = List(newNonGenerators.head)
+      newNonGenerators = newNonGenerators.tail
+    }
+    assert(newGenerators.nonEmpty, "les generateurs ont disparu!")
     WiredInOut.setInputAndOutputNeighbor(newGenerators ::: newNonGenerators ::: otherInstr)
     new Dag(newGenerators)
   }
@@ -361,12 +403,13 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
    * @param rewrite    each instruction is rewritten into O,1, or several instruction, preserve generators
    * @param otherInstr more instructions to be be added , we do not know where to insert them
    * @return New Dag with rewritten instructions, with  updated inputneighbors.
-   *         in general  rewriting of generators may not produce  generators, for example, in the case of the zone dag
+   *         the other Instructions are tm1s which must be inserted not according to topological order, but after last use
+   *         so as to generate a delay.
    **/
   def propagateUnit3(rewrite: T => T, otherInstr: List[T] = List()): Unit = {
     visitedL = visitedL.map(rewrite)
     WiredInOut.setInputAndOutputNeighbor(visitedL ::: otherInstr)
-    insertAfterLastUsedAffect(otherInstr)
+    insertAfterLastUseWrite(otherInstr)
     //visitedL=(otherInstr.reverse):::visitedL  //this would insert  the looping on variables at the end, which is not suitable
   }
 
@@ -384,6 +427,7 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
     val newNonGenerators = nonGenerators.reverse.map(rewrite).reverse
     val newGenerators = (allGenerators).reverse.map(rewrite).reverse
     WiredInOut.setInputAndOutputNeighbor(newGenerators ::: newNonGenerators ::: otherInstr)
+    assert(newGenerators.nonEmpty, "les generateurs ont disparu!")
     new Dag(newGenerators)
   }
 

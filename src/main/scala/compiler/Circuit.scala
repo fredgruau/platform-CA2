@@ -9,6 +9,11 @@ import scala.collection._
 import scala.collection.immutable.HashMap
 
 /**
+ *
+ * @param p supplementary input parameters
+ * @tparam L
+ * @tparam R
+ *
  * a circuit is implemented like a function definition, whose body is temporary undefined, and will be set to computeRoot
  * Analysed by the compiler to produce a CA rule,
  * parameter corresponds to externally generated fields input to  the CA
@@ -35,46 +40,50 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
    *
    */
 
-  def compile2(m: Machine): Unit = {
+  def compile(m: Machine): Unit = {
     body = computeRoot //we pretend that the circuit is a function which returns compute Root
 
     val prog1: DataProg[InfoType[_]] = DataProg(this);
     // print(prog1)
 
     val prog2 = prog1.treeIfy();
-    // print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
+    //  print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
+
     val prog3 = prog2.procedurIfy();
-    //  print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
+    //   print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
     val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
-    //print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
+    //   print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
     val prog5: DataProg[InfoNbit[_]] = prog4.macroIfy();
-    //print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
+    //  print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
-    // print("addParamRtoDagis255555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
+    //print("addParamRtoDagis255555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
 
+    val prog5ter = prog5bis.radiusify
+    //  print(prog5ter)
 
-    val prog6 = prog5bis.unfoldSpace(m);
-    //  print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
+    val prog6 = prog5ter.unfoldSpace(m);
+    //print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
 
     val prog7 = prog6.treeIfy(); //spatiall unfolding generates reused expression that need to be affected again
-    //print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
+    //  print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
     val prog7bis = prog7.simplify(); //this will remove id which are read only once.
-    //  print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
+    // print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
 
     val prog8 = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
     //   print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
-    //val prog9 = prog8.unfoldInt(); //this will again generates new intermediate affect
-    //print("unfold99999999999999999999999999999999999999999999999\n" + prog9 + "\n\n")
-
     val prog10 = prog8.loopIfy()
     // print(prog10)
+
     val prog11 = prog10.unfoldInt()
-    print("\n" + prog11)
+    //  print("\n" + prog11)
+
+    val prog12 = prog11.coaalesc()
+    print("\n121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212\n" + prog12)
   }
 }
 
@@ -82,8 +91,6 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
  * contains singletons uses trhoughout the compilation.
  */
 object Circuit {
-
-
   type TabSymb[T] = mutable.HashMap[String, T]
   type AstMap[T] = mutable.HashMap[AST[_], T]
   type TabConstr = TabSymb[Constraint]
@@ -141,7 +148,7 @@ object Circuit {
         }
       case F() => des match {
         case V() => /*vF->fV*/
-          val Array(Array(dp, db1, db2), Array(up, ub1, ub2)) = t; Array(Array(tm1(shiftR(ub1)), tm1(dp), tm1(shiftR(ub2))), Array(shiftR(db1), shiftR(up), db2))
+          val Array(Array(dp, db1, db2), Array(up, ub1, ub2)) = t; Array(Array(tm1(ub1), tm1(dp), tm1(shiftR(ub2)), shiftR(db1), shiftR(up), db2))
         case E() => /*eF->fE*/
           val Array(Array(db, ds1, ds2), Array(ub, us1, us2)) = t; Array(Array(tm1(ub), db), Array(ds2, us2), Array(ds1, shiftR(us1)))
       }

@@ -12,7 +12,7 @@ import dataStruc.Dag
 import dataStruc.DagNode._
 import scala.collection.{mutable, _}
 import scala.reflect.ClassTag
-
+import scala.language.implicitConversions
 
 /**
  * At some point, we decided to store the type information for each distinct constructor, in order to have direct access to this info
@@ -28,13 +28,15 @@ object ASTL {
   private[ASTL] final case class Broadcast[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[S1, R], m: repr[T[S1, S2]], n: repr[R])
     extends ASTL[T[S1, S2], R]()(repr.nomLR(m, n)) with Singleton[AST[_]]
 
+  /** a bit more subtle than broadcast  */
   private[ASTL] final case class Send[S1 <: S, S2 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, S2]], n: repr[R])
     extends ASTL[T[S1, S2], R]() with Neton[AST[_]]
 
   private[ASTL] final case class Transfer[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R], m: repr[T[S2, S1]], n: repr[R])
     extends ASTL[T[S2, S1], R]()(repr.nomLR(m, n)) with Singleton[AST[_]]
 
-  private[ASTL] final case class Unop[L <: Locus, R1 <: Ring, R2 <: Ring](op: Fundef1[R1, R2], arg: ASTLt[L, R1], m: repr[L], n: repr[R2])
+  /** Unop is not final, because we can add operators < */
+  private[ASTL] case class Unop[L <: Locus, R1 <: Ring, R2 <: Ring](op: Fundef1[R1, R2], arg: ASTLt[L, R1], m: repr[L], n: repr[R2])
     extends ASTL[L, R2]()(repr.nomLR(m, n)) with Singleton[AST[_]]
 
   private[ASTL] final case class Binop[L <: Locus, R1 <: Ring, R2 <: Ring, R3 <: Ring](op: Fundef2[R1, R2, R3], arg: ASTLt[L, R1], arg2: ASTLt[L, R2], m: repr[L], n: repr[R3])
@@ -46,9 +48,20 @@ object ASTL {
     override def redExpr: List[AST[_]] = List(arg)
   }
 
+  def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[UI]): RedopConcat[S1, S2] =
+    RedopConcat[S1, S2](arg, m, n)
+
+  /** the concat reduction has a different signature it takes a bool transfer, and produces an unsigned int. n=UI */
+  private[ASTL] final case class RedopConcat[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B], m: repr[S1], n: repr[UI])
+    extends ASTL[S1, UI]()(repr.nomLR(m, n)) with Singleton[AST[_]] {
+    /** used to compute the expression being reduced.  */
+    override def redExpr: List[AST[_]] = List(arg)
+  }
+
   private[ASTL] final case class Clock[S1 <: S, S2 <: S, S3 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R], dir: Boolean)(implicit m: repr[T[S1, S3]], n: repr[R])
     extends ASTL[T[S1, S3], R]()(repr.nomLR(m, n)) with Singleton[AST[_]]
 
+  /** central symmetry, used on vertices */
   private[ASTL] final case class Sym[S1 <: S, S2 <: S, S2new <: S, R <: Ring](arg: ASTLt[T[S1, S2], R], m: repr[T[S1, S2new]], t: CentralSym[S2, S1, S2new], n: repr[R])
     extends ASTL[T[S1, S2new], R]()(repr.nomLR(m, n)) with Singleton[AST[_]]
 
@@ -80,13 +93,17 @@ object ASTL {
 
   def composeAll2(p: Array[Int], t: iTabSymb2[Array[Int]]): iTabSymb2[Array[Int]] = t.map { case (k, v) => k -> compose(p, v) }
 
-  import scala.language.implicitConversions
 
   /** Allows to consider false and true as occurence of ASTLs */
   implicit def fromBool[L <: Locus](d: Boolean)(implicit m: repr[L]): ASTLt[L, B] = Coonst(if (d == True()) True() else False(), m, repr.nomB)
 
   /** Allows to consider integers as occurence of ASTLs */
   implicit def fromInt[L <: Locus, R <: I](d: Int)(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = Coonst(Intof(d)(n), m, n)
+
+  /** when we subtract two UI we automatically convert to SI, bysimply adding a 0 bit on the first significant bits */
+  implicit def uItoSIL[L <: Locus](d: ASTLt[L, UI])(implicit m: repr[L]) =
+    new Unop[L, UI, SI](ASTBfun.uItoSIdef, d, m, repr.nomSI) //adds the comparison operators, which requires signed bit because we take the opposite
+
 
   type ASTLg = ASTLt[_ <: Locus, _ <: Ring]
   type rewriteASTLt[L <: Locus, R <: Ring] = ASTLt[L, R] => ASTLt[L, R]
@@ -108,7 +125,7 @@ object ASTL {
   def anticlock[S1 <: S, S2 <: S, S2new <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S1, S2new]], n: repr[R]): Clock[S1, S2, S2new, R] = Clock[S1, S2, S2new, R](arg, dir = false)
 
 
-  //Build a transfer, just like v,e,f, however specify a diffent Simplicial field for each component; used for substraction.
+  //Builds a transfer, just like v,e,f, however specify a diffent Simplicial field for each component; used for substraction.
   def sendv[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, V]], n: repr[R]): Send[S1, V, R] = {
     assert(args.length == 6 / args.head.locus.density);
     Send[S1, V, R](args);
@@ -135,6 +152,16 @@ object ASTL {
   def lt[L <: Locus](arg1: ASTLt[L, SI])(implicit m: repr[L]): Unop[L, SI, B] =
     Unop[L, SI, B](ltSI1.asInstanceOf[Fundef1[SI, B]], arg1, m, repr.nomB); //-1 will be taken modulo nbit.
 
+  /* def ltUI2[L <: Locus](arg1: ASTLt[L, UI], arg2: ASTLt[L, UI])(implicit m: repr[L], n: repr[B]): ASTL[L, B] =
+     Binop(ASTBfun.ltUI2.asInstanceOf[Fundef2[UI, UI, B]], arg1, arg2, m, n)
+ */
+  def lt2[L <: Locus](arg1: ASTLt[L, SI], arg2: ASTLt[L, SI])(implicit m: repr[L], n: repr[B]): ASTL[L, B] =
+    Binop(ASTBfun.ltSI2.asInstanceOf[Fundef2[SI, SI, B]], arg1, arg2, m, n)
+
+  def gt2[L <: Locus](arg1: ASTLt[L, SI], arg2: ASTLt[L, SI])(implicit m: repr[L], n: repr[B]): ASTL[L, B] =
+    Binop(ASTBfun.gtSI2.asInstanceOf[Fundef2[SI, SI, B]], arg1, arg2, m, n)
+
+
   //todo desUISIfy
   def notNull[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, B] = Unop[L, R, B](neqSI.asInstanceOf[Fundef1[R, B]], arg1, m, repr.nomB)
 
@@ -142,7 +169,14 @@ object ASTL {
   def andLB2R[L <: Locus, R <: I](arg1: ASTLt[L, B], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Binop[L, B, R, R] =
     Binop[L, B, R, R](andLBtoRUISI(arg2.ring).asInstanceOf[Fundef2[B, R, R]], arg1, arg2, m, n)
 
-  def concat2[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[I]): ASTL[L, I] = Binop(concat2f.asInstanceOf[Fundef2[R1, R2, I]], arg1, arg2, m, n)
+  /*def concat2[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[I]): ASTL[L, I] =
+    Binop(concat2f.asInstanceOf[Fundef2[R1, R2, I]], arg1, arg2, m, n)
+*/
+  def concat2UI[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[UI]): ASTL[L, UI] =
+    Binop(concat2f.asInstanceOf[Fundef2[R1, R2, UI]], arg1, arg2, m, n)
+
+  def concat2SI[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[SI]): ASTL[L, SI] =
+    Binop(concat2f.asInstanceOf[Fundef2[R1, R2, SI]], arg1, arg2, m, n)
 
   /** @param i final number of bit   */
   def extend[L <: Locus, R <: Ring](i: Int, arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, R] =
@@ -154,12 +188,17 @@ object ASTL {
 
   //def concat[L <: Locus, R <: I](arg1: Seq[ASTLtrait[L, R]])(implicit m: repr[L], n: repr[R]) = Multop2[L, R, R](concatN, arg1,m,n);
   // def orR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]) = Redop[S1, S2, R]((orI.asInstanceOf[Fundef2[R, R, R]], False[R]), arg, m, n);
-  def orR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): Redop[S1, S2, R] = Redop[S1, S2, R](orRedop[R], arg, m, n)
 
-  def andR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): Redop[S1, S2, R] = Redop[S1, S2, R](andRedop[R], arg, m, n)
+
+  def orR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): Redop[S1, S2, R] =
+    Redop[S1, S2, R](orRedop[R], arg, m, n)
+
+  def andR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): Redop[S1, S2, R] =
+    Redop[S1, S2, R](andRedop[R], arg, m, n)
 
   def xorR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): Redop[S1, S2, R] = Redop[S1, S2, R](xorRedop[R], arg, m, n)
 
+  /** reduction betwween transfer field, using clock and anticlock */
   def redOp2[S1 <: S, S2 <: S, S2new <: S, R <: Ring](op: redop[R], arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S1, S2new]], n: repr[R]): Binop[T[S1, S2new], R, R, R] =
     Binop[T[S1, S2new], R, R, R](op._1, Clock[S1, S2, S2new, R](arg, dir = true), Clock[S1, S2, S2new, R](arg, dir = false), m, n)
 
@@ -178,7 +217,7 @@ object ASTL {
     if (arg.ring == SI()) Redop[S1, S2, SI]((minSI, Intof[SI](0)), arg.asInstanceOf[ASTLt[T[S1, S2], SI]], m, repr.nomSI).asInstanceOf[ASTLt[S1, R]]
     else Redop[S1, S2, UI]((minUI, Intof[UI](0)), arg.asInstanceOf[ASTLt[T[S1, S2], UI]], m, repr.nomUI).asInstanceOf[ASTLt[S1, R]]
 
-  /** Delayed uses a trick found on the net, to have a call by name, together with a case class necessary to make the match */
+  /** delayedL reprograms delayed, in order to add the trait ASTLt[L, R] */
   def delayedL[L <: Locus, R <: Ring](_arg: => ASTLt[L, R])(implicit m: repr[(L, R)]): ASTLt[L, R] = {
     lazy val delayed = _arg;
     new Delayed[(L, R)](() => delayed) with ASTLt[L, R]
@@ -199,16 +238,24 @@ object ASTL {
     y ^ halve(y)
   }
 
+
+  // _____________________________________________arithmetic comparison ___________________________________________________________________________
+
+
+  // _____________________________________________boolean operators ___________________________________________________________________________
+  /** Simple logical Or */
   def or[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg1.ring match {
     case B() => Binop(orB, arg1.asInstanceOf[ASTLt[L, B]], arg2.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
     case _ => Binop(orUISI(arg1.ring).asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
   }).asInstanceOf[ASTL[L, R]]
 
+  /** Simple logical And */
   def and[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg1.ring match {
     case B() => Binop(andB, arg1.asInstanceOf[ASTLt[L, B]], arg2.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
     case _ => Binop(andUISI(arg1.ring).asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
   }).asInstanceOf[ASTL[L, R]]
 
+  /** Simple logical Xor */
   def xor[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg1.ring match {
 
     case B() => Binop(xorB, arg1.asInstanceOf[ASTLt[L, B]], arg2.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
@@ -219,6 +266,13 @@ object ASTL {
     case B() => Unop(negB, arg.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
     case _ => Unop(negSI.asInstanceOf[Fundef1[R, R]], arg, m, n)
   }).asInstanceOf[ASTL[L, R]]
+
+  def id[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg.ring match {
+    case B() => Unop(identityB, arg.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
+    case UI() => Unop(identityUI.asInstanceOf[Fundef1[R, R]], arg, m, n)
+    case SI() => Unop(identitySI.asInstanceOf[Fundef1[R, R]], arg, m, n)
+  }).asInstanceOf[ASTL[L, R]]
+
 
   def opp[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, SI, SI] =
     Unop[L, SI, SI](oppSI, arg.asInstanceOf[ASTLt[L, SI]], m, repr.nomSI)
@@ -294,6 +348,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       //  case Multop(op, args,_,_)      => op.toString
       case Unop(op, _, _, _) => op.name
       case Redop(op, _, _, _) => "red" + op._1.name
+      case RedopConcat(_, _, _) => "redConcat"
       case Clock(_, dir) => if (dir) "clock" else "anticlock"
       case e@Broadcast(_, _, _) => "Broadcast" + ("" + (e.locus.asInstanceOf[T[_, _]] match {
         case T(_, y) => y
@@ -319,6 +374,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case e@Unop(_, a, _, _) => e.copy(arg = id2(a))
       case e@Binop(_, a, a2, _, _) => e.copy(arg = id2(a), arg2 = id2(a2))
       case e@Redop(_, a, _, _) => e.copy(arg = id2(a))
+      case e@RedopConcat(a, _, _) => e.copy(arg = id2(a))
       case e@Clock(a, _) => e.copy(arg = id2(a))(lpart(e.mym), rpart(e.mym))
       case e@Sym(a, _, _, _) => e.copy(arg = id2(a))
     };
@@ -327,39 +383,45 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
   }
 
   /**
-   * @param cur            The current programm
-   * @param expASTLbitSize Stores number of bits of sub expression.
-   * @param tSymb          The symbol table with number of bits of parameters and progressively upadated with variables
+   * @param cur        The current programm
+   * @param ASTbitSize Stores number of bits of sub expression.
+   * @param newtSymb   The symbol table with number of bits of parameters and progressively upadated with variables
    * @return Expression rewritten so as to include Extend, when binop operators are used,
    *         and one of the two operands has not enough bits.
    *
    */
-  override def bitIfyAndExtend(cur: DataProg[InfoType[_]], expASTLbitSize: AstMap[Int], tSymb: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
+  override def bitIfyAndExtend(cur: DataProg[InfoType[_]], ASTbitSize: AstMap[Int], newtSymb: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
     val emptyAstMapInt = immutable.HashMap.empty[AST[_], Int] //stores the bit number of an ASTB expression
-    val nbitASTLParam = mutable.HashMap.empty[Param[_], Int] //collect the bit size that  the spatial param should have.
+    /** collect the bit size that  the spatial param and then non spatial operators should have. */
+    val paramBitIncrease = mutable.HashMap.empty[String, Int]
+
     val result = this match {
-      case Binop(op, a, a2, l2, r2) =>
-        //BINOP needs more work, because it triggers possible insertion of  "extend";
-        var anew = a.bitIfyAndExtend(cur, expASTLbitSize, tSymb); //process recursively subtree
-        var a2new = a2.bitIfyAndExtend(cur, expASTLbitSize, tSymb) //process recursively subtree
-        val nbitASTBParam = emptyAstMapInt + (op.p1 -> expASTLbitSize(anew)) + (op.p2 -> expASTLbitSize(a2new)) // bit size  of the parameters of the boolean function
-        val nbitResult: Int = ASTB.nbitExpAndParam(nbitASTBParam, op.arg, nbitASTLParam) //retrieves the number of bit computed from the call to the ASTB fonction
-        if (nbitASTLParam.contains(op.p1)) anew = anew.extendMe(nbitASTLParam(op.p1)) //extends first ASTL  parameter if the first ASTB param is desired to be extended
-        if (nbitASTLParam.contains(op.p2)) a2new = a2new.extendMe(nbitASTLParam(op.p2)) //extends second ASTL  parameter if the first ASTB param is desired to be extended
+      case Binop(op, a, a2, l2, r2) => //BINOP needs more work, because it triggers possible insertion of  "extend";
+        var anew = a.bitIfyAndExtend(cur, ASTbitSize, newtSymb); //process recursively subtree
+        var a2new = a2.bitIfyAndExtend(cur, ASTbitSize, newtSymb) //process recursively subtree
+        val nbitASTBParam = emptyAstMapInt + (op.p1 -> ASTbitSize(anew)) + (op.p2 -> ASTbitSize(a2new)) // bit size  of the parameters of the boolean function
+        val nbitResult: Int = ASTB.nbitExpAndParam(nbitASTBParam, op.arg, paramBitIncrease) //retrieves the number of bit computed from the call to the ASTB fonction
+        if (paramBitIncrease.contains(op.p1.nameP)) //check if first ASTL param is desired to be "extended"
+        anew = anew.extendMe(paramBitIncrease(op.p1.nameP)) //extends parameters used in the expression
+        // of the first effective parameter if the first ASTB param is desired to be extended
+        if (paramBitIncrease.contains(op.p2.nameP)) //check if second ASTL param shoudl be "extended"
+        a2new = a2new.extendMe(paramBitIncrease(op.p2.nameP)) //same thing for second effective parameter
         val newthis = Binop(op, anew, a2new, l2, r2)
-        expASTLbitSize += newthis -> nbitResult //Store the bitsize of the Binop
+        ASTbitSize += newthis -> nbitResult //Store the bitsize of the Binop
         newthis
       case _ => //in all the other cases, no change is done on the AST, only  expASTLbitSize is updated.
-        val newthis = this.propagateASTL((d: ASTLt[L, R]) => d.bitIfyAndExtend(cur, expASTLbitSize, tSymb))
+        val newthis = this.propagateASTL((d: ASTLt[L, R]) => d.bitIfyAndExtend(cur, ASTbitSize, newtSymb))
 
-        def argBitSize() = expASTLbitSize(newthis.asInstanceOf[Singleton[AST[_]]].arg) //bit size of the arg if singleton
-        expASTLbitSize += newthis -> (newthis.asInstanceOf[ASTL[_, _]] match {
+        def argBitSize() = ASTbitSize(newthis.asInstanceOf[Singleton[AST[_]]].arg) //bit size of the arg if singleton
+
+        ASTbitSize += newthis -> (newthis.asInstanceOf[ASTL[_, _]] match {
           // case l:Layer[_,_] =>  l.nbit
-          case Coonst(cte, _, _) => ASTB.nbitExpAndParam(emptyAstMapInt, cte, nbitASTLParam)
-          case Unop(op, _, _, _) => ASTB.nbitExpAndParam(emptyAstMapInt + (op.p1 -> argBitSize()), op.arg, nbitASTLParam)
+          case Coonst(cte, _, _) => ASTB.nbitExpAndParam(emptyAstMapInt, cte, paramBitIncrease)
+          case Unop(op, _, _, _) => ASTB.nbitExpAndParam(emptyAstMapInt + (op.p1 -> argBitSize()), op.arg, paramBitIncrease)
           case Redop(_, _, _, _) | Clock(_, _) | Transfer(_, _, _) | Broadcast(_, _, _) | Sym(_, _, _, _) => argBitSize() //bit size equals bit size of arg
-          case Send(_) => expASTLbitSize(newthis.asInstanceOf[Neton[AST[_]]].args.head)
-          //FIXME for the concat redop, the number of bit must take into account the arity (2,3, or 6)
+          case Send(_) => ASTbitSize(newthis.asInstanceOf[Neton[AST[_]]].args.head)
+          case RedopConcat(exp, _, _) => this.locus.fanout //for the concat redop, the number of bit must take into account the arity (2,3, or 6)
+
         })
         newthis
     };
@@ -368,11 +430,19 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
   }
 
   /**
-   * @return true if the expression is only a concatenation of elements   */
-  override def justConcats: Boolean = this match {
-    case Unop(Fundef1("elt", _, _), arg, _, _) => arg.justConcats
-    case Binop(Fundef2("concat", _, _, _), arg, arg2, _, _) => arg.justConcats && arg2.justConcats
-    case _ => super.justConcats
+   * @return true if the expression contains  only 1-concatenation -2-elt or 3-Broadcast
+   *         indeed, those operators can be handled at the level of main instead of macro
+   **/
+  override def justConcatsorBroadcast: Boolean = this.asInstanceOf[ASTLg] match {
+    case Unop(Fundef1(namef, _, _), arg, _, _) =>
+      if (namef.startsWith("elt"))
+        arg.justConcatsorBroadcast
+      else false
+    case Binop(Fundef2("concat", _, _, _), arg, arg2, _, _) =>
+      arg.justConcatsorBroadcast && arg2.justConcatsorBroadcast
+    case RedopConcat(arg, _, _) => arg.justConcatsorBroadcast
+    case Broadcast(arg, _, _) => arg.justConcatsorBroadcast
+    case _ => super.justConcatsorBroadcast
   }
 
   def redOpSeq(m: Machine, zones: Dag[Zone], tZone: Map[String, Zone]) = this.asInstanceOf[ASTLg] match {
@@ -396,15 +466,18 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       })
       case Redop(op, a, _, _) =>
 
-        /**
-         * creates several call of opred
-         */
+        /** creates a binary tree of several call to opred       */
         def reduceEncapsulated(as: Array[ASTBt[R]], opred: redop[R]) =
           as.toList.tail.foldLeft(as(0))(new Call2(opred._1, _, _)(r) with ASTBt[R])
 
         a.unfoldTransfer(m).map((x: ArrAst) =>
           reduceEncapsulated(x.asInstanceOf[Array[ASTBt[R]]], op.asInstanceOf[redop[R]])).asInstanceOf[ArrAst]
+      case RedopConcat(a, _, _) =>
+        def reduceConcatEncapsulated(as: Array[ASTBt[B]]): ASTBt[UI] =
+          as.toList.tail.foldLeft(as(0).asInstanceOf[ASTBt[UI]])(new Concat2[UI, B, UI](_, _))
 
+        a.unfoldTransfer(m).map((x: ArrAst) =>
+          reduceConcatEncapsulated(x.asInstanceOf[Array[ASTBt[B]]])).asInstanceOf[ArrAst]
       case Clock(_, _) => throw new RuntimeException("Clock creates    a transfer type")
 
       case Sym(_, _, _, _) => throw new RuntimeException("Sym creates  a transfer type")
@@ -422,7 +495,10 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case Send(a) =>
         if (a.length != l2) throw new RuntimeException("incorrect number of arguments for send")
         a.toArray.map(_.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m)).transpose
-      case Transfer(a, _, _) => m(des, s1, a.unfoldTransfer(m))
+      case Transfer(a, _, _) =>
+        val u = 0
+        val res = m(des, s1, a.unfoldTransfer(m))
+        res
       case Unop(op, a, _, n) => a.unfoldTransfer(m).map(_.map(new Call1(op.asInstanceOf[Fundef1[Any, R]], _)(n.asInstanceOf[repr[R]]) with ASTBt[R].asInstanceOf[ASTBg]))
       case Binop(op, a, a2, _, n) => a.unfoldTransfer(m).zip(a2.unfoldTransfer(m)).map({
         case (b, b2) => b.zip(b2).map({
@@ -438,12 +514,13 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         if ((src < des) ^ dir) atr else atr.map(rot(_, trigo))
       case Sym(a, _, _, _) =>
         val T(s1, src) = a.locus;
-        val atr = a.unfoldTransfer(m).map(rotR(_));
-        s1 match {
+        val atr: Array[Array[ASTBg]] = a.unfoldTransfer(m).map(rotR(_));
+        val res = s1 match {
           case V() => atr.map(rotR(_)).map(rotR(_)) //throw new RuntimeException("sym not defined on V in the general case")
           case E() => atr // la composée de deux rotation est une rotation simple qui est aussi une permutation pour E.
           case F() => if (src < des) atr else atr.map(rotR(_)) //we follow trigonometric, the composition of tree anticlock  must add one rotation, if not(src<des).
         }
+        res
       //read and Call treated in ASTLt.
     }
   }
@@ -462,7 +539,11 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
   override def align(r: Result, tt: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
     val newExp = this.asInstanceOf[ASTLg] match { //read and Call treated in ASTLt.
       case Coonst(_, _, _) => this
-      case Broadcast(arg, _, _) => r.algn = r.algn.map { case (k, v) => k -> arg.locus.proj }; this //does not depend on v, because v is constant
+      case e@Broadcast(arg, _, _) => val newArg = arg.align(r, tt);
+        r.algn = r.algn.map { case (k, v) => k -> arg.locus.proj };
+        e.copy(arg = newArg)
+
+
       case e@Send(args) => val newArgs = args.map(_.align(r, tt)) //collects results in $r
         r.algn = r.algn.map { case (k, v) => k -> args.head.locus.proj } //does not depend on v, because v is constant
         e.copy(args = newArgs)(lpart(e.mym), rpart(e.mym))
@@ -525,6 +606,63 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
 
     }
     newExp.asInstanceOf[ASTL[L, R]]
+  }
+
+
+  /**
+   *
+   * @param r for computation of all the radius, collect the radius of identifier , plus a modifier making it precise for Edge and Face wether
+   *          they are perimeter or radial
+   * @param t symbol table to be updated for paramR() to paramRR(Int) where int indicate the radius of result param
+   * @return radius and modifier of expression
+   */
+  override def radiusify(r: TabSymb[(Int, Option[Modifier])], t: TabSymb[InfoNbit[_]]): (Int, Option[Modifier]) = {
+
+    /**
+     *
+     * @param rad    radius
+     * @param m      modifier: Perimeter or Radial
+     * @param src    locus of  origin
+     * @param target locus of  destination
+     * @return transcribes the automata presented in the article,
+     *         so as to possibly increase the radius, and update the locus modifier
+     */
+    def increaseRadius(rad: Int, m: Option[Modifier], src: Locus, target: Locus): (Int, Option[Modifier]) = {
+      val newRadius = (src, m, target) match {
+        case (E(), Some(Perimeter()), F()) | // case where the radius does not increase
+             (F(), Some(Radial()), E()) | // case where the radius does not increase
+             (E(), Some(Radial()), V()) // case where the radius does not increase
+        => rad
+        case _ => rad + 1
+      }
+      val newModifier: Option[Modifier] = (src, target) match {
+        case (E(), F()) => m
+        case (F(), E()) => Modifier.invertModifier(m)
+        case (V(), _) => Some(Perimeter())
+        case (_, V()) => None
+      }
+      (newRadius, newModifier)
+    }
+
+    this.asInstanceOf[ASTLg] match {
+      case Coonst(_, _, _) => startRadius(locus)
+      case Transfer(arg, _, _) => {
+        val (rad, m) = arg.radiusify(r, t)
+        val T(src, target) = arg.locus //we get the source and target locus knowing that arg is a transfer locus
+        increaseRadius(rad, m, src, target)
+      }
+      case Binop(_, arg, arg2, _, _) => val (r1, t1) = arg.radiusify(r, t)
+        val (r2, t2) = arg2.radiusify(r, t)
+        assert(r1 == r2 && t1 == t2, "binop should processe variables of identical radius")
+        (r1, t1)
+      case Unop(_, arg, _, _) => arg.radiusify(r, t) //ca ne change pas
+      case Broadcast(arg, _, _) => arg.radiusify(r, t) //ca ne change pas
+      case Redop(_, arg, _, _) => arg.radiusify(r, t) //ca ne change pas
+      case RedopConcat(arg, _, _) => arg.radiusify(r, t) //ca ne change pas
+      case Clock(arg, _) => arg.radiusify(r, t) //ca ne change pas
+      case Send(args) => args(0).radiusify(r, t) //ca ne change pas
+      case Sym(arg, _, _, _) => arg.radiusify(r, t) //ca ne change pas
+    }
   }
 
   override def cost(): Cost = {

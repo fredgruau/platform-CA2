@@ -1,16 +1,19 @@
 package compiler
 
 
+import compiler.AST.Layer
+import compiler.ASTL.{IntV, delayedL}
 import dataStruc.{Dag, DagNode}
 import org.scalatest.{BeforeAndAfter, FunSuite}
-import prog.{CycleLayer2}
-class  DagTest  extends FunSuite  with BeforeAndAfter{
-  
- /** A node of a DAG for testing cycles implemented as a Bag of neighbors
- *  @constructor create a node with neighbors and a name
- *  @param neighbors  passed by name for delaying evaluation
- *  @param name for printing purpose
- */
+
+class DagTest extends FunSuite with BeforeAndAfter {
+
+  /** A node of a DAG for testing cycles implemented as a Bag of neighbors
+   *
+   * @constructor create a node with neighbors and a name
+   * @param neighbors passed by name for delaying evaluation
+   * @param name      for printing purpose
+   */
    class Node(  neighbors : => List[Node],val name:String) extends DagNode[Node]    {
      def inputNeighbors: List[Node] = neighbors
 
@@ -38,6 +41,12 @@ class  DagTest  extends FunSuite  with BeforeAndAfter{
     assert(n4.getCycle match { case Some(c) => println("there is a cycle: " + c); true; case None => false })
   }
 
+  /** Builds a cycle in the DAG */
+  class CycleLayer2(nbit: Int)(implicit m: repr[V]) extends Layer[(V, SI)](nbit) with ASTLt[V, SI] {
+    lazy val x: IntV = next + pred.asInstanceOf[ASTLt[V, SI]]
+    val next: ASTLt[V, SI] = delayedL(x)
+  }
+
   val testCycle: Circuit[V, SI] = new Circuit[V, SI]() {
     val chip = new CycleLayer2(3);
 
@@ -46,7 +55,7 @@ class  DagTest  extends FunSuite  with BeforeAndAfter{
 
   test("GetcycleDagAst") {
     try {
-      testCycle.compile2(Circuit.hexagon)
+      testCycle.compile(Circuit.hexagon)
       assert(false)
     } //if no exeption is raised, test fails.
     catch {

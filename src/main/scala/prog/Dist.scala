@@ -1,14 +1,15 @@
 package prog
 
-//import compiler.ASTB._
-
-import compiler.AST.Layer
+import compiler.AST._
 import compiler.ASTL._
+import compiler.ASTLt._
 import compiler.Circuit.hexagon
 import compiler._
-import macros.ASTLfun._
+import macros.Compute._
+import macros.SReduce._
 
-class Dist2(val source: BoolV) extends Layer[(V, SI)](3) with ASTLt[V, SI] {
+
+class Dist(val source: BoolV) extends Layer[(V, SI)](3) with ASTLt[V, SI] {
   val level: BoolV = elem(2, this);
   //render2(level)
   /*
@@ -31,43 +32,19 @@ class Dist2(val source: BoolV) extends Layer[(V, SI)](3) with ASTLt[V, SI] {
   // ceci provoque bien l'erreur attendue java.lang.RuntimeException: Debug exp is allzero=>not usable for compute
   //ca montre que debug ne peut etre réutilisé.
   bugif(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
-  val next: ASTLt[V, SI] = this + cond(source, sign(-this), delta) //faudrait en faire une marco qui prends delta, source et dist et renvoie distNext
+  val next: ASTLt[V, SI] = this + cond(source, sign(-this), delta) //faudrait en faire une macro qui prends delta, source et dist et renvoie distNext
   // val temp: BoolfV = xorR2(transfer(slope)) ;  val vortex: BoolF = orR(transfer(temp));   bugif(vortex);
   show(tslope)
 }
 
-/** returns a constant layer. */
-class ConstLayer2[L <: Locus, R <: Ring](nbit: Int)(implicit m: repr[L], n: repr[R]) extends Layer[(L, R)](nbit) with ASTLt[L, R] {
-  val next: ASTLt[L, R] = delayedL(~this) //yes
-}
 
-class TestDist2 extends Circuit[V, SI](Dist2.myInput) {
-  val src = new ConstLayer2[V, B](1)
-  val dist = new Dist2(src)
-
-  def computeRoot: ASTLt[V, SI] = dist
-}
-
-//[SI](-2,3)
-/** Builds a cycle in the DAG */
-class CycleLayer2(nbit: Int)(implicit m: repr[V]) extends Layer[(V, SI)](nbit) with ASTLt[V, SI] {
-  lazy val x: IntV = next + pred.asInstanceOf[ASTLt[V, SI]]
-  val next: ASTLt[V, SI] = delayedL(x)
-}
-
-object Dist2 { //  def g[L<:Locus](t:AST[L,B])(implicit m : repr[L]) = m.name; exemple de implicit que je conserve.
-  /** fake input  */
+object Dist extends App {
   val myInput: AST.Param[(V, B)] with ASTLt[V, B] = p[V, B]("input")
+  new Circuit[V, SI](myInput) {
+    val src = constLayerBool[V]
+    val dist = new Dist(src)
 
-  def main(args: Array[String]) {
-    //val t: BoolV = true
-    val testDist2 = new TestDist2()
-    // testDist.substitute(testDist.src,const[V,B](True[B] ))
-    testDist2.compile2(hexagon //    List((testDist.src, t)) //this does a substitution.
-    )
-    //val testCycle: Circuit[V, SI] = new Circuit[V, SI]() { val chip = new CycleLayer(3); def computeRoot: ASTLt[V, SI] = chip.next }
-    //testCycle.compile();
-
-  }
-
+    def computeRoot: ASTLt[V, SI] = dist
+  }.compile(hexagon)
 }
+

@@ -7,6 +7,7 @@ import Instr._
 import VarKind._
 import dataStruc.{Align2, Dag, DagInstr, DagNode, WiredInOut}
 import Circuit._
+import compiler.ASTL.ASTLtG
 import compiler.Packet.BitLoop
 import dataStruc.Align2.{compose, invert}
 
@@ -16,6 +17,17 @@ import scala.collection.immutable.{HashMap, HashSet}
 
 /** Instruction used within the compiler, call, affect. Dag and Union allows to defined ConnectedComp  */
 abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
+
+
+  /**
+   *
+   * @param t symbol table, to get the bitsize
+   * @return a list  of Boolean Instruction compiling the integer instruction,
+   *         also updates t adding the boolean elements of integers
+   */
+  def unfoldInt(t: TabSymb[InfoNbit[_]]): List[Instr]
+
+  def radiusify(radius: TabSymb[(Int, Option[Modifier])], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {}
 
   protected def show(x: Option[Locus]) = x match {
     case Some(s) => "" + s
@@ -137,14 +149,66 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
      */
     def subNames(s: String): List[String] = if (hd.contains(s)) hd(s) :: subNames(tl(s)) else List(s)
 
+    /**
+     *
+     * @param arg one of the argument of call
+     *            if the name of arg is null, it sets it to auxL and adds it to the symbol table with apropriate type
+     *            and with store as kind
+     */
+    def setNameIfNullandAddtoT(arg: AST[_]) = {
+      if (arg.name == null) {
+        arg.setNameIfNull("auxL")
+        t += arg.name -> new InfoType(arg.mym, StoredField())
+      }
+    }
+
     this match {
       case Affect(s, exp) => exp match {
         case c: Call[_] =>
           val res = subNames(s)
+          // we must set names of effective parameters and add them to the symbol table if needed
+          c.args.toList.map(setNameIfNullandAddtoT(_))
           //value which are sent through call and retrieved from the procedure, have to be stored
           for (r <- res ::: c.args.toList.map(_.name))
-            if (t(r).k == MacroField()) t += r -> new InfoType(t(r).t, StoredField()); // register the fact that results must be stored.
+            if (t.contains(r) && t(r).k == MacroField()) t += r -> new InfoType(t(r).t, StoredField()); // register the fact that results must be stored.
+          List(CallProc(c.f.name, res, c.args.toList))
+        case Taail(_) | Heead(_) => List() //we do not need those any more.
+        case _ => List(this)
+      }
 
+      case _ => if (this.isReturn) List() else List(this)
+    }
+  }
+
+  def procedurIfyOld(hd: TabSymb[String], tl: TabSymb[String], t: TabSymb[InfoType[_]]): List[Instr] = {
+    /**
+     * @param s
+     * @return names of ASTL variables, associated to variable of type cons(cons...))
+     */
+    def subNames(s: String): List[String] = if (hd.contains(s)) hd(s) :: subNames(tl(s)) else List(s)
+
+    /**
+     *
+     * @param arg one of the argument of call
+     *            if the name of arg is null, it sets it to auxL and adds it to the symbol table with apropriate type
+     *            and with store as kind
+     */
+    def setNameIfNullandAddtoT(arg: AST[_]) = {
+      if (arg.name == null) {
+        arg.setNameIfNull("auxL")
+        t += arg.name -> new InfoType(arg.mym, StoredField())
+      }
+    }
+
+    this match {
+      case Affect(s, exp) => exp match {
+        case c: Call[_] =>
+          val res = subNames(s)
+          // we must set names of effective parameters and add them to the symbol table if needed
+          c.args.toList.map(setNameIfNullandAddtoT(_))
+          //value which are sent through call and retrieved from the procedure, have to be stored
+          for (r <- res ::: c.args.toList.map(_.name))
+            if (t.contains(r) && t(r).k == MacroField()) t += r -> new InfoType(t(r).t, StoredField()); // register the fact that results must be stored.
           List(CallProc(c.f.name, res, c.args.toList))
         case Taail(_) | Heead(_) => List() //we do not need those any more.
         case _ => List(this)
@@ -158,17 +222,17 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
    *
    * @param cur        The current programm
    * @param expBitSize mutable map, Stores number of bits of sub expressions.
-   * @param tSymb      The symbol table with number of bits
+   * @param newTSymb   The symbol table with number of bits
    * @param newFuns    Functions generated
    * @return The instructions rewritten so as to include Extend where necessary.
    */
-  def bitIfy(cur: DataProg[InfoType[_]], expBitSize: AstMap[Int], tSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[DataProg[InfoNbit[_]]]): Instr = this match {
+  def bitIfy(cur: DataProg[InfoType[_]], expBitSize: AstMap[Int], newTSymb: TabSymb[InfoNbit[_]], newFuns: TabSymb[DataProg[InfoNbit[_]]]): Instr = this match {
     case Affect(s, exp) =>
-      val newExp = exp.asInstanceOf[ASTLt[_, _]].bitIfyAndExtend(cur, expBitSize, tSymb)
-      tSymb += s -> new InfoNbit(cur.tSymbVar(s).t, cur.tSymbVar(s).k, expBitSize(newExp));
+      val newExp = exp.asInstanceOf[ASTLt[_, _]].bitIfyAndExtend(cur, expBitSize, newTSymb)
+      newTSymb += s -> new InfoNbit(cur.tSymbVar(s).t, cur.tSymbVar(s).k, expBitSize(newExp));
       Affect(s, newExp).asInstanceOf[Instr]
     case CallProc(f, names, exps) =>
-      val newexps = exps.map(_.asInstanceOf[ASTLt[_, _]].bitIfyAndExtend(cur, expBitSize, tSymb))
+      val newexps = exps.map(_.asInstanceOf[ASTLt[_, _]].bitIfyAndExtend(cur, expBitSize, newTSymb))
       val nbitarg = newexps.map(a => expBitSize(a)) //.toList.flatten
       val newname = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _)
 
@@ -182,7 +246,7 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
         // re-creates the code of f, taking into account nbitarg.
         val fprog = newFuns(newname)
         val nbitResult = fprog.paramR.map(s => fprog.tSymbVar(s).nb) //we get the number of bits of results
-        (names zip nbitResult).foreach { sn => tSymb += sn._1 -> new InfoNbit(cur.tSymbVar(sn._1).t, cur.tSymbVar(sn._1).k, sn._2) }
+        (names zip nbitResult).foreach { sn => newTSymb += sn._1 -> new InfoNbit(cur.tSymbVar(sn._1).t, cur.tSymbVar(sn._1).k, sn._2) }
         CallProc(newname, names, newexps).asInstanceOf[Instr]
       }
   }
@@ -201,16 +265,22 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
           case s: S => s.deploy(v).zip(exp2.unfoldSimplic(m)).map({ case (suf, e) => Affect(suf, e) }).toList
 
           //case s: S => s.sufx.zip(exp2.unfoldSimplic(m)).map({ case (suf, e) => Affect(v + "$" + suf, e) }).toList
-          case l@T(s1, _) => s1.sufx.zip(exp2.unfoldTransfer(m)).map({
-            case (suf1, t) =>
-              l.sufx.zip(t).map({ case (suf2, e) => Affect(v + "$" + suf1 + suf2, e) }).toList
-          }).toList.flatten
+          case l@T(s1, _) =>
+            val exp2unfolded = exp2.unfoldTransfer(m)
+            val s1zip = s1.sufx.zip(exp2unfolded)
+            s1zip.map({
+              case (suf1, t) =>
+                val secondZip = l.sufx.zip(t).map({ case (suf2, e) => Affect(v + "$" + suf1 + suf2, e) }).toList
+                secondZip
+            }).toList.flatten
         }
       case CallProc(f, n, e) => List(CallProc(f, n.flatMap(Instr.deploy(_, tSymb)),
         e.asInstanceOf[List[ASTLt[_, _]]].flatMap(_.unfoldSpace(m)))) //tSymb(n).t._1
     }
 
   def locus2: Option[Ring] = None
+
+
 }
 
 
@@ -254,6 +324,39 @@ case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) exte
     val newInstr = CallProc(p, names, exps.map((a: AST[_]) => id1(a)))
     newInstr
   }
+
+  /**
+   *
+   * @param t symbol table, to get the bitsize
+   * @return a list  of Boolean Instruction compiling the integer instruction,
+   *         also updates t adding the boolean elements of integers
+   */
+  override def unfoldInt(t: TabSymb[InfoNbit[_]]): List[Instr] = {
+    val newExps: List[List[ASTBt[B]]] = exps.asInstanceOf[List[ASTBg]].map(_.deCallify(HashMap.empty[String, ASTBt[B]]).unfoldInt(t))
+
+    var resb: List[String] = List()
+    for (nameInt <- names) {
+      val boolNames = deployInt(nameInt, t(nameInt).nb)
+      resb = resb ::: boolNames
+      for (boolName <- boolNames) {
+        if (!t.contains(boolName)) //if name is already in symbol table, adding it anew will replace a spatial type by a scalar type
+        // or will remove the layer info, which in total will loose information so we do not want that
+        t.addOne(boolName -> new InfoNbit[B](B(), t(nameInt).k, 1)) //can be either of StoredField, paramR, paramD??
+      }
+    }
+
+    /*    val boolNames=names.flatMap((name:String)=>deployInt(name,t(name).nb))
+        boolNames.map((bname:String)=>
+          if(!t.contains(bname)) //if name is already in symbol table, adding it anew will replace a spatial type by a scalar type
+            //or will remove the layer info, which in total will loose information so we do not want that
+          t.addOne(bname->new InfoNbit[B](B(), t(name),1))) //adds scalar variables. should we?*/
+    val res = List(new CallProc(p, resb, newExps.flatten))
+    res
+    //if(p=="memo") //we can generate a list of memo
+
+  }
+
+
 }
 
 /**
@@ -275,6 +378,12 @@ case class ShiftInstr(name: String, shifted: String, perm: Array[Int]) extends I
 
   override def names: List[String] = List(name)
 
+  /**
+   *
+   * @param t symbol table, to get the bitsize
+   * @return a list  of Boolean Instruction compiling the integer instruction
+   */
+  override def unfoldInt(t: TabSymb[InfoNbit[_]]): List[Instr] = List() //we do not need it
 }
 
 
@@ -291,6 +400,7 @@ case class Store(name: String, delay: Int, exp: AST[_]) extends Instr {
 
   override def usedVars(): HashSet[String] = exp.symbolsExcepLayers
 
+  override def unfoldInt(t: TabSymb[InfoNbit[_]]): List[Instr] = List() //we do not need it
 }
 
 
@@ -302,6 +412,7 @@ case class Loop(names: List[String], exps: List[AffBool]) extends Instr {
 
 
   override def usedVars(): HashSet[String] = HashSet() //todo
+  override def unfoldInt(t: TabSymb[InfoNbit[_]]): List[Instr] = List() //we do not need it
 }
 
 //todo on aurait pas du prendre de case class pour affect ou callProc.
@@ -349,7 +460,7 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
    * @return former instruction with macrofield, plus supplementary affectation
    */
   def insertMacroFieldbeforeReduceParamR(tSymbVar: TabSymb[InfoNbit[_]]): List[Instr] = {
-    if (tSymbVar(name).k == ParamR() && isRedop) {
+    if (tSymbVar(name).k.isParamR && isRedop) {
       val newName = name + "R"
       tSymbVar.addOne(newName, tSymbVar(name))
       tSymbVar.addOne(name, tSymbVar(name).macroFieldise)
@@ -443,15 +554,6 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
 
   /**
    *
-   * @param inst an integer affectation, decomposed into independant packets
-   * @return a list of list of pure boolean affectations, each list is independant from the next with respect to pipelined variables
-   *         the affect of the inner list are printed on the same line,they correspond to the loop on index,
-   *         the number of lines is therefore equal to the number of independant paceai
-   *         updates several global variables :the symbol table  to computes bit size
-   */
-
-  /**
-   *
    * @param i   current looop index considered. -1 if boolean and not integer
    * @param gen contains all the info to produce the code
    * @param env map or scan parameter's expression for index i
@@ -462,13 +564,44 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
 
   }
 
+  /**
+   *
+   * @param radius contains the already computer radius
+   * @param tSymbVar
+   */
+  override def radiusify(radius: TabSymb[(Int, Option[Modifier])], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {
+    val (r, modifier): (Int, Option[Modifier]) = exp.asInstanceOf[ASTLt[_ <: Locus, _ <: Ring]].radiusify(radius, tSymbVar)
+    radius.addOne(name -> (r, modifier)) //we store radius of identifier for future use.
+    if (tSymbVar(name).k.isParamR)
+      tSymbVar.addOne(name -> tSymbVar(name).radiusify(r)) //for paramR, we modify the symbol table
+  }
+
+  /**
+   *
+   * @param t symbol table, to get the bitsize
+   * @return a list  of Boolean Instruction compiling the integer instruction,
+   *         also updates t adding the boolean elements of integers
+   */
+  override def unfoldInt(t: TabSymb[InfoNbit[_]]): List[Instr] = {
+    val decall = exp.asInstanceOf[ASTBg].deCallify(HashMap.empty[String, ASTBt[B]])
+    if (decall.ring == B()) List(Affect[B](name, decall.unfoldInt(t).head))
+    else {
+      val boolNames = Instr.deployInt(name, t(name).nb) //affectation of int has not been tested yet
+      //updates t
+      boolNames.map((nameb: String) => t.addOne(nameb -> new InfoNbit[B](B(), t(name).k, 1)))
+      boolNames.zip(decall.asInstanceOf[ASTBt[_]].unfoldInt(t)).map(
+        (namee: (String, ASTBt[B])) => Affect[B](namee._1, namee._2).asInstanceOf[Instr])
+    }
+  }
+
 }
+
 
 object Instr {
 
   val isBoolean = (r: Instr) => a(r).exp.asInstanceOf[ASTBg].ring == B()
 
-
+  /** used to identify system instructions show, bugif, memo... */
   val sysInstr = HashSet("ret", "bug", "sho", "mem")
 
   /**
@@ -536,29 +669,42 @@ object Instr {
   /**
    *
    * @param tsymb
-   * @param paramD side effect: will receive the name of the result parameters, in right order
-   * @param e      the expression returned incuding possibly Coons, to gather several parameters.
-   * @return Instruction Affect of value computed by the function, to resultParameters.
+   * @param paramRmut side effect: will receive the name of the result parameters, in right order
+   * @param e         the expression returned incuding possibly Coons, to gather several parameters.
+   * @return Affect Instructions which affect values computed by the function, to resultParameters.
    */
-  def affectizeReturn(tsymb: TabSymb[InfoType[_]], paramD: mutable.LinkedHashSet[String], e: AST[_]): List[Instr] = {
+  def affectizeReturn(tsymb: TabSymb[InfoType[_]], paramRmut: mutable.LinkedHashSet[String], e: AST[_]): List[Instr] = {
     /**
      * @param e of the form Coons(e1,e2)
      * @return Affect of value computed by the function, to resultParameters.
      */
     def process(e: AST[_]): List[Affect[_]] = {
       val already = tsymb.contains(e.name)
-      val newName = if (!already || already && tsymb(e.name).k == MacroField()) e.name else newAux()
+      val newName = if (e.name != null && (!already || (already &&
+        (tsymb(e.name).k == MacroField() || tsymb(e.name).k == StoredField()))
+        )) e.name else "resultCA"
       //we create another variable to return result, in case it is a layer.
-      paramD += newName;
+      paramRmut += newName;
       tsymb += newName -> InfoType(e, ParamR())
       if (already && newName == e.name) List() else List(Affect(newName, e))
     }
     //recursive call because a function can returns several results grouped  together using Coons()
     e match {
-      case Cons(e1, e2) => process(e1) ::: affectizeReturn(tsymb, paramD, e2)
+      case Cons(e1, e2) => process(e1) ::: affectizeReturn(tsymb, paramRmut, e2)
       case _ => process(e)
     }
   }
+
+  /**
+   *
+   * @param n  name of integer parameter
+   * @param nb number of bits of integer
+   * @return list of names, of for each bit, obtained by appending the bit.
+   *         if name was already a boolean, nothing is changed.
+   */
+  def deployInt(n: String, nb: Int): List[String] =
+    if (nb == 1) List(n)
+    else (0 to nb - 1).map(n + "#" + _).toList
 }
 
 

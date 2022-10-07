@@ -19,25 +19,18 @@ import scala.collection.immutable.HashMap
  */
 abstract class Packet(val instrs: List[Instr],
                       val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String], val constantTable: TabSymb[Boolean],
-                      var boolAST: List[ASTBt[B]] = List()) extends WiredInOut[Packet] {
-  def usedVars() = ASTB.tmpNames(boolAST)._2
+                      var boolAST: List[ASTBt[B]] = List(), var boboolAST: List[ASTBt[B]] = List()) extends WiredInOut[Packet] {
 
-  /** names of variables produced by instruction. */
-  def names: List[String] = ASTB.tmpNames(boolAST)._1.toList
+  /** names of tmp   variables used by instruction. */
+  def usedVars() = ASTB.used(boolAST).filter(ASTB.isTmp(_)).toSet
 
-  /**
-   *
-   * @return list of temporary variables defined in the packet
-   */
-  def definedTMPint: Set[String] = instrs.map(_.names(0)).filter(ASTB.isTmp(_)).toSet
+  /** names of tmp variables produced by instruction. */
+  def names: List[String] = ASTB.names(boolAST).filter(ASTB.isTmp(_)).toList
 
-  /**
-   *
-   * @return list of temporary variables used in the packet
-   */
-  def usedTMPint: Set[String] = instrs.flatMap(_.usedVars()).toSet.filter(ASTB.isTmp(_))
 
-  var tmpLiveVarsAfter: Set[String] = null
+  /** we need to find out if int variable are live after packet evaluation, because used in another packet
+   * because then the memory occupied cannot be liberated */
+  var tmpIntLiveVarsAfter: Set[String] = null
 
   /**
    *
@@ -45,7 +38,17 @@ abstract class Packet(val instrs: List[Instr],
    * @return tmpLiveVars tmpVariable lived just before the loops
    */
   def tmpLiveBefore(tmpLiveVars: Set[String]): Set[String] = {
-    tmpLiveVarsAfter = tmpLiveVars
+    /**
+     *
+     * @return list of temporary variables defined in the packet
+     */
+    def definedTMPint: Set[String] = instrs.map(_.names(0)).filter(ASTB.isTmp(_)).toSet
+
+    /** @return list of temporary variables used in the packet
+     */
+    def usedTMPint: Set[String] = instrs.flatMap(_.usedVars()).toSet.filter(ASTB.isTmp(_))
+
+    tmpIntLiveVarsAfter = tmpLiveVars
     tmpLiveVars.union(usedTMPint).diff(definedTMPint)
   }
 
@@ -53,7 +56,10 @@ abstract class Packet(val instrs: List[Instr],
   val affected: String //generated  affectation
   def binary = if (boolAST.nonEmpty) "\nBinary() " + boolAST.map(_.toStringTree).mkString("|_|") else ""
 
-  override def toString = info + affected + binary
+  def binaary: String = if (boboolAST.nonEmpty) "\nBinaary() " + boboolAST.map(_.toStringTree).mkString("|_|") else ""
+
+
+  override def toString = info + affected + binary + binaary
 
 
   /**
@@ -63,11 +69,23 @@ abstract class Packet(val instrs: List[Instr],
   def unfoldInt(): List[ASTBt[B]]
 
   /**
+   *
+   * @return replaces variables in BoolAst by their coalesced form
+   */
+  def coalesc(c: iTabSymb[String]): List[ASTBt[B]] =
+    boolAST.map(_.coalesc(c))
+
+  /**
    * will store the boolification in the boolAst field, for future printing and code generation
    */
   def addUnfoldInt() = {
     boolAST = unfoldInt().reverse
   } // unfoldInt return affectations in reverse order because last affectation are inserted on the head, so it must be reversed
+
+  def addCoalesc(c: iTabSymb[String]) = {
+    boboolAST = coalesc(c)
+  }
+
   def isBool(s: String): Boolean =
     if (tSymbVar.contains(s))
       tSymbVar(s).ringSafe == B()
@@ -83,6 +101,10 @@ abstract class Packet(val instrs: List[Instr],
   def readWithConst(name: String): ASTBt[B] =
     if (constantTable.contains(name)) fromBoolB(constantTable(name))
     else new Read(name)(repr(B())) with ASTBt[B]
+
+  def totalOp = {
+    boolAST.map(_.totalOp).foldLeft(0)(_ + _)
+  }
 
 }
 
@@ -180,7 +202,7 @@ object Packet {
      *         therefore implemented  as an integer, not as a boolean
      */
     override def isBool(s: String): Boolean =
-      if (pipelinedTable.contains((s)) && !tmpLiveVarsAfter.contains(s)) true else super.isBool(s) //now we know also of super!!
+      if (pipelinedTable.contains((s)) && !tmpIntLiveVarsAfter.contains(s)) true else super.isBool(s) //now we know also of super!!
 
     /**
      *
@@ -208,7 +230,7 @@ object Packet {
      * @return optional suffix i added if x is live after loop
      */
     def checkLiveforAddIndex(x: String, i: Int): String =
-      if (tmpLiveVarsAfter.contains(x)) //if x is gonna be reused in another packet, we need to store the components individually
+      if (tmpIntLiveVarsAfter.contains(x)) //if x is gonna be reused in another packet, we need to store the components individually
       addSufx(x, i)
       else
       x
@@ -242,7 +264,7 @@ object Packet {
         if (evaluated(x) * step < i * step) { //means that we have not yet compiled x's pipelined expression
           evaluated += (x -> i) //register the fact that yes now we 'll compile it
           val newExp = pipelinedTable(x).exps(0).asInstanceOf[ASTBg].boolifyForIndexI(i, this, null, env) //compiles it
-          val s: String = if (!tmpLiveVarsAfter.contains(x) && lastIter(i) && pipelineUseOutsideScans(x) == 1)
+          val s: String = if (!tmpIntLiveVarsAfter.contains(x) && lastIter(i) && pipelineUseOutsideScans(x) == 1)
             null else x //for last iteration, a pipelined variable used once need not be stored, exept if the pipelined is reused in another loop
           affBoolConst(checkLiveforAddIndex(s, i), newExp, this)
         }

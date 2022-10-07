@@ -16,11 +16,13 @@ sealed abstract class Locus {
 
   def isTransfer = false
 
+  /** how many bits are needed for a boolean field of this locus */
   def density: Int = if (isTransfer) 6 else sufx.length
 
+  /** how many neighbors are adresed when doing a broadcast or the reverse, a reduce */
   def fanout = 6 / density
 
-  /** suffix of variable names representing simplicial types arity is the locus's arity */
+  /** suffix of variable names representing simplicial types.  arity is the locus's arity */
   val sufx: Array[String]
 
   /** generates allways 6 suffixe */
@@ -33,15 +35,42 @@ sealed abstract class Locus {
   /** encodes a neutral permutation with the right number of elements. */
   lazy val neutral: Array[Int] = Array.range(0, density) //we put lazy otherwise pb in initialization order
 }
+
+abstract class Modifier {
+  def invert: Modifier
+}
+
+final case class Perimeter() extends Modifier {
+  def invert = Radial()
+}
+
+final case class Radial() extends Modifier {
+  def invert = Perimeter()
+}
+
+object Modifier {
+  val invertModifier: Option[Modifier] => Option[Modifier] = {
+    case Some(x) => Some(x.invert)
+    case None => None
+  }
+}
+
+
 abstract class S extends Locus with Ordered[S] {
   override def deploy(n: String): Array[String] = sufx.map(n + "$" + _)
+
   /** number of neighbor when doing a reduction */
   def propagateFrom(s: Array[Int], c: Array[Int]): Option[Array[Int]]
-  def compare(that: S): Int = { toString.compareTo(that.toString) }
+
+  def compare(that: S): Int = {
+    toString.compareTo(that.toString)
+  }
+
   /** defines which components are regrouped upon partitionning a transfer variable */
   val proj: Array[Int]
-  /**@param t encodes a partitionnable transfer schedule on a son of this. vE or fE for E, vF or eF for F
-   * @return the corresponding siplicial schedule on this*/
+
+  /** @param t encodes a partitionnable transfer schedule on a son of this. vE or fE for E, vF or eF for F
+   * @return the corresponding siplicial schedule on this */
   def scheduleProj(t:Seq[Int]):Array[Int]
   /**Number of distinct transfer schedules that can be partitionned with a given simplicial schedule*/
   val card: Int

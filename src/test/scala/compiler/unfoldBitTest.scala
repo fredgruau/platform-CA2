@@ -52,7 +52,7 @@ class unfoldBitTest extends FunSuite {
 
   val exprMapScan = -toto
   val env3 = HashMap.empty[String, ASTBg]
-  val mapscan: ASTBg = exprMapScan.deCallify(env3, tsymb)
+  val mapscan: ASTBg = exprMapScan.deCallify(env3)
   test("deCallify") {
     assert(mapscan.toStringTree == "Mapp2xorB (Scan1andBLeft() Mapp1negB (toto  ), Mapp1negB (toto  ))")
   }

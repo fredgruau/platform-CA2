@@ -112,7 +112,7 @@ class BoolifyTest extends FunSuite {
     val dag: DagInstr = DagInstr(List(aff))
     val dataProg = new DataProg(dag, HashMap(), tSymbVar, List(), List(), HashMap()).loopIfy().unfoldInt()
     println(dataProg)
-    env = evalLines(dataProg.totalCode(), env)
+    env = evalLines(dataProg.totalCode, env)
     get(env, aff.name, tSymbVar)
   }
 

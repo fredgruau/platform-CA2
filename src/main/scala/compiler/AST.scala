@@ -1,8 +1,11 @@
 package compiler
 
 import dataStruc.DagNode._
-import AST._
+import AST.{Layer, _}
+import compiler.Circuit.TabSymb
+import compiler.VarKind.MacroField
 import dataStruc.{DagNode, Named}
+
 import scala.collection._
 import scala.collection.immutable.HashSet
 
@@ -16,6 +19,8 @@ import scala.collection.immutable.HashSet
  * @tparam T type of the expression
  * @param m implicit parameter used to compute this type. */
 abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named {
+
+
   /**
    *
    * @return all the AST's leaves
@@ -74,6 +79,38 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
       case _ => throw new RuntimeException("merdouille")
     }
 
+
+  /**
+   *
+   * @param i instruction where expression this was found. depending if it callProc or Affect, the processing will nt
+   *          be the same
+   * @param t the symbol table, it needs to be modified by transforming MacroFields, into StoredField
+   * @return effective arguments of call which needs to be affectize
+   *         we will not affectize combination of broadcast, elt and read ,
+   *         carefull: for args of call which are not such a combination, but are variables,
+   *         their kind  must still be changed from macroField to Stored field
+   */
+  def nonConcatOrBroadcastCallArg(i: Instr, t: mutable.HashMap[String, InfoType[_]]): List[AST[_]] = this.asInstanceOf[AST[_]] match {
+    case e: EmptyBag[AST[_]] =>
+      if (i.isInstanceOf[CallProc]) //this should be storedFieldified, because it is the expr of a callProc
+
+         if (e.name != null)
+        if (t(e.name).k == MacroField())
+          t.addOne(e.name -> t(e.name).storedFieldise)
+      List() //+ mym.name
+    case c: Call[_] =>
+      val (simple, complex) = c.args.partition(_.asInstanceOf[ASTL.ASTLg].justConcatsorBroadcast)
+      val formerMacroFields = simple.flatMap(_.leaves()).filter((a: AST[_]) =>
+        t.contains(a.name) && t(a.name).k == MacroField()).toSet
+      for (f <- formerMacroFields)
+        t.addOne(f.name -> t(f.name).storedFieldise)
+      complex.toList ++ inputNeighbors.flatMap(_.nonConcatOrBroadcastCallArg(null, t))
+    case Heead(_) => List()
+    case Taail(_) => List()
+    case Cons(_, _) => List()
+    case _ => inputNeighbors.flatMap(_.nonConcatOrBroadcastCallArg(null, t))
+  }
+
   /**
    * Treefy must be written also for AST because  Coons are AST but not ASTLt[L,R]
    *
@@ -117,9 +154,21 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
 
   def isNotTm1Read: Boolean = if (isInstanceOf[ASTBt[_]]) asInstanceOf[ASTBt[_]].isNotTm1Read else true
 
+  def isRead: Boolean = if (isInstanceOf[ASTBt[_]]) asInstanceOf[ASTBt[_]].isNotTm1Read else true
 }
 
 object AST {
+  /*
+    /** static function, analyse exps of callProc instructions, for affectizing, as well as exp of Call expression, the same processing holds */
+    def nonConcatOrBroadcastCallorCallProc(argsOrExps: List[AST[_]], t:TabSymb[InfoType[_]] )={
+      val (simple, complex)= argsOrExps.partition(_.asInstanceOf[ASTL.ASTLg].justConcatsorBroadcast)
+      val formerMacroFields =simple.flatMap(_.leaves()).filter((a:AST[_])=>t(a.name).k==MacroField()).toSet
+      for(f<-formerMacroFields)
+        t.addOne(f.name->t(f.name).storedFieldise)
+      complex.toList ++ argsOrExps.map(_.inputNeighbors.flatMap(_.nonConcatOrBroadcastCallArg(t)))
+    }*/
+
+
   /** Predicate on ASTs */
   type AstPred = AST[_] => Boolean
   /** Predicate on ASTs true when not read */
@@ -136,6 +185,8 @@ object AST {
     case Taail(_) | Heead(_) | Call1(_, _) | Call2(_, _, _) | Call3(_, _, _, _) => true;
     case _ => false
   }
+
+  def or(a1: AstPred, a2: AstPred) = (a: AST[_]) => a1(a) | a2(a)
 
 
   type rewriteAST[U] = AST[U] => AST[U]
@@ -164,6 +215,10 @@ object AST {
     name = nameP;
   }
 
+  // @TODO we should not import compiler._, and find a way to use parameter with IntV rather than [V,SI]
+  /** Creates a parameter for macro */
+  def p[L <: Locus, R <: Ring](name: String)(implicit n: repr[L], m: repr[R]) = new Param[(L, R)](name) with ASTLt[L, R]
+
   /** Replace call1, call2, call3, after the nbit stage */
   abstract class Call[T](val f: Fundef[T], val args: AST[_]*)(implicit n: repr[T]) extends AST[T]
 
@@ -184,6 +239,7 @@ object AST {
    * The Depth First Search  algo gathering DagNodes visits recursively all Delayed node of an  AST  as soon as they are created, because
    * the delayed expression is an inputNeighbor of the Delayed node.
    * Thereafter, treeIfy will remove them.
+   * Delayed uses a trick found on the net, to have a call by name, together with a case class necessary to make the match
    *
    * @param _arg delayed expression   */
   case class Delayed[T](_arg: () => AST[T])(implicit m: repr[T]) extends AST[T]() with Singleton[AST[_]] {
@@ -220,7 +276,7 @@ object AST {
    **/
   abstract class Layer[T](val nbit: Int)(implicit m: repr[T]) extends AST[T]() with EmptyBag[AST[_]] with Strate[T] {
     /** avoid a scala bug */
-    val v = 1
+    val v2 = 1
     /** the value at t, which  is represented as  the layer itself. */
     val pred: AST[T] = this
     /** system instruction for rendering,debuging,memorizing  can be associated to layers, so as to be latter retrieved during compilation */
@@ -241,7 +297,5 @@ object AST {
 
 
   }
-
-
 }
 

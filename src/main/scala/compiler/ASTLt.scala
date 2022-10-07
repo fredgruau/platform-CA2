@@ -8,6 +8,8 @@ import dataStruc.DagNode._
 
 import scala.collection._
 import ASTBfun.ASTBg
+import compiler.ASTLt.ConstLayer
+import compiler.VarKind.{MacroField, ParamD}
 import dataStruc.Named
 
 
@@ -53,14 +55,17 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
    * @return transformed tree  with preserved L,R type, for type checking consistency
    *         where delayed are removed, and expression usedTwice are replaced by read.
    *         generates ASTs such as READ, but implementing ASTLt by creating them using "with ASTLt"
-   *         transformation is applied on the whole tree, so subtree verifying usedTwice will form an independant family */
+   *         transformation is applied on the whole tree, so subtree verifying usedTwice will
+   *         form an independant family */
   override def setReadNode(usedTwice: AstPred, idRepr: Map[AST[_], String]): ASTLt[L, R] = {
     val newD: ASTLt[L, R] = if (usedTwice(this)) new Read[(L, R)](idRepr(this))(mym) with ASTLt[L, R]
     else this match {
       case a: ASTL[L, R] =>
         a.propagateASTL((d: ASTLt[L, R]) => d.setReadNode(usedTwice, idRepr))
       case _ => this.asInstanceOf[AST[_]] match {
-        case Param(_) => new Read[(L, R)]("p" + idRepr(this))(mym) with ASTLt[L, R]
+        //  case Param(_) => new Read[(L, R)]("p" + idRepr(this))(mym) with ASTLt[L, R]
+        case u@Param(_) => new Read[(L, R)]("p" + u.nameP)(mym) with ASTLt[L, R]
+
         case l: Layer[_] => new Read[(L, R)](Named.lify(idRepr(this)))(mym) with ASTLt[L, R]
         case Read(_) => this //throw new RuntimeException("Deja dedagifié!")
         case Delayed(arg) => //arg.asInstanceOf[ASTLt[L, R]].propagate(rewrite)
@@ -120,15 +125,15 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
 
 
   /**
-   * @param nbitLB Stores number of bits of subfields.
-   * @param tSymb  The symbol table with number of bits
+   * @param nbitLB   Stores number of bits of subfields.
+   * @param newTSymb The symbol table with number of bits
    * @return number of bits needed to store the expression this
    *         using  mutable structures, that have  been previously updated.n
    *         this is an arity 0 AST node*/
-  def newNbitAST(nbitLB: AstMap[Int], tSymb: TabSymb[InfoNbit[_]]): Int =
+  def newNbitAST(nbitLB: AstMap[Int], newTSymb: TabSymb[InfoNbit[_]]): Int =
     this.asInstanceOf[AST[_]] match {
-      case Param(s) => tSymb(s).nb
-      case Read(s) => tSymb(s).nb
+      case Param(s) => newTSymb(s).nb
+      case Read(s) => newTSymb(s).nb
       case t: Layer[_] => t.nbit
     }
 
@@ -140,15 +145,15 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
    * * @return Expression rewritten so as to include Extend where necessary.
    *
    */
-  def bitIfyAndExtend(cur: DataProg[InfoType[_]], nbitLB: AstMap[Int], tSymb: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
-    val newThis: ASTLt[L, R] = this.propagate((d: AST[(L, R)]) => d.asInstanceOf[ASTLt[L, R]].bitIfyAndExtend(cur, nbitLB, tSymb))
-    nbitLB += (newThis -> newThis.newNbitAST(nbitLB, tSymb))
+  def bitIfyAndExtend(cur: DataProg[InfoType[_]], nbitLB: AstMap[Int], newtSymb: TabSymb[InfoNbit[_]]): ASTLt[L, R] = {
+    val newThis: ASTLt[L, R] = this.propagate((d: AST[(L, R)]) => d.asInstanceOf[ASTLt[L, R]].bitIfyAndExtend(cur, nbitLB, newtSymb))
+    nbitLB += (newThis -> newThis.newNbitAST(nbitLB, newtSymb))
     newThis.setName(this.name);
     newThis //.asInstanceOf[ASTLt[L, R]]
   }
 
-  /** @return true if the expression is only a concatenation of elements   */
-  def justConcats: Boolean = this match {
+  /** @return true if the expression is only a concatenation or broadcast of elements   */
+  def justConcatsorBroadcast: Boolean = this match {
     case _: EmptyBag[_] => true
     case _ => false
   }
@@ -157,11 +162,41 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
   def redExpr = List.empty[AST[_]]
 
 
-  def align(r: Result, t: TabSymb[InfoNbit[_]]): ASTLt[L, R] = this.asInstanceOf[AST[_]] match {
-    case Read(s) => r.algn = immutable.HashMap(s -> locus.neutral); this
-    case Param(s) => r.algn = immutable.HashMap(s -> locus.neutral); this
-    case l: Layer[_] => ; this
+  def align(r: Result, t: TabSymb[InfoNbit[_]]): ASTLt[L, R] =
+    this.asInstanceOf[AST[_]] match {
+      case Read(s) =>
+        r.algn = immutable.HashMap(s -> locus.neutral); this
+      case Param(s) =>
+        r.algn = immutable.HashMap(s -> locus.neutral); this
+      case l: Layer[_] =>
+        ; this
+    }
+
+  /**
+   *
+   * @param l locus of the parameter
+   * @return a radius of 0 or 1 depending on the locus
+   */
+  def startRadius(l: Locus) = locus match {
+    case V() | T(V(), _) => (0, None)
+    case _ => (1, Some(Perimeter())) //from the start, Edge or Face have a radius one.
   }
+
+
+  /**
+   *
+   * @param r for computation of all the radius, collect the radius of identifier , plus a modifier making it precise for Edge and Face wether
+   *          they are perimeter or radial
+   * @param t symbol table to be updated for paramR() to paramRR(Int) where int indicate the radius of result param
+   * @return radius and modifier of expression
+   */
+  def radiusify(r: TabSymb[(Int, Option[Modifier])], t: TabSymb[InfoNbit[_]]): (Int, Option[Modifier]) =
+    this.asInstanceOf[AST[_]] match {
+      case Read(s) => t(s).k match {
+        case ParamD() => startRadius(locus)
+        case MacroField() => r(s) //we should have computed it before, and stored it in r
+      }
+    }
 
 
   /** Only read node are non ASTL nodes and are treated in ASTLt. */
@@ -192,6 +227,14 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
     case _ => throw new RuntimeException("unfoldSpace act only on Reads  for ASTL ")
   }
 
+  /**
+   *
+   * @param m specifies how communications are implemented and compiled
+   * @return an array of array of ASTBg
+   *         size of first array is arity of source locus, for T[F,E] it is 2
+   *         suze if second array is arity of destination locus for T[F,E] it is 3
+   *
+   */
   def unfoldTransfer(m: Machine): ArrArrAstBg = this.asInstanceOf[AST[_]] match {
     case Read(s) =>
       val T(s1, _) = this.locus;
@@ -206,11 +249,31 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
     this.asInstanceOf[AST[_]] match {
       // case t: Layer2[_] =>
       case Read(s) => Cost(0, true, true)
-
       case _ => throw new RuntimeException("unfoldSpace act only on Reads  for ASTL ")
-
     }
-
-
   }
+
+
+}
+
+object ASTLt {
+  /**
+   *
+   * @param nbit integer's number of bits
+   * @return integer constant layer, used for testing!
+   */
+  def constLayerInt[L <: Locus, R <: I](nbit: Int)(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = new ConstLayer[L, R](nbit)
+
+  /**
+   *
+   * @return boolean constant layer, used for testing, and implementing circuit border
+   */
+  def constLayerBool[L <: Locus](implicit m: repr[L]): ASTLt[L, B] = new ConstLayer[L, B](1)
+
+
+  /** constant layer. */
+  private[ASTLt] class ConstLayer[L <: Locus, R <: Ring](nbit: Int)(implicit m: repr[L], n: repr[R]) extends Layer[(L, R)](nbit) with ASTLt[L, R] {
+    val next: ASTLt[L, R] = delayedL(this) //yes
+  }
+
 }

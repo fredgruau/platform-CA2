@@ -1,27 +1,73 @@
 package compiler
 
-import AST.{AstPred, Call1, Call2, Call3, Delayed, Fundef1, Fundef2, Fundef3, Layer, Param, Read}
+import AST.{AstPred, Call1, Call2, Call3, Delayed, Fundef, Fundef1, Fundef2, Fundef3, Layer, Param, Read}
 import ASTB.{And, Dir, Extend, False, Intof, Mapp2, Or, ParOp, Scan1, Scan2, Tminus1, True, Xor, nbitCte, rewriteASTBt}
 import ASTBfun.{ASTBg, Fundef2R}
 import ASTL.rewriteASTLt
 import Circuit.{TabSymb, iTabSymb, iTabSymb2}
 
-import scala.collection.{Map, immutable, mutable}
+import scala.collection.{Map, Set, immutable, mutable}
 import scala.collection.immutable.{HashMap, HashSet}
 import Array._
 import ASTB._
 import compiler.Packet.{BitLoop, BitNoLoop}
 import dataStruc.Named
 
+
+object ASTBt {
+  /** stores for each function, the parameter having the same number of bits as the result */
+  private var paramSameBitSizeMem: mutable.HashMap[String, Set[String]] = mutable.HashMap()
+
+  /**
+   *
+   * @param f next function to consider
+   * @return int parameter of f, whose number of bits is equal to the number of bit of f's result
+   *         we use a table  paramSameBitSize in order to avoid recomputing the value all the time
+   */
+  private[ASTBt] def paramSameBitSize(f: Fundef[_]): Set[String] = {
+    if (!paramSameBitSizeMem.contains(f.name))
+      paramSameBitSizeMem.addOne(f.name -> (f.body.asInstanceOf[ASTBt[_]].sameIntBitSize()))
+    paramSameBitSizeMem(f.name)
+  }
+
+}
+
 /** Identifies AST corresponding to int or bool, excludes those obtained with cons */
 trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
   self: AST[R] =>
+
+
   def isConst = false
 
 
   /** return the affbool that label subtrees nearest to the root */
   def affBoolify(): List[ASTBt[B]] = {
     inputNeighbors.flatMap(_.asInstanceOf[ASTBt[_]].affBoolify())
+  }
+
+  /**
+   * this must be of type integer
+   *
+   * @return names of parameters in exp having same bit size as exp, of type AST
+   */
+  def sameIntBitSize(): Set[String] = {
+    var res: Set[String] = HashSet()
+    this.asInstanceOf[AST[_]] match {
+      case Param(namep) =>
+        res = HashSet(namep)
+      case Call1(f, arg) =>
+        val fparams = ASTBt.paramSameBitSize(f)
+        if (fparams.contains(f.p1.nameP))
+          res = (arg.asInstanceOf[ASTBt[_]].sameIntBitSize())
+      case Call2(f, arg, arg2) =>
+
+        val fparams = ASTBt.paramSameBitSize(f)
+        if (fparams.contains(f.p1.nameP))
+          res = res.union(arg.asInstanceOf[ASTBt[_]].sameIntBitSize())
+        if (fparams.contains(f.p2.nameP))
+          res = res.union(arg2.asInstanceOf[ASTBt[_]].sameIntBitSize())
+    }
+    res
   }
 
   /**
@@ -39,6 +85,17 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
     }
     affBoolConst(name, exp, l)
   }
+
+  /**
+   *
+   * @return number of boolean operators Or, And, Xor, Neg, contained in the expression
+   */
+  def totalOp: Int =
+    this.asInstanceOf[AST[_]] match {
+      case u@Param(_) => 0
+      case Read(x) => 0
+      case _ => 0
+    }
 
   def boolExprNoIndex(nl: BitNoLoop, name: String, env: HashMap[String, ASTBt[B]]): ASTBt[B] = {
     val exp = this.asInstanceOf[AST[_]] match {
@@ -78,12 +135,11 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
 
   /**
    *
-   * @param env     used to store parameter's value
-   * @param tabSymb stores scalar variable that had to be introduced. in fact we need only count them and take the max for all integer affectation
+   * @param env used to store parameter's value
    * @return we evaluate all the calls and only the calls,
-   *         that produces a big pure ASTL tree and gives an idea of what is there.
+   *         this will produce a big pure ASTB DAG, which will need an affectify, after that, it will give an idea of what is there.
    **/
-  def deCallify(env: HashMap[String, ASTBg], tabSymb: TabSymb[InfoNbit[_]]): ASTBg =
+  def deCallify(env: HashMap[String, ASTBg]): ASTBg =
     this.asInstanceOf[AST[_]] match {
       case Read(x) =>
         this.asInstanceOf[ASTBt[B]]
@@ -93,20 +149,20 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
         // we dlike to write something like that op.p1.mym=x.mym
         if (x.mym.name != op.p1.mym.name)
           throw new Exception("Faut preserver SI ou UI")
-        val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBg].deCallify(env, tabSymb))
-        op.arg.asInstanceOf[ASTBg].deCallify(newEnv, tabSymb)
+        val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBg].deCallify(env))
+        op.arg.asInstanceOf[ASTBg].deCallify(newEnv)
       case Call2(op, x, y) => //il se peut quon rajute un affect et augmente la tsymb
-        if (x.mym.name != op.p1.mym.name || y.mym.name != op.p2.mym.name)
+        if ((x.mym.name != op.p1.mym.name && op.p1.mym.name != UISIB()) || (y.mym.name != op.p2.mym.name && op.p2.mym.name != UISIB()))
           throw new Exception("Faut preserver SI ou UI")
-        val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBg].deCallify(env, tabSymb)) +
-          (op.p2.nameP -> y.asInstanceOf[ASTBg].deCallify(env, tabSymb))
-        op.arg.asInstanceOf[ASTBg].deCallify(newEnv, tabSymb)
+        val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBg].deCallify(env)) +
+          (op.p2.nameP -> y.asInstanceOf[ASTBg].deCallify(env))
+        op.arg.asInstanceOf[ASTBg].deCallify(newEnv)
       case Call3(op, x, y, z) => //il se peut quon rajoute un affect et augmente la tsymb
         val newEnv = env +
-          (op.p1.nameP -> x.asInstanceOf[ASTBg].deCallify(env, tabSymb)) +
-          (op.p2.nameP -> y.asInstanceOf[ASTBg].deCallify(env, tabSymb)) +
-          (op.p3.nameP -> z.asInstanceOf[ASTBg].deCallify(env, tabSymb))
-        op.arg.asInstanceOf[ASTBg].deCallify(newEnv, tabSymb)
+          (op.p1.nameP -> x.asInstanceOf[ASTBg].deCallify(env)) +
+          (op.p2.nameP -> y.asInstanceOf[ASTBg].deCallify(env)) +
+          (op.p3.nameP -> z.asInstanceOf[ASTBg].deCallify(env))
+        op.arg.asInstanceOf[ASTBg].deCallify(newEnv)
     }
 
   /**
@@ -236,6 +292,20 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
       env.map((f: (String, ASTBt[B])) => (Param(f._1)(repr(f._2.ring)) -> (f._2.nBit(t, c, env))))
     nbitExp2(paramBitSize, this, t, c)
   }
+
+
+  /**
+   *
+   * @param t symbol table used to check the bit size of int
+   * @return transform an int expression in a list of bool expression, the size of the list is the bit size
+   */
+  def unfoldInt(t: TabSymb[InfoNbit[_]]): immutable.List[ASTBt[B]] = this.asInstanceOf[AST[_]]
+  match {
+    case Read(which) =>
+      if (this.ring == B()) List(this.asInstanceOf[ASTBt[B]]) //nothing to do, it's already OK
+      else Instr.deployInt(which, t(which).nb).map((s: String) => new Read(s)(repr.nomB) with ASTBt[B])
+  }
+
 }
 
 

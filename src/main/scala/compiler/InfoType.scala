@@ -1,7 +1,7 @@
 package compiler
 
 import Circuit.TabSymb
-import VarKind.MacroField
+import VarKind.{MacroField, ParamRR, StoredField}
 
 /**
  * The most elementary info stored in symbol table: type and kind
@@ -30,6 +30,10 @@ class InfoType[+T](val t: T, val k: VarKind) {
     case u@(_, _) => u._2.asInstanceOf[Ring] //if the type is a couple the second is the ring
     case _ => t.asInstanceOf[Ring]
   }
+
+  /** sets varKind to Stored Field */
+  def storedFieldise: InfoType[_] = new InfoType(t, StoredField())
+
 }
 
 object InfoType {
@@ -54,15 +58,19 @@ object InfoNbit {
  * @tparam T toto
  */
 class InfoNbit[+T](override val t: T, override val k: VarKind, val nb: Int) extends InfoType(t, k) {
+  def radiusify(r: Int): InfoNbit[_] = new InfoNbit(t, ParamRR(r), nb)
+
   /** sets varKind to macroField */
   def macroFieldise: InfoNbit[_] = new InfoNbit(t, MacroField(), nb)
 
-  /** @return same info except we drop the locus and the type is ring   */
-  def scalarify = this
+  /** sets varKind to Stored Field */
+  def storedFieldise2 = new InfoNbit(t, StoredField(), nb)
 
-  /*  : InfoNbit[Ring] = {
-    new InfoNbit(ring, k, nb)
-  }*/
+  /** @return same info except we drop the locus and the type is ring   */
+  def scalarified = {
+    val (locus, ring) = t.asInstanceOf[(Locus, Ring)]
+    new InfoNbit[Ring](ring, k, nb)
+  }
 
   /**
    *

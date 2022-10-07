@@ -1,16 +1,14 @@
 package compiler
 
-import AST.Layer
+import AST._
 import ASTL.{IntV, delayedL}
 import Circuit.hexagon
-import macros.ASTLfun.p
 import org.scalatest.FunSuite
-import prog.TestDist2
 
 class DelayedCycleTest extends FunSuite {
   test("simple cycle") {
     val testCycle: Circuit[V, SI] = new CircuitCycleLayer2()
-    testCycle.compile2(Circuit.hexagon);
+    testCycle.compile(Circuit.hexagon);
   }
 }
 
