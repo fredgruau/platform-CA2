@@ -2,7 +2,7 @@ package compiler
 
 import dataStruc.DagNode._
 import AST.{Layer, _}
-import compiler.Circuit.TabSymb
+import compiler.Circuit.{TabSymb, iTabSymb}
 import compiler.VarKind.MacroField
 import dataStruc.{DagNode, Named}
 

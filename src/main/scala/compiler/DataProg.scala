@@ -128,8 +128,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   def invariantCoalesc =
     if (coalesc != null)
       for (c <- coalesc.values)
-        if (!tSymbVar.contains(c) && !(Try(c.toInt).isSuccess))
-          throw new Exception("colesced register:" + c + " not present in symbol table")
+        if (!tSymbVar.contains(c) && !c.startsWith("Mem[")) //!(Try(c.toInt).isSuccess))
+        throw new Exception("colesced register:" + c + " not present in symbol table")
 
   invariantCoalesc
 
@@ -137,7 +137,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   def invariantVariable =
     for (i: Instr <- dagis.visitedL)
       for (v <- i.usedVars())
-        if (!tSymbVarExists(v) & !tSymbVarExists("p" + v))
+        if (!tSymbVarExists(v) && !tSymbVarExists("p" + v) && !v.startsWith("Mem["))
           throw new Exception("variable:" + v + " not present in symbol table")
 
   invariantVariable
@@ -189,7 +189,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       var res = 0
       for (f <- funs.values)
         res += f.asInstanceOf[DataProgLoop[_]].totalOp
-      " total complexity is: " + res + " "
+      " total complexity is: " + res + "gates "
     }
 
     if (!isLeafCaLoop //paramD.size==1&&paramD.head=="pinput"
@@ -269,7 +269,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
   override def toString: String = {
     toStringFuns + toStringHeader + toStringInstr + toStringTabSymb + toStringCoalesc(coalesc) + "\n" + listOf(funs).mkString("\n\n\n")
-
   }
 
 

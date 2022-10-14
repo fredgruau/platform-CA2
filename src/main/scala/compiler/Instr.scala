@@ -5,7 +5,7 @@ import ASTB.AffBool
 import ASTBfun.{ASTBg, redop}
 import Instr._
 import VarKind._
-import dataStruc.{Align2, Dag, DagInstr, DagNode, WiredInOut}
+import dataStruc.{Align2, Dag, DagInstr, DagNode, HeapStates, WiredInOut}
 import Circuit._
 import compiler.ASTL.ASTLtG
 import compiler.Packet.BitLoop
@@ -17,7 +17,19 @@ import scala.collection.immutable.{HashMap, HashSet}
 
 /** Instruction used within the compiler, call, affect. Dag and Union allows to defined ConnectedComp  */
 abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
+  /** substitute x in names and x in read(x) by coalesc(x) */
+  def coalesc(allCoalesc: iTabSymb[String]): Instr = null
 
+  /**
+   *
+   *
+   * @param heap       initial state of heap
+   * @param funs       function that could be called
+   * @param occupied   number of global variables
+   * @param allCoalesc corespondance between parameters, and also memory adresses
+   * @return
+   */
+  def codeGen(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int, allCoalesc: iTabSymb[String]): List[CallProc] = null
 
   /**
    *
@@ -356,7 +368,34 @@ case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) exte
 
   }
 
+  override def codeGen(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int, allCoalesc: iTabSymb[String]):
+  List[CallProc] =
+    p match { //specific processing of the system calls
+      case "memo" | "bug" | "show" => List(this.coalesc(allCoalesc).asInstanceOf[CallProc])
+      case _ => val fun: DataProgLoop[_] = funs(p)
+        if (fun.isLeafCaLoop) {
+          //we just need to coalesc this by replacing names used either using param or using adress
+          List(this.coalesc(allCoalesc).asInstanceOf[CallProc])
+        }
+        else {
+          //we build the correspondance from formal paramter to effective
+          var params: iTabSymb[String] = HashMap()
+          for ((pdata, exp) <- fun.paramD zip exps) {
+            val nameOp = exp.asInstanceOf[Read[_]].which
+            params = params + (pdata -> nameOp)
+          }
+          for ((pres, name) <- fun.paramR zip names) {
+            params = params + (pres -> name)
+          }
+          fun.codeGen(heap, occupied, params) //here there are many elements in the  List.
+        }
 
+    }
+
+  /** substitute x in names and x in read(x) by coalesc(x) */
+  override def coalesc(c: iTabSymb[String]): Instr = {
+    CallProc(p, names.map((s: String) => c.getOrElse(s, s)), exps.map(_.asInstanceOf[ASTBt[_ <: Ring]].coalesc(c)))
+  }
 }
 
 /**
@@ -508,9 +547,6 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
   override def isTransfer: Boolean = exp.asInstanceOf[ASTLt[_, _]].locus.isInstanceOf[TT] // || exp.isInstanceOf[Red2[_,_,_]]
   override def propagate(id1: rewriteAST2): Instr = Affect(name, id1(exp))
 
-  def coalesc(newName: iTabSymb[String]): Affect[_] =
-    Affect(if (!newName.contains(name)) name else newName(name), exp.asInstanceOf[ASTBt[_]].coalesc(newName))
-
   /**
    *
    * @param cs constraints for cycle
@@ -594,6 +630,16 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
     }
   }
 
+
+  override def coalesc(newName: iTabSymb[String]): Affect[_] =
+    Affect(if (!newName.contains(name)) name else newName(name), exp.asInstanceOf[ASTBt[_]].coalesc(newName))
+
+
+  //affectation are replace by call to the copy macro, which just  copies *
+  // data
+  override def codeGen(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int, allCoalesc: iTabSymb[String]):
+  List[CallProc] = List(CallProc("copy", List(allCoalesc.getOrElse(name, name)),
+    List(exp.asInstanceOf[ASTBt[_ <: Ring]].coalesc(allCoalesc))))
 }
 
 

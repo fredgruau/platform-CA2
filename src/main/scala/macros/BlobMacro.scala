@@ -34,6 +34,7 @@ object BlobMacro {
   val nbccBis: Fundef1[(T[V, F], B), (V, UI)] = {
     val vB = p[T[V, F], B]("blobis")
     val nbChanges: UintV = nbcc(vB) + nbcc(vB)
+    nbChanges.setName("nbChange")
     Fundef1("nbccbis", nbChanges, vB)
   }
 

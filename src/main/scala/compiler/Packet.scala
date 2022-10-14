@@ -56,7 +56,8 @@ abstract class Packet(val instrs: List[Instr],
   val affected: String //generated  affectation
   def binary = if (boolAST.nonEmpty) "\nBinary() " + boolAST.map(_.toStringTree).mkString("|_|") else ""
 
-  def binaary: String = if (boboolAST.nonEmpty) "\nBinaary() " + boboolAST.map(_.toStringTree).mkString("|_|") else ""
+  def binaary: String = if (boboolAST.nonEmpty)
+    "\nBinaary() " + boboolAST.map(_.toStringTree).mkString("|_|") else ""
 
 
   override def toString = info + affected + binary + binaary

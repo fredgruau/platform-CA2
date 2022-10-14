@@ -77,7 +77,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //   print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
     val prog10 = prog8.loopIfy()
-    // print(prog10)
+    //   print(prog10)
 
     val prog11 = prog10.unfoldInt()
     //  print("\n" + prog11)

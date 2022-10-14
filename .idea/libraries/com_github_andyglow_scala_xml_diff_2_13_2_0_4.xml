@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="com.github.andyglow:scala-xml-diff_2.13:2.0.4" type="repository">
+    <properties maven-id="com.github.andyglow:scala-xml-diff_2.13:2.0.4" />
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/github/andyglow/scala-xml-diff_2.13/2.0.4/scala-xml-diff_2.13-2.0.4.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/org/scala-lang/scala-library/2.13.0/scala-library-2.13.0.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/org/scala-lang/modules/scala-xml_2.13/1.2.0/scala-xml_2.13-1.2.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

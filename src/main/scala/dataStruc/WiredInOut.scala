@@ -119,16 +119,25 @@ object WiredInOut {
         memory(adress(s)) = null
     }
 
-    var liveVar: HashSet[String] = HashSet()
-    var liveVars: List[HashSet[String]] = List(liveVar) //strings contained in buffer
-    for (p <- packets.reverse) { //we compute live vars, starting from the end towards the beginning
-      liveVar = liveVar.union(p.usedVars()).diff(p.names.toSet)
-      liveVars ::= liveVar
+    /** computes the set of variables live after each packet */
+    def livVars: List[HashSet[String]] = {
+      var liveVar: HashSet[String] = HashSet() //last liveVar are empty!
+      var liveVars: List[HashSet[String]] = List(liveVar) //strings contained in buffer
+      for (p <- packets.reverse) { //we compute live vars, starting from the end towards the beginning
+        liveVar = liveVar.union(p.usedVars()).diff(p.names.toSet)
+        liveVars ::= liveVar
+      }
+      liveVars
     }
+
+    val liveVars = livVars
+    var liveVar = liveVars.head
     place(liveVar)
     for ((p, l) <- (packets zip liveVars.tail)) {
-      place(p.names.toSet)
-      unPlace(p.names.toSet.union(liveVar).diff(l)) //we keep only l in the memory
+      place(p.names.toSet) //affected variables need a memory
+      //here the memory should be passed to f, if there is a call to f
+      unPlace(p.names.toSet.union(liveVar).diff(l)) //we now free the previously livevar and the names exepted
+      // those which will still live
       liveVar = l
     }
 
