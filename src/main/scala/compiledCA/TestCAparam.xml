@@ -1,0 +1,19 @@
+<paramCA>
+    <expandedLayer>
+        <Layer>wall2</Layer>
+        <Layer>grow</Layer>
+        <Layer>part</Layer>
+        <Layer>wall</Layer>
+        <Layer>distwall</Layer>
+        <Layer>distwall2</Layer>
+    </expandedLayer>
+    <colorOfField>
+        <layer color="0x80FF00">lldistwall</layer>
+        <layer color="0x00FFFF">lldistwall2</layer>
+        <layer color="0xFFC800">llgrow</layer>
+        <layer color="0xFF00FF">llwall</layer>
+        <layer color="0xFF0080">lldistpart</layer>
+        <layer color="0xFF0000">llwall2</layer>
+        <layer color="0xFFFF00">vortex</layer>
+    </colorOfField>
+</paramCA>

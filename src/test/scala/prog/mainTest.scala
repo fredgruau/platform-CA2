@@ -19,7 +19,7 @@ class mainTest extends FunSuite with BeforeAndAfter {
   }
 }
 
-/** uses the blob to grow voronoi region stoping the growth just before merge happens */
+/** test concatR with elem */
 class DisguisedIdentity() extends Layer[(V, B)](1) with BlobV {
   val next: BoolV = elem(0, concatR(e(this))) //this is in fact the identity
   show(this)

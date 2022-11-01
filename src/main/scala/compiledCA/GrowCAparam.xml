@@ -1,0 +1,8 @@
+<paramCA>
+    <expandedLayer>
+        <Layer>grow</Layer>
+    </expandedLayer>
+    <colorOfField>
+        <layer color="0xFFC800">grow</layer>
+    </colorOfField>
+</paramCA>

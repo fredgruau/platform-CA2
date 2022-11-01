@@ -167,11 +167,17 @@ object Locus {
    *         obtained by adding  one (resp. two) suffixes to n,
    */
 
-
   def deploy(n: String, l: Locus): List[String] = l match {
     case V() => List(n) //no need of dollars nor suffx we keep the same string
     case s: S => s.sufx.map(n + "$" + _).toList
     case T(s1, _) => s1.sufx.map((suf1: String) => l.sufx.map(n + "$" + suf1 + _).toList).toList.flatten
   }
+
+  //static method to be called from java, because V(), E(), F() are not accessible.
+  def locusV = V()
+
+  def locusE = E()
+
+  def locusF = F()
 
 }
