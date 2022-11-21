@@ -178,6 +178,6 @@ object Circuit {
     };
     r
   })
-  print(hexPermut)
+  //print(hexPermut)
 }
 

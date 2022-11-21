@@ -1,10 +1,10 @@
 package simulator
 
+import java.awt.Color
+
 import scalaswingcontrib.tree.{ExternalTreeModel, InternalTreeModel, Tree, TreeModel}
 
 import scala.swing.{Action, BorderPanel, Button, Component, Dimension, GridPanel, Label, MainFrame, ScrollPane, SimpleSwingApplication, Swing, TabbedPane}
-
-
 import compiler.V
 //import javax.swing.Renderer
 import javax.swing.event.{TreeExpansionEvent, TreeExpansionListener}
@@ -23,25 +23,31 @@ import scala.collection.immutable.HashMap
 import scala.swing.{Dimension}
 import scala.xml.XML
 
-/** Allows to browse the layer */
+/**
+ * Allows to browse the layer
+ *
+ * @param xmlLayerTree fixed file, containing the layer structure
+ * @param controller
+ */
 class LayerTree(val xmlLayerTree: Node, val controller: Controller) extends Tree[Node] with TreeExpansionListener {
   //  former version model = TreeModel(xmlDoc)(_.child filterNot (_.text.trim.isEmpty))
-  //preferredSize = (150, 768): Dimension
+  // preferredSize = (width,height): Dimension
+  //background = Color.lightGray
 
   import Simulator.ExampleData._
 
   model = TreeModel(xmlLayerTree)(_.child filterNot (_.isInstanceOf[Text]))
   renderer = Renderer.labeled[Node] { n =>
     val icon =
-      if (controller.colorOfFields.contains(extractNodeText(n)))
-        new DiamondIcon(V(), controller.colorOfFields(extractNodeText(n)), true)
+      if (controller.colorDisplayedField.contains(extractNodeText(n)))
+        new DiamondIcon(V(), controller.colorDisplayedField(extractNodeText(n)), true)
       else if (isLayer((n))) folderIcon
       else fileIcon
     (icon, extractNodeText(n))
   }
   // if (n.label startsWith "#") n.text.trim   else /*n.label + ":" +*/
 
-  preferredSize = (300, 100): Dimension
+
   //we use javax swing for listening to expansion event, because we failed to use scala swing
   peer.addTreeExpansionListener(this)
 

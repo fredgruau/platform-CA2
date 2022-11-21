@@ -13,21 +13,30 @@ import java.util.HashMap;
 public final class TestCA implements CAloops {
 
     @Override
-    public HashMap<String, List<Integer>> printedLayerOfset() {
+    public List<String> directInit() {
+        return CAloops.list("seed");
+    }
+
+    public int CAmemWidth() {
+        return 1;
+    }
+
+    @Override
+    public HashMap<String, List<Integer>> fieldOffset() {
         HashMap<String, List<Integer>> map = new HashMap<>();
         map.put("vishal", CAloops.list(new Integer(10)));
         return (map);
     }
 
     @Override
-    public HashMap<String, Locus> printedLayerLocus() {
+    public HashMap<String, Locus> fieldLocus() {
         HashMap<String, Locus> map = new HashMap<>();
         map.put("vishal", Locus.locusV());
         return (map);
     }
 
     @Override
-    public HashMap<String, Integer> printedLayerBitSize() {
+    public HashMap<String, Integer> fieldBitSize() {
         HashMap<String, Integer> map = new HashMap<>();
         map.put("vishal", 3);
         return (map);

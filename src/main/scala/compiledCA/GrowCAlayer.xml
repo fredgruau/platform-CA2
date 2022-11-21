@@ -1,3 +1,5 @@
-<layer>grow
-    <field>llgrow</field>
+<layer>seed
+    <field>llseed</field>
+    <field>tmp1</field>
+    <field>tmp2</field>
 </layer>

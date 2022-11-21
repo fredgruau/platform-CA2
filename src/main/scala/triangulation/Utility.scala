@@ -1,0 +1,289 @@
+package triangulation
+
+import java.awt.{Color, Polygon}
+
+import math.min
+import scala.swing.Dimension
+
+/** contains all the simple static functions needed for simulation */
+object Utility {
+  def addPoint(p: Polygon, a: Vector2D) =
+    p.addPoint(a.x.toInt, a.y.toInt)
+
+  def addPoints(p: Polygon, l: List[Vector2D]) =
+    for (a <- l) addPoint(p, a)
+
+  def toPolygon(l: List[Vector2D]) = {
+    val p = new Polygon();
+    addPoints(p, l);
+    p
+  }
+
+  def fromPolygon(p: Polygon): List[Vector2D] = {
+    val x = p.xpoints.toList
+    val y = p.ypoints.toList
+    (x zip y).map((p: (Int, Int)) => new Vector2D(p._1, p._2))
+  }
+
+  def toPolygon(t: Triangle2D): Polygon = toPolygon(List(t.a, t.b, t.c))
+
+  private def vector2D(xy: (Int, Int)) = new Vector2D(xy._1, xy._2)
+
+  def toPolygon(d: Dimension): Polygon = toPolygon(List((0, 0), (0, d.height), (d.width, d.height), (d.width, 0)).map(vector2D(_)))
+
+  val epsilon = 1e-10
+
+  def neglectable(d: Double) = Math.abs(d) < epsilon
+
+  def time(operation: => Unit, operationName: String): Double = {
+    val t0 = System.nanoTime()
+    operation
+    val time = (System.nanoTime() - t0) / 1e6
+    println(operationName + "took ", time, "ms")
+    return time
+  }
+
+  /**
+   *
+   * @param input Int storing a stack of bits
+   * @param b     another bit, most significant bits pushed first, will be found to the left
+   * @return stack updated by pushing b
+   */
+  def push(input: Int, b: Boolean): Int =
+    (input << 1) | (if (b) 1 else 0) //<<1 multiple par 2
+
+  /**
+   *
+   * @param input Int storing a stack of bits
+   * @return new stack with one bit b popped, together with b*/
+  def pop(input: Int): (Int, Boolean) = {
+    val res: Boolean = (input & 1) == 1
+    (input >>> 1, res)
+  }
+
+  /**
+   *
+   * @param input    integer storing a stack of bits
+   * @param booleans input bits to stack, most significant bits first msb first
+   * @return resulting stack
+   */
+  def push(input: Int, booleans: Seq[Boolean]): Int = {
+    var res = input
+    for (b: Boolean <- booleans)
+      res = push(res, b)
+    res
+  }
+
+  /**
+   *
+   * @param input    integer storing a stack of bits
+   * @param booleans array to receive popped bit from this stack, msb first
+   * @return pops the bits and return them in booleans,
+   *         also returns the integer storing the resulting stack
+   */
+  def pop(input: Int, booleans: Array[Boolean]): Int = {
+    var res = input
+    for (v <- (0 until booleans.size).reverse) {
+      val (newInput, b) = pop(res)
+      booleans(v) = b
+      res = newInput
+    }
+    res
+  }
+
+  /** THIS IS OBSOLETE
+   *
+   * @param l      input 2D array of boolean
+   * @param iStart index at which we start to read boolean lines
+   * @param iEnd   index at which we  finish to read boolean lines
+   * @return Int32bits, storing the booleans as a stack
+   */
+  def linesTo1Int(l: Array[Array[Boolean]], iStart: Int, iEnd: Int): Int = {
+    var res: Int = 0
+    for (i <- iStart until iEnd)
+      res = push(res, l(i))
+    res
+  }
+
+  /**
+   *
+   * @param lCA    input 1D array of boolean of size>30
+   * @param lCAmem array of 32bits int, where to pack those booleans as integer
+   * @param iStart starting index in lCAmem where to start packing
+   * @param iEnd   lastIndex in lCAmem where to finish packing
+   * @return LCS has one more int containing 30 bits (or less) of a line of LCA
+   */
+  def lineToInts(lCA: Seq[Boolean], lCAmem: Array[Int], iStart: Int, iEnd: Int) = {
+    for (i <- iStart until iEnd) { //we iterate on the indexes of  target Int32 of LCAmem
+      var int32: Int = 0
+      //for(j<-0 until lCA.size)
+      for (j <- (i - iStart) * 30 until min((i + 1 - iStart) * 30, lCA.size)) // j visits the indexes of the portion in the considered LCA lines
+        int32 = push(int32, lCA(j))
+      lCAmem(i) = int32 << 1 //<<1 leave the place  for the communication bit
+    }
+  }
+
+  /**
+   *
+   *
+   * @param lCAmem input array of 32bits int, where booleans are packed as integer
+   * @param lCA    output  1D array of boolean of size>30
+   * @param iStart starting index in lCAmem where to start unpacking
+   * @param iEnd   lastIndex where to finish unpacking
+   * @return
+   */
+  def intsToLine(lCAmem: Array[Int], lCA: Array[Boolean], iStart: Int, iEnd: Int) = {
+
+    for (i <- iStart until iEnd) {
+
+      var res: Int = lCAmem(i) >>> 1 //>>> ignore the communication bit
+      for (j <- ((i - iStart) * 30 until min((i + 1 - iStart) * 30, lCA.size)).reverse) { //unpacking the 30 bits in LCA(i) in reverse order because of the stack
+        val (newRes, b) = pop(res)
+        res = newRes
+        lCA(j) = b
+      }
+    }
+  }
+
+
+  /**
+   *
+   * @param x          integer being shifted
+   * @param firstshift number of bits to shift (like x<<firstshift or x>>firstshift in C++)
+   * @param bits       the number of bits you want to have/emulate, ...
+   * @return
+   */
+  def rol(x: Int, firstshift: Int, bits: Int): Int = {
+    if (firstshift < 0) return ror(x, -firstshift, bits)
+    val shift = firstshift % bits
+    // masks                           |       bits        |
+    val m0 = (1 << (bits - shift)) - 1 // |0000000|11111111111|
+    // | shift |           |
+    val m1 = (1 << shift) - 1 // |00000000000|1111111|
+    // |           | shift |
+    ((x & m0) << shift) | ((x >>> (bits - shift)) & m1)
+  }
+
+  //---------------------------------------------------------------------------
+  def ror(x: Int, firstshift: Int, bits: Int): Int = {
+    if (firstshift < 0) return rol(x, -firstshift, bits)
+    val shift = firstshift % bits
+    val m0 = (1 << (bits - shift)) - 1
+    val m1 = (1 << shift) - 1
+    ((x >>> shift) & m0) | ((x & m1) << (bits - shift))
+  }
+
+  import compiler.rotateRight
+  import compiler.rotateLeft
+
+  /**
+   * @param nbColCA    the number of columns in the CA
+   * @param nbLineCA   the number of lines in the CA
+   * @param memCAbool  a list of booleans processed by the CA, supplied as data
+   * @param memCAint32 a list of 32bits integer packing the booleans
+   * @return lCAmem is computed from lCA
+   *         same as encode, except we add interleaving and rotation
+   *         we rotate to the right when encoding, the LSB is moved and this amounts to dividing by 2.
+   */
+  def encodeInterleavRot(nbLineCA: Int, nbColCA: Int, memCAbool: Array[Array[Boolean]], memCAint32: Array[Int]) = {
+    assert(nbLineCA == memCAbool.size)
+    assert(nbColCA == memCAbool(0).size)
+    if (nbColCA <= 30) { //one int32 stores  several CA lines.we need to spare 2 bits for communication.
+      assert(30 % nbColCA == 0, "each int32 must be responsible for the same number of small CA lines")
+
+      /** number of Int32 needed for encoding, already computed as the target array size, which was already created */
+      val nbInt32total = memCAint32.size
+      for (i <- 0 until nbLineCA) { //we iterate on the CA lines,
+        /** index of target Int32 */
+        val index = i % nbInt32total //implements interleaving
+        memCAint32(index) = push(memCAint32(index), memCAbool(i))
+      }
+      /** number of lines stored in one 32 bits integers, ] */
+      val nbLinesPerInt = 30 / nbColCA
+      /** number of meaningfull bits in each int32 */
+      val nbBitPerInt32 = nbColCA * nbLinesPerInt
+
+      /** each int32  needs to be rotated right */
+      for (i <- 0 until memCAint32.size) {
+        /** how much do we need to rotate right */
+        val shift = (i / 2) % nbColCA
+        memCAint32(i) = ror(memCAint32(i), shift, nbBitPerInt32)
+      }
+    }
+    else { //symetric case: we need several ints, in order to store one line of the CA
+      /** number of int32 needed to represent one CA line */
+      val nbInt32 = nbColCA / 30 //this is gonna be >=2, two bits are devoted to communication
+      for (i <- 0 until nbLineCA) { //we iterate on the CA lines whose length is nbColCA
+        /** how much do we need to rotate right */
+        val shift = (i / 2) % nbColCA
+        lineToInts(rotateRight(memCAbool(i), shift), memCAint32, i * nbInt32, min((i + 1) * nbInt32, nbColCA)) //rotation is done on the whole CA lines.
+      }
+    }
+  }
+
+  /**
+   * @param nbColCA    the number of columns in the CA
+   * @param nbLineCA   the number of lines in the CA
+   * @param memCAbool  a list of booleans processed by the CA, supplied as data
+   * @param memCAint32 a list of 32bits integer packing the booleans
+   * @return lCA is computed from lCAmem
+   *         we rotate to the Left when decoding, the MSB is moved and this amounts to  multiplying by 2.
+   */
+  def decodeInterleavRot(nbLineCA: Int, nbColCA: Int, memCAint32: Array[Int], memCAbool: Array[Array[Boolean]]) = {
+    assert(nbLineCA == memCAbool.size)
+    assert(nbColCA == memCAbool(0).size)
+    if (nbColCA <= 30) { //one int32 stores one or several sub= lines.
+      assert(30 % nbColCA == 0, "each int32 must be responsible for the same number of small CA lines")
+      /** number of lines stored in one 32 bits integers, ] */
+      val nbLinesPerInt = 30 / nbColCA
+      /** number of meaningfull bits in each int32 */
+      val nbBitPerInt32 = nbColCA * nbLinesPerInt
+      /** each int32  needs to be rotated left */
+      val tmp = new Array[Int](memCAint32.size) //we use tmp in order not to destroy the CA memory
+      memCAint32.copyToArray(tmp)
+      for (i <- 0 until memCAint32.size) {
+        /** how much do we need to rotate left */
+        val shift = (i / 2) % nbColCA
+        tmp(i) = rol(tmp(i), shift, nbBitPerInt32)
+      }
+
+      /** number of Int32 needed for encoding, already computed as the target array size */
+      val nbInt32total = memCAint32.size
+      for (i <- (0 until nbLineCA).reverse) { //we iterate downward, because integer are used as stacks,
+        /** index of target Int32 */
+        val index = i % nbInt32total //result from interleaving
+        tmp(index) = pop(tmp(index), memCAbool(i))
+      }
+    }
+    else { //symetric case: we need several ints, in order to store one line of the CA
+      /** number of int32 needed to represent one CA line */
+      val nbInt32 = nbColCA / 30 //this is gonna be >=2, two bits are devoted to communication
+      for (i <- (0 until nbLineCA)) { //we iterate on the CA lines
+        /** how much do we need to rotate right */
+        intsToLine(memCAint32, memCAbool(i), i * nbInt32, min((i + 1) * nbInt32, memCAint32.size))
+        val shift = (i / 2) % nbColCA
+        memCAbool(i) = rotateLeft(memCAbool(i), shift).toArray //rotation is done on the whole CA lines.
+      }
+    }
+  }
+
+
+  //color Utilities
+
+  def halve(color: Color): Color = {
+    val red = color.getRed
+    val green = color.getGreen
+    val blue = color.getBlue
+    new Color(red / 2, green / 2, blue / 2)
+  }
+
+  def crop(c: Int) = Math.min(c, 255)
+
+  def addColor(color: Color, c: Color): Color = {
+    val red = crop(color.getRed + c.getRed)
+    val green = crop(color.getGreen + c.getGreen)
+    val blue = crop(color.getBlue + c.getBlue)
+    new Color(red, green, blue)
+  }
+
+}

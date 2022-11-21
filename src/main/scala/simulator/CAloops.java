@@ -12,29 +12,35 @@ import java.util.HashMap;
  * on top of the program itself, in java, we find information needed to display
  */
 public interface CAloops {
+    public List<String> directInit();
+
+    /**
+     * first dimension of the memory
+     */
+    public int CAmemWidth();
 
     /**
      * @return the offset where to find the data in the CA memory, for a given field
      */
-    public HashMap<String, List<Integer>> printedLayerOfset();
+    public HashMap<String, List<Integer>> fieldOffset();
 
     /**
-     * @return we need to know the locus in order to display the field at the right place
+     * @return locus of fields, used for displaying or initializing
      */
-    public HashMap<String, Locus> printedLayerLocus();
+    public HashMap<String, Locus> fieldLocus();
 
     /**
      * @return for integer fields, we need to knwo the bit size
      */
-    public HashMap<String, Integer> printedLayerBitSize();
+    public HashMap<String, Integer> fieldBitSize();
 
     /**
      * @param ts  list of parameters
      * @param <T> type of parameters
-     * @return A scala List[T]
+     * @return A scala List[T] translating a java List.
      */
     public static <T> List<T> list(T... ts) {
-        List<T> result = List$.MODULE$.empty();
+        List<T> result = (List<T>) List$.MODULE$.empty();
         for (int i = ts.length; i > 0; i--) {
             result = new $colon$colon(ts[i - 1], result);
         }

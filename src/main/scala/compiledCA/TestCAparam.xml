@@ -1,19 +1,51 @@
 <paramCA>
+    <fixed>
+        <machine nbCol="32" nbColMin="8" nbColMax="24" arch="christal"/>
+        <display nbCol="2" CAwidth="700" CAheight="400" iter="CAsize"/>
+        <inits>
+            <layer init="center">
+                seed
+            </layer>
+        </inits>
+    </fixed>
     <expandedLayer>
-        <Layer>wall2</Layer>
-        <Layer>grow</Layer>
-        <Layer>part</Layer>
-        <Layer>wall</Layer>
-        <Layer>distwall</Layer>
-        <Layer>distwall2</Layer>
+        <Layer>
+            part
+        </Layer>
+        <Layer>
+            distwall2
+        </Layer>
+        <Layer>
+            wall
+        </Layer>
+        <Layer>
+            wall2
+        </Layer>
+        <Layer>
+            grow
+        </Layer>
+        <Layer>
+            distwall
+        </Layer>
     </expandedLayer>
     <colorOfField>
-        <layer color="0x80FF00">lldistwall</layer>
-        <layer color="0x00FFFF">lldistwall2</layer>
-        <layer color="0xFFC800">llgrow</layer>
-        <layer color="0xFF00FF">llwall</layer>
-        <layer color="0xFF0080">lldistpart</layer>
-        <layer color="0xFF0000">llwall2</layer>
-        <layer color="0xFFFF00">vortex</layer>
+        <layer color="0xFFC800">
+            llgrow
+        </layer>
+        <layer color="0xFF0080">
+            lldistpart
+        </layer>
+        <layer color="0xFFFF00">
+            vortex
+        </layer>
+        <layer color="0xFF00FF">
+            llwall
+        </layer>
+        <layer color="0xFF0000">
+            lldistwall
+        </layer>
+        <layer color="0x00FFFF">
+            lldistwall2
+        </layer>
     </colorOfField>
 </paramCA>

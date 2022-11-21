@@ -1,8 +1,28 @@
 <paramCA>
+    <fixed>
+        <machine nbCol="15" nbLine="10" arch="christal"/>
+        //default CA size and architecture
+        <display nbCol="2" CAwidth="700" CAheight="400" iter="CAsize"/>
+        <inits>
+            <layer init="center">llseed</layer>
+            <layer init="center">tmp1</layer>
+            <layer init="center">tmp2</layer>
+        </inits>
+        <sizes>
+            <size nbLine="5" nbCol="6"/>
+            <size nbLine="6" nbCol="10"/>
+            <size nbLine="10" nbCol="15"/>
+            <size nbLine="10" nbCol="60"/>
+        </sizes>
+    </fixed>
     <expandedLayer>
-        <Layer>grow</Layer>
+        <Layer>
+            seed
+        </Layer>
     </expandedLayer>
     <colorOfField>
-        <layer color="0xFFC800">grow</layer>
+        <layer color="0x0080FF">
+            llseed
+        </layer>
     </colorOfField>
 </paramCA>
