@@ -10,10 +10,13 @@ import scala.swing.{Dimension, Frame, MainFrame, Panel, SimpleSwingApplication}
 import java.awt.Dimension
 import java.awt.Image
 
-import triangulation.{DelaunayTriangulator, NotEnoughPointsException, Triangle2D, Vector2D}
+import triangulation.{DelaunayTriangulator, NotEnoughPointsException, Triangle2D, Vector2D, Voronoi}
+
 import scala.collection.JavaConverters._
 import triangulation.Utility._
 import Color._
+
+import compiler.E
 
 /**
  * pannel for drawing one CA , together with relevant information
@@ -51,6 +54,13 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops) extends Panel
    * @param env
    */
   def drawCA(g: myGraphics2D, env: Env) = {
+
+    def drawTriangles(c: Color) = {
+      g.setColor(c);
+      for (t <- env.medium.triangleSoup)
+        g.drawPolygon(toPolygon(t))
+    }
+
     def drawCAinsideContour(c: Color) = {
       g.setColor(c);
       for ((_, v) <- env.medium.voronoi)
@@ -65,7 +75,7 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops) extends Panel
           g.drawPolygon(v.polygon)
     }
 
-    def drawCAtestInit(initMethod: env.medium.InitMold, c: Color) = {
+    def drawCAtestInitBoolV(initMethod: env.medium.InitMold, c: Color) = {
       g.setColor(c)
       for (i <- 0 until initMethod.boolVField.size)
         for (j <- 0 until initMethod.boolVField(0).size)
@@ -75,19 +85,34 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops) extends Panel
           }
     }
 
+    def drawCAtestInit(initMethod: env.medium.InitMold, c: Color) = {
+      g.setColor(c)
+      for (d <- 0 until initMethod.locus.density)
+        for (i <- 0 until env.medium.nbLineCA)
+          for (j <- 0 until env.medium.nbColCA)
+            if (initMethod.memFields(d)(i)(j)) {
+              assert(env.medium.locusPlane(initMethod.locus)(d)(i)(j).isDefined, "defined is defined exactly when the point exists")
+              val v: Vector2D = env.medium.locusPlane(initMethod.locus)(d)(i)(j).get
+              g.fillPolygon(env.medium.voronoi(v).polygon)
+            }
+    }
+
     def drawCAcolorVoronoi() = {
       //env.computeVoronoirColors() //painting allways need to recompute the colors, it would seem
-      for (v <- env.medium.voronoi.values)
-        if (v.color != Color.black) {
+      for (v: Voronoi <- env.medium.voronoi.values)
+        if (v.color != Color.black || v.corner.isDefined //we print the corners even it they are black, because they can overlap
+        ) {
           g.setColor(v.color)
           g.fillPolygon(v.polygon)
         }
     }
+    // drawTriangles(white)
+
+    //drawCAtestInit(env.medium.defInit(E()),red)
+    drawCAcolorVoronoi()
 
     drawCAinsideContour(gray)
     drawCA1DborderContour(white)
-    // drawCAtestInit(env.medium.centerInit,red)
-    drawCAcolorVoronoi()
   }
 
 }

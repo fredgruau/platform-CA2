@@ -7,6 +7,24 @@
                 seed
             </layer>
         </inits>
+        <layers>part
+            <layer>distpart
+                <field>lldistpart</field>
+                <field>vortex</field>
+            </layer>
+            <layer>wall
+                <field>llwall</field>
+                <layer>distwall
+                    <field>lldistwall</field>
+                    <layer>wall2
+                        <field>llwall2</field>
+                        <layer>distwall2
+                            <field>lldistwall2</field>
+                        </layer>
+                    </layer>
+                </layer>
+            </layer>
+        </layers>
     </fixed>
     <expandedLayer>
         <Layer>

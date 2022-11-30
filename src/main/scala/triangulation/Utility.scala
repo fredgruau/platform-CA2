@@ -105,45 +105,10 @@ object Utility {
     res
   }
 
-  /**
-   *
-   * @param lCA    input 1D array of boolean of size>30
-   * @param lCAmem array of 32bits int, where to pack those booleans as integer
-   * @param iStart starting index in lCAmem where to start packing
-   * @param iEnd   lastIndex in lCAmem where to finish packing
-   * @return LCS has one more int containing 30 bits (or less) of a line of LCA
-   */
-  def lineToInts(lCA: Seq[Boolean], lCAmem: Array[Int], iStart: Int, iEnd: Int) = {
-    for (i <- iStart until iEnd) { //we iterate on the indexes of  target Int32 of LCAmem
-      var int32: Int = 0
-      //for(j<-0 until lCA.size)
-      for (j <- (i - iStart) * 30 until min((i + 1 - iStart) * 30, lCA.size)) // j visits the indexes of the portion in the considered LCA lines
-        int32 = push(int32, lCA(j))
-      lCAmem(i) = int32 << 1 //<<1 leave the place  for the communication bit
-    }
-  }
+  def interleaved(i: Int, nbBlock: Int, blockSize: Int) = (i % nbBlock) * blockSize + i / nbBlock
 
-  /**
-   *
-   *
-   * @param lCAmem input array of 32bits int, where booleans are packed as integer
-   * @param lCA    output  1D array of boolean of size>30
-   * @param iStart starting index in lCAmem where to start unpacking
-   * @param iEnd   lastIndex where to finish unpacking
-   * @return
-   */
-  def intsToLine(lCAmem: Array[Int], lCA: Array[Boolean], iStart: Int, iEnd: Int) = {
-
-    for (i <- iStart until iEnd) {
-
-      var res: Int = lCAmem(i) >>> 1 //>>> ignore the communication bit
-      for (j <- ((i - iStart) * 30 until min((i + 1 - iStart) * 30, lCA.size)).reverse) { //unpacking the 30 bits in LCA(i) in reverse order because of the stack
-        val (newRes, b) = pop(res)
-        res = newRes
-        lCA(j) = b
-      }
-    }
-  }
+  /** unInterleave is like interleave, permuting block number and block size */
+  def unInterleaved(i: Int, nbBlock: Int, blockSize: Int): Int = interleaved(i, blockSize, nbBlock)
 
 
   /**
@@ -177,46 +142,136 @@ object Utility {
   import compiler.rotateLeft
 
   /**
+   *
+   * @param lCA    input 1D array of boolean of size>30
+   * @param lCAmem array of 32bits int, where to pack those booleans as integer
+   * @param iStart starting index in lCAmem where to start packing
+   * @param iEnd   lastIndex in lCAmem where to finish packing
+   * @return LCS has one more int containing 30 bits (or less) of a line of LCA
+   */
+  def lineToInts(lCA: Seq[Boolean], lCAmem: Array[Int], iStart: Int, iEnd: Int, nbBlock: Int, blockSize: Int) = {
+    for (i <- iStart until iEnd) { // indexes of  target Int32 of LCAmem, if we were not interleaving
+      var int32: Int = 0
+      //for(j<-0 until lCA.size)
+      for (j <- (i - iStart) * 30 until min((i + 1 - iStart) * 30, lCA.size)) // j visits the indexes of the portion in the considered LCA lines
+        int32 = push(int32, lCA(j))
+      //lCAmem(i) = int32 << 1 //<<1 leave the place  for the communication bit
+      val i2 = interleaved(i, nbBlock, blockSize)
+      lCAmem(i2) = int32 << 1 //<<1 leave the place  for the communication bit
+    }
+  }
+
+
+  def move(t: Array[Int], i: Int, i1: Int, blockSize: Int) =
+    for (j <- (0 until blockSize).reverse)
+      t(i1 + j) = t(i + j)
+
+  def moveBack(t: Array[Int], i: Int, i1: Int, blockSize: Int) =
+    for (j <- (0 until blockSize))
+      t(i + j) = t(i1 + j)
+
+  def interleaveSpace(memCAint32: Array[Int], nbBlock: Int, blockSize: Int) =
+    for (i <- (0 until nbBlock).reverse)
+      move(memCAint32, i * blockSize, 2 + i * (blockSize + 1), blockSize)
+
+  def unInterleaveSpace(memCAint32: Array[Int], nbBlock: Int, blockSize: Int) =
+    for (i <- (0 until nbBlock))
+      moveBack(memCAint32, i * blockSize, 2 + i * (blockSize + 1), blockSize)
+
+
+  /**
    * @param nbColCA    the number of columns in the CA
    * @param nbLineCA   the number of lines in the CA
    * @param memCAbool  a list of booleans processed by the CA, supplied as data
    * @param memCAint32 a list of 32bits integer packing the booleans
    * @return lCAmem is computed from lCA
-   *         same as encode, except we add interleaving and rotation
-   *         we rotate to the right when encoding, the LSB is moved and this amounts to dividing by 2.
+   *         we add interleaving and rotation
+   *         when we  rotate to the right , the LSB is moved and this amounts to dividing by 2.
    */
   def encodeInterleavRot(nbLineCA: Int, nbColCA: Int, memCAbool: Array[Array[Boolean]], memCAint32: Array[Int]) = {
     assert(nbLineCA == memCAbool.size)
     assert(nbColCA == memCAbool(0).size)
+    val nbInt32used = (nbLineCA * nbColCA) / 30 //carefull:that is distinct from memCAbool.size
     if (nbColCA <= 30) { //one int32 stores  several CA lines.we need to spare 2 bits for communication.
       assert(30 % nbColCA == 0, "each int32 must be responsible for the same number of small CA lines")
-
-      /** number of Int32 needed for encoding, already computed as the target array size, which was already created */
-      val nbInt32total = memCAint32.size
       for (i <- 0 until nbLineCA) { //we iterate on the CA lines,
-        /** index of target Int32 */
-        val index = i % nbInt32total //implements interleaving
+        /** index of target Int32, which implements interleaving */
+        val index = i % nbInt32used
         memCAint32(index) = push(memCAint32(index), memCAbool(i))
       }
-      /** number of lines stored in one 32 bits integers, ] */
-      val nbLinesPerInt = 30 / nbColCA
-      /** number of meaningfull bits in each int32 */
-      val nbBitPerInt32 = nbColCA * nbLinesPerInt
-
-      /** each int32  needs to be rotated right */
-      for (i <- 0 until memCAint32.size) {
+      for (i <- 0 until nbInt32used) { // each int32  needs to be rotated right
         /** how much do we need to rotate right */
         val shift = (i / 2) % nbColCA
-        memCAint32(i) = ror(memCAint32(i), shift, nbBitPerInt32)
+        memCAint32(i) = rol(memCAint32(i), shift, 30) << 1
       }
+      interleaveSpace(memCAint32, 1, nbInt32used)
     }
     else { //symetric case: we need several ints, in order to store one line of the CA
       /** number of int32 needed to represent one CA line */
-      val nbInt32 = nbColCA / 30 //this is gonna be >=2, two bits are devoted to communication
-      for (i <- 0 until nbLineCA) { //we iterate on the CA lines whose length is nbColCA
+      val nbIntColCA = nbColCA / 30 //this is gonna be >=2, two bits are devoted to communication
+      for (i <- 0 until nbLineCA) { //we process line i whose length is nbColCA
         /** how much do we need to rotate right */
         val shift = (i / 2) % nbColCA
-        lineToInts(rotateRight(memCAbool(i), shift), memCAint32, i * nbInt32, min((i + 1) * nbInt32, nbColCA)) //rotation is done on the whole CA lines.
+        lineToInts(rotateLeft(memCAbool(i), shift), memCAint32, i * nbIntColCA, min((i + 1) * nbIntColCA, nbColCA), nbIntColCA, nbLineCA) //rotation is done on the whole CA lines.
+      }
+      interleaveSpace(memCAint32, nbIntColCA, nbLineCA)
+    }
+
+  }
+
+  def encodeInterleavRotOld(nbLineCA: Int, nbColCA: Int, memCAbool: Array[Array[Boolean]], memCAint32: Array[Int]) = {
+    assert(nbLineCA == memCAbool.size)
+    assert(nbColCA == memCAbool(0).size)
+
+    if (nbColCA <= 30) { //one int32 stores  several CA lines.we need to spare 2 bits for communication.
+      val nbInt32used = (nbLineCA * (nbColCA + 2)) / 32 //carefull:that is distinct from memCAbool.size
+      assert(32 % (nbColCA + 2) == 0, "nbColCA =6 or 8")
+      for (i <- 0 until nbLineCA) { //we iterate on the CA lines,
+        /** how much do we need to rotate right */
+        val shift = (i / 2) % nbColCA
+        val rotated = rotateLeft(memCAbool(i), shift)
+        /** index of target Int32, which implements interleaving */
+        val index = i % nbInt32used
+        memCAint32(index) = memCAint32(index) << 1 //separating bit
+        memCAint32(index) = push(memCAint32(index), rotated)
+        memCAint32(index) = memCAint32(index) << 1 //separating bit
+      }
+      //insert the necessary spaces
+      interleaveSpace(memCAint32, 1, nbInt32used)
+    }
+    else { //symetric case: we need several ints, in order to store one line of the CA
+      /** number of int32 needed to represent one CA line */
+      val nbIntColCA = nbColCA / 30 //this is gonna be >=2, two bits are devoted to communication
+      for (i <- 0 until nbLineCA) { //we process line i whose length is nbColCA
+        /** how much do we need to rotate right */
+        val shift = (i / 2) % nbColCA
+        lineToInts(rotateLeft(memCAbool(i), shift), memCAint32, i * nbIntColCA, min((i + 1) * nbIntColCA, nbColCA), nbIntColCA, nbLineCA) //rotation is done on the whole CA lines.
+      }
+      interleaveSpace(memCAint32, nbIntColCA, nbLineCA)
+    }
+
+  }
+
+
+  /**
+   *
+   *
+   * @param lCAmem input array of 32bits int, where booleans are packed as integer
+   * @param lCA    output  1D array of boolean of size>30
+   * @param iStart starting index in lCAmem where to start unpacking
+   * @param iEnd   lastIndex where to finish unpacking
+   * @return
+   */
+  def intsToLine(lCAmem: Array[Int], lCA: Array[Boolean], iStart: Int, iEnd: Int, nbBlock: Int, blockSize: Int) = {
+
+    for (i <- iStart until iEnd) {
+      // var res: Int = lCAmem(i) >>> 1 //>>> ignore the communication bit
+      val i2 = interleaved(i, nbBlock, blockSize)
+      var res: Int = lCAmem(i2) >>> 1 //>>> ignore the communication bit
+      for (j <- ((i - iStart) * 30 until min((i + 1 - iStart) * 30, lCA.size)).reverse) { //unpacking the 30 bits in LCA(i) in reverse order because of the stack
+        val (newRes, b) = pop(res)
+        res = newRes
+        lCA(j) = b
       }
     }
   }
@@ -226,43 +281,56 @@ object Utility {
    * @param nbLineCA   the number of lines in the CA
    * @param memCAbool  a list of booleans processed by the CA, supplied as data
    * @param memCAint32 a list of 32bits integer packing the booleans
-   * @return lCA is computed from lCAmem
+   * @return lCA is compurotateLeftted from lCAmem
    *         we rotate to the Left when decoding, the MSB is moved and this amounts to  multiplying by 2.
    */
   def decodeInterleavRot(nbLineCA: Int, nbColCA: Int, memCAint32: Array[Int], memCAbool: Array[Array[Boolean]]) = {
     assert(nbLineCA == memCAbool.size)
     assert(nbColCA == memCAbool(0).size)
-    if (nbColCA <= 30) { //one int32 stores one or several sub= lines.
-      assert(30 % nbColCA == 0, "each int32 must be responsible for the same number of small CA lines")
-      /** number of lines stored in one 32 bits integers, ] */
-      val nbLinesPerInt = 30 / nbColCA
-      /** number of meaningfull bits in each int32 */
-      val nbBitPerInt32 = nbColCA * nbLinesPerInt
-      /** each int32  needs to be rotated left */
-      val tmp = new Array[Int](memCAint32.size) //we use tmp in order not to destroy the CA memory
-      memCAint32.copyToArray(tmp)
-      for (i <- 0 until memCAint32.size) {
+
+    val tmp = Array.ofDim[Int](memCAint32.size) //we use tmp in order to not modify the CA memory
+    for (i <- 0 until memCAint32.size)
+      tmp(i) = memCAint32(i)
+    if (nbColCA < 30) { //one int32 stores one or several sub= lines.
+      /*      val nbInt32used = (nbLineCA*(nbColCA+2))/32
+            assert(32 % (nbColCA+2) == 0, "each int32 must be responsible for the same number of small CA lines")
+            /** each int32  needs to be rotated left */
+            unInterleaveSpace(tmp,1,nbInt32used)
+            for (i <- (0 until nbLineCA).reverse) {
+              val index = i % nbInt32used
+              tmp(index)=tmp(index) >>>1 //separating bit
+              tmp(index) = pop(tmp(index), memCAbool(i)) //lecture de la iéme ligne
+              tmp(index)=tmp(index) >>>1 //separating bit
+              /** how much do we need to rotate right */
+              val shift = (i / 2) % nbColCA
+              memCAbool(i)=rotateRight(memCAbool(i), shift).toArray
+            }*/
+
+      val nbInt32used = (nbLineCA * (nbColCA)) / 30
+      unInterleaveSpace(tmp, 1, nbInt32used)
+      for (i <- 0 until nbInt32used)
+        tmp(i) = tmp(i) >>> 1
+      for (i <- 0 until nbInt32used) { //we start by applying left rotation
         /** how much do we need to rotate left */
         val shift = (i / 2) % nbColCA
-        tmp(i) = rol(tmp(i), shift, nbBitPerInt32)
+        tmp(i) = ror(tmp(i), shift, 30)
       }
-
-      /** number of Int32 needed for encoding, already computed as the target array size */
-      val nbInt32total = memCAint32.size
       for (i <- (0 until nbLineCA).reverse) { //we iterate downward, because integer are used as stacks,
         /** index of target Int32 */
-        val index = i % nbInt32total //result from interleaving
+        val index = i % nbInt32used //result from interleaving
         tmp(index) = pop(tmp(index), memCAbool(i))
       }
     }
     else { //symetric case: we need several ints, in order to store one line of the CA
       /** number of int32 needed to represent one CA line */
-      val nbInt32 = nbColCA / 30 //this is gonna be >=2, two bits are devoted to communication
+      val nbInt32used = (nbLineCA * nbColCA) / 30
+      val nbIntColCA = nbColCA / 30 //this is gonna be >=2, two bits are devoted to communication
+      unInterleaveSpace(tmp, nbIntColCA, nbLineCA)
       for (i <- (0 until nbLineCA)) { //we iterate on the CA lines
+        intsToLine(tmp, memCAbool(i), i * nbIntColCA, min((i + 1) * nbIntColCA, nbInt32used), nbIntColCA, nbLineCA)
         /** how much do we need to rotate right */
-        intsToLine(memCAint32, memCAbool(i), i * nbInt32, min((i + 1) * nbInt32, memCAint32.size))
         val shift = (i / 2) % nbColCA
-        memCAbool(i) = rotateLeft(memCAbool(i), shift).toArray //rotation is done on the whole CA lines.
+        memCAbool(i) = rotateRight(memCAbool(i), shift).toArray //rotation is done on the whole CA lines.
       }
     }
   }

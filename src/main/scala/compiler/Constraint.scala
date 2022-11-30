@@ -35,7 +35,7 @@ sealed abstract class Constraint(val locus:Locus)
   def printSchedules(): String = {
     var result: String = "";
     for (s: Seq[Int] <- schedules)
-      result += s.map(locus.lessufx(_)).mkString("->")
+      result += s.map(locus.the6sufx(_)).mkString("->")
     result
   }
 
@@ -101,7 +101,7 @@ object Constraint {
 
     override def verified(a: Seq[Int]): Boolean = b.contains(a)
 
-    private def printSched(a: Seq[Int]) = a.map(locus.lessufx(_))
+    private def printSched(a: Seq[Int]) = a.map(locus.the6sufx(_))
 
     override def toString: String = "on " + locus +
       (if (b.size == 1) "  picked" else ("there is " + b.size)) +

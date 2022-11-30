@@ -36,7 +36,7 @@ class OrientedLine(private val vectDir: Vector2D, private val origin: Vector2D)
     val lselected = (0 until points.size).filter( //the  points on the perimeter have a positive sinus, until selected
       (i: Int) => (sinuses(i) >= 0) && (sinuses((i + 1) % points.size) <= 0) //after selected it becomes negative
     )
-    assert(lselected.size == 1, "there must be a unique crossed side")
+//    assert(lselected.size == 1, "there must be a unique crossed side")
     val selected = lselected.head
     (Line(points(selected), points((selected + 1) % points.size)), selected)
   }

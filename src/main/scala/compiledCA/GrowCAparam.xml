@@ -1,20 +1,31 @@
 <paramCA>
-    <fixed>
-        <machine nbCol="15" nbLine="10" arch="christal"/>
-        //default CA size and architecture
-        <display nbCol="2" CAwidth="700" CAheight="400" iter="CAsize"/>
-        <inits>
-            <layer init="center">llseed</layer>
-            <layer init="center">tmp1</layer>
-            <layer init="center">tmp2</layer>
-        </inits>
-        <sizes>
-            <size nbLine="5" nbCol="6"/>
-            <size nbLine="6" nbCol="10"/>
-            <size nbLine="10" nbCol="15"/>
-            <size nbLine="10" nbCol="60"/>
-        </sizes>
-    </fixed>
+        <fixed>
+            <machine nbCol="15" nbLine="10" arch="christal"/>
+            //default CA size and architecture
+            <display nbCol="2" CAwidth="700" CAheight="400" iter="CAsize"/>
+            <simul t0="0 "/>
+            <inits>
+                <layer init="center">llseed</layer>
+                <layer init="border">tmp1</layer>
+                <layer init="center">tmp2</layer>
+                <layer init="def">defE</layer>
+                <layer init="def">defF</layer>
+                <layer init="def">defVe</layer>
+            </inits>
+            <sizes>
+                <size nbLine="4" nbCol="6"/>
+                <size nbLine="12" nbCol="14"/>
+                <size nbLine="12" nbCol="30"/>
+            </sizes>
+            <layers>seed
+                <field>llseed</field>
+                <field>tmp1</field>
+                <field>tmp2</field>
+                <field>defE</field>
+                <field>defF</field>
+                <field>defVe</field>
+            </layers>
+        </fixed>
     <expandedLayer>
         <Layer>
             seed

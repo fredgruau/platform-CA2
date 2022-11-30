@@ -12,6 +12,14 @@ import java.util.HashMap;
  * on top of the program itself, in java, we find information needed to display
  */
 public interface CAloops {
+
+
+    /**
+     * applies a set of loops realizing one iteration on the CA.
+     */
+    // public void theLoops(int[][] mem, int nbBlock,int blockSize);
+    public void theLoops(int[][] mem, PrShift prepareShift);
+
     public List<String> directInit();
 
     /**

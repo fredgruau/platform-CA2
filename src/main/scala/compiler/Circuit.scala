@@ -124,7 +124,7 @@ object Circuit {
    * diagonal (d1,d2) and antidiagonla (ad1,ad2) are oriented
    * so that all the shift and delay gets applied on d1 (up), so that the same computation is applied
    * on d2 and ad2, when the vE fields is obtain by a broadcast followed by a transfer.
-   * voir commentaire du code sur l'emplacement des tm1s par rapports au shift, faudra gérer cela de facon un peu plus général
+   * voir commentaire du code sur l'emplacement des tm1s par rapports au shift, faudra générer cela de facon otoMatik!
    */
 
   import ASTB.tm1

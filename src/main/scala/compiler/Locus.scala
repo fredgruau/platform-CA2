@@ -26,7 +26,7 @@ sealed abstract class Locus {
   val sufx: Array[String]
 
   /** generates allways 6 suffixe */
-  def lessufx: Array[String]
+  def the6sufx: Array[String]
 
   /** adds a suffix to a name in order to distinguish between the associated scalars encoding the spatial locus */
 
@@ -81,7 +81,8 @@ abstract class S extends Locus with Ordered[S] {
   /**@param a encodes a  schedule on a transfer locus which  son of this. vE or fE for E, vF or eF for F
   @return true if this scheduled can be partitionned */
   def partitionable(a:scala.Seq[Int]):Boolean
-  def lessufx=sufx
+
+  def the6sufx = sufx
 
 }
 final case class V() extends S {
@@ -123,7 +124,8 @@ final case class F() extends S {
 abstract class TT extends Locus{
   def arity2:Int
   def les6sufx: Array[String]
-  def lessufx: Array[String] = les6sufx
+
+  def the6sufx: Array[String] = les6sufx
 }
 
 /** T stands for Transfer, and uses two simplicial locus. The first is the simplicial. T[V,E] corresponds to  eV  */
@@ -179,5 +181,7 @@ object Locus {
   def locusE = E()
 
   def locusF = F()
+
+  def locusVe = T(V(), E())
 
 }

@@ -13,7 +13,7 @@ import scala.swing._
 import java.awt.Color
 import java.net.URL
 
-import javax.swing.{Icon, ImageIcon}
+import javax.swing.{ImageIcon}
 import simulator.Simulator.CAtype.CAMem
 import simulator.XMLutilities.{xInt, _}
 
@@ -55,17 +55,17 @@ object Simulator extends SimpleSwingApplication {
   def envs(param: Node, sizes: collection.Seq[(Int, Int)], CAwidth: Int, CAmemWidth: Int, controller: Controller): Iterable[Env] = {
     /**
      *
-     * @param CAmemWidth total number of Int32 needed to compute the CA's next state, including system bits such as bug
-     * @return the number of Int32 needed for one bit plan of the CA memory
+     * @return total number of Int32 needed for one bit plan of the CA memory
      */
-    def CAmemNbInt32(CAmemWidth: Int, nbLineCA: Int, nbColCA: Int): Int = {
+    def nbInt32CAmem(nbLineCA: Int, nbColCA: Int): Int = {
       if (nbColCA <= 30) { //one int32 stores one or several sub= line, encoded on 30 of its bits
-        val nbSubLines = 30 / (nbColCA) //two bits are devoted to communication
-        (nbLineCA / nbSubLines).toInt
+        assert(30 % nbColCA == 0 && (nbLineCA * nbColCA) % 30 == 0, "nbCol divides 30")
+        2 + (nbLineCA * nbColCA) / 30 //we need an extra int32, Before and after.
       }
       else { //symetric case: we need nbInt32 ints, to store one line of the CA
-        val nbInt32 = nbColCA / 30
-        (nbLineCA * nbInt32).toInt
+        assert(nbColCA % 30 == 0, "nbCol is a multiple of 30")
+        val nbIntColCA = nbColCA / 30 //the number of "macro columns"
+        (nbLineCA + 1) * nbIntColCA + 1 //we need to insert one integer has a buffer between each macro columns, plus one before and one after
       }
     }
 
@@ -79,37 +79,24 @@ object Simulator extends SimpleSwingApplication {
         var nbColCA: Int = xInt(param, "machine", "@nbCol")
         /** coded as a method because when iterating through the CAsizes, nbColCA is modified */
         val arch = x(param, "machine", "@arch")
-        //Set the initial values of environment when iterating: it also depend on what we iterates
-        iter match {
-          case "CAsize" =>
-            nbLineCA = sizes(0)._1 //inital value of nbLineCA
-            nbColCA = sizes(0)._2
-        }
 
+        /** @return `true` if there is a next element, `false` otherwise */
         override def hasNext: Boolean = iter match {
-          case "CAsize" =>
-            nbIter < sizes.size
+          case "CAsize" => nbIter < sizes.size
         }
 
+        /** @return next element */
         override def next(): Env = {
           iter match {
-            case "CAsize" =>
-              nbLineCA = sizes(nbIter)._1 //inital value of nbLineCA
-              nbColCA = sizes(nbIter)._2
-              nbIter = nbIter + 1
-          }
-          new Env(arch, nbLineCA, nbColCA, CAwidth, controller,
-            Array.ofDim[Int](CAmemWidth, CAmemNbInt32(CAmemWidth, nbLineCA, nbColCA)), 0)
+            case "CAsize" => nbLineCA = sizes(nbIter)._1; nbColCA = sizes(nbIter)._2
+          } //inital value of nbLineCA
+          nbIter = nbIter + 1
+          new Env(arch, nbLineCA, nbColCA, CAwidth, controller, 0)
         }
       }
     }
   }
 
-
-  def myButton(ic: Icon, controller: Controller) = new Button {
-    icon = ic
-    controller.listenTo(this)
-  }
 
 
   /** hierarchy of swing widget */
@@ -124,7 +111,10 @@ object Simulator extends SimpleSwingApplication {
     def CAmemWidth = progCA.CAmemWidth() //shortcut that increases lisibility
     /** process the signal we create controller first in order to instanciate state variable used by tree */
     val controller = new Controller(nameCA, param, progCA)
-    val xmLayerHierarchy: Node = readXML("src/main/scala/compiledCA/" + nameCA + "layer.xml")
+    //val xmLayerHierarchy: Node = readXML("src/main/scala/compiledCA/" + nameCA + "layer.xml")
+    val xmLayerHierarchy: Node = (param \\ "layers").head
+
+
     /** Tree for browsing the hierarchy of layers and which field to display */
     val layerTree = new LayerTree(xmLayerHierarchy, controller)
     val scrollableXmlTree = new ScrollPane(layerTree) //we put it scrollable because it can become big
@@ -138,38 +128,47 @@ object Simulator extends SimpleSwingApplication {
     val iterEnvs: Iterable[Env] = envs(param, sizes, CAwidth, CAmemWidth, controller)
 
     val pannels = new GridBagPanel {
-      def constraints(x: Int, y: Int): Constraints = {
+      def constraints(x: Int, y: Int, gridwidth: Int = 1,
+                      fill: GridBagPanel.Fill.Value = GridBagPanel.Fill.None): Constraints = {
         val c = new Constraints;
         c.gridx = x;
         c.gridy = y;
+        c.gridwidth = gridwidth
+        c.fill = fill
         c
       }
 
       var numEnv = 0
       val nbColPannel = xInt(param, "display", "@nbCol")
-
       for (env <- iterEnvs) {
         controller.envList = controller.envList :+ env //we will need to acess the list of env, from the controler
         env.pannel = new CApannel(CAwidth, (CAwidth / Math.sqrt(2)).toInt, env, progCA)
-        add(env.pannel, constraints(numEnv % nbColPannel, numEnv / nbColPannel)) //adds the pannel using the Grid layout (GridBagPnnel)
+        if (numEnv == 2) {
+          add(env.pannel, constraints(numEnv % nbColPannel, numEnv / nbColPannel, 2, GridBagPanel.Fill.Horizontal)) //adds the pannel using the Grid layout (GridBagPnnel)
+          numEnv += 1
+        }
+        else
+          add(env.pannel,
+            constraints(numEnv % nbColPannel, numEnv / nbColPannel)) //adds the pannel using the Grid layout (GridBagPnnel)
         numEnv += 1
       }
     }
-    val scrollablPannels = new ScrollPane(pannels)
 
-    val ForwardButton = myButton(ExampleData.forwardIcon, controller)
-    val toolBar = new ToolBar() {
-      peer.setRollover(true)
-      contents += ForwardButton
-    }
+    val scrollablPannels = new ScrollPane(pannels)
+    /*
+        val forwardButton = myButton(ExampleData.forwardIcon, controller)
+        val toolBar = new ToolBar() {
+          peer.setRollover(true)
+          contents += forwardButton
+        }*/
 
     contents = new BorderPanel {
 
       import BorderPanel.Position._
 
       layout(scrollableXmlTree) = West
-      layout(controller) = East //controller takes O room
-      layout(toolBar) = North
+      layout(controller) = North //controller takes O room
+      // layout(toolBar) = North
       layout(scrollablPannels) = Center
     }
     //contents=new ScrollPane(xmlTree)
@@ -190,6 +189,7 @@ object Simulator extends SimpleSwingApplication {
     val pauseNormalIcon = Icon("src/ressources/pause_black.gif")
     val forwardIcon = Icon("src/ressources/skip_forward_black.gif")
     val backwarddIcon = Icon("src/ressources/skip_backward_black.gif")
+    val initIcon = Icon("src/ressources/rewind_black.gif")
   }
 
   /** contains the types used in the simulator */

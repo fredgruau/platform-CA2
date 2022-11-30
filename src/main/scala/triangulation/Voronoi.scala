@@ -8,6 +8,7 @@ import triangulation.Utility._
 
 import scala.collection.{Set, immutable}
 import scala.collection.immutable.Set
+import scala.swing.Dimension
 
 /** contains the code for computing the voronoi Cell, as a polygon */
 class Voronoi(val center: Vector2D) {
@@ -69,19 +70,21 @@ class Voronoi(val center: Vector2D) {
   var sides: Set[Int] = Set()
   var polygon = new Polygon()
 
+  def corner: Option[Int] =
+    if (sides.size < 2) None
+    else {
+      val firstSide = sides.reduce(Math.max)
+      Some(if (firstSide == 3 && sides.contains(0)) 0 else firstSide) //express a toroidal metric not immediate to grasp
+    }
+
   /**
    * sets the polygons, take into account if it cuts the bounding box.
    *
-   * @param bbP bounding box
+   * @param bb bounding box
    */
-  def setPolygon(bbP: Polygon) = {
+  def setPolygon(bb: Dimension) = {
+    val bbP = toPolygon(bb)
 
-    def corner: Option[Int] =
-      if (sides.size < 2) None
-      else {
-        val firstSide = sides.reduce(Math.max)
-        Some(if (firstSide == 3 && sides.contains(0)) 0 else firstSide)
-      }
 
     def cornerPoint: List[Vector2D] = {
       val c = corner
@@ -125,29 +128,42 @@ class Voronoi(val center: Vector2D) {
       hitTheWall(first, true) ::: others.map(_.computeCenter()) ::: hitTheWall(last, false) ::: cornerPoint
 
     /** true if the center of triangle lies ouside of the bounding box */
-    def outside(t: Triangle2D) = {
-      t.computeCenter();
-      !bbP.inside(t.center.x.toInt, t.center.y.toInt)
+    def outside(t: Triangle2D): Boolean = {
+      val c = t.computeCenter();
+      val epsilon = 0.00000001
+      c.x < epsilon || c.x > bb.width - epsilon || c.y < epsilon || c.y > bb.height - epsilon
+
+      //!bbP.inside(t.center.x.toInt, t.center.y.toInt)
     }
+
+    def inside(t: Triangle2D): Boolean = !outside(t)
 
     polygon.reset()
     triangles.map(permute2(_)) //not necessary but we leave it
     val l: List[Vector2D] =
-      if (discontinuousTriangle) {
-        val others = triangles.reverse.tail.reverse.tail
-        truncatedPoly(triangles.head, others, triangles.last)
+      if (discontinuousTriangle) { //triangles are missing
+        val (insideTriangles, outsideTriangles) = triangles.partition(inside(_))
+        val others = if (insideTriangles.size > 1) insideTriangles.reverse.tail.reverse.tail else List.empty[Triangle2D]
+        if (insideTriangles.size > 0)
+          truncatedPoly(insideTriangles.head, others, insideTriangles.last)
+        else //all the triangles are outside!!!
+          truncatedPoly(outsideTriangles.head, others, outsideTriangles.last)
       }
       else {
         //we select the adjacent delaunay triangle whose circumCenter falls outside the bounding box.
-        val indexTruncated = triangles.indexWhere(outside(_))
-        val lastIndexTruncated = triangles.lastIndexWhere(outside(_))
-        assert(indexTruncated == lastIndexTruncated, "there should be at most one circumcenter outside the bounding box")
-        if (indexTruncated == -1)
-          triangles.map(_.computeCenter())
+
+        val indexTruncated: Int = triangles.indexWhere(outside(_))
+        if (indexTruncated == -1) //one of the triangles has its circum center outside the box
+        triangles.map(_.computeCenter())
         else { //one of the triangle has its center outside the box
-          triangles = rotate(triangles, indexTruncated) //truncated triangle is now the first
-          val outside = triangles.head
-          truncatedPoly(outside, triangles.tail, outside)
+          val lastIndexTruncated: Int = triangles.lastIndexWhere(outside(_))
+          //assert(indexTruncated == lastIndexTruncated, "we make the hypothese that here should be at most one circumcenter outside the bounding box")
+          do (triangles = rotate(triangles, 1))
+          while (outside(triangles.head) || inside(triangles.last)) //at the end the list of triangles is in two pieces.
+          val (in, out) = triangles.partition(inside(_))
+          val firstOut = out.last
+          val lastOut = out.head
+          truncatedPoly(firstOut, in, lastOut)
         }
       }
     polygon = toPolygon(l)
