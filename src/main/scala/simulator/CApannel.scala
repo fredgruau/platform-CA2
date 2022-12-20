@@ -2,7 +2,7 @@ package simulator
 
 import java.awt.{Color, Graphics2D, Point, Polygon, geom}
 
-import simulator.Simulator.CAtype.myGraphics2D
+import simulator.CAtype._
 
 import scala.swing.Swing._
 import scala.swing.event._

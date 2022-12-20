@@ -1,20 +1,18 @@
 package triangulation
 
-import java.awt.Color
-
-import compiler.Locus._
-import compiler.{E, F, Locus, T, V, rotateLeft, rotateRight}
-import simulator.Simulator.CAtype.pointLines
-import triangulation.Medium.createPoints
+import compiler._
+import simulator.CAtype.pointLines
+import simulator.UtilBitJava.{propagateBit14and1, propagateBit6and1, propagateBitxand1}
+import simulator.{PrShift, UtilBitJava}
+import triangulation.Medium._
 import triangulation.Utility._
 
+import java.awt.Color
 import scala.collection.JavaConverters._
 import scala.collection.immutable.HashMap
+import scala.math.{min, round}
 import scala.swing.Dimension
 import scala.swing.Swing.pair2Dimension
-import math.{min, round}
-import Medium._
-import simulator.{PrShift, UtilJava}
 
 trait Init {
   /**
@@ -22,7 +20,7 @@ trait Init {
    *
    * @param CAmemFields memory fields to fill
    */
-  def init(CAmemFields: Array[Array[Int]])
+  def init(CAmemFields: Array[Array[Int]]): Unit
 }
 
 /**
@@ -46,7 +44,7 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
   /** total  number of Int32 needed for one bit plane, including separating integers.   **/
   def nbInt32CAmem: Int
 
-  def prepareShift: PrShift
+  def propagate4Shift: PrShift
 
   /**
    * encode from boolean to ints 32 bits
@@ -108,7 +106,7 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
    * @param j y coordinate
    * @return neighbor in absolute coordinate obtained by adding i,j to the neighbors matrix
    */
-  def neigborsAbs(d: Int, i: Int, j: Int) = add2(neighbors(d)(i)(j), (i, j))
+  private def neigborsAbs(d: Int, i: Int, j: Int): (Int, Int) = add2(neighbors(d)(i)(j), (i, j))
 
   /**
    *
@@ -175,7 +173,7 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
           }
       res
     }
-  val weight = 0.33333
+  private val weight = 0.33333 //transfer locus are not located in the middle
   locusPlane +=
     T(V(), E()) -> {
       val res = Array.ofDim[Option[Vector2D]](6, nbLineCA, nbColCA) //first is down, second is up
@@ -203,7 +201,7 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
 
   /** Sets the points in space, according to what is being colored */
 
-  def initVoronoi(L: Set[Locus]) = {
+  def initVoronoi(L: Set[Locus]): Unit = {
     for (l <- L)
       displayedPoint ++= pointSet(l)
     val t = time(voronoise(), "voronoise")
@@ -234,13 +232,13 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
   /** we create that array once and forall to decode memory bit planes */
   private val sandBox = Array.ofDim[Boolean](nbLineCA, nbColCA)
 
-  def resetColorVoronoi(L: Set[Locus]) =
+  def resetColorVoronoi(L: Set[Locus]): Unit =
     for (l <- L)
       for (points2D: pointLines <- locusPlane(l))
         for (i <- 0 until nbLineCA)
           for (j <- 0 until nbColCA) {
             val point = points2D(i)(j) //corresponding point in 2D space
-            if (point != None)
+            if (point.isDefined)
               voronoi(point.get).resetColor() //updating voronoi's polygon color
           }
 
@@ -252,8 +250,8 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
    * @param color     color to be summed
    * @param bitPlanes where it should be summed
    */
-  def sumColorVoronoi(locus: Locus, color: Color, bitPlanes: List[Array[Int]]) = {
-    if (bitPlanes.size != locusPlane(locus).size)
+  def sumColorVoronoi(locus: Locus, color: Color, bitPlanes: List[Array[Int]]): Unit = {
+    if (bitPlanes.size != locusPlane(locus).length)
       println("the points of the locus must have been generated, and the density must correspond")
     for ((plane, points) <- bitPlanes zip locusPlane(locus)) { //we do a dot iteration simultaneously on pointsPlane, and bitPlane
       //   decodeInterleavRot(nbLineCA, nbColCA, plane, sandBox) //we convert the compact encoding on Int32, into simple booleans
@@ -263,7 +261,7 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
           if (sandBox(i)(j)) { //the field is present, its color must contribute to the voronoi polygon's color
             val point = points(i)(j) //corresponding point in 2D space
             // assert(point!=None,"we should have defined the color of non existing points")
-            if (point != None)
+            if (point.isDefined)
               voronoi(point.get).addColor(color) //updating voronoi's polygon color
           }
 
@@ -315,13 +313,16 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
   /** different possible inits
    * declared with lazy to spare memory, since only one or two will be instanciated
    * make use of primitives fields declared in medium to simplify the programming */
-  lazy val centerInit: InitMold = new InitMold(V(), 1) {
+  private lazy val centerInit: InitMold = new InitMold(V(), 1) {
     setBoolVField(center)
   }
-  lazy val yaxisInit: InitMold = new InitMold(V(), 1) {
+  private lazy val debugInit: InitMold = new InitMold(V(), 1) {
+    setBoolVField(new Vector2D(3, nbColCA - 1))
+  }
+  private lazy val yaxisInit: InitMold = new InitMold(V(), 1) {
     for (i <- 0 until nbLineCA) setBoolVField(i, 0)
   }
-  lazy val dottedBorderInit: InitMold = new InitMold(V(), 1) {
+  private lazy val dottedBorderInit: InitMold = new InitMold(V(), 1) {
     for (i <- 0 until nbLineCA) if (i % 1 == 0) {
       setBoolVField(i, 0)
       setBoolVField(i, nbColCA - 1)
@@ -333,7 +334,7 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
   }
 
   /** the def fields is generated for each locus, */
-  val defInit: HashMap[Locus, InitMold] = HashMap() ++ List(E(), F(), T(V(), E())).map((l: Locus) =>
+  private val defInit: HashMap[Locus, InitMold] = HashMap() ++ List(E(), F(), T(V(), E())).map((l: Locus) =>
     l -> new InitMold(l, 1) {
       for (d <- 0 until l.density)
         for (i <- 0 until nbLineCA)
@@ -352,6 +353,7 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
    */
   def initSelect(initMethodName: String, l: Locus): Init = initMethodName match {
     case "center" => centerInit
+    case "debug" => debugInit
     case "def" => defInit(l)
     case "yaxis" => yaxisInit
     case "border" => dottedBorderInit
@@ -368,9 +370,9 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
   class InitMold(val locus: Locus, val nbit: Int) extends Init {
     assert(nbit == 1, "we assume that we do not initalize int fields, only boolean fields")
     /** use as a tmp list of arrays of booleans, to more  easily computes the initial values */
-    val memFields = Array.ofDim[Boolean](locus.density * nbit, nbLineCA, nbColCA)
+    val memFields: Array[Array[Array[Boolean]]] = Array.ofDim[Boolean](locus.density * nbit, nbLineCA, nbColCA)
     /** simplification for the common case which is a boolV field */
-    val boolVField = if (locus == V()) memFields(0) else null
+    val boolVField: Array[Array[Boolean]] = if (locus == V()) memFields(0) else null
 
     /**
      * fills the set of memory fields corresponding to a CA field, according to a given init wished for
@@ -378,7 +380,7 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
      * @param CAmemFields memory fields to fill
      */
     override def init(CAmemFields: Array[Array[Int]]): Unit = {
-      assert(CAmemFields.size == memFields.size, "the number of fields used in CA memory does not corresponds")
+      assert(CAmemFields.length == memFields.length, "the number of fields used in CA memory does not corresponds")
       for ((lCA, lCAmem: Array[Int]) <- memFields zip CAmemFields) { //dot iteration, we iterate on the dot product of the two ranges
         encode(lCA, lCAmem)
         //encodeInterleavRot(nbLineCA, nbColCA, lCA, lCAmem)
@@ -387,7 +389,7 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
     }
 
 
-    def setMemField(d: Int, i: Int, j: Int) = {
+    def setMemField(d: Int, i: Int, j: Int): Unit = {
       memFields(d)(i)(j) = true
     }
 
@@ -396,11 +398,11 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
      * @param p a point within the medium
      * @return set the corresponding value of the boolVfield being initialized
      */
-    def setBoolVField(p: Vector2D) = {
+    def setBoolVField(p: Vector2D): Unit = {
       boolVField(round(p.x).toInt)(round(p.y).toInt) = true
     }
 
-    def setBoolVField(i: Int, j: Int) = {
+    def setBoolVField(i: Int, j: Int): Unit = {
       boolVField(i)(j) = true
     }
 
@@ -412,59 +414,57 @@ abstract class Medium(val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dime
 object Medium {
   /**
    *
-   * @param nbCol     numbrt of columns
-   * @param nbRow     number of rows.
+   * @param nbColCA   numbrt of columns
+   * @param nbLineCA  number of rows.
    * @param widthLt30 width of the pannel in which we draw
    * @return builds the non toroidal hexagonal grid for the CA pannel available, assuming we know the width of the CA pannel
    */
-  def apply(nbRow: Int, nbCol: Int, widthLt30: Int): Medium = {
-    val width = if (nbCol < 30) widthLt30 else 2 * widthLt30 //we see that for 64 column we draw the CA in the full available width by using two cells.
-    val radiusSqrt = Math.floor(width.toDouble / (2 * nbCol - 1)) //we compute radius so that the CA fills the available space on the pannel,
+  def apply(nbLineCA: Int, nbColCA: Int, widthLt30: Int): Medium = {
+    val width = if (nbColCA < 30) widthLt30 else 2 * widthLt30 //we see that for 64 column we draw the CA in the full available width by using two cells.
+    val radiusSqrt = Math.floor(width.toDouble / (2 * nbColCA - 1)) //we compute radius so that the CA fills the available space on the pannel,
     // normally we assume that the number of lines is the number of columns divided by sqrt(2)
-    val radius = if (nbRow * 1.1 < nbCol) radiusSqrt else (radiusSqrt * nbCol) / (nbRow * 1.4)
+    val radius = if (nbLineCA * 1.1 < nbColCA) radiusSqrt else (radiusSqrt * nbColCA) / (nbLineCA * 1.4)
     //the height should be around 1/sqrt2 the width
     assert(radius > 0, "not enough space to draw voronoi")
     //computation of point location in 2D space
-    val vertices = createPoints(nbRow, nbCol)
-    val deltax = 2 * radius;
+    val vertices = createPoints(nbLineCA, nbColCA)
+    val deltax = 2 * radius
     val deltay = Math.sqrt(3) * radius
     val bb = (
-      ((nbCol - 1) * deltax + deltax / 2).toInt,
-      ((nbRow - 1) * deltay).toInt): Dimension
-    for (i <- 0 until nbRow) {
+      ((nbColCA - 1) * deltax + deltax / 2).toInt,
+      ((nbLineCA - 1) * deltay).toInt): Dimension
+    for (i <- 0 until nbLineCA) {
       val startx = if (i % 2 == 0) 0 else deltax / 2
-      for (j <- 0 until nbCol)
+      for (j <- 0 until nbColCA)
         vertices(i)(j) = Some(new Vector2D(startx + j * deltax, i * deltay))
     }
     //computation of relative neighboring relationship
     val even: Array[(Int, Int)] = Array((0, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0))
     val odd: Array[(Int, Int)] = Array((0, 1), (1, 1), (1, 0), (0, -1), (-1, 0), (-1, 1))
-    val neighbors: Array[Array[Array[(Int, Int)]]] = Array.ofDim[(Int, Int)](6, nbRow, nbCol)
-    for (i <- 0 until nbRow)
-      for (j <- 0 until nbCol)
+    val neighbors: Array[Array[Array[(Int, Int)]]] = Array.ofDim[(Int, Int)](6, nbLineCA, nbColCA)
+    for (i <- 0 until nbLineCA)
+      for (j <- 0 until nbColCA)
         for (d <- 0 until 6)
           neighbors(d)(i)(j) = if (i % 2 == 0) even(d) else odd(d)
-    //encoding and decoding differs significantly, depending wether the number of columns is bigger than 30 or not
 
-    if (nbCol >= 30)
-      new Medium(nbRow, nbCol, bb, vertices, neighbors) {
+    //encoding and decoding differs , depending wether the number of columns is bigger than 30 or not
+    if (nbColCA >= 30)
+      new Medium(nbLineCA, nbColCA, bb, vertices, neighbors) {
         assert(nbColCA % 30 == 0, "nbCol is a multiple of 30")
         /** number of ints needed storing the booleans of one bit plane of the CA memory */
-        override val nbInt32 = (nbLineCA * (nbColCA)) / 30
+        override val nbInt32: Int = (nbLineCA * nbColCA) / 30
         /** the number of "macro columns, two if nbColumn=60" */
-        val nbBlock = nbColCA / 30
+        val nbBlock: Int = nbColCA / 30
         /** we need to insert one integer as a buffer between each macro columns, plus two before and one after */
-        override val nbInt32CAmem = (nbLineCA + 1) * nbBlock + 2
-        override val prepareShift = new PrShift {
-          override def prepareShift(h: Array[Int]): Unit = {
-            val blockSizeInterleaved = nbLineCA + 1
-            val nbInt32total: Int = nbBlock * blockSizeInterleaved //we have to take the interleaved space into account
-            val nbInnerLoop: Int = nbBlock
-            for (i <- 0 until nbInnerLoop)
-              for (j <- i * blockSizeInterleaved until (i + 1) * blockSizeInterleaved) {
-                UtilJava.propagateBit1and30(h, 1 + j, 1 + (j + blockSizeInterleaved) % nbInt32total)
-              }
-          }
+        override val nbInt32CAmem: Int = (nbLineCA + 1) * nbBlock + 2
+        override val propagate4Shift: PrShift = (h: Array[Int]) => {
+          val blockSizeInterleaved = nbLineCA + 1
+          val nbInt32total: Int = nbBlock * blockSizeInterleaved //we have to take the interleaved space into account
+          val nbInnerLoop: Int = nbBlock
+          for (i <- 0 until nbInnerLoop)
+            for (j <- i * blockSizeInterleaved until (i + 1) * blockSizeInterleaved) {
+              UtilBitJava.propagateBit1and30(h, 1 + j, 1 + (j + blockSizeInterleaved) % nbInt32total)
+            }
         }
 
         /**
@@ -492,7 +492,7 @@ object Medium {
         override def decode(memCAint32: Array[Int], memCAbool: Array[Array[Boolean]]): Unit = {
           val tmp = copyArray(memCAint32)
           unInterleaveSpace(tmp, nbBlock, nbLineCA)
-          for (i <- (0 until nbLineCA)) { //we iterate on the CA lines
+          for (i <- 0 until nbLineCA) { //we iterate on the CA lines
             intsToLine(tmp, memCAbool(i), i * nbBlock, min((i + 1) * nbBlock, nbInt32), nbBlock, nbLineCA)
             /** how much do we need to rotate right */
             val shift = (i / 2) % nbColCA
@@ -501,27 +501,30 @@ object Medium {
         }
       }
     //one int32 stores one or several sub= line, encoded on 30 of its bits
-    else new Medium(nbRow, nbCol, bb, vertices, neighbors) {
-      assert(32 % (nbColCA + 2) == 0 && (nbLineCA * (nbColCA + 2)) % 32 == 0, "nbCol must be  6 or 14, all the int32 are used completely")
+    else new Medium(nbLineCA, nbColCA, bb, vertices, neighbors) {
+      val nbLignePerInt32 = 32 / (nbColCA + 2)
+      assert((nbColCA == 6 || nbColCA == 8 || nbColCA == 14) && (nbLineCA % nbLignePerInt32) == 0, "nbCol must be  6, 8 or 14, all the int32 are used completely")
       /** number of ints needed storing the booleans of one bit plane of the CA memory */
-      override val nbInt32 = (nbLineCA * (nbColCA + 2)) / 32 //for each lines, we need two separating bits
+      override val nbInt32: Int = nbLineCA / nbLignePerInt32 //for each lines, we need two separating bits
       /** number of Int32 needed for one bit plan of the CA memory **/
       override def nbInt32CAmem: Int = 3 + nbInt32 //we need two extra int32 before and one int32 after.
-      override val prepareShift = new PrShift() {
-        def prepareShift(t: Array[Int]): Unit = {
+      override val propagate4Shift: PrShift = new PrShift() {
+        def propagate4shift(t: Array[Int]): Unit = {
           val last = t(t.length - 2) //last integer
-          val first = t(2) //first integer
-          t(1) = last >>> (nbColCA + 2)
-          t(t.length - 1) = first << (nbColCA + 2)
-          if (nbColCA == 6) { //we start by computing  the very first h[1] and very last  h[h.length - 2] integer. normal bits start at h[2]
-            for (i <- 1 until t.length)
-              UtilJava.propagateBit6and1(t, i)
-          }
-          else if (nbColCA == 14) {
-            for (i <- 1 until t.length)
-              UtilJava.propagateBit14and1(t, i)
+          val first = t(2) //first integer. normal bits start at t[2]
+          t(1) = last >>> (nbColCA + 2) //we start by computing  the very first integer t[1]
+          t(t.length - 1) = first << (nbColCA + 2) //and then the very last integer t[t.length - 2]
 
-          }
+          val masks: Map[Integer, Integer] = UtilBitJava.mask.asScala.toMap
+          val m: Integer = masks(new Integer(nbColCA)).toInt
+          for (i <- 1 until t.length)
+            t(i) = propagateBitxand1(t(i), nbColCA, m)
+          /*for(i <- 1 until t.length)
+            if(nbColCA==6)propagateBit6and1(t,i)
+            else propagateBit14and1(t,i)
+*/
+
+
         }
       }
       //PrepareShift.prepareShiftGte30
@@ -572,9 +575,8 @@ object Medium {
   private def createPoints(h: Int, w: Int): pointLines = Array.ofDim[Option[Vector2D]](h, w)
 
   private def copyArray(t: Array[Int]): Array[Int] = {
-    val tmp = Array.ofDim[Int](t.size) //we use tmp when decoding in order to to avoid modify the CA memory
-    for (i <- 0 until t.size)
-      tmp(i) = t(i)
+    val tmp = Array.ofDim[Int](t.length) //we use tmp when decoding in order to to avoid modify the CA memory
+    t.copyToArray(tmp)
     tmp
   }
 
@@ -585,11 +587,11 @@ object Medium {
 
   /**
    *
-   * @param tuple
-   * @param tuple1
+   * @param tuple  first tuple
+   * @param tuple1 second tuple
    * @return summ of tuples
    */
-  def add2(tuple: (Int, Int), tuple1: (Int, Int)) = (tuple._1 + tuple1._1, tuple._2 + tuple1._2)
+  private def add2(tuple: (Int, Int), tuple1: (Int, Int)) = (tuple._1 + tuple1._1, tuple._2 + tuple1._2)
 
   /**
    *
@@ -597,7 +599,7 @@ object Medium {
    * @param n  maximum allowed
    * @return true if 0<=ni<=n
    */
-  def insideInterval(ni: Int, n: Int) = 0 <= ni && ni< n
+  private def insideInterval(ni: Int, n: Int) = 0 <= ni && ni < n
 
 
 }

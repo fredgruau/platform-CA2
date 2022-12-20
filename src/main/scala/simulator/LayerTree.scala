@@ -1,67 +1,44 @@
 package simulator
 
-import java.awt.Color
-
-import scalaswingcontrib.tree.{ExternalTreeModel, InternalTreeModel, Tree, TreeModel}
-
-import scala.swing.{Action, BorderPanel, Button, Component, Dimension, GridPanel, Label, MainFrame, ScrollPane, SimpleSwingApplication, Swing, TabbedPane}
 import compiler.V
-//import javax.swing.Renderer
-import javax.swing.event.{TreeExpansionEvent, TreeExpansionListener}
-import scalaswingcontrib.tree.Tree.Path
 import scalaswingcontrib.tree.{Tree, TreeModel}
+import scalaswingcontrib.tree.Tree.{Path, Renderer}
+import simulator.ExampleData._
 import simulator.XMLutilities.extractNodeText
-import Tree.{Renderer}
 
+import javax.swing.event.{TreeExpansionEvent, TreeExpansionListener}
 import scala.swing.event.MouseClicked
 import scala.xml.{Node, Text}
 
-
-import scala.swing._
-import Swing._
-import scala.collection.immutable.HashMap
-import scala.swing.{Dimension}
-import scala.xml.XML
-
 /**
- * Allows to browse the layer
+ * Tree swing component, allowing  to easily browse the layer and select layers for display
  *
  * @param xmlLayerTree fixed file, containing the layer structure
- * @param controller
+ * @param controller   the controller
  */
 class LayerTree(val xmlLayerTree: Node, val controller: Controller) extends Tree[Node] with TreeExpansionListener {
-  //  former version model = TreeModel(xmlDoc)(_.child filterNot (_.text.trim.isEmpty))
-  // preferredSize = (width,height): Dimension
-  //background = Color.lightGray
-
-  import Simulator.ExampleData._
-
-  model = TreeModel(xmlLayerTree)(_.child filterNot (_.isInstanceOf[Text]))
-  renderer = Renderer.labeled[Node] { n =>
+  model = TreeModel(xmlLayerTree)(_.child filterNot (_.isInstanceOf[Text])) //text are also nodes, we do not want those
+  renderer = Renderer.labeled[Node] { n => //
     val icon =
-      if (controller.colorDisplayedField.contains(extractNodeText(n)))
-        new DiamondIcon(V(), controller.colorDisplayedField(extractNodeText(n)), true)
-      else if (isLayer((n))) folderIcon
-      else fileIcon
-    (icon, extractNodeText(n))
+      if (controller.colorDisplayedField.contains(extractNodeText(n))) //test if the field is to be displayed
+      new DiamondIcon(V(), controller.colorDisplayedField(extractNodeText(n)), true) //if so displays its color, diamond should be different depending on  locus
+      else if (isLayer(n)) folderIcon //layers contains other layers, therefore they display as folder
+      else fileIcon //those are not yet displayed field
+    (icon, extractNodeText(n)) //we also display layers or field's name
   }
-  // if (n.label startsWith "#") n.text.trim   else /*n.label + ":" +*/
-
-
-  //we use javax swing for listening to expansion event, because we failed to use scala swing
-  peer.addTreeExpansionListener(this)
+  peer.addTreeExpansionListener(this) //we had to resort to directly use javax swing for listening to expansion event, because we failed to use scala swing
 
   listenTo(mouse.clicks)
   reactions += {
     case MouseClicked(_, pp, _, _, _) =>
-      val p = peer.getPathForLocation(pp.x, pp.y) //Jtree utility that allows to retrieve the node clicked
+      val p = peer.getPathForLocation(pp.x, pp.y) //we resorted to that Jtree utility that allows to retrieve the node clicked
       if (p != null && p.last.label == "field") { //only field"s node can have a color
         val s = extractNodeText(p.last)
-        println("mouseClick  " + s)
-        publish(new ToggleColorEvent(s)) //forward the event to the controller in a clean way.
+        // println("mouseClick  " + s)
+        publish(ToggleColorEvent(s)) //forward the event to the controller in a clean way, so that it can update what is dipalayed.
       }
   }
-  expandExpandedDescendant(xmlLayerTree, Vector(xmlLayerTree)) //Vector(xmlDoc) is the pasth to xmlDoc
+  expandExpandedDescendant(xmlLayerTree, Vector(xmlLayerTree)) //exands already expanded node. Vector(n) is the path to n.
 
   private def isLayer(n: Node): Boolean = n.label == "layer"
 
@@ -75,7 +52,7 @@ class LayerTree(val xmlLayerTree: Node, val controller: Controller) extends Tree
    * @param p path to that node
    *          check if the layers encoded by t where already expanded in a previour run, and if so, expands them directly
    */
-  def expandExpandedDescendant(t: Node, p: Path[Node]): Unit = {
+  private def expandExpandedDescendant(t: Node, p: Path[Node]): Unit = {
     val layerName = extractNodeText(t)
     if (controller.expandedLayers.contains(layerName)) {
       expandPath(p)
@@ -83,6 +60,5 @@ class LayerTree(val xmlLayerTree: Node, val controller: Controller) extends Tree
         expandExpandedDescendant(c, p :+ c)
     }
   }
-
 
 }

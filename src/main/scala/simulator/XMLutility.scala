@@ -56,6 +56,9 @@ object XMLutilities {
   def xInt(node: scala.xml.Node, tag: String, attrb: String) =
     x(node, tag, attrb).toInt
 
+  def xBool(node: scala.xml.Node, tag: String, attrb: String) =
+    x(node, tag, attrb).toBoolean
+
 
   def fromXMLasHashMap(node: scala.xml.Node, tag: String, attrb: String): Map[String, String] = {
     val node2 = (node \\ tag).head

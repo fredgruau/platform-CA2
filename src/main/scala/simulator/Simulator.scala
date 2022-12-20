@@ -1,26 +1,18 @@
 package simulator
 
-import java.awt.Polygon
-
-import compiler.Locus
-import simulator.DynamicClassUtility._
-import triangulation.{Medium, Vector2D}
-
-import scala.collection.JavaConverters._
-import scala.collection.immutable.HashMap
-import scala.swing.Swing.{Icon, pair2Dimension}
-import scala.swing._
-import java.awt.Color
+import simulator.SimulatorUtil._
+import simulator.XMLutilities._
+import triangulation.Vector2D
+import java.awt.{Color, Polygon}
 import java.net.URL
-
-import javax.swing.{ImageIcon}
-import simulator.Simulator.CAtype.CAMem
-import simulator.XMLutilities.{xInt, _}
-
+import javax.swing.ImageIcon
+import scala.swing.Swing.Icon
+import scala.swing._
 import scala.xml.Node
+import BorderPanel.Position._
 
 object Simulator extends SimpleSwingApplication {
-  /** name of Cellular automaton being simulated */
+  /** name of Cellular automaton being simulated, to be set by method startUp, and then used by method top */
   var nameCA: String = " "
 
   /**
@@ -34,51 +26,104 @@ object Simulator extends SimpleSwingApplication {
     super.startup(args)
   }
 
-  /**
-   *
-   * @param args command line argument, contains the name of CA being simulated
-   */
+  /** @param args command line argument, contains the name of CA being simulated */
   override def main(args: Array[String]): Unit = {
     super.main(args)
   }
 
-
-  /**
-   *
-   * @param param      contains parameters
-   * @param sizes      the different posible CA sizes
-   * @param CAwidth    how many pixelx in width are available
-   * @param CAmemWidth how many memory bit planes in the CA
-   * @param controller the controler
-   * @return we generates all the env in a separate method because it is big
-   */
-  def envs(param: Node, sizes: collection.Seq[(Int, Int)], CAwidth: Int, CAmemWidth: Int, controller: Controller): Iterable[Env] = {
-    /**
-     *
-     * @return total number of Int32 needed for one bit plan of the CA memory
-     */
-    def nbInt32CAmem(nbLineCA: Int, nbColCA: Int): Int = {
-      if (nbColCA <= 30) { //one int32 stores one or several sub= line, encoded on 30 of its bits
-        assert(30 % nbColCA == 0 && (nbLineCA * nbColCA) % 30 == 0, "nbCol divides 30")
-        2 + (nbLineCA * nbColCA) / 30 //we need an extra int32, Before and after.
+  /** hierarchy of swing Jcomponents */
+  def top: MainFrame = new MainFrame {
+    title = "spatial computation"
+    /** contains XML code representing many parameters */
+    val paramCA: Node = readXML("src/main/scala/compiledCA/" + nameCA + "param.xml")
+    //  preferredSize = new Dimension(xInt(param,"display","@width"),xInt(param,"display","@height"))
+    //size = (1024, 768): Dimension
+    val classCA: Class[CAloops] = loadClass("compiledCA." + nameCA)
+    /** contains the loops but also many other parameters */
+    val progCA: CAloops = getProg(classCA)
+    /** process the signal we create controller first in order to instanciate state variable used by tree */
+    val controller = new Controller(nameCA, paramCA, progCA)
+    /** Tree for browsing the hierarchy of layers and which field to display */
+    val layerTree = new LayerTree((paramCA \\ "layers").head, controller)
+    val scrollableXmlTree = new ScrollPane(layerTree) //we put it scrollable because it can become big
+    controller.init(layerTree) //now we can pass it to the controller which needs to listen to exansion and coloration events
+    /** When simulating CAs whose number of Lines and columns augment */
+    val sizesCA: collection.Seq[(Int, Int)] = fromXMLasListIntCouple(paramCA, "sizes", "size", "@nbLine", "@nbCol")
+    /** We simulate several CA simultaneously. We generate a list of environement using an iterator */
+    val iterEnvs: Iterable[Env] = envs(sizesCA, controller)
+    /** pannels are put together in a  Grid using the GridBagPannel container, which allows to fill muliple lines */
+    val pannels: GridBagPanel = new GridBagPanel {
+      /** helper supplying default values for specifying where to put the pannel, and how many columns it will span */
+      def constraints(x: Int, y: Int, gridwidth: Int = 1, fill: GridBagPanel.Fill.Value = GridBagPanel.Fill.None): Constraints = {
+        val c = new Constraints
+        c.gridx = x;
+        c.gridy = y
+        c.gridwidth = gridwidth;
+        c.fill = fill
+        c
       }
-      else { //symetric case: we need nbInt32 ints, to store one line of the CA
-        assert(nbColCA % 30 == 0, "nbCol is a multiple of 30")
-        val nbIntColCA = nbColCA / 30 //the number of "macro columns"
-        (nbLineCA + 1) * nbIntColCA + 1 //we need to insert one integer has a buffer between each macro columns, plus one before and one after
+
+      var numEnv = 0
+      var numCell = 0
+      //how many columns
+      val nbColPannel: Int = xInt(paramCA, "display", "@nbCol")
+      for (env <- iterEnvs) {
+        controller.envList = controller.envList :+ env //we will need to acess the list of env, from the controler
+        env.pannel = new CApannel(controller.CAwidth, controller.CAheight, env, progCA) // the number of CAlines is 1/ sqrt(2) the number of CA colomns.
+        if (sizesCA(numEnv)._2 >= 30) { // if the CA has too many columns, it get displayed on multiple columns
+          assert(numCell % nbColPannel == 0, "you must garantee that CA whose number of columns is >=30 are displayed on multiple of nbColPannel")
+          add(env.pannel, constraints(numCell % nbColPannel, numCell / nbColPannel, nbColPannel, GridBagPanel.Fill.Horizontal)) //adds the pannel using the Grid layout (GridBagPnnel)
+          numCell += nbColPannel
+        }
+        else { //adds the pannel in a signel cell
+          add(env.pannel, constraints(numCell % nbColPannel, numCell / nbColPannel))
+          numCell += 1
+        }
+        numEnv += 1
       }
     }
+    val scrollablPannels = new ScrollPane(pannels) // we generate many pannels and the mouse wheel will allow to easily scroll
+    /** this way of doing make the toolbar floatable */
+    contents = new BorderPanel {
+      layout(scrollableXmlTree) = West
+      layout(controller) = North
+      layout(scrollablPannels) = Center
+    }
 
+  }
+}
+
+object ExampleData {
+  // retrieve  icons stored in the ressources directory
+  //  def getIconUrl(path: String): URL = resourceFromClassloader(path) ensuring(_ != null, "Couldn't find icon " + path)
+  val fileIcon: ImageIcon = Icon("src/ressources/file.png")
+  val folderIcon: ImageIcon = Icon("src/ressources/folder.png")
+  val playNormalIcon: ImageIcon = Icon("src/ressources/play_black.gif")
+  val pauseNormalIcon: ImageIcon = Icon("src/ressources/pause_black.gif")
+  val forwardIcon: ImageIcon = Icon("src/ressources/skip_forward_black.gif")
+  val backwarddIcon: ImageIcon = Icon("src/ressources/skip_backward_black.gif")
+  val initIcon: ImageIcon = Icon("src/ressources/rewind_black.gif")
+}
+
+object SimulatorUtil {
+  /**
+   *
+   * @param sizes      the different posible CA sizes
+   * @param controller the controler
+   * @return we generates  the env Iterator in a separate method because it is big
+   */
+  def envs(sizes: collection.Seq[(Int, Int)], controller: Controller): Iterable[Env] = {
+    val param = controller.paramCA
     new Iterable[Env] {
       val iterator: Iterator[Env] = new Iterator[Env] {
         var nbIter = 0 //counter
         /** the parameter on which we iterate */
-        val iter = x(param, "display", "@iter") //what we iterate on
+        val iter: String = x(param, "display", "@iter") //what we iterate on
         /** coded as a double so that we do not loose precision when multiplying by sqrt(2) */
         var nbLineCA: Int = xInt(param, "machine", "@nbLine")
         var nbColCA: Int = xInt(param, "machine", "@nbCol")
         /** coded as a method because when iterating through the CAsizes, nbColCA is modified */
-        val arch = x(param, "machine", "@arch")
+        val arch: String = x(param, "machine", "@arch")
 
         /** @return `true` if there is a next element, `false` otherwise */
         override def hasNext: Boolean = iter match {
@@ -91,114 +136,45 @@ object Simulator extends SimpleSwingApplication {
             case "CAsize" => nbLineCA = sizes(nbIter)._1; nbColCA = sizes(nbIter)._2
           } //inital value of nbLineCA
           nbIter = nbIter + 1
-          new Env(arch, nbLineCA, nbColCA, CAwidth, controller, 0)
+          new Env(arch, nbLineCA, nbColCA, controller, 0)
         }
       }
     }
   }
 
-
-
-  /** hierarchy of swing widget */
-  def top: MainFrame = new MainFrame {
-    title = "spatial computation"
-    val param: Node = readXML("src/main/scala/compiledCA/" + nameCA + "param.xml")
-    //  preferredSize = new Dimension(xInt(param,"display","@width"),xInt(param,"display","@height"))
-    //size = (1024, 768): Dimension
-    val classCA: Class[CAloops] = loadClass("compiledCA." + nameCA)
-    val progCA: CAloops = getProg(classCA)
-
-    def CAmemWidth = progCA.CAmemWidth() //shortcut that increases lisibility
-    /** process the signal we create controller first in order to instanciate state variable used by tree */
-    val controller = new Controller(nameCA, param, progCA)
-    //val xmLayerHierarchy: Node = readXML("src/main/scala/compiledCA/" + nameCA + "layer.xml")
-    val xmLayerHierarchy: Node = (param \\ "layers").head
-
-
-    /** Tree for browsing the hierarchy of layers and which field to display */
-    val layerTree = new LayerTree(xmLayerHierarchy, controller)
-    val scrollableXmlTree = new ScrollPane(layerTree) //we put it scrollable because it can become big
-    controller.init(layerTree)
-
-    /** this is for the display, this is not the number of lines and columns. */
-    val CAwidth = xInt(param, "display", "@CAwidth")
-    val CAheight = xInt(param, "display", "@CAheight")
-    val sizes: collection.Seq[(Int, Int)] = fromXMLasListIntCouple(param, "sizes", "size", "@nbLine", "@nbCol")
-
-    val iterEnvs: Iterable[Env] = envs(param, sizes, CAwidth, CAmemWidth, controller)
-
-    val pannels = new GridBagPanel {
-      def constraints(x: Int, y: Int, gridwidth: Int = 1,
-                      fill: GridBagPanel.Fill.Value = GridBagPanel.Fill.None): Constraints = {
-        val c = new Constraints;
-        c.gridx = x;
-        c.gridy = y;
-        c.gridwidth = gridwidth
-        c.fill = fill
-        c
-      }
-
-      var numEnv = 0
-      val nbColPannel = xInt(param, "display", "@nbCol")
-      for (env <- iterEnvs) {
-        controller.envList = controller.envList :+ env //we will need to acess the list of env, from the controler
-        env.pannel = new CApannel(CAwidth, (CAwidth / Math.sqrt(2)).toInt, env, progCA)
-        if (numEnv == 2) {
-          add(env.pannel, constraints(numEnv % nbColPannel, numEnv / nbColPannel, 2, GridBagPanel.Fill.Horizontal)) //adds the pannel using the Grid layout (GridBagPnnel)
-          numEnv += 1
-        }
-        else
-          add(env.pannel,
-            constraints(numEnv % nbColPannel, numEnv / nbColPannel)) //adds the pannel using the Grid layout (GridBagPnnel)
-        numEnv += 1
-      }
+  /**
+   *
+   * @param path where to find a compiledCA */
+  def loadClass(path: String): Class[CAloops] = {
+    var res: Class[CAloops] = null;
+    try {
+      res = Class.forName(path).asInstanceOf[Class[CAloops]];
     }
-
-    val scrollablPannels = new ScrollPane(pannels)
-    /*
-        val forwardButton = myButton(ExampleData.forwardIcon, controller)
-        val toolBar = new ToolBar() {
-          peer.setRollover(true)
-          contents += forwardButton
-        }*/
-
-    contents = new BorderPanel {
-
-      import BorderPanel.Position._
-
-      layout(scrollableXmlTree) = West
-      layout(controller) = North //controller takes O room
-      // layout(toolBar) = North
-      layout(scrollablPannels) = Center
+    catch {
+      case e: ClassNotFoundException =>
+        System.out.println("la classe " + path + " n'existe même pas");
     }
-    //contents=new ScrollPane(xmlTree)
-    // contents= new SplitPane(Orientation.Vertical, new ScrollPane(xmlTree){preferredSize = (1024, 768): Dimension}, new Controller(xmlTree)) {  continuousLayout = true  }
-    //This setting allows go insert the contoler as a pannel, without wasting space
-    //contents=new FlowPanel{ contents+=new ScrollPane(xmlTree);contents+=controller}
+    return res;
   }
 
-  object ExampleData {
-    // File system icons
-    def getIconUrl(path: String): URL = resourceFromClassloader(path) ensuring(_ != null, "Couldn't find icon " + path)
-
-    // val fileIcon = Icon(getIconUrl("/scalaswingcontrib/test/images/file.png"))
-    //   val folderIcon = Icon(getIconUrl("/scalaswingcontrib/test/images/folder.png"))
-    val fileIcon: ImageIcon = Icon("src/ressources/file.png")
-    val folderIcon: ImageIcon = Icon("src/ressources/folder.png")
-    val playNormalIcon = Icon("src/ressources/play_black.gif")
-    val pauseNormalIcon = Icon("src/ressources/pause_black.gif")
-    val forwardIcon = Icon("src/ressources/skip_forward_black.gif")
-    val backwarddIcon = Icon("src/ressources/skip_backward_black.gif")
-    val initIcon = Icon("src/ressources/rewind_black.gif")
+  def getProg(progClass: Class[CAloops]): CAloops = {
+    var res: CAloops = null
+    try res = progClass.newInstance
+    catch {
+      case e: InstantiationException =>
+        e.printStackTrace()
+      case e: IllegalAccessException =>
+        e.printStackTrace()
+    }
+    res
   }
-
+}
   /** contains the types used in the simulator */
   object CAtype {
     /** stores all the memory fields of a CA */
     type CAMem = Array[Array[Int]]
     /** defines the value of one bit for all vertices, or for one subfield of all edges, face or transfer locus */
     type pointLines = Array[Array[Option[Vector2D]]]
-
     /** allows to reuse the same code for displaying or for generating svg */
     trait myGraphics2D {
       def setColor(c: Color): Unit
@@ -209,4 +185,4 @@ object Simulator extends SimpleSwingApplication {
     }
 
   }
-}
+

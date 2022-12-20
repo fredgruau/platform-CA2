@@ -1,6 +1,7 @@
 package simulator
 
 import org.scalatest.{BeforeAndAfter, FunSuite}
+import triangulation.Medium
 import triangulation.Utility._
 
 import scala.util.Random
@@ -67,22 +68,36 @@ class TestEncodeDecode extends FunSuite with BeforeAndAfter {
     unInterleaveSpace(a, 2, 4)
     assert(a.toList.dropRight(3) == b.toList)
   }
-  test("encodeDecodeInterleavedRorate<=32") {
-    val lCAinput = Array.ofDim[Boolean](10, 15)
+  test("encodeDecode<=32") {
+    val lCAinput = Array.ofDim[Boolean](12, 14)
     randomFill(lCAinput)
-    val lCAoutput = Array.ofDim[Boolean](10, 15)
-    val lCAmem = Array.ofDim[Int](7)
-    encodeInterleavRot(10, 15, lCAinput, lCAmem)
-    decodeInterleavRot(10, 15, lCAmem, lCAoutput)
+    val lCAoutput = Array.ofDim[Boolean](12, 14)
+    val lCAmem = Array.ofDim[Int](9)
+    val m = Medium(12, 14, 30)
+    m.encode(lCAinput, lCAmem)
+    m.decode(lCAmem, lCAoutput)
     assert(list(lCAinput) == list(lCAoutput))
   }
-  test("encodeDecodeInterleavedRorateSingleInt") {
-    val lCAinput = Array.ofDim[Boolean](6, 5)
+
+  test("encodeDecodeSingleInt") {
+    val lCAinput = Array.ofDim[Boolean](4, 6)
     randomFill(lCAinput)
-    val lCAoutput = Array.ofDim[Boolean](6, 5)
+    val lCAoutput = Array.ofDim[Boolean](4, 6)
     val lCAmem = Array.ofDim[Int](4)
-    encodeInterleavRot(6, 5, lCAinput, lCAmem)
-    decodeInterleavRot(6, 5, lCAmem, lCAoutput)
+    val m = Medium(4, 6, 30)
+    m.encode(lCAinput, lCAmem)
+    m.decode(lCAmem, lCAoutput)
+    assert(list(lCAinput) == list(lCAoutput))
+  }
+
+  test("encodeDecodetwoInt") {
+    val lCAinput = Array.ofDim[Boolean](6, 8)
+    randomFill(lCAinput)
+    val lCAoutput = Array.ofDim[Boolean](6, 8)
+    val lCAmem = Array.ofDim[Int](5)
+    val m = Medium(6, 8, 30)
+    m.encode(lCAinput, lCAmem)
+    m.decode(lCAmem, lCAoutput)
     assert(list(lCAinput) == list(lCAoutput))
   }
 
@@ -101,10 +116,10 @@ class TestEncodeDecode extends FunSuite with BeforeAndAfter {
   test("exchangeOand31") {
     val input = -4 >>> 1 //01111111111111111111111111111110
     val T = Array(input)
-    UtilJava.propagateBit1and30(T, 0, 0)
+    UtilBitJava.propagateBit1and30(T, 0, 0)
     assert(T(0) == -1)
     val T2 = Array(input, input)
-    UtilJava.propagateBit1and30(T2, 0, 1)
+    UtilBitJava.propagateBit1and30(T2, 0, 1)
     assert(T2(0) == -1 >>> 1) //01111111111111111111111111111111
     assert(T2(1) == -2) //11111111111111111111111111111110
   }

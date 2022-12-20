@@ -2,8 +2,8 @@
         <fixed>
             <machine nbCol="15" nbLine="10" arch="christal"/>
             //default CA size and architecture
-            <display nbCol="2" CAwidth="700" CAheight="400" iter="CAsize"/>
-            <simul t0="0 "/>
+            <display nbCol="2" CAwidth="650" iter="CAsize"/>
+            <simul isPlaying="false" t0="0"/>
             <inits>
                 <layer init="center">llseed</layer>
                 <layer init="border">tmp1</layer>
@@ -13,9 +13,10 @@
                 <layer init="def">defVe</layer>
             </inits>
             <sizes>
-                <size nbLine="4" nbCol="6"/>
+                <size nbLine="6" nbCol="8"/>
                 <size nbLine="12" nbCol="14"/>
                 <size nbLine="12" nbCol="30"/>
+                <size nbLine="12" nbCol="60"/>
             </sizes>
             <layers>seed
                 <field>llseed</field>
