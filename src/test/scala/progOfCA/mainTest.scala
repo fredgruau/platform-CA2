@@ -1,4 +1,4 @@
-package prog
+package progOfCA
 
 import compiler.AST._
 import compiler.ASTL._

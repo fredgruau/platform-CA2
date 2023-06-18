@@ -1,0 +1,8 @@
+public final class {{NAMECA}}CA implements CAloops2 {
+    public int CAmemWidth() {  return {{MEMWIDTH}}}}    }
+@Override   public HashMap<String, List<Integer>> fieldOffset() {
+        HashMap<String, List<Integer>> map = new HashMap<>();
+        map.put("defVe",li(1,2,3,4,5,6));
+        map.put("llseed",  li(7));   map.put("E", li(8,9,10));  return (map);  }}
+
+

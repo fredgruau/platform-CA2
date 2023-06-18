@@ -25,6 +25,8 @@
                 <field>defE</field>
                 <field>defF</field>
                 <field>defVe</field>
+                <field>existE</field>
+                <field>existV</field>
             </layers>
         </fixed>
     <expandedLayer>
@@ -35,6 +37,9 @@
     <colorOfField>
         <layer color="0x0080FF">
             llseed
+        </layer>
+        <layer color="0x8000FF">
+            existV
         </layer>
     </colorOfField>
 </paramCA>

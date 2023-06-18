@@ -381,7 +381,7 @@ case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) exte
           //we build the correspondance from formal paramter to effective
           var params: iTabSymb[String] = HashMap()
           for ((pdata, exp) <- fun.paramD zip exps) {
-            val nameOp = exp.asInstanceOf[Read[_]].which
+            val nameOp: String = exp.asInstanceOf[Read[_]].which
             params = params + (pdata -> nameOp)
           }
           for ((pres, name) <- fun.paramR zip names) {
@@ -745,7 +745,7 @@ object Instr {
    *
    * @param n  name of integer parameter
    * @param nb number of bits of integer
-   * @return list of names, of for each bit, obtained by appending the bit.
+   * @return list of names, one for each bit, obtained by appending the bit index.
    *         if name was already a boolean, nothing is changed.
    */
   def deployInt(n: String, nb: Int): List[String] =

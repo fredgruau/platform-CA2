@@ -22,7 +22,6 @@ class Voronoi(val center: Vector2D) {
   def resetColor() = color = Color.black;
 
 
-  var bug = false
   var discontinuousTriangle = false
   var triangles: List[Triangle2D] = List()
 
@@ -50,19 +49,24 @@ class Voronoi(val center: Vector2D) {
         res = first :: res
       }
     } while (withCommonSideBefore.nonEmpty)
-
     if (triangleLeft.nonEmpty) //first has no triangle neighbor before, we must be on the points convex hull
     do {
-      val (List(newLast), t2s) = triangleLeft.partition(_.b == last.c) //we know there should be exactly one element matching
+      val (lt1, t2s) = triangleLeft.partition(_.b == last.c) //we know there should be exactly one element matching
+      // val (lt1, t2s) = triangleLeft.partition( (t: Triangle2D)=>quasiEqual2(t.b ,last.c) )//we know there should be exactly one element matching
+      if (lt1.size != 1)
+        System.out.print("problem Order triangle")
+      val newLast = lt1.head
       res2 = newLast :: res2;
       triangleLeft = t2s;
       last = newLast
     } while (triangleLeft.nonEmpty)
     if (first.b != last.c) //the triangles around the voronoi's center do not form a ring,
-    discontinuousTriangle = true // the center of the polygon is onconvex hull of all the point
+      discontinuousTriangle = true // the center of the polygon is onconvex hull of all the point
     triangles = res ::: res2.reverse
 
   }
+
+  val epsilon = 0.000000000000000001
 
   import scala.collection.immutable.Set
 
@@ -171,7 +175,6 @@ class Voronoi(val center: Vector2D) {
 }
 
 object Voronoi {
-
   /**
    *
    * @param l list

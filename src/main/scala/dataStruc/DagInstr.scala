@@ -105,7 +105,9 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
     newAffect = affectExpList.map((e: AST[_]) => Affect(e.name, e))
     val rewrite: Instr => Instr = (i: Instr) => i.propagate(deDagRewrite) //replace the expression by a read(identifier)
     if (scheduleMatters) {
-      propagateUnitKeepSchedule(rewrite, newAffect); dag = null; this
+      newAffect = propagateUnitKeepSchedule(rewrite, newAffect).asInstanceOf[List[Affect[_]]];
+      dag = null;
+      this
     } //dagdag should be recomputed because the expressions have changed
     else propagateUnitKeepGenerators(rewrite, newAffect) //computes input and output neighbors
 

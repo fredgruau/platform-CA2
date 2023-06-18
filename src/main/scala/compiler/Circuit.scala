@@ -50,40 +50,40 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //  print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
 
     val prog3 = prog2.procedurIfy();
-    //   print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
+     //  print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
     val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
     //   print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
     val prog5: DataProg[InfoNbit[_]] = prog4.macroIfy();
-    //  print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
+    //    print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
-    //print("addParamRtoDagis255555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
+    //  print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
 
     val prog5ter = prog5bis.radiusify
-    //  print(prog5ter)
+    // print("radiusify555555555555555555555555555555\n"+prog5ter)
 
     val prog6 = prog5ter.unfoldSpace(m);
     //print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
 
     val prog7 = prog6.treeIfy(); //spatiall unfolding generates reused expression that need to be affected again
-    //  print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
+    //print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
     val prog7bis = prog7.simplify(); //this will remove id which are read only once.
-    // print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
+    //    print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
 
-    val prog8 = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
-    //   print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
+    val prog8: DataProg[InfoType[_]] = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
+    //print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
-    val prog10 = prog8.loopIfy()
-    //   print(prog10)
+    val prog10: DataProgLoop[InfoNbit[_]] = prog8.loopIfy()
+    //  print(prog10)
 
     val prog11 = prog10.unfoldInt()
-    //  print("\n" + prog11)
-
+    //  print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
     val prog12 = prog11.coaalesc()
-    print("\n121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212\n" + prog12)
+    print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc\n" + prog12)
+    print("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.javaCode)
   }
 }
 
@@ -128,29 +128,36 @@ object Circuit {
    */
 
   import ASTB.tm1
+
   val hexagon: Machine = (src: S, des: S, t: ArrArrAstBg) => {
     implicit val scalarType: repr[_ <: Ring] = t(0)(0).mym;
     src match {
       case V() => des match {
         case E() => /*eV->vE*/
-          val Array(e, ne, nw, w, sw, se) = t(0)
-          Array(Array(tm1(shiftL(w)), tm1(e)), Array(tm1(se), nw), Array(shiftL(tm1(sw)), ne)) //ici on pousse les tm1s vers la fin pour factoriser les tm1 dans transfer(broadcast) de V vers vE
-        case F() => /*fV->vF*/
-          val Array(ne, n, nw, sw, s, se) = t(0); Array(Array(n, tm1(sw), tm1(se)), Array(tm1(shiftL(s)), ne, shiftL(nw)))
+          // val Array(e, ne, nw, w, sw, se) = t(0)
+          val Array(e, se, sw, w, nw, ne) = t(0)
+          Array(Array(tm1(shiftL(w)), tm1(e)), Array(tm1(se), nw), Array(tm1(sw), shiftR(ne))) //ici on pousse les tm1s vers la fin pour factoriser les tm1 dans transfer(broadcast) de V vers vE
+        case F() => /*Vf->Fv*/
+          val Array(se, s, sw, nw, n, ne) = t(0);
+          Array(Array(n, tm1(shiftL(sw)), tm1(se)), Array(tm1(s), shiftR(ne), nw))
+        //Array(Array(n, tm1(sw), tm1(se)), Array(tm1(shiftL(s)), ne, shiftL(nw)))
       }
       case E() =>
-        val Array(Array(h1, h2), Array(d1, d2), Array(ad1, ad2)) = t; //common to vE and fE
+
         des match {
           case V() => /*vE->eV*/
-            Array(Array(h2, tm1(ad2), tm1(shiftR(d2)), shiftR(h1), shiftR(ad1), d1)) //ici au contraire on met tm1 au début pour factoriser les tm1 dans reduce(broadcast de vE vers V
+            val Array(Array(h1, h2), Array(d1, d2), Array(ad1, ad2)) = t;
+            Array(Array(h1, d1, ad1, shiftR(h2), tm1(d2), tm1(shiftL(ad2)))) //ici au contraire on met tm1 au début pour factoriser les tm1 dans reduce(broadcast de vE vers V
           case F() => /*fE->eF*/
-            Array(Array(tm1(h2), tm1(ad1), tm1(d1)), Array(h1, tm1(shiftL(ad2)), tm1(d2)))
+            val Array(Array(h1, h2), Array(d1, d2), Array(ad1, ad2)) = t; //todo consider renaming d and ad by o  and ao, 'o' for oblique
+            Array(Array(tm1(h2), tm1(shiftL(d1)), tm1(ad1)), Array(shiftR(h1), tm1((d2)), tm1(ad2)))
         }
       case F() => des match {
-        case V() => /*vF->fV*/
-          val Array(Array(dp, db1, db2), Array(up, ub1, ub2)) = t; Array(Array(tm1(ub1), tm1(dp), tm1(shiftR(ub2)), shiftR(db1), shiftR(up), db2))
+        case V() => /*Fv->Vf*/
+          val Array(Array(dp, db1, db2), Array(up, ub1, ub2)) = t; Array(Array(db2, up, shiftR(db1), tm1(ub2), tm1(dp), tm1(shiftL(ub1))))
         case E() => /*eF->fE*/
-          val Array(Array(db, ds1, ds2), Array(ub, us1, us2)) = t; Array(Array(tm1(ub), db), Array(ds2, us2), Array(ds1, shiftR(us1)))
+          val Array(Array(db, ds1, ds2), Array(ub, us1, us2)) = t;
+          Array(Array(tm1(shiftL(ub)), db), Array(ds2, us2), Array(us1, shiftR(ds1)))
       }
     }
   }

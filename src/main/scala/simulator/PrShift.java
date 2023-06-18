@@ -1,9 +1,11 @@
 package simulator;
-
+/**
+ * ann object implementing PrShift can do the computation needed for horizontal communication
+ */
 public interface PrShift {
+
     /**
-     * propagates bits on the CA memory, so that << and >>> need not do a rotation.
-     *
+     * bit level communication within the CA memory, so that << and >>> need only a shift instead of a rotation
      * @param h int32 CA memory
      */
     public void propagate4shift(int[] h);

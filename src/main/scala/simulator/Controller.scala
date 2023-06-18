@@ -21,7 +21,7 @@ import scala.xml.{Node, NodeSeq, XML}
  * @param paramCA mutable  because updated as we interact with display, and also stored
  * @param progCA  contains the code for the loops
  */
-class Controller(val nameCA: String, var paramCA: Node, val progCA: CAloops)
+class Controller(val nameCA: String, var paramCA: Node, val progCA: CAloops2)
   extends ToolBar() { //the controller inherits the toolBar, so that it can easily identifies which button was ckicqued, using the button's variable  name
   /** we need to know the locus of fields which are either displayed or initialized */
   val locusDisplayedOrDirectInitField: Map[String, Locus] = progCA.fieldLocus.asScala.toMap

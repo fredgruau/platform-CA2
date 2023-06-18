@@ -2,14 +2,18 @@ package simulator;
 
 import java.util.HashMap;
 
-//static functions used for bit manipulation
+/**
+ * static functions used for bit manipulation
+ */
 public class UtilBitJava {
+    /** mask(i) is true for the index of the bits that should be set through propagation from the right */
     public final static HashMap<Integer, Integer> mask = new HashMap<>();
 
     static {
         mask.put(new Integer(6), new Integer(0x01010101));
         mask.put(new Integer(8), new Integer(1 | 1 << 10 | 1 << 20));  //0x00100801)  0b00000000000100000000010000000001
         mask.put(new Integer(14), new Integer(0x00010001));
+        mask.put(new Integer(32), new Integer(0x00000001));
     }
 
     final static int maskRight = (1 << 31) - 1;  // 0|1111111111111111111111111111111
@@ -37,7 +41,6 @@ public class UtilBitJava {
      * nbColCA=6, each line of 6 bits from 1 to 6 has two empty bit slots: bit 0 and bit7
      * which are filled before the loop, in a toroidal way, using bit 6 and bit 1
      * this holds for the four lines stored in one int32
-     *
      * @param h CAmemory encoded in int32 bits
      * @param i index of cell where propagation takes place
      */
@@ -48,6 +51,14 @@ public class UtilBitJava {
         h[i] = h[i] & maskLeft8 | bitRight << 6;
     }
 
+    /**
+     * progagates in a generic way when supplied the appropriate mask
+     *
+     * @param v           integer containing multiple lines
+     * @param nbCol       number of colomns in the CA
+     * @param bitMaskx(i) is true for the index of the bits that should be set through propagation from the right
+     * @return
+     */
     public static int propagateBitxand1(int v, int nbCol, int bitMaskx) {
         int bitLeft = v & bitMaskx << nbCol;
         int bitRight = v & bitMaskx << 1;

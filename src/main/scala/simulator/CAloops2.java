@@ -11,13 +11,13 @@ import java.util.HashMap;
  * method that  should be produced by the compiler in order to describe a CA
  * on top of the program itself, in java, we find information needed to display
  */
-public interface CAloops {
+public interface CAloops2 {
 
     /**
      * applies a set of loops realizing one iteration on the CA.
      */
-    // public void theLoops(int[][] mem, int nbBlock,int blockSize);
-    public void theLoops(int[][] mem, PrShift prepareShift);
+    void theLoops(PrShift p);
+
 
     /**
      * @return the layer for which an init method is programmed in the medium
@@ -36,6 +36,7 @@ public interface CAloops {
     /**
      * @return the offset where to find the data in the CA memory, for a given field
      */
+    public void anchorFieldInMem(int[][] m);
 
     public HashMap<String, List<Integer>> fieldOffset();
 

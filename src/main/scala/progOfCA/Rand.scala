@@ -1,10 +1,10 @@
-package prog
+package progOfCA
 
 import compiler.AST._
 import compiler.ASTL._
 import compiler.Circuit.hexagon
 import compiler._
-import prog.Rand.randDef
+import progOfCA.Rand.randDef
 
 /** Layer implementing a random bit */
 class Rand() extends Layer[(V, B)](1) with ASTLt[V, B] {

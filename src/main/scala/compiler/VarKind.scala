@@ -17,6 +17,7 @@ sealed class VarKind extends Comparable[VarKind] {
     case _ => false
   }
 
+  def isParam = isInstanceOf[ParamRR] || isInstanceOf[ParamD] || isInstanceOf[ParamR]
 
   def isStoredField: Boolean = this match {
     case StoredField() => true;

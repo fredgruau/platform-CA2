@@ -18,7 +18,6 @@ class InfoType[+T](val t: T, val k: VarKind) {
   def locus: Locus = repr.lpart(repr1.asInstanceOf[repr[(_ <: Locus, _ <: Ring)]]).name
 
   def ring: Ring = repr.rpart(repr1.asInstanceOf[repr[(_ <: Locus, _ <: Ring)]]).name
-
   /** in some cases (i.e. creation of affectation, there is no obvious locus associated to the variable. */
   def locusOption: Option[Locus] = t match {
     case u@(_, _) => if (u._1.isInstanceOf[Locus]) Some(u._1.asInstanceOf[Locus]) else None //if the type is a couple, the first is the locus unless it is cons
@@ -58,6 +57,7 @@ object InfoNbit {
  * @tparam T toto
  */
 class InfoNbit[+T](override val t: T, override val k: VarKind, val nb: Int) extends InfoType(t, k) {
+
   def radiusify(r: Int): InfoNbit[_] = new InfoNbit(t, ParamRR(r), nb)
 
   /** sets varKind to macroField */

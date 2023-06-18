@@ -270,21 +270,44 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
    * insert instructions at the right place
    * we scan visitedL starting from the last instructions and insert the new affect when nobody uses them
    * * @param otherInstr instruction factorizing code
+   *
+   * @return the node in sorted order
    */
-  private def insertBeforeFirstUse(otherInstr: List[T]) = {
+  private def insertBeforeFirstUse(otherInstr: List[T]): List[T] = {
+    var orderedOtherInstr: List[T] = List()
     var res: List[T] = List.empty
     var nbUser: HashMap[T, Int] = HashMap.empty ++ otherInstr.map((instr: T) => (instr -> instr.outputNeighbors.size)) //compte les output
-    for (instr <- visitedL) {
-      res ::= instr
-      for (other <- instr.inputNeighbors) {
-        if (nbUser.contains(other)) {
-          nbUser += (other -> (nbUser(other) - 1))
-          if (nbUser(other) == 0)
-            res ::= other
+
+    def updateNbUser(addedInstr: T): List[T] = {
+      var res2: List[T] = List()
+      for (otherInput: T <- addedInstr.inputNeighbors) {
+        if (nbUser.contains(otherInput)) {
+          nbUser += (otherInput -> (nbUser(otherInput) - 1)) //going towards the first instr, we decrement the user count for each instr to be inserted
+          if (nbUser(otherInput) == 0) {
+            orderedOtherInstr ::= otherInput
+            res2 ::= otherInput
+            res2 :::= updateNbUser(otherInput) //recursive call because inserting otherInput might cause decrement of usecount for other affectated variable
+          }
         }
       }
+      res2
+    }
+
+    for (instr <- visitedL) {
+      res ::= instr
+      res :::= updateNbUser(instr)
+      /*  for (other <- instr.inputNeighbors) {
+          if (nbUser.contains(other)) {
+            nbUser += (other -> (nbUser(other) - 1)) //going towards the first instr, we decrement the user count for each instr to be inserted
+            if (nbUser(other) == 0) {
+              res ::= other
+              //we must update user again, because other might use variable being redefined
+            }
+          }
+        }*/
     }
     visitedL = res.reverse
+    orderedOtherInstr
   }
 
   /**
@@ -305,8 +328,8 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
    * @param rewrite    each instruction into instruction,
    * @param otherInstr more instructions to be be added
    * @return Like propagate instead we work only on visitedL, because we want to keep the schedule.
-   **/
-  def propagateUnitKeepSchedule(rewrite: T => T, otherInstr: List[T] = List()) = {
+   * */
+  def propagateUnitKeepSchedule(rewrite: T => T, otherInstr: List[T] = List()): List[T] = {
     visitedL = visitedL.map(rewrite)
     WiredInOut.setInputAndOutputNeighbor(visitedL ::: otherInstr)
     insertBeforeFirstUse(otherInstr)

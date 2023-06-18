@@ -84,7 +84,9 @@ trait Named {
    * @param prefix
    */
   def setNameIfNull(prefix: String) = {
-    if (name == null) name = prefix + Named.getCompteur(prefix)
+    def twoDigit(s: String) = if (s.length == 1) "0" + s else s
+
+    if (name == null) name = prefix + twoDigit("" + Named.getCompteur(prefix))
   }
 
 

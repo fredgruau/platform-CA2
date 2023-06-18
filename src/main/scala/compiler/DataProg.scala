@@ -1,7 +1,6 @@
 package compiler
 
 import java.util.stream.Collectors
-
 import ASTB._
 import AST.{AstPred, Call, Fundef, Layer, Read, isCons, isNotRead}
 import Circuit.{AstMap, Machine, TabSymb, iTabSymb, iTabSymb2}
@@ -13,6 +12,7 @@ import ASTB.Tminus1
 import ASTBfun.{ASTBg, Fundef2R, redop}
 import ASTL.ASTLg
 
+import java.util
 import scala.collection.{Iterable, IterableOnce, Map, MapView, Set, immutable, mutable}
 import scala.collection.immutable.{HashMap, HashSet, ListMap}
 import scala.language.postfixOps
@@ -22,7 +22,7 @@ object DataProg {
   /** set to false after first construct, identifies the mainRoot */
   var isRootMain = true
 
-  /** pring a map on several small lines, instead of one big line */
+  /** print a map on several small lines, instead of one big line */
   private def string[T](t: TabSymb[T], s: String): String = t.toList.grouped(4).map(_.mkString(s)).mkString("\n") + "\n"
 
   /**
@@ -129,7 +129,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     if (coalesc != null)
       for (c <- coalesc.values)
         if (!tSymbVar.contains(c) && !c.startsWith("Mem[")) //!(Try(c.toInt).isSuccess))
-        throw new Exception("colesced register:" + c + " not present in symbol table")
+          throw new Exception("colesced register:" + c + " not present in symbol table")
 
   invariantCoalesc
 
@@ -160,11 +160,12 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   private def dagisScheduleMatters = coalesc != null
 
   /** look up the symbol table if not found, take the coalesced form */
-  protected def tSymbVarSafe(str: String) = {
+  protected def tSymbVarSafe(str: String): U = {
     if (coalesc == null) tSymbVar(str)
     else if (!tSymbVar.contains(str) && (!coalesc.contains(str) || !tSymbVar.contains(coalesc(str))))
       throw new Exception("on trouve pas " + str)
-    else tSymbVar.getOrElse(str, tSymbVar(coalesc(str)))
+    else
+      tSymbVar.getOrElse(str, tSymbVar(coalesc(str)))
   }
 
   /** look up the symbol table if not found, take the coalesced form */
@@ -196,66 +197,95 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     ) //verifie que c'est la racine
     {
       countCAloops(this);
-      "there is " + branch + " main branch fun and " + leave + " leaf ca loop\n" + totalComplexity
+      "************************************************\n there is " + branch + " main branch fun and " + leave + " leaf ca loop\n" + totalComplexity
     }
     else ""
   }
 
-  /** @return instructions in textual form  */
-  def toStringHeader =
-    (if (isLeafCaLoop) "leaf CA loop " else "non-leaf main ") +
-      " of signature: " + paramD.mkString(" ") + "=>" + paramR.mkString(" ") + "\n"
+  /** @return instructions in textual form */
 
-  /** @return instructions in textual form  */
+  def toStringHeader =
+    (if (isLeafCaLoop) "************************************************\nleaf CA loop " else "non-leaf main ") +
+      " of signature: " + paramD.mkString(" ") + "=>" + paramR.mkString(" ") /*+ " name of CA " + paramR(0) */ + "\n"
+
+  /** @return instructions in textual form */
   def toStringInstr = "there is " + dagis.visitedL.length + " instructions\n" +
     dagis.visitedL.reverse.map((i: Instr) => i.toString() + "\n").mkString("")
 
-  /** @return the whole symbol table  in textual form  */
-  def toStringTabSymb = {
-    val keys: List[String] = tSymbVar.keys.toList
-    val bitsize = try {
-      val intKeys = keys.filter(tSymbVar(_).asInstanceOf[InfoNbit[_]].nb > 1)
-      "non boolean varaiable are : " + intKeys.map((id: String) => id + ":" + tSymbVar(id).asInstanceOf[InfoNbit[_]].nb + " bit")
-    }
-    catch {
-      case e: ClassCastException => ""
-    } //we have not yet computed bit size, so tabSymb does not contains InfoNbit
+  lazy val keys: List[String] = tSymbVar.keys.toList
+  /** regroup  identifier having a common varkind */
+  lazy val idIndexedByKind: Predef.Map[VarKind, List[String]] = keys.groupBy(tSymbVar(_).k)
 
-    /** in order to obtain a more compact notation, avoiding repeating the varkind,
-     * we regroupe identifier having a common varkind */
-    val idIndexedByKind: Predef.Map[VarKind, List[String]] = keys.groupBy(tSymbVar(_).k)
+  lazy val intKeys: List[String] = try {
+    keys.filter(tSymbVar(_).asInstanceOf[InfoNbit[_]].nb > 1)
+  }
+  catch {
+    case _: ClassCastException => List()
+  } // tabSymb may not contains InfoNbit if bit size was not yet computed
 
-    /** in order to also avoid repeating the spatial type, we will also regroup identifiers by  spatial type */
-    def spatial(s: List[String]): List[String] = s.filter(!tSymbVar(_).t.isInstanceOf[Ring])
+  def isScalar(s: String): Boolean = tSymbVar(s).t.isInstanceOf[Ring]
 
-    def scalar(s: List[String]): List[String] = s.filter(tSymbVar(_).t.isInstanceOf[Ring])
+  def isSpatial(s: String): Boolean = !tSymbVar(s).t.isInstanceOf[Ring]
 
-    def indexingBySpatialType(s: List[String]): Predef.Map[Any, List[String]] = spatial(s).groupBy(tSymbVar(_).t)
+  /** in order to also avoid repeating the spatial type, we also regroup identifiers by  spatial or scalar type */
+  def indexingByType(s: List[String], p: String => Boolean) = s.filter(p).groupBy(tSymbVar(_).t)
 
-    def indexingByScalarType(s: List[String]): Predef.Map[Any, List[String]] = scalar(s).groupBy(tSymbVar(_).t)
-
-    /** this illustrates a simple way of recomputing all the values of a map,
-     * using a match of the (keys,value) pair .map{case (k, v) and reconstruction association using the arrow k-> indexingBySpatialType(v) */
-    val idIndexedBySpatialtypeThenByKind = idIndexedByKind.map { case (k, v) => k -> indexingBySpatialType(v) }
-    val idIndexedByScalartypeThenByKind = idIndexedByKind.map { case (k, v) => k -> indexingByScalarType(v) }
-    /** We defined ParamD < ParamR < MacroFields, so as to be able to sort and show first  dataPamater and resutParameters */
-    val sortedIdSpatial = ListMap(idIndexedBySpatialtypeThenByKind.toSeq.sortBy(_._1): _*)
-    val sortedIdScalar = ListMap(idIndexedByScalartypeThenByKind.toSeq.sortBy(_._1): _*)
-
-    tSymbVar.size + " variables sorted by kind and then by spatial type:\n " +
-      sortedIdSpatial.mkString("\n") +
-      "\nScalar Fields: " +
-      // sortedIdScalar.values.map(_.mkString("\n")) +
-      sortedIdScalar.filter((x: (VarKind, Map[_, List[String]])) => x._2.nonEmpty).mkString("\n") +
-      "\n" + bitsize + "\n"
+  /** The following illustrates a simple and standard way of recomputing all the values of a map,
+   * using a match of the (keys,value) pair .map{case (k, v) and
+   * re-building association using the arrow k-> indexingBySpatialType(v) */
+  def indexedByKindThenByType(p: String => Boolean): Map[VarKind, Map[Any, List[String]]] = idIndexedByKind.map {
+    case (k, v) => k -> indexingByType(v, p)
   }
 
-  /** @return coalesced registers in textual form  */
-  def toStringCoalesc(c: iTabSymb[String]) = (if (c == null || c.isEmpty) "" //no Coalesced Ids\n"
-  else {
-    val coalesced = c.keys groupBy (c(_))
-    "" + coalesced.size + " classes of coalesced Ids\n" + coalesced.grouped(3).map(_.mkString("---")).mkString("\n")
-  })
+  /** We defined ParamD < ParamR < MacroFields, so as to be able to sort and
+   * show first  dataPamater and resutParameters */
+  def sortedindexedByKindThenByType(p: String => Boolean) = ListMap(indexedByKindThenByType(p).toSeq.sortBy(_._1): _*)
+
+
+  /** @return the whole symbol table  in textual form */
+  def toStringTabSymb = {
+    tSymbVar.size + " variables sorted by kind and then by spatial or scalar type:\nSpatial types: \n " +
+      sortedindexedByKindThenByType(isSpatial).mkString("\n") +
+      "\nScalar type: \n" +
+      // sortedIdScalar.values.map(_.mkString("\n")) +
+      sortedindexedByKindThenByType(isScalar).filter((x: (VarKind, Map[_, List[String]])) => x._2.nonEmpty).mkString("\n") +
+      "\nnon boolean varaiable are : " + intKeys.map((id: String) => id + ":" + tSymbVar(id).asInstanceOf[InfoNbit[_]].nb + " bit") + "\n"
+  }
+
+  /** keys of coalescInverted are register list towards which variables are coalesced, we must add standalone variables */
+  lazy val coalesced: Map[String, Iterable[String]] =
+    if (coalesc == null || coalesc.isEmpty) HashMap()
+    else coalesc.keys groupBy (coalesc(_))
+
+  /** names of variables which are used before being affected */
+  lazy val delayed = {
+    var res: Set[String] = HashSet()
+    var defined: Set[String] = HashSet()
+    for (instr: Instr <- dagis.visitedL.reverse) {
+      res ++= (instr.usedVars() -- defined)
+      defined ++= instr.names
+    }
+    if (idIndexedByKind.contains(ParamD()))
+      res --= idIndexedByKind(ParamD()).toSet // dis   <-  pdis makes pdis appear as a delayed variable,
+    // pdis appears in tabSymb sorted by kind,
+    // (res -- paramD.toSet).toList.sorted  pdis does not appears directly in paramD, which countains pdis#0, pdis#1 ...
+    res
+  }
+  /** register which are not coalesced, and shoud be defined. */
+  lazy val standaloneRegister: Iterable[String] =
+    tSymbVar.keys.filter((s: String) => (!coalesc.contains(s) && !tSymbVar(s).k.isParam &&
+      !coalesced.contains(s) && !(s(0) == '_')))
+
+  /** @return coalesced registers in textual form with alphabetic ordering on the keys
+   *          so that the register r1,r2... stand out together */
+  def toStringCoalesc: String = {
+    val sortCoalesced = ListMap(coalesced.toSeq.sortBy(_._1): _*)
+    "standalone (also need registers): " + standaloneRegister.mkString(",") + "\n" +
+      "delayed: (need initialize) " + delayed.mkString(",") + "\n" +
+      coalesced.size + " classes of coalesced Ids\n" +
+      coalesced.keys.toList.sorted.mkString(", ") + "\n" +
+      sortCoalesced.grouped(2).map(_.mkString("---")).mkString("\n") + "\n"
+  }
 
   /**
    * @param t declared function, and macro
@@ -268,7 +298,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   }
 
   override def toString: String = {
-    toStringFuns + toStringHeader + toStringInstr + toStringTabSymb + toStringCoalesc(coalesc) + "\n" + listOf(funs).mkString("\n\n\n")
+    toStringFuns + toStringHeader + toStringInstr + toStringTabSymb + toStringCoalesc + "\n" + listOf(funs).mkString("\n\n")
   }
 
 
@@ -309,13 +339,21 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
 
   def treeIfy(): DataProg[U] = {
-    val iT = dagis.inputTwice.filter(isNotRead) //we could filter out more stuff because it consumes register and registers are a precious ressource
-    val dagis2 = dagis.affectIfy(iT, "auxL", dagisScheduleMatters) //also replaces access to data parameters+layers by read
+    /** we will consider read if it is a parameter is read */
+    val isNotReadReg: AstPred = {
+      case AST.Read(x) =>
+        tSymbVarSafe(x).k == ParamD()
+      case _ => true
+    }
+    val iT = dagis.inputTwice.filter(isNotReadReg) //should filter out more stuff because it consumes register which are a precious ressource
+    val dagis2: DagInstr = dagis.affectIfy(iT, "auxL", dagisScheduleMatters) //also replaces access to data parameters+layers by read
+
     val (layerFields, macroFields) = dagis.newAffect.map(_.exp).partition(isLayerField(_)) // dagis.newAffect, stores precisely affected expression which are also nonGenerators.
+    //todo newAffect has been ordered so that nbit of a variable v1 that uses a variable v2, is upbdated after v2. It may be the case that
+    // dividing into layerfields and macrofields, perturbate this order.
     if (!dagisScheduleMatters) {
       updateTsymb(macroFields, MacroField()) // when a variable is used twice it should be evaluated in a macro => its type = MacroField,
       updateTsymb(layerFields, StoredField()) // excepted for affectation of the form dist<-lldist, the type of dist is set to storedLayer, the varKind Layer will be replaced by stored field, and no longer used at all
-
     }
     else {
       //val g = new CodeGen(tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]], coalesc)
@@ -717,7 +755,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
    *         we add delays in exoression,  if a binop is applied to two expression of distinct radius.
    */
   def radiusify: DataProg[InfoNbit[_]] = {
-    val radius: TabSymb[(Int, Option[Modifier])] = mutable.HashMap.empty //stores all the varius of the id in that symbol tables.
+    val radius: TabSymb[(Int, Option[Modifier])] = mutable.HashMap.empty //stores all the radius of the id in that symbol tables.
     val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
     if (isLeafCaLoop)
       dagis.visitedL.reverse.map(_.radiusify(radius, p.tSymbVar))
@@ -834,7 +872,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       if (info.k == ParamD() || info.k.isInstanceOf[ParamRR]) { //we unfold paramD and paramR
         for (nameWithSufx <- deploySpace(name))
           tSymbScalar2.addOne(nameWithSufx -> info)
-        if (info.locus != V()) tSymbScalar2.remove(name) //the prior infoTab must be removed from the symbol Table, for V there is no suffixes, this is why it is special
+        //if (info.locus != V()) tSymbScalar2.remove(name) //the prior infoTab must be removed from the symbol Table, for V there is no suffixes, this is why it is special
+        if (info.locus != V()) tSymbScalar2.addOne(name -> info) //TODO just changed, ca risque de creer du bordel
 
       }
     return new DataProg(DagInstr(muI13), noSubFun, tSymbScalar2, paramD.flatMap(deploySpace(_)), paramR.flatMap(deploySpace(_)), coalesc2)
@@ -863,7 +902,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     /** stores a mapping to coalesced registers    */
     var coalesc: iTabSymb[String] = HashMap.empty
 
-    /**
+    /** ****************
      *
      * @param name variable affected by an instruction
      * @return muInstVector  associated to instr, now scheduled
@@ -1347,7 +1386,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       val nameStillUsed = p.dagis.visitedL.flatMap(_.names).toSet.diff(idCand4Simplnotsdwich)
       val coalescedStillUsed = nameStillUsed.map((str: String) => coalesc.getOrElse(str, str))
       for (str <- newTsymbar.keys) //we remove from the table the now useless symbols
-        if (!coalescedStillUsed.contains(str) && !(newTsymbar(str).k == ParamD())) {
+        if (!coalescedStillUsed.contains(str) && !(newTsymbar(str).k == ParamD()) && !(newTsymbar(str).k isParam)) {
+          //  if (!coalescedStillUsed.contains(str) && !(newTsymbar(str).k == ParamD()) && !(newTsymbar(str).k == ParamD())) {
           newTsymbar.remove(str)
         }
       //dagis.visitedL.map(_.asInstanceOf[Affect[_]].correctName())
@@ -1466,8 +1506,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   /**
    * @return tm1 of a single register R1<-exp ...tm1(R2),
    *         //rule A    if R2 is not affected before the instruction ==> the tm1 is simply supressed.
+   *         // rule A' if R2 is a param D, and R1 is a just a tm we move the instruction to the end
    *         // rule B   if R1 is not affected before the instruction
-   *         //      and R2 is not affected after the instruction, until last R1's use ==> move the instruction after last R1's use
+   *         //      and R2 is not affected after the instruction, until last R1's use ==>
+   *         move the instruction after last R1's use
    * @param candReg
    * @param instrs
    */
@@ -1505,13 +1547,15 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       }
     }
     candB = candB.diff(candA) //candidates veryfying A and B are hanled as A
+
     def pred(s: (String, String)) = candB.contains(s._1) //we need a map for candB to know where to move.
+
     val reInsertionB = lastUse.filter(pred).map(_ swap) //allows to reuse move
     (candA, reInsertionB)
   }
 
-  /** tm1 operator are normaly supressed by adding registers, nevertheless, different rules can be applied to avoid the cost
-   * of adding register:
+  /** tm1 operator are normaly supressed by adding registers, nevertheless,
+   * different rules can be applied to avoid the cost of adding register:
    * juste removing the tm1 (rule A)
    * moving the instruction forward (rule B) or backward.(rule C)
    * adding a store instruction (rule D) */
@@ -1521,11 +1565,13 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     val p = this.asInstanceOf[DataProg[InfoType[_]]]
     if (isLeafCaLoop) {
       val candReg: Map[String, String] = instrsWithaTm1Reg(p.dagis.visitedL)
-      val (candA, reInsertionB) = ruleAandB(candReg, p.dagis.visitedL)
-
+      val (candA: Predef.Set[String], reInsertionB) = ruleAandB(candReg, p.dagis.visitedL)
+      if (candA.nonEmpty)
+        System.out.println("attention, flat detmisation of " + candA)
       //we now  remove tm1s, from candA
       p.dagis.visitedL = p.dagis.visitedL.map(
-        (instr: Instr) => if (candA.contains(instr.names(0))) instr.detm1iseR else instr
+        (instr: Instr) => if (candA.contains(instr.names(0)))
+          instr.detm1iseR else instr
       )
 
       //we now  remove tm1s, and move instructions from candB
@@ -1574,8 +1620,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   def loopIfy(): DataProgLoop[InfoNbit[_]] = {
     val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
     var constants: TabSymb[Boolean] = new mutable.HashMap() //stores the constant variables, and their values
-
-
     var instrNumber = 0
 
     /**
@@ -1585,6 +1629,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
      *         each packet can be executed in a single loop
      */
     def loopIfyInstr(instr: Instr): InstrLoop = {
+      if (instr.names(0) == "delta_1")
+        System.out.println("trouv")
       val exp = instr.exps(0).asInstanceOf[ASTBg]
       val decall = exp.deCallify(HashMap.empty[String, ASTBt[B]])
       // println("\n"+decall.toStringTree)
@@ -1636,21 +1682,24 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       }
 
       val wrap = immutable.HashMap.empty[Instr, treeDag.Wrap] ++ treeDag.visitedL.map(x => x -> treeDag.Wrap(x))
-      val loops1 = treeDag.indexedComponents(pipelineProximity2, wrap)
-      val loops2 = treeDag.topologicSort2(loops1, wrap).reverse //we sort them so as to process them in the right order
+      val loops1: Map[Instr, List[Instr]] = treeDag.indexedComponents(pipelineProximity2, wrap)
+      val loops2: Seq[List[Instr]] = treeDag.topologicSort2(loops1, wrap).reverse //we sort them so as to process them in the right order
       var result: List[Packet] = List()
       for (packet: List[Instr] <- loops2) { //todo when coalescing,  care should be taken that temporary variables used in the computation of one loop can reused in the next loop
         result = Packet(packet, tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]], coalesc, constants) :: result //we re-establish natural processing topological order
       }
       new InstrLoop(instr, result.reverse, {
-        instrNumber += 1; instrNumber
+        instrNumber += 1;
+        instrNumber
       }) //we also recover natural processing order
     }
 
     if (isLeafCaLoop) {
       val loops: List[InstrLoop] = dagis.visitedL.reverse.map(loopIfyInstr(_))
-      val instrs = loops.flatMap(_.loops.flatMap(_.instrs))
-      new DataProgLoop[InfoNbit[_]](DagInstr(instrs), p.funs.map { case (k, v) ⇒ k -> v.loopIfy() }, p.tSymbVar, paramD,
+      val instrs = loops.flatMap(_.loops.flatMap(_.instrs.reverse)) //instrs of a packet are also considered in reverse, since
+      //everything is in reversed order
+      val d = DagInstr(instrs)
+      new DataProgLoop[InfoNbit[_]](d, p.funs.map { case (k, v) ⇒ k -> v.loopIfy() }, p.tSymbVar, paramD,
         paramR, coalesc, loops)
     }
 

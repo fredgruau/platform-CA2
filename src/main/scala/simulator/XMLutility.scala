@@ -6,7 +6,7 @@ import java.io.{BufferedReader, FileReader, IOException}
 import scala.collection.JavaConverters._
 import scala.collection.immutable
 import scala.xml.{Node, Text, XML}
-
+/** contains static function to extract information from an UML node */
 object XMLutilities {
 
   def readXML(path: String): Node = {
@@ -52,6 +52,9 @@ object XMLutilities {
 
   def x(node: scala.xml.Node, tag: String, attrb: String): String =
     ((node \\ tag) \ attrb).text.trim
+
+  def xArrayString(node: scala.xml.Node, tag: String, attrb: String): Array[String] =
+    ((node \\ tag) \ attrb).text.trim.split(",")
 
   def xInt(node: scala.xml.Node, tag: String, attrb: String) =
     x(node, tag, attrb).toInt

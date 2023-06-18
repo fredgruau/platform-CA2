@@ -15,7 +15,8 @@ import scala.collection.immutable.HashMap
  * @param tSymbVar      needed to find about bit size
  * @param coalesc
  * @param constantTable contains constant values, in order to fold constants
- * @param boolAST       binary code with boolea operators, as a List of ASTBt[B]
+ * @param boolAST       binary code with boolean operators, as a List of ASTBt[B] is sometimes empty, I do not get why
+ * @param boboolAST     binaryCode with coalesced registers.
  */
 abstract class Packet(val instrs: List[Instr],
                       val tSymbVar: TabSymb[InfoNbit[_]], val coalesc: iTabSymb[String], val constantTable: TabSymb[Boolean],
@@ -54,10 +55,14 @@ abstract class Packet(val instrs: List[Instr],
 
   val info: String
   val affected: String //generated  affectation
-  def binary = if (boolAST.nonEmpty) "\nBinary() " + boolAST.map(_.toStringTree).mkString("|_|") else ""
 
+  /** print binary code if non empty */
+  def binary = if (boolAST.nonEmpty) "\nBinary() " + boolAST.map(_.toStringTree).mkString(" |_| ")
+
+  /** print coalesced binary code if non empty */
   def binaary: String = if (boboolAST.nonEmpty)
-    "\nBinaary() " + boboolAST.map(_.toStringTree).mkString("|_|") else ""
+    "\nBinaary() " + boboolAST.map(_.toStringTree).mkString(" |_| ") else
+    "emptyyy"
 
 
   override def toString = info + affected + binary + binaary
@@ -151,24 +156,25 @@ object Packet {
    * Stores the info about one elementary packet that can be compiled as a single loop
    * an instruction itself is compiled into a list of such loop
    *
-   * @param dir       wether we go from left to right or the reverse
-   * @param loopSize  number of loop iterations
-   * @param affects   variables set by the loops
-   * @param pipelined variables computed and then consumed during the loops, we do not need to instantiate,
-   *                  except if they are live after the pacquet.
+   * @param dir      wether we go from left to right or the reverse
+   * @param loopSize number of loop iterations
+   * @param affects  variables set by the loops
+   * @param instrs   the instructions part of the loop
    */
   class BitLoop(override val tSymbVar: TabSymb[InfoNbit[_]],
                 override val coalesc: iTabSymb[String], override val constantTable: TabSymb[Boolean], val dir: Dir, val loopSize: Int, val affects: List[Instr],
-                val pipelined: List[Instr], val init: Int, val step: Int, val fin: Int,
-               ) extends Packet(affects ::: pipelined, tSymbVar, coalesc, constantTable) {
+                override val instrs: List[Instr], val init: Int, val step: Int, val fin: Int,
+               ) extends Packet(instrs, tSymbVar, coalesc, constantTable) { //TODO the order matters between affects and pipelined
     /* display  direction and number of iterations of loop */
     val info = dir + " " + loopSize + " bits "
     /* display the instruction in topological order, starting with the pipelined if any, and avoiding redundant display*/
-    val affected = (if (pipelined.nonEmpty) "pipelined" + pipelined.mkString("\n                      ") + "\n              " else "") +
-      "affected " + affects.mkString("\n                       ") //we put many space characters to obtain a correct alinement
+    val pipelined = instrs.filter(!affects.toSet.contains(_)) //all the instructions not leading to affectation, will be pipelined.
+    //variables computed and then consumed during the loops, we do not need to instantiate,    except if they are live after the pacquet.
+    val affected = (if (pipelined.nonEmpty) "pipelined" + pipelined.reverse.mkString("\n                      ") + "\n              " else "") +
+      "affected " + affects.mkString("\n                       ") //print pipelined in the right order. we put many space characters to obtain a correct alinement
     /** allows to quickly find if a variable is pipelined */
     val pipelinedTable = new immutable.HashMap() ++ pipelined.map((is: Instr) => is.names(0) -> is)
-    /** evaluated(x)=i iff pipelined affectation x<-exp has been done for itération i.   */
+    /** evaluated(x)=i iff pipelined affectation x<-exp has been done for itération i. */
     var evaluated: iTabSymb[Int] = new HashMap[String, Int]() ++ pipelined.map(_.names(0) -> (init - step))
     /**
      * number of times a variable is used outside scan
@@ -345,7 +351,7 @@ object Packet {
         case ASTB.Right() => (loopSize, -1, -1)
         case _ => throw new Exception("direction should have been narrowed to Left or right")
       }
-      new BitLoop(t, c, const, dir, loopSize, remainAsAffects, pipelined, init, step, fin)
+      new BitLoop(t, c, const, dir, loopSize, remainAsAffects, instrs, init, step, fin)
     }
 
 

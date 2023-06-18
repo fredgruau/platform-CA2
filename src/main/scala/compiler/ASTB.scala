@@ -211,7 +211,7 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
 
   override def toString: String =
     this.asInstanceOf[ASTB[_]] match {
-      case AffBool(nameb, _) => nameb + ":="
+      case AffBool(nameb, _) => nameb + "="
       case Intof(v) => "" + v
       case True() => "truue"
       case False() => "faalse"
@@ -227,7 +227,7 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
       case Scan1(x, op, _, dir, _) => "Scan1" + op.name + dir //+ mym.name
       case Scan2(x, y, op, _, dir, _) => "Scan2" + op.name + dir //+ mym.name
       case Reduce(x, op, _) => "Red" + op.name
-      case Shift(x, right) => (if (right) ">>" else "<<")
+      case Shift(x, right) => (if (right) ">>>" else "<<")
       case Tminus1(x) => "tm1"
     }
 
@@ -360,7 +360,6 @@ object ASTB {
   //______Elementary type
   type Uint = ASTBt[UI];
   type Sint = ASTBt[SI];
-  type Boool = ASTBt[B]
 
 
   /** Communication Constructors, work for both Booleans and integers  */
@@ -396,7 +395,7 @@ object ASTB {
   final case class Or(arg: ASTBt[B], arg2: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Doubleton[AST[_]] //{assert(y.nbit==x.nbit)}
   final case class Neg(arg: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Singleton[AST[_]]
 
-  /** ¯Boolean Affectation are also considered as  expression */
+  /** ¯Boolean Affectation are also considered as  expression , they have a value */
   final case class AffBool(nameb: String, arg: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Singleton[AST[_]]
 
   def affBool(nameb: String, arg: ASTBt[B]) = if (nameb == null) arg else AffBool(nameb, arg)

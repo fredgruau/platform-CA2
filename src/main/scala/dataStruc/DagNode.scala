@@ -1,6 +1,9 @@
 package dataStruc
 
-import compiler.AST
+import compiler.AST.Read
+import compiler.ASTB.AffBool
+import compiler.{AST, ASTB, Affect, InfoType}
+import compiler.Circuit.TabSymb
 import dataStruc.DagNode.Neton
 
 import scala.collection.{Iterable, immutable, mutable}
@@ -27,6 +30,43 @@ trait DagNode[+T <: DagNode[T]] {
     (if (inputNeighbors.size > 1 || this.isInstanceOf[Neton[_]])
       "(" + inputNeighbors.map(_.toStringTree).foldLeft("")(_ + ", " + _).substring(2) + ")" //le substring vire la premiere virgule
     else if (inputNeighbors.size == 1) inputNeighbors.head.toStringTree else " ")
+
+  def isShift(s: String) = s.equals("<<") || s.equals(">>>")
+
+  private def neighbor1or1() = if (isShift(toString)) " 1" else inputNeighbors(1).toStringTreeInfixPar(null)
+
+  /** * @param t symbol Table needed to check if variable is a parameter
+   *
+   * @return code of boolean instruction, adds a [i] if isParam is true
+   */
+  def toStringParam(t: TabSymb[InfoType[_]]): String = {
+    if (t != null) if (isInstanceOf[AST[_]])
+      this.asInstanceOf[AST[_]] match {
+        case Read(name) => if (t(name).k.isParam) return name + "[i]"
+        case ASTB.AffBool(name, _) => if (t(name).k.isParam) return name + "[i]="
+        case _ => toString
+      };
+    toString
+  }
+
+
+  def toStringTreeInfix(t: TabSymb[InfoType[_]]): String = {
+    assert {
+      inputNeighbors.size <= 2
+    }
+    if (inputNeighbors.size == 2 || (inputNeighbors.size == 1 && isShift(toString)))
+      inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1()
+    else " " + toStringParam(t) + " " + (if (inputNeighbors.size == 1) inputNeighbors.head.toStringTreeInfix(t) else " ")
+  }
+
+  private def toStringTreeInfixPar(t: TabSymb[InfoType[_]]): String = {
+    assert {
+      inputNeighbors.size <= 2
+    }
+    if (inputNeighbors.size == 2 || (inputNeighbors.size == 1 && isShift(toString)))
+      "(" + inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1() + ")"
+    else " " + toStringParam(t) + " " + (if (inputNeighbors.size == 1) inputNeighbors.head.toStringTreeInfix(t) else " ")
+  }
 
   /**
    * Tries to find a cycle

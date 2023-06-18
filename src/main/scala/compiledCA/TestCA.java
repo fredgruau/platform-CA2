@@ -13,6 +13,7 @@ import java.util.HashMap;
  */
 public final class TestCA implements CAloops {
 
+
     @Override
     public void theLoops(int[][] mem, PrShift p) {
     }
@@ -25,6 +26,7 @@ public final class TestCA implements CAloops {
     public int CAmemWidth() {
         return 1;
     }
+
 
     @Override
     public HashMap<String, List<Integer>> fieldOffset() {

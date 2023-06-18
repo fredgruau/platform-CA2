@@ -3,6 +3,7 @@ package simulator
 import simulator.SimulatorUtil._
 import simulator.XMLutilities._
 import triangulation.Vector2D
+
 import java.awt.{Color, Polygon}
 import java.net.URL
 import javax.swing.ImageIcon
@@ -10,11 +11,12 @@ import scala.swing.Swing.Icon
 import scala.swing._
 import scala.xml.Node
 import BorderPanel.Position._
+import scala.collection.immutable.HashMap
 
 object Simulator extends SimpleSwingApplication {
   /** name of Cellular automaton being simulated, to be set by method startUp, and then used by method top */
   var nameCA: String = " "
-
+  private var nameCAparam: String = null
   /**
    * startup is called before top is launched,so that
    * it can access the nameCA and store it in order to open the appropriate files
@@ -23,6 +25,8 @@ object Simulator extends SimpleSwingApplication {
    */
   override def startup(args: Array[String]): Unit = {
     nameCA = args(0)
+    if (args.size > 1) //we supplied a file of parameter name with a name that is not <progName>+"param"
+      nameCAparam = args(1)
     super.startup(args)
   }
 
@@ -34,23 +38,36 @@ object Simulator extends SimpleSwingApplication {
   /** hierarchy of swing Jcomponents */
   def top: MainFrame = new MainFrame {
     title = "spatial computation"
+
+    if (nameCAparam == null)
+      nameCAparam = nameCA + "param.xml" //standard name of file containing parameters, if not supplied.
     /** contains XML code representing many parameters */
-    val paramCA: Node = readXML("src/main/scala/compiledCA/" + nameCA + "param.xml")
+    val directories = List("compiledCA", "compHandCA")
+    //find  the right directory
+    val possibleDir = directories.filter((s: String) => loadClass(s + "." + nameCA) != null)
+    assert(possibleDir.size > 0, nameCA + "could not be found in any of the directories " + directories)
+    assert(possibleDir.size < 2, nameCA + "could not be found two times in the directories " + directories)
+    val chosenDir = possibleDir.head
+    val classCA: Class[CAloops2] = loadClass(chosenDir + "." + nameCA)
+    /** contains the loops but also many other parameters */
+    val progCA: CAloops2 = getProg(classCA)
+
+    val paramCA: Node =
+      readXML("src/main/scala/" + chosenDir + "/" + nameCAparam)
     //  preferredSize = new Dimension(xInt(param,"display","@width"),xInt(param,"display","@height"))
     //size = (1024, 768): Dimension
-    val classCA: Class[CAloops] = loadClass("compiledCA." + nameCA)
-    /** contains the loops but also many other parameters */
-    val progCA: CAloops = getProg(classCA)
+    /* possible places where to find CAs    */
+
+
     /** process the signal we create controller first in order to instanciate state variable used by tree */
     val controller = new Controller(nameCA, paramCA, progCA)
     /** Tree for browsing the hierarchy of layers and which field to display */
     val layerTree = new LayerTree((paramCA \\ "layers").head, controller)
     val scrollableXmlTree = new ScrollPane(layerTree) //we put it scrollable because it can become big
     controller.init(layerTree) //now we can pass it to the controller which needs to listen to exansion and coloration events
-    /** When simulating CAs whose number of Lines and columns augment */
-    val sizesCA: collection.Seq[(Int, Int)] = fromXMLasListIntCouple(paramCA, "sizes", "size", "@nbLine", "@nbCol")
+
     /** We simulate several CA simultaneously. We generate a list of environement using an iterator */
-    val iterEnvs: Iterable[Env] = envs(sizesCA, controller)
+    val iterEnvs: Iterable[Env] = envs(controller)
     /** pannels are put together in a  Grid using the GridBagPannel container, which allows to fill muliple lines */
     val pannels: GridBagPanel = new GridBagPanel {
       /** helper supplying default values for specifying where to put the pannel, and how many columns it will span */
@@ -67,10 +84,10 @@ object Simulator extends SimpleSwingApplication {
       var numCell = 0
       //how many columns
       val nbColPannel: Int = xInt(paramCA, "display", "@nbCol")
-      for (env <- iterEnvs) {
+      for (env: Env <- iterEnvs) {
         controller.envList = controller.envList :+ env //we will need to acess the list of env, from the controler
         env.pannel = new CApannel(controller.CAwidth, controller.CAheight, env, progCA) // the number of CAlines is 1/ sqrt(2) the number of CA colomns.
-        if (sizesCA(numEnv)._2 >= 30) { // if the CA has too many columns, it get displayed on multiple columns
+        if (env.nbColCA >= 30) { // if the CA has too many columns, it get displayed on multiple columns
           assert(numCell % nbColPannel == 0, "you must garantee that CA whose number of columns is >=30 are displayed on multiple of nbColPannel")
           add(env.pannel, constraints(numCell % nbColPannel, numCell / nbColPannel, nbColPannel, GridBagPanel.Fill.Horizontal)) //adds the pannel using the Grid layout (GridBagPnnel)
           numCell += nbColPannel
@@ -108,35 +125,54 @@ object ExampleData {
 object SimulatorUtil {
   /**
    *
-   * @param sizes      the different posible CA sizes
+   * @param gridSizes  the different posible CA sizes
    * @param controller the controler
    * @return we generates  the env Iterator in a separate method because it is big
    */
-  def envs(sizes: collection.Seq[(Int, Int)], controller: Controller): Iterable[Env] = {
-    val param = controller.paramCA
+  def envs(controller: Controller): Iterable[Env] = {
+    val paramCA = controller.paramCA
+    /** When simulating CAs whose number of Lines and columns augment */
+    val gridSizes: collection.Seq[(Int, Int)] = fromXMLasListIntCouple(paramCA, "sizes", "size", "@nbLine", "@nbCol")
+    /** When simulating CAs with different init */
+    val multiInits = xArrayString(paramCA, "multiInit", "@inits")
+    val rootLayer = if (multiInits.nonEmpty) x(paramCA, "multiInit", "@layer") else null
+    val iter: String = x(paramCA, "display", "@iter") //what we iterate on
+
+    def totalIter: Int = iter match {
+      case "CAsize" => gridSizes.size
+      case "multiInit" => multiInits.size
+      case "random" => 4
+      case "none" => 1
+    }
+
     new Iterable[Env] {
       val iterator: Iterator[Env] = new Iterator[Env] {
         var nbIter = 0 //counter
+
         /** the parameter on which we iterate */
-        val iter: String = x(param, "display", "@iter") //what we iterate on
+
+
         /** coded as a double so that we do not loose precision when multiplying by sqrt(2) */
-        var nbLineCA: Int = xInt(param, "machine", "@nbLine")
-        var nbColCA: Int = xInt(param, "machine", "@nbCol")
+        var nbLineCA: Int = xInt(paramCA, "machine", "@nbLine")
+        var nbColCA: Int = xInt(paramCA, "machine", "@nbCol")
+        var initRoot: HashMap[String, String] = HashMap.empty
         /** coded as a method because when iterating through the CAsizes, nbColCA is modified */
-        val arch: String = x(param, "machine", "@arch")
+        val arch: String = x(paramCA, "machine", "@arch")
+        var randomRoot = 0
 
         /** @return `true` if there is a next element, `false` otherwise */
-        override def hasNext: Boolean = iter match {
-          case "CAsize" => nbIter < sizes.size
-        }
+        override def hasNext: Boolean = nbIter < totalIter
 
         /** @return next element */
         override def next(): Env = {
           iter match {
-            case "CAsize" => nbLineCA = sizes(nbIter)._1; nbColCA = sizes(nbIter)._2
+            case "CAsize" => nbLineCA = gridSizes(nbIter)._1; nbColCA = gridSizes(nbIter)._2
+            case "multiInit" => initRoot = HashMap(rootLayer -> multiInits(nbIter))
+            case "random" => randomRoot = nbIter
+            case _ =>
           } //inital value of nbLineCA
           nbIter = nbIter + 1
-          new Env(arch, nbLineCA, nbColCA, controller, 0)
+          new Env(arch, nbLineCA, nbColCA, controller, initRoot, randomRoot)
         }
       }
     }
@@ -145,10 +181,10 @@ object SimulatorUtil {
   /**
    *
    * @param path where to find a compiledCA */
-  def loadClass(path: String): Class[CAloops] = {
-    var res: Class[CAloops] = null;
+  def loadClass(path: String): Class[CAloops2] = {
+    var res: Class[CAloops2] = null;
     try {
-      res = Class.forName(path).asInstanceOf[Class[CAloops]];
+      res = Class.forName(path).asInstanceOf[Class[CAloops2]];
     }
     catch {
       case e: ClassNotFoundException =>
@@ -157,8 +193,8 @@ object SimulatorUtil {
     return res;
   }
 
-  def getProg(progClass: Class[CAloops]): CAloops = {
-    var res: CAloops = null
+  def getProg(progClass: Class[CAloops2]): CAloops2 = {
+    var res: CAloops2 = null
     try res = progClass.newInstance
     catch {
       case e: InstantiationException =>
@@ -173,11 +209,15 @@ object SimulatorUtil {
   object CAtype {
     /** stores all the memory fields of a CA */
     type CAMem = Array[Array[Int]]
-    /** defines the value of one bit for all vertices, or for one subfield of all edges, face or transfer locus */
+    /** coordinate for all vertices, or for one subfield of all edges, face or transfer locus
+     * may be undefined, if point lies out of the bounding box */
     type pointLines = Array[Array[Option[Vector2D]]]
+
     /** allows to reuse the same code for displaying or for generating svg */
     trait myGraphics2D {
       def setColor(c: Color): Unit
+
+      def drawPoint(x: Int, y: Int): Unit
 
       def fillPolygon(p: Polygon): Unit
 

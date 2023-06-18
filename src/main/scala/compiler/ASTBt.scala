@@ -177,7 +177,6 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
         case AffBool(x, exp) => AffBool(newName.getOrElse(x, x), exp.coalesc(newName)).asInstanceOf[ASTBt[R]]
         case _ => a.propagateASTB(rewrite)
       }
-
       case _ => this.asInstanceOf[AST[_]] match {
         case Read(x) =>
           if (!newName.contains(x)) this

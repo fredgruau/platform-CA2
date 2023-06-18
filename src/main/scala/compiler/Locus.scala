@@ -112,13 +112,22 @@ final case class E() extends S {
 }
 
 final case class F() extends S {
-  val sufx  = Array("up", "do"); val proj: Array[Int] = Array(0, 0, 0, 1, 1, 1); val card = 48; val cardSucc = 2
+  val sufx = Array("do", "up");
+  val proj: Array[Int] = Array(0, 0, 0, 1, 1, 1);
+  val card = 48;
+  val cardSucc = 2
+
   def propagateFrom(s: Array[Int], c: Array[Int]): Option[Array[Int]] = Some(Array(c(s(0) * 3), c(s(0) * 3) + 1, c(s(0) * 3 + 2), c(s(1) * 3), c(s(1) * 3) + 1, c(s(1) * 3 + 2)))
-  override def scheduleProj(t: Seq[Int]): Array[Int] = Array( t(0),t(3))
-  private val  p2=List(3,4,5).permutations
-  private def combine(t:List[Int],u:List[Int]): Seq[Array[ Int]] = List( (t:::u).toArray,(u:::t).toArray )
-  def partitionnables: Option[Iterator[Array[Int]]] = Some( List(0, 1, 2).permutations.flatMap((t: List[Int]) => p2.map(combine(t, _))).flatten)
-  def partitionable(a:scala.Seq[Int])=a(0)==a(1)&&a(1)==a(2)&&a(3)==a(4)&& a(4)==a(5)
+
+  override def scheduleProj(t: Seq[Int]): Array[Int] = Array(t(0), t(3))
+
+  private val p2 = List(3, 4, 5).permutations
+
+  private def combine(t: List[Int], u: List[Int]): Seq[Array[Int]] = List((t ::: u).toArray, (u ::: t).toArray)
+
+  def partitionnables: Option[Iterator[Array[Int]]] = Some(List(0, 1, 2).permutations.flatMap((t: List[Int]) => p2.map(combine(t, _))).flatten)
+
+  def partitionable(a: scala.Seq[Int]) = a(0) == a(1) && a(1) == a(2) && a(3) == a(4) && a(4) == a(5)
 }
 
 abstract class TT extends Locus{
@@ -141,8 +150,8 @@ final case class T[+S1 <: S, +S2 <: S](from: S1, to: S2) extends TT {
    * for vertices there is 6 choices which do not have the same name for fV and eV */
   val sufx: Array[String] = from match {
     case V() => to match {
-      case E() => Array("w", "nw", "ne", "e", "se", "sw")
-      case F() => Array("wn", "n", "en", "es", "s", "ws")
+      case E() => Array("e", "se", "sw", "w", "nw", "ne")
+      case F() => Array("es", "s", "ws", "wn", "n", "en")
     }
     case E() => to match {
       case V() | F() => Array("1", "2")
@@ -183,5 +192,15 @@ object Locus {
   def locusF = F()
 
   def locusVe = T(V(), E())
+
+  def locusEv = T(E(), V())
+
+  def locusVf = T(V(), F())
+
+  def locusFv = T(F(), V())
+
+  def locusFe = T(F(), E())
+
+  val Ef = T(E(), F())
 
 }

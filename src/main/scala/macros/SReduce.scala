@@ -1,13 +1,15 @@
 package macros
 
-import compiler.AST._
+import compiler.AST.{p, _}
 import compiler.ASTL._
+import compiler.repr.nomV
 import compiler.{B, E, F, V}
+import macros.SReduce.existF2V
 
 /** Contains elementary loops doing simple reduction combined with a broacast from VEF to VEF */
 object SReduce {
 
-  /** From a boolV, computes edges on the frontier of blob radius 1 */
+  /** From a boolE, computes adjacent vertices */
   val existE2VDef: Fundef1[(E, B), (V, B)] = {
     val e = p[E, B]("edge")
     val existV: BoolV = orR(transfer(v(e)))
@@ -15,8 +17,106 @@ object SReduce {
     Fundef1("existE2V", existV, e)
   }
 
-  /** wrapper to  Call frontierE.  */
+  /** wrapper to  Call existE2V. */
   def existE2V(e: BoolE): BoolV = new Call1(existE2VDef, e) with BoolV
+
+
+  /** From a boolE, computes adjacent vertices */
+  val existE2FDef: Fundef1[(E, B), (F, B)] = {
+    val e = p[E, B]("edge")
+    val existF: BoolF = orR(transfer(f(e)))
+    existF.setName("existF");
+    Fundef1("existE2F", existF, e)
+  }
+
+  /** wrapper to  Call existE2V. */
+  def existE2F(e: BoolE): BoolF = new Call1(existE2FDef, e) with BoolF
+
+
+  /** From a boolE, computes adjacent vertices */
+  val existF2VDef: Fundef1[(F, B), (V, B)] = {
+    val f = p[F, B]("face")
+    val existV: BoolV = orR(transfer(v(f)))
+    existV.setName("existV");
+    Fundef1("existE2F", existV, f)
+  }
+
+  /** wrapper to  Call existE2V. */
+  def existF2V(f: BoolF): BoolV = new Call1(existF2VDef, f) with BoolV
+
+  /** From a boolV, computes adjacent edges */
+  val existV2EDef: Fundef1[(V, B), (E, B)] = {
+    val v = p[V, B]("vertice")
+    val existE: BoolE = orR(transfer(e(v)))
+    existE.setName("existE");
+    Fundef1("existV2E", existE, v)
+  }
+
+  /** wrapper to  Call existV2E. */
+  def existV2E(v: BoolV): BoolE = new Call1(existV2EDef, v) with BoolE
+
+
+  /** From a boolV, computes adjacent edges */
+  val existF2EDef: Fundef1[(F, B), (E, B)] = {
+    val f = p[F, B]("face")
+    val existE: BoolE = orR(transfer(e(f)))
+    existE.setName("exsistE");
+    Fundef1("existF2E", existE, f)
+  }
+
+  /** wrapper to  Call existV2E. */
+  def existF2E(f: BoolF): BoolE = new Call1(existF2EDef, f) with BoolE
+
+
+  /** From a boolV, computes adjacent faces */
+  val existV2FDef: Fundef1[(V, B), (F, B)] = {
+    val v = p[V, B]("vertice")
+    val existF: BoolF = orR(transfer(f(v)))
+    existF.setName("existF");
+    Fundef1("existV2F", existF, v)
+  }
+
+  /** wrapper to  Call existV2E. */
+  def existV2F(v: BoolV): BoolF = new Call1(existV2FDef, v) with BoolF
+
+
+  /** From a boolV, computes the neighborhoodV radius 2 */
+  val neighborhoodDef: Fundef1[(V, B), (V, B)] = {
+    val b = p[V, B]("blob")
+    //  val neighbEE=orR(transfer(e(b)))
+    // val neighbor: BoolV = orR(transfer(v(neighbEE)))
+    val neighbEE: BoolE = existV2E(b)
+    val neighbor: BoolV = existE2V(neighbEE)
+    neighbor.setName("neighbVV");
+    Fundef1("neighborhood", neighbor, b)
+  }
+
+  /** wrapper to  Call neighborhood. */
+  def neighborhood(b: BoolV): BoolV = new Call1(neighborhoodDef, b) with BoolV
+
+  /** From a boolF, computes the neighborhoodF radius 2 by going through edges */
+  val neighborhoodfDef: Fundef1[(V, B), (V, B)] = {
+    val b = p[V, B]("blob")
+    val neighbFF = existV2F(b)
+    val neighbor: BoolV = existF2V(neighbFF)
+    neighbor.setName("neighbVV");
+    Fundef1("neighborhood", neighbor, b)
+  }
+
+  /** wrapper to  Call neighborhood. */
+  def neighborhoodf(b: BoolV): BoolV = new Call1(neighborhoodfDef, b) with BoolV
+
+  /** From a boolV, computes the neighborhoodV radius 2 by going through faces */
+  val neighborhoodfeDef: Fundef1[(F, B), (F, B)] = {
+    val f = p[F, B]("face")
+    val neighbE = existF2E(f)
+    val neighbor: BoolF = existE2F(neighbE)
+    neighbor.setName("neighbVV");
+    Fundef1("neighborhood", neighbor, f)
+  }
+
+  /** wrapper to  Call neighborhood. */
+  def neighborhoodfe(b: BoolF): BoolF = new Call1(neighborhoodfeDef, b) with BoolF
 
 
   /** From a boolV, computes edges on the frontier of blob radius 1 */
@@ -27,7 +127,7 @@ object SReduce {
     Fundef1("frontierE", frontierE, b)
   }
 
-  /** wrapper to  Call frontierE.  */
+  /** wrapper to  Call frontierE. */
   def frontierE(b: BoolV): BoolE = new Call1(frontierEDef, b) with BoolE
 
 
@@ -91,17 +191,6 @@ object SReduce {
   /** wrapper to  Call insideE.  */
   def insideF(b: BoolV): BoolF = new Call1(insideFDef, b) with BoolF
 
-
-  /** From a boolV, computes the neighborhoodV radius 2 */
-  val neighborhoodDef: Fundef1[(V, B), (V, B)] = {
-    val b = p[V, B]("blob")
-    val neighbor: BoolV = orR(transfer(v(orR(transfer(e(b))))))
-    neighbor.setName("neighbor");
-    Fundef1("neighborhood", neighbor, b)
-  }
-
-  /** wrapper to  Call neighborhood.  */
-  def neighborhood(b: BoolV): BoolV = new Call1(neighborhoodDef, b) with BoolV
 
 
 }

@@ -32,10 +32,11 @@ class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class
   val liveVars = livVars
   var heapSize = 0
   /**
-   * adress (or register number) where a given variable will be stored, an association of each variable to an integer corresponding to a variable used for arithmetic
+   * adress (or register number) where a given variable will be stored,
+   * an association of each variable to an integer corresponding to a variable used for arithmetic
    * *         the required number  of such cells is simply the map size
    * *         The algo follows a generic allocation strategy; reusable in other circumstances.
-   * adress is used  by unplace, which free memory,
+   * adress is used  by unplace, which frees memory,
    */
   var adress: HashMap[String, Int] = HashMap()
 
@@ -80,9 +81,14 @@ class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class
 
     override def hasNext: Boolean = packetLeft.nonEmpty
 
+    /**
+     * computes *
+     *
+     * @return memory state string occupying each place, and adress associated to each string
+     */
     override def next(): (Vector[String], iTabSymb[Int]) = {
       val p = packetLeft.head
-      val newAllocatedAdress = p.names
+      val newAllocatedAdress: List[String] = p.names
       place(newAllocatedAdress.toSet)
       val res = heap //state will evolve with the following unplace, we need to point to the heap's state before that unplace.
       val l = liveVarLeft.head
