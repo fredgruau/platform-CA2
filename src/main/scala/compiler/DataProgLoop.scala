@@ -1,15 +1,19 @@
 
 package compiler
 
-import compiler.AST.isNotRead
+import compiler.AST.{Read, isNotRead}
 import compiler.ASTB.{AffBool, Dir, Elt, Reduce, outputStored}
 import compiler.ASTBfun.ASTBg
 import compiler.ASTL.BoolV
 import compiler.Circuit.{TabSymb, iTabSymb}
-import compiler.DataProgLoop.{removeAfterChar, shortenedSig}
+import compiler.DataProgLoop2.{removeAfterChar, shortenedSig}
 import compiler.Instr.{a, deployInt}
+import compiler.Locus.{all2DLocus, allLocus}
 import compiler.VarKind.{MacroField, StoredField}
 import dataStruc.{DagInstr, DagNode, HeapStates, WiredInOut}
+
+import scala.::
+import scala.collection.immutable.Nil.:::
 import scala.collection.{Map, Set, immutable, mutable}
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.collection.mutable.ArrayBuffer
@@ -28,8 +32,6 @@ class InstrNoLayersNorParam(val instr: Instr, val t: TabSymb[InfoNbit[_]]) exten
 
   /** names of variables produced by instruction. */
   override def names: List[String] = instr.names.filter(needAdressInHeap(_))
-
-
 }
 
 /**
@@ -58,7 +60,7 @@ class InstrLoop(val affect: Instr, val loops: List[Packet], val instrNumber: Int
 
   /** @return hashmap describing how to best map tmp register to local registers, so as to minimize their number */
   def coalescTmp: iTabSymb[String] = {
-    val res = WiredInOut.heap(loops).map((x: (String, Int)) => (x._1 -> ("r" + x._2)))
+    val res: Map[String, String] = WiredInOut.heap(loops).map((x: (String, Int)) => (x._1 -> ("r" + x._2)))
     nbTmpReg = res.values.toSet.size //pretty heavy computation but does the job
     res
   }
@@ -75,23 +77,7 @@ class InstrLoop(val affect: Instr, val loops: List[Packet], val instrNumber: Int
 
 }
 
-object DataProgLoop {
-  private def removeAfterChar(s: String, c: Char): String = if (s.contains(c)) s.substring(0, s.indexOf(c)) else s
 
-  private def truncateBefore(s: String, p: String) = {
-    if (s.indexOf(p) == -1) s else s.substring(0, s.indexOf(p))
-  }
-
-  private def radicalOfVar(s: String): String = {
-    truncateBefore(truncateBefore(s, "$"), "#")
-  }
-
-  private def shortenedSig(param: List[String]): List[String] = {
-    val res: mutable.LinkedHashSet[String] = mutable.LinkedHashSet()
-    for (p <- param) res += radicalOfVar(p)
-    return res.toList;
-  }
-}
 
 /**
  * Contains the compiled data, and all the functions used to implement the stage of compilation:
@@ -157,6 +143,9 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
    */
   def isHeap(s: String): Boolean = s.startsWith("Mem[")
 
+  /** if variables is Mem[14] returns 14 */
+  def adress(s: String) = s.substring(4, s.length - 1).toInt
+
   lazy val totalNamesSubMain: Set[String] = dagis.visitedL.flatMap(_.names).filter(isHeap(_)).toSet //we look at the call
   lazy val totalNamesRootMain: Set[String] = coalesc.values.filter(isHeap(_)).toSet
 
@@ -217,7 +206,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
    * are assigned the same register
    * allocate both CA lines for main loop, and Registers, for CA loops.
    *
-   * @return coalesced form of the program, where both the number of CA bit planes, and registers used is minimized.
+   * @return coalesced form of the program, coalescing of variables is done on index of memory bit planes.
+   *         where both the number of CA bit planes, and registers used is minimized.
    *         using a simple and classic heap
    */
   def coaalesc(): DataProgLoop[U] = {
@@ -231,11 +221,11 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
       for (k <- coal.keys)
         if (tSymbVarSafe(k).nb > 1)
         //we need to check if k+"#"+i happens to also be coalesced to k, in which case we have a "chained coalesc"
-        for (i <- 0 to tSymbVarSafe(k).nb - 1) {
-          result = result + (k + "#" + i -> (coal(k) + "#" + i))
-          //we add the boolean entry in tabsymb
-          tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]].addOne(coal(k) + "#" + i -> new InfoNbit[B](B(), tSymbVar(coal(k)).k, 1))
-        }
+          for (i <- 0 to tSymbVarSafe(k).nb - 1) {
+            result = result + (k + "#" + i -> (coal(k) + "#" + i))
+            //we add the boolean entry in tabsymb
+            tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]].addOne(coal(k) + "#" + i -> new InfoNbit[B](B(), tSymbVar(coal(k)).k, 1))
+          }
         else result = result + (k -> coal(k))
       result
     }
@@ -253,7 +243,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
       loops.map(_.coalesc(allCoalesc)) //applies the  coalesc extended to bool, for all the code
     }
     else if (isRootMain) { //we generate a list of call proc only for the main root
-      val (callProcs, allAdresses) = codeGen()
+      val (callProcs: List[CallProc], allAdresses) = codeGen()
       newDagis = DagInstr(callProcs)
       //in order to compute the code of a callProc,
       //we will prefer to leave the name of variables in the mainRoot it is more clear,
@@ -263,10 +253,10 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
         allAdresses.toList.map((e: (String, Int)) => (e._1, "Mem[" + (e._2).toString + "]".toString)) //      It can be used to coalesc
     }
     new DataProgLoop[U](newDagis, funs.map { case (k, v) ⇒ k -> v.coaalesc() }, tSymbVar, paramD,
-      paramR, allCoalesc, loops)
+      paramR, allCoalesc, loops) with ProduceJava[U]
   }
 
-  /** list of calls produce by mainRoot together with adresses of variables in the heap */
+  /** returns list of calls produce by mainRoot together with adresses of variables in the heap */
   def codeGen(): (List[CallProc], iTabSymb[Int]) = {
     var res: List[CallProc] = List()
     val noLayersInstr = dagis.visitedL.reverse.map((i: Instr) => new InstrNoLayersNorParam(i, tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]]))
@@ -277,7 +267,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
     val nbLayers = layers.length
     allAdresses ++= //we store all the adresses, layers and heap, as strings so as to store them in allcoalesc
       (layers zip (0 to nbLayers - 1)) //adress of layers
-    (paramR zip (nbLayers to nbLayers + paramR.length)) //adresses of  result parameter to the mainRoot
+    allAdresses ++= (paramR zip (nbLayers to nbLayers + paramR.length)) //adresses of  result parameter to the mainRoot
     val nbGlobals = allAdresses.size //the number of variables allways in the heap,
     // where morover, the distincts bit planes are found in sequence in the heap
     val hs = new HeapStates[InstrNoLayersNorParam](noLayersInstr)
@@ -321,23 +311,23 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
       throw new Exception("we compile main")
   }
 
+  def isBoolV(str: String) = tSymbVarSafe(str).t == (V(), B()) // .isInstanceOf[BoolV]
+
+  /** returns a hashmap of all the leafCAlloops, undexed by their name */
+  def allCAloop: Map[String, DataProgLoop[U]] = {
+    def f(st: Tuple2[String, DataProgLoop[U]]) =
+      if (st._2.isLeafCaLoop) List(st._1 -> st._2) else st._2.allCAloop
+
+    funs.map(f(_)).flatten.toMap
+  }
+
 
   /**
    *
-   * @return bitPlanes indexes associated to spatial variables
+   * @param nameFile non du fichier à trous
+   * @param map      spécifie par quoi on remplace chaque trous, les quels sont occupés par les clefs de la map
+   * @return resultat aprés remplacement.
    */
-
-  def isBoolV(str: String) = tSymbVarSafe(str).t == (V(), B()) // .isInstanceOf[BoolV]
-
-  /** returns all the leafCAlloops, undexed by their name in an hashmap */
-  def allCAloop: Iterable[(String, DataProgLoop[U])] = {
-    def f(st: Tuple2[String, DataProgLoop[U]]) = if (st._2.isLeafCaLoop) List(st._1 -> st._2) else st._2.allCAloop
-
-    funs.map(f(_)).flatten
-  }
-
-  def javaCode: String = javaCodeMain + allCAloop.map { case (k, v) => v.javaCodeCAloop(k) }.mkString("\n")
-
   def replaceAll(nameFile: String, map: iTabSymb[String]): String = {
     val template: String = Source.fromFile(nameFile).getLines().mkString("\n")
     val Regexp = """\{\{([^{}]+)\}\}""".r
@@ -352,63 +342,91 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
     replace(template)
   }
 
-  def javaCodeMain: String =
-    replaceAll("src/main/scala/compHandCA/templateCA.txt", Map(
-      "NAMECA" -> paramR(0).capitalize,
-      "MEMWIDTH" -> ("" + mainHeapSize)) //TODO on calcule pas bien la memwidth)
-    )
-  // shorten to " +    (shortenedSignature(paramD) ++ shortenedSignature(paramR)).mkString(" ") + "\n"
+  /**
+   *
+   * @param spatialType les signatures spatiales des macros pour faire la correspondances avec les tableaux
+   * @return
+   */
+  def density(str: String, st: (Locus, Ring)) = tSymbVarSafe(str).nb
 
+  /** declares all the named arrays */
+  def DeclNamed(offset: Map[String, List[Int]]): String = {
+    val (var1D, var2D) = offset.keys.partition(offset(_).size == 1) //we distinguish 1D arrays from 2D arrays.
+    "public static int[]" + var1D.mkString(",") + ";\n" +
+      "public static int[][]" + var2D.mkString(",") + ";\n"
+  }
 
-  def javaCodeCAloop(nameMacro: String): String = {
-    val shortSigIn = shortenedSig(paramD);
-    val shortSigOut = shortenedSig(paramR)
-
-    /** add type to parameters, one dimension is enough for spatial type boolV, two dimensions are needed for other locus */
-    def javaIntArray(s: String) = (if (isBoolV(s)) ("int [] ") else ("int [][] ")) + s
-
-    val parameters = (shortSigIn ::: shortSigOut).map(javaIntArray(_))
-
-    def anchorParam(shortened: List[String], original: List[String]): List[String] = {
-      var res: List[String] = List()
-      var i = 0
-      for (s: String <- shortened) {
-        if (isBoolV(s)) i += 1
-        else {
-          var j = 0
-          try while (removeAfterChar(original(i), '$') == s) {
-            res = original(i) + "=" + s + "[" + j + "]" :: res //ish=isE[0]
-            j += 1;
-            i += 1
-
-          } catch {
-            case _: IndexOutOfBoundsException =>
-          }
-        }
-      }
+  /** code that anchors named arrays on memory */
+  def anchorNamed(offset: Map[String, List[Int]]): String = {
+    def anchorOneVar(oneVar: (String, List[Int])) = {
+      val ints = oneVar._2
+      var res = ints.map("m[" + _ + "]").mkString(",")
+      if (ints.size > 1) res = " new int[][]{" + res + "}" //we have a 2D array
+      res = oneVar._1 + "=" + res;
       res
     }
 
-    replaceAll("src/main/scala/compHandCA/templateCAloop.txt", Map(
-      "NAMEMACRO" -> nameMacro,
-      "PARAMETERS" -> parameters.mkString(","),
-      "ANCHORPARAM" -> (anchorParam(shortSigIn, paramD) ::: anchorParam(shortSigOut, paramR)).reverse.mkString(","),
-      "PROPAGATEFIRSTBIT" -> paramD.map((s: String) => "p.propagate4shift(" + s + ")").mkString(";"),
-      "FIRSTPARAM" -> (paramD ::: paramR)(0), //There must be at least one param,
-      // we need to read it so as to know the length which is the number of CA lines.
-      //  "READPARAM"->paramD.map((s:String)=>s+"i"+"="+s+"[i]").mkString(";"),
-      "DECLINITPARAM" -> {
-        val intReg = (standaloneRegister ++ coalesced.keys)
-        val boolReg: Iterable[String] = intReg.flatMap((s: String) => deployInt(s, tSymbVarSafe(s).nb))
-
-        def isDelayed(s: String) = delayed.contains(removeAfterChar(s, '#'))
-
-        "int " + boolReg.map((s: String) => if (isDelayed(s)) s + "=0" else s).mkString(",")
-      },
-      "LOOPBODY" -> totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ")
-
-    ))
+    offset.map(anchorOneVar(_)).mkString(";\n")
   }
+
+  def fieldOffset(offset: Map[String, List[Int]]): String = {
+    def offsetOneVar(oneVar: (String, List[Int])) = {
+      val ints = oneVar._2
+      var res = ints.map("" + _).mkString(",")
+      res = "map.put(\"" + oneVar._1 + "\", Util.li(" + res + "));";
+      res
+    }
+
+    offset.map(offsetOneVar(_)).mkString("\n")
+  }
+
+  /** returns a list of offset for all named fields, which is used to anchor named 1D arrays, and also to list memory planes */
+  def offsetsInt: Map[String, List[Int]] = {
+    var res: Map[String, List[Int]] = HashMap()
+    val spatials: Map[VarKind, Map[Any, List[String]]] = sortedindexedByKindThenByType(isSpatial)
+    for (k <- spatials.keys)
+      for (t <- spatials(k).keys.asInstanceOf[Set[(Locus, Ring)]])
+        for (nameVar: String <- spatials(k)(t))
+          if (t == (V(), B())) res = res + (nameVar -> List(adress(coalesc(nameVar)))) //we have a scalar
+          else {
+            val ofsetstring = t._1.deploy(nameVar, tSymbVarSafe(nameVar).nb)
+            val ofsetint: Array[Int] = ofsetstring.map((s: String) => adress(coalesc(s)))
+            res = res + (nameVar -> ofsetint.toList)
+          } //non scalar variable,
+    res
+  }
+
+  /** Codes that decalres unamed arrays */
+  def declNotNamed(decomposition: Map[Locus, Map[List[Int], Int]]): String = { //todo queskispass si c'est un tableau 1D?
+    val var1D = (0 until decomposition(V()).size).map("V" + _) //name of unamed points to its locus.
+    var var2D: List[String] = List() //needs 2D arrays
+    for (l: Locus <- all2DLocus) {
+      var2D = var2D ++ (0 until decomposition(l).size).map(l.parentheseLessToString + _)
+    }
+    // seedE = new int[][]{m[8], m[9], m[10]};
+    "public static int[]" + var1D.mkString(",") + ";\n" +
+      "public static int[][]" + var2D.mkString(",") + ";\n"
+  }
+
+  /** Codes that decompose array 2D into memory slices */
+  def anchorNotNamed(decomposition: Map[Locus, Map[List[Int], Int]]): String = { //todo queskispass si c'est un tableau 1D?
+    var codeDecl: List[String] = List()
+    for (l: Locus <- allLocus)
+      for ((li, i) <- decomposition(l))
+        codeDecl = l.parentheseLessToString + i + "= new int[][]{" + li.map("m[" + _ + "]").mkString(", ") + "};" :: codeDecl
+    // seedE = new int[][]{m[8], m[9], m[10]};
+    codeDecl.mkString("\n")
+  }
+
+  /** outputs the sequence of all codes to macro loops */
+
+  // shorten to " +    (shortenedSignature(paramD) ++ shortenedSignature(paramR)).mkString(" ") + "\n"
+
+  /** Asuming we kept original spatial variables in symbol table returns the list of spatial tpes, mixing data and result parameters */
+  def spatialSig: List[(Locus, Ring)] = (shortenedSig(paramD) ::: shortenedSig(paramR)).map(tSymbVarSafe(_).t.asInstanceOf[(Locus, Ring)])
+
+  /** Asuming we kept original spatial variables in symbol table returns the list of bit size, mixing data and result parameters */
+  def nbitSig: List[Int] = (shortenedSig(paramD) ::: shortenedSig(paramR)).map(tSymbVarSafe(_).nb)
 
 }
 

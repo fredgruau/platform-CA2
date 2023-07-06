@@ -190,6 +190,14 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
    * @param t symbol table to be updated for paramR() to paramRR(Int) where int indicate the radius of result param
    * @return radius and modifier of expression
    */
+  def radiusify2(r: TabSymb[Int], t: TabSymb[InfoNbit[_]]): Int =
+    this.asInstanceOf[AST[_]] match {
+      case Read(s) => t(s).k match {
+        case ParamD() => 0
+        case MacroField() => r(s) //we should have computed it before, and stored it in r
+      }
+    }
+
   def radiusify(r: TabSymb[(Int, Option[Modifier])], t: TabSymb[InfoNbit[_]]): (Int, Option[Modifier]) =
     this.asInstanceOf[AST[_]] match {
       case Read(s) => t(s).k match {

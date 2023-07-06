@@ -13,6 +13,7 @@ sealed abstract class Locus {
     case T(_, _) => 9
   }
 
+  def parentheseLessToString = ("" + this).dropRight(2)
 
   def isTransfer = false
 
@@ -31,6 +32,11 @@ sealed abstract class Locus {
   /** adds a suffix to a name in order to distinguish between the associated scalars encoding the spatial locus */
 
   def deploy(n: String): Array[String]
+
+  /** does also a deploy between O and nbit-1 */
+  def deploy(n: String, nbit: Int): Array[String] =
+    if (nbit == 1) deploy(n)
+    else deploy(n).flatMap((s: String) => (0 until nbit).map(s + "#" + _))
 
   /** encodes a neutral permutation with the right number of elements. */
   lazy val neutral: Array[Int] = Array.range(0, density) //we put lazy otherwise pb in initialization order
@@ -185,22 +191,24 @@ object Locus {
   }
 
   //static method to be called from java, because V(), E(), F() are not accessible.
-  def locusV = V()
+  val locusV = V()
 
-  def locusE = E()
+  val locusE = E()
 
-  def locusF = F()
+  val locusF = F()
 
-  def locusVe = T(V(), E())
+  val locusVe = T(V(), E())
 
-  def locusEv = T(E(), V())
+  val locusEv = T(E(), V())
 
-  def locusVf = T(V(), F())
+  val locusVf = T(V(), F())
 
-  def locusFv = T(F(), V())
+  val locusFv = T(F(), V())
 
-  def locusFe = T(F(), E())
+  val locusFe = T(F(), E())
 
-  val Ef = T(E(), F())
+  val locusEf = T(E(), F())
 
+  val allLocus: List[Locus] = List(V(), E(), F(), locusVe, locusEv, locusVf, locusFv, locusEf, locusFe)
+  val all2DLocus: List[Locus] = List(E(), F(), locusVe, locusEv, locusVf, locusFv, locusEf, locusFe)
 }

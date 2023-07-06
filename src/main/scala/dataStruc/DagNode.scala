@@ -4,6 +4,7 @@ import compiler.AST.Read
 import compiler.ASTB.AffBool
 import compiler.{AST, ASTB, Affect, InfoType}
 import compiler.Circuit.TabSymb
+import compiler.DataProgLoop2.{radicalOfVar, radicalOfVar2}
 import dataStruc.DagNode.Neton
 
 import scala.collection.{Iterable, immutable, mutable}
@@ -37,13 +38,19 @@ trait DagNode[+T <: DagNode[T]] {
 
   /** * @param t symbol Table needed to check if variable is a parameter
    *
-   * @return code of boolean instruction, adds a [i] if isParam is true
+   * @return code of boolean instruction, adds a [i] if isParam is true, or i-1 if result parameter of radius 1
    */
   def toStringParam(t: TabSymb[InfoType[_]]): String = {
     if (t != null) if (isInstanceOf[AST[_]])
       this.asInstanceOf[AST[_]] match {
-        case Read(name) => if (t(name).k.isParam) return name + "[i]"
-        case ASTB.AffBool(name, _) => if (t(name).k.isParam) return name + "[i]="
+        case Read(name) => if (t(radicalOfVar2(name)).k.isParam)
+          return name + "[i]"
+        case ASTB.AffBool(name, _) =>
+          val nameRad = radicalOfVar2(name)
+          if (t(nameRad).k.isParam)
+            if (t(nameRad).k.isRadius1)
+              return name + "[i-1]=" //Radius can be either 0 or 1
+            else return name + "[i]="
         case _ => toString
       };
     toString

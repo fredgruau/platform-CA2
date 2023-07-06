@@ -40,7 +40,8 @@ class Dist(val source: BoolV) extends Layer[(V, SI)](3) with ASTLt[V, SI] {
 
 object Dist extends App {
   val myInput: AST.Param[(V, B)] with ASTLt[V, B] = p[V, B]("input")
-  new Circuit[V, SI](myInput) {
+  new Circuit[V, SI]() { //pour l'instant on teste sans parametres
+    // new Circuit[V, SI](myInput) {
     val src = constLayerBool[V]
     val dist = new Dist(src)
 

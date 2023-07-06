@@ -10,6 +10,7 @@ import Circuit.{iTabSymb2, _}
 import repr._
 import dataStruc.Dag
 import dataStruc.DagNode._
+
 import scala.collection.{mutable, _}
 import scala.reflect.ClassTag
 import scala.language.implicitConversions
@@ -64,6 +65,9 @@ object ASTL {
   /** central symmetry, used on vertices */
   private[ASTL] final case class Sym[S1 <: S, S2 <: S, S2new <: S, R <: Ring](arg: ASTLt[T[S1, S2], R], m: repr[T[S1, S2new]], t: CentralSym[S2, S1, S2new], n: repr[R])
     extends ASTL[T[S1, S2new], R]()(repr.nomLR(m, n)) with Singleton[AST[_]]
+
+  /** delaying so as to obtain same radius is a special unop! */
+
 
   /** Field which has a value both  at time t, and t+1 */
   trait Strate[L <: Locus, R <: Ring] {
@@ -178,13 +182,20 @@ object ASTL {
   def concat2SI[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[SI]): ASTL[L, SI] =
     Binop(concat2f.asInstanceOf[Fundef2[R1, R2, SI]], arg1, arg2, m, n)
 
-  /** @param i final number of bit   */
+  /** @param i final number of bit */
   def extend[L <: Locus, R <: Ring](i: Int, arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, R] =
     Unop[L, R, R](ASTBfun.extend[R](i).asInstanceOf[Fundef1[R, R]], arg, m, n)
 
   def elem[L <: Locus, R <: I](i: Int, arg: ASTLt[L, R])(implicit m: repr[L], n: repr[B]): Unop[L, R, B] =
     Unop[L, R, B](eltUISI(arg.ring, i).asInstanceOf[Fundef1[R, B]], arg, m, n)
 
+  /** binop that implements a delay */
+  def increaseRadius[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, R] = {
+
+    val lll = Unop[L, R, R](ASTBfun.increaseRadius[R], arg, m, n)
+    lll
+  }
+  //{ ASTL.Unop(opp.asInstanceOf[Fundef1[R, SI]], this, m, repr.nomSI) }
 
   //def concat[L <: Locus, R <: I](arg1: Seq[ASTLtrait[L, R]])(implicit m: repr[L], n: repr[R]) = Multop2[L, R, R](concatN, arg1,m,n);
   // def orR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]) = Redop[S1, S2, R]((orI.asInstanceOf[Fundef2[R, R, R]], False[R]), arg, m, n);
@@ -276,8 +287,6 @@ object ASTL {
 
   def opp[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, SI, SI] =
     Unop[L, SI, SI](oppSI, arg.asInstanceOf[ASTLt[L, SI]], m, repr.nomSI)
-
-  //{ ASTL.Unop(opp.asInstanceOf[Fundef1[R, SI]], this, m, repr.nomSI) }
 
 
   /** uses a fixed val addUISI, and let the compiler believe that this val has the appropriate expected  type R=UI or R=SI  */
@@ -616,9 +625,48 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
    * @param t symbol table to be updated for paramR() to paramRR(Int) where int indicate the radius of result param
    * @return radius and modifier of expression
    */
+  override def radiusify2(r: TabSymb[Int], t: TabSymb[InfoNbit[_]]): Int = {
+    def increaseRadius(rad: Int, src: Locus, target: Locus): Int = {
+      val newRadius = (src, target) match {
+        case (V(), _) | (E(), F()) => rad + 1
+        case _ => rad
+      }
+      assert(newRadius < 2) // we have to do  another communication between radius=1 and radius=-2
+      newRadius
+    }
+
+    this.asInstanceOf[ASTLg] match {
+      case Coonst(_, _, _) => -1000 //radius is arbitrary
+      case Transfer(arg, _, _) => {
+        val rad = arg.radiusify2(r, t)
+        val T(src, target) = arg.locus //we get the source and target locus knowing that arg is a transfer locus
+        increaseRadius(rad, src, target)
+      }
+      case Binop(_, arg, arg2, _, _) =>
+        val r1 = arg.radiusify2(r, t)
+        val r2 = arg2.radiusify2(r, t)
+        assert(r1 == r2 || r1 < 0 || r2 < 0, "binop should processe variables of identical index i") //todo introduce delays
+        math.max(r1, r2)
+
+      case Unop(op, arg, _, _) =>
+        arg.radiusify2(r, t) +
+          (if (op.name == "increaseRadius")
+            1
+          else 0) //ca ne change pas
+      case Broadcast(arg, _, _) => arg.radiusify2(r, t) //ca ne change pas
+      case Redop(_, arg, _, _) => arg.radiusify2(r, t) //ca ne change pas
+      case RedopConcat(arg, _, _) => arg.radiusify2(r, t) //ca ne change pas
+      case Clock(arg, _) => arg.radiusify2(r, t) //ca ne change pas
+      case Send(args) => args(0).radiusify2(r, t) //ca ne change pas
+      case Sym(arg, _, _, _) => arg.radiusify2(r, t) //ca ne change pas
+    }
+
+  }
+
   override def radiusify(r: TabSymb[(Int, Option[Modifier])], t: TabSymb[InfoNbit[_]]): (Int, Option[Modifier]) = {
 
     /**
+     * t
      *
      * @param rad    radius
      * @param m      modifier: Perimeter or Radial

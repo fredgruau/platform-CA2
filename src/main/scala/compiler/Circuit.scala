@@ -61,7 +61,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
     //  print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
 
-    val prog5ter = prog5bis.radiusify
+    val prog5ter = prog5bis.radiusify2
     // print("radiusify555555555555555555555555555555\n"+prog5ter)
 
     val prog6 = prog5ter.unfoldSpace(m);
@@ -77,13 +77,13 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
     val prog10: DataProgLoop[InfoNbit[_]] = prog8.loopIfy()
-    //  print(prog10)
+    //   print(prog10)
 
     val prog11 = prog10.unfoldInt()
-    //  print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
+    // print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
     val prog12 = prog11.coaalesc()
-    print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc\n" + prog12)
-    print("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.javaCode)
+    // print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc\n" + prog12)
+    print("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].javaCode)
   }
 }
 

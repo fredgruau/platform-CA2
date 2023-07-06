@@ -10,6 +10,7 @@ import compiler.ASTL.BoolV
  * THEY SHOULD BE DECLARED IN THE RIGHT ORDER OTHERWISE IT WILL RESULT IN TROUBLESOME NUL VALUES
  * THAT I TAKE A LONG TIME TO SPOT */
 object ASTBfun {
+
   type ASTB1[R <: Ring] = ASTBt[R]
   type ASTBg = ASTBt[_ <: Ring]
   type Fundef3R[R <: Ring] = Fundef3[R, R, R, R]
@@ -175,6 +176,13 @@ object ASTBfun {
     Fundef1("extend" + i + m.name,
       Extend[R](i, x), x)
   }
+
+  def increaseRadius[R <: Ring]()(implicit m: repr[R]): Fundef1[R, R] = {
+    val x = p[R]("x");
+    Fundef1("increaseRadius",
+      IncreaseRadius[R](x), x)
+  }
+
 
   /** @param i final number of bits */
   def extendSI(i: Int): Fundef1[SI, SI] = {

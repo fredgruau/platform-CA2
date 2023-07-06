@@ -39,6 +39,9 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
    */
   def unfoldInt(t: TabSymb[InfoNbit[_]]): List[Instr]
 
+
+  def radiusify2(radius: TabSymb[Int], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {}
+
   def radiusify(radius: TabSymb[(Int, Option[Modifier])], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {}
 
   protected def show(x: Option[Locus]) = x match {
@@ -300,27 +303,29 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
  * call of a procedure,
  * where several parameters can be passed by result.
  *
- * @param p     procedure's' name
- * @param names names of values produced by procedure.
- * @param exps  passed as data
+ * @param procName procedure's' name
+ * @param names    names of values produced by procedure.
+ * @param exps     passed as data
  */
-case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) extends Instr {
+case class CallProc(var procName: String, names: List[String], exps: List[AST[_]]) extends Instr {
   override def callProcToAffect: Instr = if (tobeProcessedInMacro) new Affect(names(0), exps(0))
   else throw new Exception("only memo callProc gets macroified");
 
 
   override def tobeProcessedInMacro =
-    isProcessedInMacro(p)
+    isProcessedInMacro(procName)
 
   // override def namesDefined: List[String] = if() List()
+
   /**
    * for bug and show we will add the name of the motherLayer to the name of the call
+   *
    * @param motherLayer : Layer to which the bug or the show is attached
    */
-  def preciseName(motherLayer: String) = p += motherLayer
+  def preciseName(motherLayer: String) = procName += motherLayer
 
 
-  override def toString: String = pad(names.mkString(","), 25) + "<-" + p + "(" + exps.map(_.toStringTree).mkString(" ") + ")"
+  override def toString: String = pad(names.mkString(","), 25) + "<-" + procName + "(" + exps.map(_.toStringTree).mkString(" ") + ")"
 
 
   //override def toString: String = pad(names.foldLeft(" ")(_ + "," + _).substring(2), 25) + "<-" + p + "(" + exps.map(_.toStringTree).foldLeft(" ")(_ + " " + _) + ")\n"
@@ -333,7 +338,7 @@ case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) exte
 
 
   override def propagate(id1: rewriteAST2): Instr = {
-    val newInstr = CallProc(p, names, exps.map((a: AST[_]) => id1(a)))
+    val newInstr = CallProc(procName, names, exps.map((a: AST[_]) => id1(a)))
     newInstr
   }
 
@@ -362,7 +367,7 @@ case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) exte
           if(!t.contains(bname)) //if name is already in symbol table, adding it anew will replace a spatial type by a scalar type
             //or will remove the layer info, which in total will loose information so we do not want that
           t.addOne(bname->new InfoNbit[B](B(), t(name),1))) //adds scalar variables. should we?*/
-    val res = List(new CallProc(p, resb, newExps.flatten))
+    val res = List(new CallProc(procName, resb, newExps.flatten))
     res
     //if(p=="memo") //we can generate a list of memo
 
@@ -370,9 +375,11 @@ case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) exte
 
   override def codeGen(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int, allCoalesc: iTabSymb[String]):
   List[CallProc] =
-    p match { //specific processing of the system calls
-      case "memo" | "bug" | "show" => List(this.coalesc(allCoalesc).asInstanceOf[CallProc])
-      case _ => val fun: DataProgLoop[_] = funs(p)
+    procName match { //specific processing of the system calls
+      case "memo" | "bug" | "show" | "copy" =>
+        val l = List(this.coalesc(allCoalesc).asInstanceOf[CallProc])
+        l
+      case _ => val fun: DataProgLoop[_] = funs(procName)
         if (fun.isLeafCaLoop) {
           //we just need to coalesc this by replacing names used either using param or using adress
           List(this.coalesc(allCoalesc).asInstanceOf[CallProc])
@@ -394,7 +401,7 @@ case class CallProc(var p: String, names: List[String], exps: List[AST[_]]) exte
 
   /** substitute x in names and x in read(x) by coalesc(x) */
   override def coalesc(c: iTabSymb[String]): Instr = {
-    CallProc(p, names.map((s: String) => c.getOrElse(s, s)), exps.map(_.asInstanceOf[ASTBt[_ <: Ring]].coalesc(c)))
+    CallProc(procName, names.map((s: String) => c.getOrElse(s, s)), exps.map(_.asInstanceOf[ASTBt[_ <: Ring]].coalesc(c)))
   }
 }
 
@@ -605,6 +612,14 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
    * @param radius contains the already computer radius
    * @param tSymbVar
    */
+  override def radiusify2(radius: TabSymb[Int], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {
+
+    val r = exp.asInstanceOf[ASTLt[_ <: Locus, _ <: Ring]].radiusify2(radius, tSymbVar)
+    radius.addOne(name -> r) //we store radius of identifier for future use.
+    if (tSymbVar(name).k.isParamR)
+      tSymbVar.addOne(name -> tSymbVar(name).radiusify(r)) //for paramR, we modify the symbol table
+  }
+
   override def radiusify(radius: TabSymb[(Int, Option[Modifier])], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {
     val (r, modifier): (Int, Option[Modifier]) = exp.asInstanceOf[ASTLt[_ <: Locus, _ <: Ring]].radiusify(radius, tSymbVar)
     radius.addOne(name -> (r, modifier)) //we store radius of identifier for future use.
@@ -637,9 +652,14 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
 
   //affectation are replace by call to the copy macro, which just  copies *
   // data
-  override def codeGen(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int, allCoalesc: iTabSymb[String]):
-  List[CallProc] = List(CallProc("copy", List(allCoalesc.getOrElse(name, name)),
-    List(exp.asInstanceOf[ASTBt[_ <: Ring]].coalesc(allCoalesc))))
+  override def codeGen(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int,
+                       allCoalesc: iTabSymb[String]): List[CallProc] = {
+
+
+    val res = List(CallProc("copy", List(allCoalesc.getOrElse(name, name)),
+      List(exp.asInstanceOf[ASTBt[_ <: Ring]].coalesc(allCoalesc))))
+    res
+}
 }
 
 

@@ -457,6 +457,8 @@ object ASTB {
   /** will copy the msb until nbits are obtained, we inherit parOpScan in order to enjoy a register to store that last bit */
   case class Extend[R <: Ring](i: Int, arg: ASTBt[R])(implicit n: repr[R]) extends ParOpScan[R](Left()) with Singleton[AST[_]]
 
+  case class IncreaseRadius[R <: Ring](arg: ASTBt[R])(implicit n: repr[R]) extends ParOp[R](Both()) with Singleton[AST[_]]
+
   /** Iterates on one int */
   case class Mapp1Old[R <: I](arg: ASTBt[R], op: Fundef1[B, B])(implicit n: repr[R]) extends ParOp[R](Both()) with Singleton[AST[_]]
 
@@ -469,6 +471,7 @@ object ASTB {
    * @tparam R scalar type
    */
   case class Mapp1[R <: I](op: Fundef1[B, B], args: List[ASTBt[R]])(implicit n: repr[R]) extends ParOp[R](Both()) with Neton[AST[_]]
+
 
   /** iterates on two ints with identical number of bits */
   case class Mapp2[R <: I](arg: ASTBt[R], arg2: ASTBt[R], op: Fundef2[B, B, B])(implicit n: repr[R])
@@ -598,6 +601,7 @@ object ASTB {
       case Mapp2(exp, exp2, _) => maxArgSize(exp, exp2)
       case Shift(e, _) => nbitExpAndParam(nbitASTBParam, e, paramBitIncrease)
       case Tminus1(e) => nbitExpAndParam(nbitASTBParam, e, paramBitIncrease)
+      case IncreaseRadius(e) => nbitExpAndParam(nbitASTBParam, e, paramBitIncrease)
       case Mapp1(_, expList) => nbitExpAndParam(nbitASTBParam, expList.head, paramBitIncrease)
       //case MappBI(exp, exp2, opp)               => nBitR(nbit, exp2, pm)
       case Elt(_, _) => 1;

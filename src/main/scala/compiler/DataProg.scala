@@ -273,12 +273,12 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   }
   /** register which are not coalesced, and shoud be defined. */
   lazy val standaloneRegister: Iterable[String] =
-    tSymbVar.keys.filter((s: String) => (!coalesc.contains(s) && !tSymbVar(s).k.isParam &&
-      !coalesced.contains(s) && !(s(0) == '_')))
+
+    tSymbVar.keys.filter((s: String) => (!coalesc.contains(s) && !tSymbVar(s).k.isParam && !coalesced.contains(s) && !(s(0) == '_')))
 
   /** @return coalesced registers in textual form with alphabetic ordering on the keys
    *          so that the register r1,r2... stand out together */
-  def toStringCoalesc: String = {
+  def toStringCoalesc: String = if (coalesc == null) "" else {
     val sortCoalesced = ListMap(coalesced.toSeq.sortBy(_._1): _*)
     "standalone (also need registers): " + standaloneRegister.mkString(",") + "\n" +
       "delayed: (need initialize) " + delayed.mkString(",") + "\n" +
@@ -751,9 +751,18 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
   /**
    *
-   * @return in the varkind of the symbol table, we replace ParamR by ParamRR(r) where r is the radius.
+   * @return in the varkind of the symbol table, we replace ParamR by ParamRR(r) where r is the radius
+   *         computed with respect to index in the bit plane (and not the distance)
    *         we add delays in exoression,  if a binop is applied to two expression of distinct radius.
    */
+  def radiusify2: DataProg[InfoNbit[_]] = {
+    val radius: TabSymb[Int] = mutable.HashMap.empty //stores all the radius of the id in that symbol tables.
+    val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
+    if (isLeafCaLoop)
+      dagis.visitedL.reverse.map(_.radiusify2(radius, p.tSymbVar))
+    new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.radiusify2 }, p.tSymbVar, paramD, paramR, coalesc)
+  }
+
   def radiusify: DataProg[InfoNbit[_]] = {
     val radius: TabSymb[(Int, Option[Modifier])] = mutable.HashMap.empty //stores all the radius of the id in that symbol tables.
     val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
@@ -1560,7 +1569,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
    * moving the instruction forward (rule B) or backward.(rule C)
    * adding a store instruction (rule D) */
   def detm1Ify(): DataProg[InfoType[_]] = {
-    def isParamR(str: String) = tSymbVarSafe(str).k isParamR
+    def isParamR(str: String) = tSymbVarSafe(str).k.isParamR
 
     val p = this.asInstanceOf[DataProg[InfoType[_]]]
     if (isLeafCaLoop) {

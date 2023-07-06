@@ -13,6 +13,17 @@ public class Util {
     public static int[] defe, defse, defsw, defw, defnw, defne;
     public static int[] bug;
 
+    public static void copy(int[] src, int[] dest) {
+        assert (src.length == dest.length);
+        System.arraycopy(src, 0, dest, 0, src.length);
+    }
+
+    public static void copy2(int[][] src, int[][] dest) {
+        assert (src.length == dest.length);
+        for (int i = 0; i < src.length; i++)
+            copy(src[i], dest[i]);
+    }
+
     public static void anchorFixedInMem(int[][] m) {
         bug = m[0];
         defVe = new int[][]{m[1], m[2], m[3], m[4], m[5], m[6]};

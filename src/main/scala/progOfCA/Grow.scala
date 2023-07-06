@@ -13,6 +13,16 @@ class Grow extends Layer[(V, B)](1) with ASTLt[V, B] {
   show(this)
 }
 
+// implement the intermediate stage in main, so that we have name variables as 2D arrays.
+class GrowDec extends Layer[(V, B)](1) with ASTLt[V, B] {
+  // val GrowE= existV2E(this);  val next: BoolV = existE2V(GrowE)
+
+  val neighbEE: BoolE = existV2E(this)
+  show(neighbEE)
+  val next: BoolV = existE2V(neighbEE)
+  show(this)
+}
+
 class GrowF extends Layer[(F, B)](1) with ASTLt[F, B] {
   val next: BoolF = neighborhoodfe(this)
   show(this)
@@ -30,6 +40,14 @@ class GrowVor() extends Layer[(V, B)](1) with ASTLt[V, B] with BlobV {
 object Grow extends App {
   new Circuit[V, B]() {
     val grow = new Grow();
+
+    def computeRoot: BoolV = grow
+  }.compile(hexagon)
+}
+
+object GrowDec extends App {
+  new Circuit[V, B]() {
+    val grow = new GrowDec();
 
     def computeRoot: BoolV = grow
   }.compile(hexagon)

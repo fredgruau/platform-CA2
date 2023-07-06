@@ -50,7 +50,7 @@ public final class TestEfCA implements CAloops {
         map.put("defVe", Locus.locusVe());
         map.put("defE", Locus.locusE());
         map.put("defF", Locus.locusF());
-        map.put("fE", Locus.Ef());
+        map.put("fE", Locus.locusEf());
         return (map);
     }
 

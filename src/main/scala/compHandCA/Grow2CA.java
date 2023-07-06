@@ -5,13 +5,13 @@ import scala.collection.immutable.List;
 import simulator.CAloops;
 import simulator.CAloops2;
 import simulator.PrShift;
+import simulator.Util;
 
 import java.util.HashMap;
 
 import static compiledLoops.redS.orE2V;
 import static compiledLoops.redS.orV2E;
-import static simulator.Util.*;
-
+import static simulator.Util.anchorFixedInMem;
 /**
  * This illustrates an example of the files that should be produced by the compiler in order to describe a CA
  * THis will regroupe all the 6 reduction from one simplicial locus to the two others,
@@ -24,8 +24,8 @@ public final class Grow2CA implements CAloops2 {
         return 11;
     }
 
-    public int[][] seedE;
-    public int[] seed;
+    public static int[][] seedE;
+    public static int[] seed;
 
     public void anchorFieldInMem(int[][] m) {
         anchorFixedInMem(m);//global variables
@@ -36,9 +36,9 @@ public final class Grow2CA implements CAloops2 {
     @Override
     public HashMap<String, List<Integer>> fieldOffset() {
         HashMap<String, List<Integer>> map = new HashMap<>();
-        map.put("defVe", li(1, 2, 3, 4, 5, 6));
-        map.put("llseed", li(7));
-        map.put("E", li(8, 9, 10));
+        map.put("defVe", Util.li(1, 2, 3, 4, 5, 6));
+        map.put("llseed", Util.li(7));
+        map.put("E", Util.li(8, 9, 10));
         return (map);
     }
 
@@ -48,7 +48,6 @@ public final class Grow2CA implements CAloops2 {
         orE2V(p, seedE, seed);
         //orV2E(p,mem[7],mem[8],mem[9],mem[10]);
         //orE2V(p, mem[1], mem[2], mem[3], mem[4], mem[5], mem[6], mem[8],mem[9],mem[10],mem[7]);
-
         //  grow(p, mem[0], mem[3], mem[4], mem[5], mem[6], mem[7], mem[8]);
     }
 

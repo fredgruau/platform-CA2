@@ -17,7 +17,16 @@ sealed class VarKind extends Comparable[VarKind] {
     case _ => false
   }
 
-  def isParam = isInstanceOf[ParamRR] || isInstanceOf[ParamD] || isInstanceOf[ParamR]
+  def isParam = this match {
+    case ParamR() | ParamRR(_) | ParamD() => true
+    case _ => false
+  }
+
+  //def isParam = isInstanceOf[ParamRR] || isInstanceOf[ParamD] || isInstanceOf[ParamR]
+  def isRadius1: Boolean = this match {
+    case ParamRR(1) => true
+    case _ => false
+  }
 
   def isStoredField: Boolean = this match {
     case StoredField() => true;
@@ -37,7 +46,7 @@ object VarKind {
 
   /** Default type of variable which will not be stored in the CA memory,
    * instead, it will be temporarily hold in a java longint register.
-   * Used to compute liveness at the beginning and at the end of the loop body  */
+   * Used to compute liveness at the beginning and at the end of the loop body */
   final case class MacroField() extends VarKind {}
 
   /** used only at the very beginning, when constructing the Dag */

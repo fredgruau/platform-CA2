@@ -1,8 +1,37 @@
 public final class {{NAMECA}}CA implements CAloops2 {
     public int CAmemWidth() {  return {{MEMWIDTH}}}}    }
-@Override   public HashMap<String, List<Integer>> fieldOffset() {
-        HashMap<String, List<Integer>> map = new HashMap<>();
-        map.put("defVe",li(1,2,3,4,5,6));
-        map.put("llseed",  li(7));   map.put("E", li(8,9,10));  return (map);  }}
+    {{DECLNAMED}}
+   {{DECLNOTNAMED}}
+    //  public int[][] seedE;   public int[] seed;
 
 
+
+public void anchorFieldInMem(int[][] m) {
+   anchorFixedInMem(m);//global variables
+  {{ANCHORNAMED}}
+  {{ANCHORNOTNAMED}}
+}
+
+
+@Override
+public HashMap<String, List<Integer>> fieldOffset() {
+   HashMap<String, List<Integer>> map = new HashMap<>();
+   {{FIELDOFFSET}}
+   return (map);
+}
+
+
+
+@Override
+    public void theLoops(PrShift p) {
+           {{LISTCALL}}
+    }
+}
+
+@Override
+public HashMap<String, Locus> fieldLocus() {
+   HashMap<String, Locus> map = new HashMap<>();
+   map.put("llseed", Locus.locusV());
+   map.put("defVe", Locus.locusVe());
+   return (map);
+}
