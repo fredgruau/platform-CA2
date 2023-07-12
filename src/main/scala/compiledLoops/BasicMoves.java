@@ -65,16 +65,12 @@ public class BasicMoves {
     }
 
     /**
-     * @param p     how to do the communication implementing rotation
-     * @param is    current configuration
-     * @param defe  wether east neighbor is defined
-     * @param defse wether south-east neighbor is defined
-     * @param defsw wether south west neighbor is defined
-     * @param defw  wether west neighbor is defined
-     * @param defnw wether north west neighbor is defined
-     * @param defne wether north east neighbor is defined
+     * @param p  how to do the communication implementing rotation
+     * @param is current configuration
      */
-    public static void grow(PrShift p, int[] is, int[] defe, int[] defse, int[] defsw, int[] defw, int[] defnw, int[] defne) {
+    //public static void grow(PrShift p, int[] is, int[] defe, int[] defse, int[] defsw, int[] defw, int[] defnw, int[] defne) {
+    public static void grow(PrShift p, int[] is, int[][] defVe) {
+        int[] defe = defVe[0], defse = defVe[1], defsw = defVe[2], defw = defVe[3], defnw = defVe[4], defne = defVe[5];
         p.propagate4shift(is);
         int llistm1 = 0, llis = 0, isNe = 0, isNw = 0, isE = 0, isW = 0, isSe = 0, defsetm1 = 0, isSw = 0, defswtm1 = 0;
         for (int i = 1; i < is.length; i++) {

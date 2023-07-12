@@ -12,6 +12,7 @@ sealed abstract class Locus {
     case F() => 5
     case T(_, _) => 9
   }
+  def javaName: String
 
   def parentheseLessToString = ("" + this).dropRight(2)
 
@@ -63,6 +64,8 @@ object Modifier {
 
 
 abstract class S extends Locus with Ordered[S] {
+  def javaName: String = "locus" + toString
+
   override def deploy(n: String): Array[String] = sufx.map(n + "$" + _)
 
   /** number of neighbor when doing a reduction */
@@ -145,6 +148,8 @@ abstract class TT extends Locus{
 
 /** T stands for Transfer, and uses two simplicial locus. The first is the simplicial. T[V,E] corresponds to  eV  */
 final case class T[+S1 <: S, +S2 <: S](from: S1, to: S2) extends TT {
+  def javaName: String = "locus" + from.parentheseLessToString + to.parentheseLessToString.toLowerCase + "()"
+
   override def deploy(n: String) =
     from.sufx.map((suf1: String) => sufx.map(n + "$" + suf1 + _).toList).toList.flatten.toArray
 

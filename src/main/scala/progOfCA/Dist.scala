@@ -9,9 +9,14 @@ import macros.Compute._
 import macros.SReduce._
 
 
-class Dist(val source: BoolV) extends Layer[(V, SI)](3) with ASTLt[V, SI] {
+trait Dddist {
+  self: Layer[(V, B)] =>
+  val theDist = new Dist(self)
+  show(theDist) //if this is not in class Dist, then class Dist is not compiled because not used from SRC
+}
+
+class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3) with ASTLt[V, SI] {
   val level: BoolV = elem(2, this);
-  //render2(level)
   /*
   val tepred = transfer(e(pred))
   val grad: IntvE =  tepred - sym(tepred)  ; //should use opp to make only one subtraction, we need to adress selectively the two neighbors of an edge.
@@ -32,20 +37,20 @@ class Dist(val source: BoolV) extends Layer[(V, SI)](3) with ASTLt[V, SI] {
   // ceci provoque bien l'erreur attendue java.lang.RuntimeException: Debug exp is allzero=>not usable for compute
   //ca montre que debug ne peut etre réutilisé.
   bugif(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
-  val next: ASTLt[V, SI] = this + cond(source, sign(-this), delta) //faudrait en faire une macro qui prends delta, source et dist et renvoie distNext
+  val next: ASTLt[V, SI] = this + cond(source.asInstanceOf[BoolV], sign(-this), delta) //faudrait en faire une macro qui prends delta, source et dist et renvoie distNext
   // val temp: BoolfV = xorR2(transfer(slope)) ;  val vortex: BoolF = orR(transfer(temp));   bugif(vortex);
   show(tslope)
+
 }
 
 
-object Dist extends App {
+object Dist2 extends App {
   val myInput: AST.Param[(V, B)] with ASTLt[V, B] = p[V, B]("input")
-  new Circuit[V, SI]() { //pour l'instant on teste sans parametres
+  new Circuit[V, B]() { //pour l'instant on teste sans parametres
     // new Circuit[V, SI](myInput) {
-    val src = constLayerBool[V]
-    val dist = new Dist(src)
+    val src = new ConstLayer[V, B](1) with Dddist {}
 
-    def computeRoot: ASTLt[V, SI] = dist
+    def computeRoot: ASTLt[V, B] = src
   }.compile(hexagon)
 }
 

@@ -1,8 +1,7 @@
 public final class {{NAMECA}}CA implements CAloops2 {
-    public int CAmemWidth() {  return {{MEMWIDTH}}}}    }
+    public int CAmemWidth() {  return {{MEMWIDTH}}    }
     {{DECLNAMED}}
    {{DECLNOTNAMED}}
-    //  public int[][] seedE;   public int[] seed;
 
 
 
@@ -31,7 +30,15 @@ public HashMap<String, List<Integer>> fieldOffset() {
 @Override
 public HashMap<String, Locus> fieldLocus() {
    HashMap<String, Locus> map = new HashMap<>();
-   map.put("llseed", Locus.locusV());
-   map.put("defVe", Locus.locusVe());
+   {{FIELDLOCUS}}
    return (map);
 }
+
+
+    @Override
+    public HashMap<String, Integer> fieldBitSize() {
+        HashMap<String, Integer> map = new HashMap<>();
+        {{BITSIZE}}
+        map.put("llseed", 3);
+        return (map);
+    }

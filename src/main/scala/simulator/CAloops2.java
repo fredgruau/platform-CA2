@@ -13,6 +13,8 @@ import java.util.HashMap;
  */
 public interface CAloops2 {
 
+    // void theLoops(int[][] mem, PrShift p);
+
     /**
      * applies a set of loops realizing one iteration on the CA.
      */

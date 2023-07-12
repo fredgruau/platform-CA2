@@ -45,7 +45,7 @@ object DataProg {
     def getLayers(l: List[AST[_]]) = l.collect { case la: Layer[_] => la }
 
     def getSysInstr(l: List[AST[_]]): List[CallProc] = getLayers(l).flatMap(_.systInstr)
-
+    //def getHierarchyDisplay:HashMap[Layer[_],ASTL[_ <: Locus,_ <: Ring]]=new HashMap()++
     //TODO build the layer structure here, exploit that we have it!
     val dag: Dag[AST[_]] = Dag()
     /** f.body  is the expression containing the value returned by the functions.
@@ -102,24 +102,24 @@ object DataProg {
  * @param tSymbVar symbol table
  * @param paramD   names of data parameters, provides  an order on them
  * @param paramR   names of result parameters , provides  an order on them
- * @param coalesc  when unfolding from spatial type to scalar type , or scalar int to bool,
- *                 each variable is rewritten into several, however, those several duplicata can sometimes be coalesced
- *                 for exemple grad$d2, grad$ad1, grad$h1, grad$ad2, grad$d1, grad$h2 can be coalesced
- *                 because we succeeded to schedule instructions so that they in fact correspond to a single variable
- *                 naturally, we coalesc them to a register called "grad"
- *                 when such coalescing  happens grad$d2, grad$ad1, grad$h1, grad$ad2, grad$d1, grad$h2
- *                 will not appear in the symbol table,
- *                 instead they will figure in the coalesc table.
- *                 The locus if forgotten in the the type of stored variables in main loop,
- *                 but is kept in the type of macroFields, DataParameters, ... for CA loops.
- *                 For main loop----------
- *                 The former variable, "grad", remains in the symbol table, and this holds even if no coalescing happens
- *                 the reason is that this will allow to retrieve the locus, which will be usefull for displaying
- *                 For boolean vertice variable, we choose to not insert several entries, for the spatial, the non spatial a
- *                 and finally the boolean variable, we use a single spatial variable, with type V(),B()
- *                 For CA loop ----------------
- *                 we keep the locus in the type, it helps to distinguish scalar variables from variables which
- *                 come from unfolding. Macrofields are not printed anyway
+ * @param coalesc when unfolding from spatial type to scalar type , or scalar int to bool,
+ *                each variable is rewritten into several, however, those several duplicata can sometimes be coalesced
+ *                for exemple grad$d2, grad$ad1, grad$h1, grad$ad2, grad$d1, grad$h2 can be coalesced
+ *                because we succeeded to schedule instructions so that they in fact correspond to a single variable
+ *                naturally, we coalesc them to a register called "grad"
+ *                when such coalescing  happens grad$d2, grad$ad1, grad$h1, grad$ad2, grad$d1, grad$h2
+ *                will not appear in the symbol table,
+ *                instead they will figure in the coalesc table.
+ *                The locus is forgotten in the the type of stored variables in main loop,
+ *                but is kept in the type of macroFields, DataParameters, ... for CA loops.
+ *                For main loop----------
+ *                The former variable, "grad", remains in the symbol table, and this holds even if no coalescing happens
+ *                the reason is that this will allow to retrieve the locus, which will be usefull for displaying
+ *                For boolean vertice variable, we choose to not insert several entries, for the spatial, the non spatial a
+ *                and finally the boolean variable, we use a single spatial variable, with type V(),B()
+ *                For CA loop ----------------
+ *                we keep the locus in the type, it helps to distinguish scalar variables from variables which
+ *                come from unfolding. Macrofields are not printed anyway
  */
 class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataProg[U]], val tSymbVar: TabSymb[U],
                                  val paramD: List[String], val paramR: List[String],

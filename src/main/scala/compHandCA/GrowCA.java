@@ -1,31 +1,41 @@
 
 package compHandCA;
+
 import compiler.Locus;
 import scala.collection.immutable.List;
 import simulator.CAloops;
+import simulator.CAloops2;
 import simulator.PrShift;
 
 import java.util.HashMap;
 
-import static compiledLoops.BasicMoves.*;
+import static compiledLoops.BasicMoves.grow;
+import static simulator.Util.anchorFixedInMem;
 
 /**
  * This illustrate an example of the files that should be produced by the compiler in order to describe a CA
+ * Grows is directly implemented using only 6 ors, without computing an intermediate boolE
  */
 
+public final class GrowCA implements CAloops2 {
+    public static int[][] defVe;
+    public static int[] seed;
 
-public final class GrowCA implements CAloops {
+    public void anchorFieldInMem(int[][] mem) {
+        anchorFixedInMem(mem);//global variables
+        seed = mem[0];
+        defVe = new int[][]{mem[3], mem[4], mem[5], mem[6], mem[7], mem[8]};
+    }
 
     @Override
-    public void theLoops(int[][] mem, PrShift p) {
-        grow(p, mem[0], mem[3], mem[4], mem[5], mem[6], mem[7], mem[8]);
+    public void theLoops(PrShift p) {
+        grow(p, seed, defVe);
     }
 
 
     @Override
     public List<String> directInit() {
         return CAloops.list("llseed", "tmp1", "tmp2", "defE", "defF", "defVe");//
-        // ,"defVe"
     }
 
     public int CAmemWidth() {

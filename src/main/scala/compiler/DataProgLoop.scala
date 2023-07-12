@@ -317,7 +317,6 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   def allCAloop: Map[String, DataProgLoop[U]] = {
     def f(st: Tuple2[String, DataProgLoop[U]]) =
       if (st._2.isLeafCaLoop) List(st._1 -> st._2) else st._2.allCAloop
-
     funs.map(f(_)).flatten.toMap
   }
 
@@ -331,14 +330,11 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   def replaceAll(nameFile: String, map: iTabSymb[String]): String = {
     val template: String = Source.fromFile(nameFile).getLines().mkString("\n")
     val Regexp = """\{\{([^{}]+)\}\}""".r
-
     def replace(incoming: String) = {
       def replace(what: String, `with`: String)(where: String) = where.replace(what, `with`)
-
       val composedReplace = Regexp.findAllMatchIn(incoming).map { m => replace(m.matched, map(m.group(1)))(_) }.reduceLeftOption((lf, rf) => lf compose rf).getOrElse(identity[String](_))
       composedReplace(template)
     }
-
     replace(template)
   }
 
@@ -352,8 +348,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   /** declares all the named arrays */
   def DeclNamed(offset: Map[String, List[Int]]): String = {
     val (var1D, var2D) = offset.keys.partition(offset(_).size == 1) //we distinguish 1D arrays from 2D arrays.
-    "public static int[]" + var1D.mkString(",") + ";\n" +
-      "public static int[][]" + var2D.mkString(",") + ";\n"
+    (if (var1D.nonEmpty) "public static int[]" + var1D.mkString(",") + ";\n" else "") +
+      (if (var2D.nonEmpty) "public static int[][]" + var2D.mkString(",") + ";\n" else "")
   }
 
   /** code that anchors named arrays on memory */
@@ -365,7 +361,6 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
       res = oneVar._1 + "=" + res;
       res
     }
-
     offset.map(anchorOneVar(_)).mkString(";\n")
   }
 
@@ -396,17 +391,17 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
     res
   }
 
-  /** Codes that decalres unamed arrays */
+  /** Codes that declares unamed arrays */
   def declNotNamed(decomposition: Map[Locus, Map[List[Int], Int]]): String = { //todo queskispass si c'est un tableau 1D?
     val var1D = (0 until decomposition(V()).size).map("V" + _) //name of unamed points to its locus.
     var var2D: List[String] = List() //needs 2D arrays
     for (l: Locus <- all2DLocus) {
       var2D = var2D ++ (0 until decomposition(l).size).map(l.parentheseLessToString + _)
     }
-    // seedE = new int[][]{m[8], m[9], m[10]};
-    "public static int[]" + var1D.mkString(",") + ";\n" +
-      "public static int[][]" + var2D.mkString(",") + ";\n"
+    (if (var1D.nonEmpty) "public static int[] " + var1D.mkString(",") + ";\n" else "") +
+      (if (var2D.nonEmpty) "public static int[][] " + var2D.mkString(",") + ";\n" else "")
   }
+
 
   /** Codes that decompose array 2D into memory slices */
   def anchorNotNamed(decomposition: Map[Locus, Map[List[Int], Int]]): String = { //todo queskispass si c'est un tableau 1D?

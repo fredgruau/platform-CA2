@@ -6,6 +6,7 @@ import scalaswingcontrib.tree.Tree.{Path, Renderer}
 import simulator.ExampleData._
 import simulator.XMLutilities.extractNodeText
 
+import javax.swing.JTree
 import javax.swing.event.{TreeExpansionEvent, TreeExpansionListener}
 import scala.swing.event.MouseClicked
 import scala.xml.{Node, Text}
@@ -17,16 +18,18 @@ import scala.xml.{Node, Text}
  * @param controller   the controller
  */
 class LayerTree(val xmlLayerTree: Node, val controller: Controller) extends Tree[Node] with TreeExpansionListener {
+  peer.setRootVisible(false) //marche pas
+  peer.setShowsRootHandles(true) //marche pas
+  peer.addTreeExpansionListener(this) //we had to resort to directly use javax swing for listening to expansion event, because we failed to use scala swing
   model = TreeModel(xmlLayerTree)(_.child filterNot (_.isInstanceOf[Text])) //text are also nodes, we do not want those
   renderer = Renderer.labeled[Node] { n => //
     val icon =
       if (controller.colorDisplayedField.contains(extractNodeText(n))) //test if the field is to be displayed
-      new DiamondIcon(V(), controller.colorDisplayedField(extractNodeText(n)), true) //if so displays its color, diamond should be different depending on  locus
+        new DiamondIcon(V(), controller.colorDisplayedField(extractNodeText(n)), true) //if so displays its color, diamond should be different depending on  locus
       else if (isLayer(n)) folderIcon //layers contains other layers, therefore they display as folder
       else fileIcon //those are not yet displayed field
     (icon, extractNodeText(n)) //we also display layers or field's name
   }
-  peer.addTreeExpansionListener(this) //we had to resort to directly use javax swing for listening to expansion event, because we failed to use scala swing
 
   listenTo(mouse.clicks)
   reactions += {

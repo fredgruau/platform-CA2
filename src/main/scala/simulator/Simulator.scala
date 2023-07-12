@@ -6,7 +6,7 @@ import triangulation.Vector2D
 
 import java.awt.{Color, Polygon}
 import java.net.URL
-import javax.swing.ImageIcon
+import javax.swing.{ImageIcon, JTree}
 import scala.swing.Swing.Icon
 import scala.swing._
 import scala.xml.Node
@@ -47,7 +47,7 @@ object Simulator extends SimpleSwingApplication {
     val possibleDir = directories.filter((s: String) => loadClass(s + "." + nameCA) != null)
     assert(possibleDir.size > 0, nameCA + "could not be found in any of the directories " + directories)
     assert(possibleDir.size < 2, nameCA + "could not be found two times in the directories " + directories)
-    val chosenDir = possibleDir.head
+    val chosenDir: String = possibleDir.head
     val classCA: Class[CAloops2] = loadClass(chosenDir + "." + nameCA)
     /** contains the loops but also many other parameters */
     val progCA: CAloops2 = getProg(classCA)
@@ -60,10 +60,15 @@ object Simulator extends SimpleSwingApplication {
 
 
     /** process the signal we create controller first in order to instanciate state variable used by tree */
-    val controller = new Controller(nameCA, paramCA, progCA)
+    val controller = new Controller(nameCA, paramCA, progCA, chosenDir, this)
     /** Tree for browsing the hierarchy of layers and which field to display */
     val layerTree = new LayerTree((paramCA \\ "layers").head, controller)
+    val myTree: JTree = layerTree.peer
+    myTree.expandRow(0)
+    myTree.setRootVisible(false)
+    myTree.setShowsRootHandles(true)
     val scrollableXmlTree = new ScrollPane(layerTree) //we put it scrollable because it can become big
+
     controller.init(layerTree) //now we can pass it to the controller which needs to listen to exansion and coloration events
 
     /** We simulate several CA simultaneously. We generate a list of environement using an iterator */
@@ -98,6 +103,7 @@ object Simulator extends SimpleSwingApplication {
         }
         numEnv += 1
       }
+
     }
     val scrollablPannels = new ScrollPane(pannels) // we generate many pannels and the mouse wheel will allow to easily scroll
     /** this way of doing make the toolbar floatable */
@@ -135,7 +141,7 @@ object SimulatorUtil {
     val gridSizes: collection.Seq[(Int, Int)] = fromXMLasListIntCouple(paramCA, "sizes", "size", "@nbLine", "@nbCol")
     /** When simulating CAs with different init */
     val multiInits = xArrayString(paramCA, "multiInit", "@inits")
-    val rootLayer = if (multiInits.nonEmpty) x(paramCA, "multiInit", "@layer") else null
+    val rootLayer: String = if (multiInits.nonEmpty) x(paramCA, "multiInit", "@layer") else null
     val iter: String = x(paramCA, "display", "@iter") //what we iterate on
 
     def totalIter: Int = iter match {

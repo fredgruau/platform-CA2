@@ -280,7 +280,8 @@ object ASTLt {
 
 
   /** constant layer. */
-  private[ASTLt] class ConstLayer[L <: Locus, R <: Ring](nbit: Int)(implicit m: repr[L], n: repr[R]) extends Layer[(L, R)](nbit) with ASTLt[L, R] {
+  //private[ASTLt]
+  class ConstLayer[L <: Locus, R <: Ring](nbit: Int)(implicit m: repr[L], n: repr[R]) extends Layer[(L, R)](nbit) with ASTLt[L, R] {
     val next: ASTLt[L, R] = delayedL(this) //yes
   }
 

@@ -2,29 +2,64 @@ package compiler
 
 import compiler.AST.Read
 import compiler.Circuit.TabSymb
-import compiler.DataProgLoop2.{radicalOfVar, removeAfterChar, shortenedSig}
+import compiler.DataProgLoop2.{fatherOfVar, indexOfLastUpperCase, radicalOfVar, removeAfterChar, shortenedSig}
 import compiler.Instr.deployInt
 import compiler.Locus.allLocus
+import dataStruc.Named
 
-
+import java.util.regex.Pattern
+import scala.::
+import scala.collection.convert.ImplicitConversions.`collection asJava`
 import scala.collection.{Map, mutable}
-import scala.collection.immutable.HashMap
+import scala.collection.immutable.{HashMap, HashSet}
+import scala.xml.Elem
 
+/** contains the code needed to produce the final java code */
 trait ProduceJava[U <: InfoNbit[_]] {
   self: DataProgLoop[U] =>
   def javaCode: String = { //we need to generate spatial signature for macros before we can adress the main.
     val loops: Map[String, DataProgLoop[U]] = allCAloop
-
     val codeLoops: String = loops.map { case (k, v) => v.asInstanceOf[ProduceJava[U]].javaCodeCAloop(k) }.mkString("\n")
 
     def sptyp(st: Tuple2[String, DataProgLoop[U]]) = (st._1, st._2.spatialSig)
 
     def nbittyp(st: Tuple2[String, DataProgLoop[U]]) = (st._1, st._2.nbitSig)
 
-    val spatialTypeParamLoops: Map[String, List[(Locus, Ring)]] = loops.map(sptyp(_))
+    val spatialTypeParamLoops: Map[String, List[(Locus, Ring)]] = loops.map(sptyp(_)) //
     val nbitTypeParamLoops: Map[String, List[Int]] = loops.map(nbittyp(_))
     val codeMain: String = javaCodeMain(spatialTypeParamLoops, nbitTypeParamLoops)
     codeLoops + codeMain
+  }
+
+  /** Produce the code to inintialize 1D array from 2D arrays */
+  def anchorParam(shortened: List[String], original: List[String]): List[String] = {
+    var res: List[String] = List()
+    var i = 0
+    for (s: String <- shortened) {
+      if (isBoolV(s)) i += 1
+      else {
+        var j = 0
+        try while (removeAfterChar(original(i), '$') == s) {
+          res = original(i) + "=" + s + "[" + j + "]" :: res //ish=isE[0]
+          j += 1;
+          i += 1
+        } catch {
+          case _: IndexOutOfBoundsException =>
+        }
+      }
+    }
+    res
+  }
+
+  /** declares all the variables local to the loops, and initializes them to zero if needed */
+  def declInitParam = {
+    val intReg = (standaloneRegister ++ coalesced.keys) //should be declared
+    val boolReg: Iterable[String] = intReg.flatMap((s: String) => deployInt(s, tSymbVarSafe(s).nb)) //intReg which have a single component are not deployed
+
+    /** variable which are delayed must be indentified so as to be initialized */
+    def isDelayed(s: String) = delayed.contains(removeAfterChar(s, '#'))
+
+    "int " + boolReg.map((s: String) => if (isDelayed(s)) s + "=0" else s).mkString(",")
   }
 
   def javaCodeCAloop(nameMacro: String): String = {
@@ -37,27 +72,6 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
     val parameters = (shortSigIn ::: shortSigOut).map(javaIntArray(_))
 
-    /** Produce the code to inintialize 1D array from 2D arrays */
-    def anchorParam(shortened: List[String], original: List[String]): List[String] = {
-      var res: List[String] = List()
-      var i = 0
-      for (s: String <- shortened) {
-        if (isBoolV(s)) i += 1
-        else {
-          var j = 0
-          try while (removeAfterChar(original(i), '$') == s) {
-            res = original(i) + "=" + s + "[" + j + "]" :: res //ish=isE[0]
-            j += 1;
-            i += 1
-
-          } catch {
-            case _: IndexOutOfBoundsException =>
-          }
-        }
-      }
-      res
-    }
-
     replaceAll("src/main/scala/compHandCA/templateCAloop.txt", Map(
       "NAMEMACRO" -> nameMacro,
       "PARAMETERS" -> parameters.mkString(","),
@@ -66,23 +80,31 @@ trait ProduceJava[U <: InfoNbit[_]] {
       "FIRSTPARAM" -> (paramD ::: paramR)(0), //There must be at least one param,
       // we need to read it so as to know the length which is the number of CA lines.
       //  "READPARAM"->paramD.map((s:String)=>s+"i"+"="+s+"[i]").mkString(";"),
-      "DECLINITPARAM" -> {
-        val intReg = (standaloneRegister ++ coalesced.keys)
-        val boolReg: Iterable[String] = intReg.flatMap((s: String) => deployInt(s, tSymbVarSafe(s).nb))
-
-        def isDelayed(s: String) = delayed.contains(removeAfterChar(s, '#'))
-
-        "int " + boolReg.map((s: String) => if (isDelayed(s)) s + "=0" else s).mkString(",")
-      },
+      "DECLINITPARAM" -> declInitParam,
       "LOOPBODY" -> totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ")
 
     ))
   }
 
+  /** number of bits for non boolean variables. */
+  def fieldBitSize(names: Iterable[String]): HashMap[String, Int] =
+    HashMap[String, Int]() ++ names.filter(tSymbVar(_).nb > 1).map((s: String) => s -> tSymbVar(s).nb)
+
+  def fieldLocus(names: Iterable[String]): HashMap[String, Locus] = {
+    val res = HashMap[String, Locus]() ++ names.map((s: String) => s -> tSymbVar(s).t.asInstanceOf[(Locus, Ring)]._1)
+    val u = 0
+    res
+  }
+
+  var mainCallCode: List[String] = null
+
   def javaCodeMain(spatialTypes: Map[String, List[(Locus, Ring)]], nbitType: Map[String, List[Int]]): String = {
     /** use  locus and parameter occurence order to create parameter names */
     val offfsetsInt = offsetsInt
     val (theCallCode, decompositionLocus) = theCalllCode(spatialTypes, nbitType)
+    mainCallCode = theCallCode
+    val l = layerXML
+    System.out.println(l)
     replaceAll("src/main/scala/compHandCA/templateCA.txt", Map(
       "NAMECA" -> paramR(0).capitalize,
       "MEMWIDTH" -> ("" + mainHeapSize + "\n"), //TODO on calcule pas bien la memwidth)
@@ -91,8 +113,59 @@ trait ProduceJava[U <: InfoNbit[_]] {
       "LISTCALL" -> theCallCode.reverse.mkString("\n"),
       "ANCHORNAMED" -> anchorNamed(offfsetsInt), //anchorNamed,
       "ANCHORNOTNAMED" -> anchorNotNamed(decompositionLocus),
-      "FIELDOFFSET" -> fieldOffset(offfsetsInt)))
+      "FIELDOFFSET" -> fieldOffset(offfsetsInt),
+      "FIELDLOCUS" -> fieldLocus(offfsetsInt.keys).map((kv: (String, Locus)) =>
+        " map.put(\"" + kv._1 + "\"," + kv._2.javaName + ")").mkString("\n"),
+      "BITSIZE" -> fieldBitSize(offfsetsInt.keys).map((kv: (String, Int)) =>
+        " map.put(\"" + kv._1 + "\"," + kv._2 + ")").mkString("\n"),
+    ))
+
   }
+
+  /**
+   * it uses the mainCallCode to get the display command
+   *
+   * @return keys are names of Layers, value are names of fields or Layers
+   */
+  def hierarchyDisplayedField: Map[String, List[String]] = {
+    var res: Map[String, List[String]] = new HashMap()
+    for (v <- theDispayed) {
+      val f = fatherOfVar(v)
+      val l = if (res.contains(f)) res(f) else List()
+      res = res + (f -> (v :: l))
+    }
+    res
+  }
+
+  def layerXML = {
+    val h = hierarchyDisplayedField
+    val rootLayers: Iterable[String] = h.keys.filter(indexOfLastUpperCase(_) == -1).toSet - ""
+
+    /** recursive traversing of hierarchy */
+    def xmll(s: String): Elem = {
+      <Layer>
+        {s}{if (theDispayed.contains(s)) //if layer is printed, adds the field storing the former layer's value
+      {
+        <Field>
+          {Named.lify(s)}
+        </Field>
+      }}{h(s).map(nameFieldorLayer => if (h.contains(nameFieldorLayer)) xmll(nameFieldorLayer) else {
+        <Field>
+          {nameFieldorLayer}
+        </Field>
+      }
+      )}
+      </Layer>
+    }
+
+    <layers>layers
+      {rootLayers.map(nameLayer => xmll(nameLayer))}
+    </layers>
+  }
+
+
+  /** names of displayed variables */
+  var theDispayed: Set[String] = HashSet()
 
   def theCalllCode(spatialTypes: Map[String, List[(Locus, Ring)]], nbitType: Map[String, List[Int]]): (List[String], Map[Locus, Map[List[Int], Int]]) = {
     var decompositionLocus: Map[Locus, Map[List[Int], Int]] = HashMap() ++ allLocus.map(_ -> HashMap())
@@ -106,7 +179,11 @@ trait ProduceJava[U <: InfoNbit[_]] {
       var callCode = call.procName + "(" //we now need to add the params
       var paramCode: List[String] = List()
       call.procName match {
-        case "copy" | "show" | "memo" | "bug" => //
+        case "show" =>
+          val callCodeArg = radicalOfVar(call.usedVars().toList.head)
+          theDispayed += callCodeArg //display has allways a single arg which is the field to be displayed
+          callCode += callCodeArg + ")"
+        case "copy" | "memo" | "bug" => //
         case _ =>
           for ((spatialType, nbit) <- spatialTypes(call.procName) zip nbitType(call.procName)) {
             val locus: Locus = spatialType._1
@@ -144,8 +221,6 @@ trait ProduceJava[U <: InfoNbit[_]] {
     }
     (theCallCode, decompositionLocus)
   }
-
-
 }
 
 object DataProgLoop2 {
@@ -161,6 +236,21 @@ object DataProgLoop2 {
 
   def radicalOfVar2(s: String): String = {
     truncateBefore(s, "#")
+  }
+
+  def indexOfLastUpperCase(v: String) = {
+    val pat = Pattern.compile("[A-Z][^A-Z]*$")
+    val `match` = pat.matcher(v)
+    var lastCapitalIndex = -1
+    if (`match`.find) lastCapitalIndex = `match`.start
+    lastCapitalIndex
+  }
+
+  /** returns the name of the layers containing var, or empty string if there is none */
+  def fatherOfVar(v: String): String = {
+    val i = indexOfLastUpperCase(v)
+    if (i == -1) ""
+    else v.substring(0, i)
   }
 
   def shortenedSig(param: List[String]): List[String] = {

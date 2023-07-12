@@ -3,6 +3,7 @@ package compiledCA;
 import compiler.Locus;
 import scala.collection.immutable.List;
 import simulator.CAloops;
+import simulator.CAloops2;
 import simulator.PrShift;
 
 import java.util.HashMap;
@@ -11,11 +12,12 @@ import java.util.HashMap;
 /**
  * This illustrate an example of the files that should be produced by the compiler in order to describe a CA
  */
-public final class TestCA implements CAloops {
+public final class TestCA implements CAloops2 {
 
 
     @Override
-    public void theLoops(int[][] mem, PrShift p) {
+    public void theLoops(PrShift p) {
+
     }
 
     @Override
@@ -25,6 +27,11 @@ public final class TestCA implements CAloops {
 
     public int CAmemWidth() {
         return 1;
+    }
+
+    @Override
+    public void anchorFieldInMem(int[][] m) {
+
     }
 
 

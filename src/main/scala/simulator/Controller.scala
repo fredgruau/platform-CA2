@@ -17,11 +17,12 @@ import scala.xml.{Node, NodeSeq, XML}
 
 /**
  *
- * @param nameCA  name used to find out where param and progCA are
- * @param paramCA mutable  because updated as we interact with display, and also stored
- * @param progCA  contains the code for the loops
+ * @param nameCA    name used to find out where param and progCA are
+ * @param paramCA   mutable  because updated as we interact with display, and also stored
+ * @param progCA    contains the code for the loops
+ * @param chosenDir directory containing the CA code
  */
-class Controller(val nameCA: String, var paramCA: Node, val progCA: CAloops2)
+class Controller(val nameCA: String, var paramCA: Node, val progCA: CAloops2, val chosenDir: String, val mf: MainFrame)
   extends ToolBar() { //the controller inherits the toolBar, so that it can easily identifies which button was ckicqued, using the button's variable  name
   /** we need to know the locus of fields which are either displayed or initialized */
   val locusDisplayedOrDirectInitField: Map[String, Locus] = progCA.fieldLocus.asScala.toMap
@@ -89,7 +90,7 @@ class Controller(val nameCA: String, var paramCA: Node, val progCA: CAloops2)
         })}
         </colorOfField>
       </paramCA>
-    XML.save("src/main/scala/compiledCA/" + nameCA + "param.xml", paramCA)
+    XML.save("src/main/scala/" + chosenDir + "/" + nameCA + "param.xml", paramCA)
   }
 
   private class SimpleButton(ic: javax.swing.Icon) extends Button() {
@@ -119,10 +120,15 @@ class Controller(val nameCA: String, var paramCA: Node, val progCA: CAloops2)
       expandedLayers += s
       updateAndSaveXMLparamCA()
       layerTree.repaint()
+      mf.pack() //resize the space allocated to the tree so that it prints entirely
+    // mf.unmaximize()
+    // we hope it recomputes size of tree windows so as to accomodate
+    //this.repaint()
     case CollapseLayer(s) =>
       expandedLayers -= s
       updateAndSaveXMLparamCA()
       layerTree.repaint()
+      mf.pack()
     case ToggleColorEvent(s) =>
       val l = locusDisplayedOrDirectInitField(s)
       colorDisplayedField =
