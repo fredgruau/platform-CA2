@@ -1,0 +1,41 @@
+<paramCA>
+    <fixed>
+        <machine nbCol="6" nbLine="8" arch="christal"/>
+        //default CA size and architecture
+        <display nbCol="1" CAwidth="1600" iter="none"/>
+        <simul isPlaying="false" t0="0"/>
+        <inits>
+            <layer init="center">llseed</layer>
+            <layer init="def">defE</layer>
+            <layer init="def">defF</layer>
+            <layer init="def">defVe</layer>
+        </inits>
+        <multiInit inits="center,border,random,dottedBorder" layer="llseed"/>
+        <sizes>
+            <size nbLine="6" nbCol="8"/>
+            <size nbLine="12" nbCol="14"/>
+            <size nbLine="12" nbCol="30"/>
+            <size nbLine="12" nbCol="60"/>
+        </sizes>
+        <layers>seed
+            <field>llseed</field>
+            <field>defE</field>
+            <field>defF</field>
+            <field>defVe</field>
+            <field>Ve</field>
+        </layers>
+    </fixed>
+    <expandedLayer>
+        <Layer>
+            seed
+        </Layer>
+    </expandedLayer>
+    <colorOfField>
+        <layer color="0x0000FF">
+            Ve
+        </layer>
+        <layer color="0x0080FF">
+            llseed
+        </layer>
+    </colorOfField>
+</paramCA>

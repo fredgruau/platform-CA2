@@ -1,0 +1,23 @@
+<paramCA>
+    <fixed>
+        <machine arch="christal" nbLine="10" nbCol="15"/>
+        <display iter="CAsize" CAwidth="650" nbCol="2"/>
+        <sizes>
+            <size nbCol="8" nbLine="6"/>
+            <size nbCol="14" nbLine="12"/>
+            <size nbCol="30" nbLine="12"/>
+            <size nbCol="60" nbLine="12"/>
+        </sizes>
+
+    </fixed>
+    <expandedLayer>
+        <Layer>
+            layers
+        </Layer>
+    </expandedLayer>
+    <colorOfField>
+        <layer color="0x0000FF">
+            seed
+        </layer>
+    </colorOfField>
+</paramCA>
