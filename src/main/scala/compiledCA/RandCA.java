@@ -8,8 +8,8 @@ import simulator.PrShift;
 
 import java.util.HashMap;
 
-import static compiledLoops.BasicMoves.randBit;
-import static compiledLoops.BasicMoves.vtoEv;
+import static compiledMacro.BasicMoves.randBit;
+import static compiledMacro.BasicMoves.vtoEv;
 
 /**
  * This illustrate an example of the files that should be produced by the compiler in order to describe a CA

@@ -4,15 +4,6 @@ import compiler.Locus;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.FontMetrics;
-import java.awt.Graphics;
-import java.awt.GridLayout;
-import java.awt.Image;
-import java.awt.Insets;
-import java.awt.Polygon;
 
 class DiamondIcon implements Icon {
     private Color color;

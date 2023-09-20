@@ -6,11 +6,11 @@ import compiler.ASTB.{AffBool, Dir, Elt, Reduce, outputStored}
 import compiler.ASTBfun.ASTBg
 import compiler.ASTL.BoolV
 import compiler.Circuit.{TabSymb, iTabSymb}
-import compiler.DataProgLoop2.{removeAfterChar, shortenedSig}
+import dataStruc.Util.{radicalOfVar, removeAfterChar, shortenedSig}
 import compiler.Instr.{a, deployInt}
 import compiler.Locus.{all2DLocus, allLocus}
 import compiler.VarKind.{MacroField, StoredField}
-import dataStruc.{DagInstr, DagNode, HeapStates, WiredInOut}
+import dataStruc.{DagInstr, DagNode, HeapStates, Named, WiredInOut}
 
 import scala.::
 import scala.collection.immutable.Nil.:::
@@ -141,9 +141,9 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   /** @param s name of a variable
    * @return true if that variable is a bit plane number.
    */
-  def isHeap(s: String): Boolean = s.startsWith("Mem[")
+  def isHeap(s: String): Boolean = s.startsWith("mem[")
 
-  /** if variables is Mem[14] returns 14 */
+  /** if variables is "mem[14]" returns 14 */
   def adress(s: String) = s.substring(4, s.length - 1).toInt
 
   lazy val totalNamesSubMain: Set[String] = dagis.visitedL.flatMap(_.names).filter(isHeap(_)).toSet //we look at the call
@@ -234,7 +234,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
      * The code of  non main root, is transfered to main loop */
     var allCoalesc: iTabSymb[String] = HashMap()
     var newDagis: DagInstr = dagis //we keep the same dagis for CAloop
-    if (isLeafCaLoop) {
+    if (isLeafCaLoop) { // we generate a macro
       //updates the symbol table
       allCoalesc = extendToBool(coalesc) ++ coalesc ++ coalescTMP //we keep coalesc so that invariant remains correct
       val maxTmpReg: Int = loops.map(_.nbTmpReg).reduce(Math.max) //max number of register used.
@@ -242,41 +242,46 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
         tSymbVar.addOne("r" + i -> new InfoNbit(B(), MacroField(), 1).asInstanceOf[U])
       loops.map(_.coalesc(allCoalesc)) //applies the  coalesc extended to bool, for all the code
     }
-    else if (isRootMain) { //we generate a list of call proc only for the main root
-      val (callProcs: List[CallProc], allAdresses) = codeGen()
+    else if (isRootMain) { //we generate a list of call proc only for the main root, the other prog are explored from the main loop.
+      val (callProcs: List[CallProc], allAdresses: iTabSymb[Int]) = codeGenMain()
       newDagis = DagInstr(callProcs)
       //in order to compute the code of a callProc,
       //we will prefer to leave the name of variables in the mainRoot it is more clear,
-      //we compute coalesc, but we do not replace in expressions, the variable name x by Mem[11] for example
-      //instead we will simply compile x=Mem[11] before.
+      //we compute coalesc, but we do not replace in expressions, the variable name x by mem[11] for example
+      //instead we will simply compile x=mem[11] before.
       allCoalesc = HashMap() ++
-        allAdresses.toList.map((e: (String, Int)) => (e._1, "Mem[" + (e._2).toString + "]".toString)) //      It can be used to coalesc
+        allAdresses.toList.map((e: (String, Int)) => (e._1, "mem[" + (e._2).toString + "]".toString)) //      It can be used to coalesc
     }
     new DataProgLoop[U](newDagis, funs.map { case (k, v) ⇒ k -> v.coaalesc() }, tSymbVar, paramD,
       paramR, allCoalesc, loops) with ProduceJava[U]
   }
 
-  /** returns list of calls produce by mainRoot together with adresses of variables in the heap */
-  def codeGen(): (List[CallProc], iTabSymb[Int]) = {
+
+  /**
+   * to be executed only by the main dataProg
+   *
+   * @return list of calls produce by mainRoot together with adresses of variables in the heap
+   *
+   */
+  def codeGenMain(): (List[CallProc], iTabSymb[Int]) = {
     var res: List[CallProc] = List()
     val noLayersInstr = dagis.visitedL.reverse.map((i: Instr) => new InstrNoLayersNorParam(i, tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]]))
     //by building instr which ignore layers we prevent allocation of layers in the heap. layers are allocated as global variables.
-    var allAdresses: iTabSymb[Int] = HashMap()
+    var allAdresses: iTabSymb[Int] = HashMap() //will allocate one memory slot for each scalar variables
     val emptyCoalesc: iTabSymb[String] = HashMap()
-    val layers: List[String] = tSymbVar.toList.filter(_._1.startsWith("ll")).filter(_._2.nb == 1).map(_._1).sorted
-    val nbLayers = layers.length
-    allAdresses ++= //we store all the adresses, layers and heap, as strings so as to store them in allcoalesc
-      (layers zip (0 to nbLayers - 1)) //adress of layers
-    allAdresses ++= (paramR zip (nbLayers to nbLayers + paramR.length)) //adresses of  result parameter to the mainRoot
+    for (s <- layerSubProg2.keys)
+      tSymbVar.addOne((s, layerSubProg2(s))) //adds to tSymbVar, constant layers defined in subProgram in tSymbVar
+    val layerSpace = layerSubProg2.map(l => l._2.asInstanceOf[InfoNbit[_]].density).sum
+    //we store all the adresses, layers and heap, as strings so as to store them in allcoalesc
+    allAdresses ++= (layerSubProg2.toList.flatMap(l => l._2.locus.deploy(l._1, l._2.asInstanceOf[InfoNbit[_]].nb)) zip (0 to layerSpace - 1)) //adress of layers
+    allAdresses ++= (paramR zip (layerSpace to layerSpace + paramR.length)) //adresses of  result parameter to the mainRoot
     val nbGlobals = allAdresses.size //the number of variables allways in the heap,
     // where morover, the distincts bit planes are found in sequence in the heap
     val hs = new HeapStates[InstrNoLayersNorParam](noLayersInstr)
-
+    //On itere sur hs. cela est complexe, on recupere pour chaque instr, l'état courant du heap pour modeliser un appel a une autre CAbranche      res = res ++ instr.codeGen(heapCur, funs, nbGlobals, emptyCoalesc)
     for ((instr, (heapCur, adresses)) <- dagis.visitedL.reverse zip hs) {
-      res = res ++ instr.codeGen(heapCur, funs, nbGlobals, emptyCoalesc)
-      //iterer sur hs est complexe, on recupere pour chaque instr, l'état courant du heap pour modeliser un appel a une autre CAbranche      res = res ++ instr.codeGen(heapCur, funs, nbGlobals, emptyCoalesc)
+      res = res ++ instr.codeGenInstr(heapCur, funs, nbGlobals, emptyCoalesc)
       allAdresses ++= adresses.toList.map((e: (String, Int)) => (e._1, nbGlobals + (e._2)))
-      val n = 0
     }
     heapSize = hs.heapSize + nbGlobals
     (res, allAdresses)
@@ -299,8 +304,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
       //val hs=new HeapStates[Instr](dagis.visitedL.reverse, h)  //todo enlever les parametres de names et de used.
       val hs = new HeapStates[InstrNoLayersNorParam](noLayersInstr, h) //dagis.visitedL.reverse)
       for ((instr, (heapCur, adresses)) <- dagis.visitedL.reverse zip hs) {
-        allCoalesc = allCoalesc ++ adresses.toList.map((e: (String, Int)) => (e._1, "Mem[" + (e._2 + nbGlobal).toString + "]"))
-        res = res ++ instr.codeGen(heapCur, funs, nbGlobal, allCoalesc) //we directly update the coalesc table adding the new adress to the parameters
+        allCoalesc = allCoalesc ++ adresses.toList.map((e: (String, Int)) => (e._1, "mem[" + (e._2 + nbGlobal).toString + "]"))
+        res = res ++ instr.codeGenInstr(heapCur, funs, nbGlobal, allCoalesc) //we directly update the coalesc table adding the new adress to the parameters
         // instr.codeGen call recursively this.codeGen
       }
       heapSize = Math.max(heapSize, hs.heapSize) //codegen of a proc may be called several times with different heap size.
@@ -313,13 +318,29 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
 
   def isBoolV(str: String) = tSymbVarSafe(str).t == (V(), B()) // .isInstanceOf[BoolV]
 
-  /** returns a hashmap of all the leafCAlloops, undexed by their name */
-  def allCAloop: Map[String, DataProgLoop[U]] = {
-    def f(st: Tuple2[String, DataProgLoop[U]]) =
-      if (st._2.isLeafCaLoop) List(st._1 -> st._2) else st._2.allCAloop
-    funs.map(f(_)).flatten.toMap
-  }
 
+  // data computed only once from the mainDataProgLoop, using def and lazy
+  private def subDP: iTabSymb[DataProg[U]] = funs ++ funs.flatMap({ case (k, v) => v.subDP })
+
+  /** hashmap of all the progCA except the main. It is undexed by their name,
+   * it works only if called from the first global main loop */
+
+  lazy val subDataProgs: iTabSymb[DataProgLoop[U]] = subDP.asInstanceOf[iTabSymb[DataProgLoop[U]]] //used only for the main data Prog, this is why we put a lazy
+
+  /**
+   *
+   * @param progs map of programms, whose layers have been entered in tabSymb of the main entry point dataProg
+   * @return all the layers.
+   */
+  def layers(progs: List[DataProgLoop[U]]) = progs.flatMap(_.tSymbVar.filter(x =>
+    Named.isLayer(x._1) && //name should start with "ll"
+      x._2.k.isLayerField && //we check the type for it can happen that paramR start with ll
+      Named.noDollarNorHashtag(x._1)).toList).toMap //if a $ or a # is present, it not a layer but only a layer component
+
+  /** does not take into account the layers of this */
+  lazy val layerSubProgStrict = layers(subDataProgs.values.toList) //: Predef.Map[String, U] = ( subDataProgs.values.toList).flatMap(_.tSymbVar.filter(x => x._2.k.isLayerField).toList).toMap
+  /** takes into account the layer of this */
+  lazy val layerSubProg2 = layers(this :: subDataProgs.values.toList) //(this :: subDataProgs.values.toList).flatMap(_.tSymbVar.filter(x =>  x._2.k.isLayerField).toList).toMap
 
   /**
    *
@@ -338,84 +359,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
     replace(template)
   }
 
-  /**
-   *
-   * @param spatialType les signatures spatiales des macros pour faire la correspondances avec les tableaux
-   * @return
-   */
-  def density(str: String, st: (Locus, Ring)) = tSymbVarSafe(str).nb
-
-  /** declares all the named arrays */
-  def DeclNamed(offset: Map[String, List[Int]]): String = {
-    val (var1D, var2D) = offset.keys.partition(offset(_).size == 1) //we distinguish 1D arrays from 2D arrays.
-    (if (var1D.nonEmpty) "public static int[]" + var1D.mkString(",") + ";\n" else "") +
-      (if (var2D.nonEmpty) "public static int[][]" + var2D.mkString(",") + ";\n" else "")
-  }
-
-  /** code that anchors named arrays on memory */
-  def anchorNamed(offset: Map[String, List[Int]]): String = {
-    def anchorOneVar(oneVar: (String, List[Int])) = {
-      val ints = oneVar._2
-      var res = ints.map("m[" + _ + "]").mkString(",")
-      if (ints.size > 1) res = " new int[][]{" + res + "}" //we have a 2D array
-      res = oneVar._1 + "=" + res;
-      res
-    }
-    offset.map(anchorOneVar(_)).mkString(";\n")
-  }
-
-  def fieldOffset(offset: Map[String, List[Int]]): String = {
-    def offsetOneVar(oneVar: (String, List[Int])) = {
-      val ints = oneVar._2
-      var res = ints.map("" + _).mkString(",")
-      res = "map.put(\"" + oneVar._1 + "\", Util.li(" + res + "));";
-      res
-    }
-
-    offset.map(offsetOneVar(_)).mkString("\n")
-  }
-
-  /** returns a list of offset for all named fields, which is used to anchor named 1D arrays, and also to list memory planes */
-  def offsetsInt: Map[String, List[Int]] = {
-    var res: Map[String, List[Int]] = HashMap()
-    val spatials: Map[VarKind, Map[Any, List[String]]] = sortedindexedByKindThenByType(isSpatial)
-    for (k <- spatials.keys)
-      for (t <- spatials(k).keys.asInstanceOf[Set[(Locus, Ring)]])
-        for (nameVar: String <- spatials(k)(t))
-          if (t == (V(), B())) res = res + (nameVar -> List(adress(coalesc(nameVar)))) //we have a scalar
-          else {
-            val ofsetstring = t._1.deploy(nameVar, tSymbVarSafe(nameVar).nb)
-            val ofsetint: Array[Int] = ofsetstring.map((s: String) => adress(coalesc(s)))
-            res = res + (nameVar -> ofsetint.toList)
-          } //non scalar variable,
-    res
-  }
-
-  /** Codes that declares unamed arrays */
-  def declNotNamed(decomposition: Map[Locus, Map[List[Int], Int]]): String = { //todo queskispass si c'est un tableau 1D?
-    val var1D = (0 until decomposition(V()).size).map("V" + _) //name of unamed points to its locus.
-    var var2D: List[String] = List() //needs 2D arrays
-    for (l: Locus <- all2DLocus) {
-      var2D = var2D ++ (0 until decomposition(l).size).map(l.parentheseLessToString + _)
-    }
-    (if (var1D.nonEmpty) "public static int[] " + var1D.mkString(",") + ";\n" else "") +
-      (if (var2D.nonEmpty) "public static int[][] " + var2D.mkString(",") + ";\n" else "")
-  }
-
-
-  /** Codes that decompose array 2D into memory slices */
-  def anchorNotNamed(decomposition: Map[Locus, Map[List[Int], Int]]): String = { //todo queskispass si c'est un tableau 1D?
-    var codeDecl: List[String] = List()
-    for (l: Locus <- allLocus)
-      for ((li, i) <- decomposition(l))
-        codeDecl = l.parentheseLessToString + i + "= new int[][]{" + li.map("m[" + _ + "]").mkString(", ") + "};" :: codeDecl
-    // seedE = new int[][]{m[8], m[9], m[10]};
-    codeDecl.mkString("\n")
-  }
 
   /** outputs the sequence of all codes to macro loops */
-
-  // shorten to " +    (shortenedSignature(paramD) ++ shortenedSignature(paramR)).mkString(" ") + "\n"
 
   /** Asuming we kept original spatial variables in symbol table returns the list of spatial tpes, mixing data and result parameters */
   def spatialSig: List[(Locus, Ring)] = (shortenedSig(paramD) ::: shortenedSig(paramR)).map(tSymbVarSafe(_).t.asInstanceOf[(Locus, Ring)])

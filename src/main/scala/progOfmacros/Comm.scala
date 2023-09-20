@@ -1,4 +1,4 @@
-package macros
+package progOfmacros
 
 import compiler.AST._
 import compiler.ASTL._

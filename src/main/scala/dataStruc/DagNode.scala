@@ -4,7 +4,7 @@ import compiler.AST.Read
 import compiler.ASTB.AffBool
 import compiler.{AST, ASTB, Affect, InfoType}
 import compiler.Circuit.TabSymb
-import compiler.DataProgLoop2.{radicalOfVar, radicalOfVar2}
+import dataStruc.Util.{radicalOfVar, radicalOfVar2}
 import dataStruc.DagNode.Neton
 
 import scala.collection.{Iterable, immutable, mutable}
@@ -34,7 +34,8 @@ trait DagNode[+T <: DagNode[T]] {
 
   def isShift(s: String) = s.equals("<<") || s.equals(">>>")
 
-  private def neighbor1or1() = if (isShift(toString)) " 1" else inputNeighbors(1).toStringTreeInfixPar(null)
+  /** returns either the second neighbor or the value 1. */
+  private def neighbor1or1(t: TabSymb[InfoType[_]]) = if (isShift(toString)) " 1" else inputNeighbors(1).toStringTreeInfixPar(t)
 
   /** * @param t symbol Table needed to check if variable is a parameter
    *
@@ -43,7 +44,8 @@ trait DagNode[+T <: DagNode[T]] {
   def toStringParam(t: TabSymb[InfoType[_]]): String = {
     if (t != null) if (isInstanceOf[AST[_]])
       this.asInstanceOf[AST[_]] match {
-        case Read(name) => if (t(radicalOfVar2(name)).k.isParam)
+        case Read(name) => val rad = radicalOfVar2(name)
+          if (t(rad).k.isParam || t(rad).k.isLayerField)
           return name + "[i]"
         case ASTB.AffBool(name, _) =>
           val nameRad = radicalOfVar2(name)
@@ -62,7 +64,7 @@ trait DagNode[+T <: DagNode[T]] {
       inputNeighbors.size <= 2
     }
     if (inputNeighbors.size == 2 || (inputNeighbors.size == 1 && isShift(toString)))
-      inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1()
+      inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1(t)
     else " " + toStringParam(t) + " " + (if (inputNeighbors.size == 1) inputNeighbors.head.toStringTreeInfix(t) else " ")
   }
 
@@ -71,7 +73,7 @@ trait DagNode[+T <: DagNode[T]] {
       inputNeighbors.size <= 2
     }
     if (inputNeighbors.size == 2 || (inputNeighbors.size == 1 && isShift(toString)))
-      "(" + inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1() + ")"
+      "(" + inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1(t) + ")"
     else " " + toStringParam(t) + " " + (if (inputNeighbors.size == 1) inputNeighbors.head.toStringTreeInfix(t) else " ")
   }
 

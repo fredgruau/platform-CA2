@@ -1,10 +1,10 @@
-package macros
+package progOfmacros
 
 import compiler.AST._
 import compiler.ASTL._
 import compiler._
-import macros.Compute._
-import macros.SReduce.frontierEDef
+import progOfmacros.Compute._
+import progOfmacros.SReduce.frontierEDef
 
 /** macro used specifically to compute the blob predicate */
 object BlobMacro {

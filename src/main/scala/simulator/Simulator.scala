@@ -16,6 +16,11 @@ import scala.collection.immutable.HashMap
 object Simulator extends SimpleSwingApplication {
   /** name of Cellular automaton being simulated, to be set by method startUp, and then used by method top */
   var nameCA: String = " "
+  var simulParam: Node = null
+  var displayParam: Node = null
+
+  var globalInit: Array[String] = null
+
   private var nameCAparam: String = null
   /**
    * startup is called before top is launched,so that
@@ -24,9 +29,20 @@ object Simulator extends SimpleSwingApplication {
    * @param args command line argument, contains the name of CA being simulated
    */
   override def startup(args: Array[String]): Unit = {
-    nameCA = args(0)
-    if (args.size > 1) //we supplied a file of parameter name with a name that is not <progName>+"param"
-      nameCAparam = args(1)
+    nameCA = args(0) //name of the CA program
+    val nameGlobalInit = args(1)
+    val nodeGlobalInit: Node = readXML("src/main/scala/compiledCA/globalInit/" + nameGlobalInit)
+    globalInit = fromXMLasList((nodeGlobalInit \\ "inits").head).toArray
+    val nameSimulParam = args(2)
+
+    /** parameters common to all simulations */
+    simulParam = readXML("src/main/scala/compiledCA/simulParam/" + nameSimulParam)
+
+    /** which layers are expanded, what are the used colors. */
+    displayParam = readXML("src/main/scala/compiledCA/displayParam/" + nameCA + ".xml")
+
+    if (args.size > 2) //we supplied a file of parameter name with a name that is not <progName>+"param"
+      nameCAparam = args(2)
     super.startup(args)
   }
 
@@ -42,31 +58,28 @@ object Simulator extends SimpleSwingApplication {
     if (nameCAparam == null)
       nameCAparam = nameCA + "param.xml" //standard name of file containing parameters, if not supplied.
     /** contains XML code representing many parameters */
-    val directories = List("compiledCA", "compHandCA")
+    val directories = List("compiledCA") //, "compHandCA")
     //find  the right directory
     val possibleDir = directories.filter((s: String) => loadClass(s + "." + nameCA) != null)
     assert(possibleDir.size > 0, nameCA + "could not be found in any of the directories " + directories)
-    assert(possibleDir.size < 2, nameCA + "could not be found two times in the directories " + directories)
+    assert(possibleDir.size < 2, nameCA + "could  be found two times in the directories " + directories)
     val chosenDir: String = possibleDir.head
     val classCA: Class[CAloops2] = loadClass(chosenDir + "." + nameCA)
     /** contains the loops but also many other parameters */
     val progCA: CAloops2 = getProg(classCA)
 
-    val paramCA: Node =
-      readXML("src/main/scala/" + chosenDir + "/" + nameCAparam)
-    //  preferredSize = new Dimension(xInt(param,"display","@width"),xInt(param,"display","@height"))
-    //size = (1024, 768): Dimension
-    /* possible places where to find CAs    */
+    //val paramCA: Node =   readXML("src/main/scala/" + chosenDir + "/" + nameCAparam)
+
 
 
     /** process the signal we create controller first in order to instanciate state variable used by tree */
-    val controller = new Controller(nameCA, paramCA, progCA, chosenDir, this)
+    val controller = new Controller(nameCA, globalInit, simulParam, displayParam, progCA, chosenDir, this)
     /** Tree for browsing the hierarchy of layers and which field to display */
-    val layerTree = new LayerTree((paramCA \\ "layers").head, controller)
-    val myTree: JTree = layerTree.peer
-    myTree.expandRow(0)
-    myTree.setRootVisible(false)
-    myTree.setShowsRootHandles(true)
+    val xmlLayerTree = readXmlTree(progCA.displayableLayerHierarchy())
+    System.out.println(xmlLayerTree)
+    //val xmlLayerTree2: Node = (simulParam \\ "layers").head
+    val layerTree: LayerTree = new LayerTree(xmlLayerTree, controller)
+    // val layerTree: LayerTree = new LayerTree(xmlLayerTree.head, controller)
     val scrollableXmlTree = new ScrollPane(layerTree) //we put it scrollable because it can become big
 
     controller.init(layerTree) //now we can pass it to the controller which needs to listen to exansion and coloration events
@@ -88,7 +101,7 @@ object Simulator extends SimpleSwingApplication {
       var numEnv = 0
       var numCell = 0
       //how many columns
-      val nbColPannel: Int = xInt(paramCA, "display", "@nbCol")
+      val nbColPannel: Int = xInt(simulParam, "display", "@nbCol")
       for (env: Env <- iterEnvs) {
         controller.envList = controller.envList :+ env //we will need to acess the list of env, from the controler
         env.pannel = new CApannel(controller.CAwidth, controller.CAheight, env, progCA) // the number of CAlines is 1/ sqrt(2) the number of CA colomns.
@@ -112,7 +125,6 @@ object Simulator extends SimpleSwingApplication {
       layout(controller) = North
       layout(scrollablPannels) = Center
     }
-
   }
 }
 
@@ -136,13 +148,13 @@ object SimulatorUtil {
    * @return we generates  the env Iterator in a separate method because it is big
    */
   def envs(controller: Controller): Iterable[Env] = {
-    val paramCA = controller.paramCA
+    val simulParam = controller.simulParam
     /** When simulating CAs whose number of Lines and columns augment */
-    val gridSizes: collection.Seq[(Int, Int)] = fromXMLasListIntCouple(paramCA, "sizes", "size", "@nbLine", "@nbCol")
+    val gridSizes: collection.Seq[(Int, Int)] = fromXMLasListIntCouple(simulParam, "sizes", "size", "@nbLine", "@nbCol")
     /** When simulating CAs with different init */
-    val multiInits = xArrayString(paramCA, "multiInit", "@inits")
-    val rootLayer: String = if (multiInits.nonEmpty) x(paramCA, "multiInit", "@layer") else null
-    val iter: String = x(paramCA, "display", "@iter") //what we iterate on
+    val multiInits = xArrayString(simulParam, "multiInit", "@inits")
+    val rootLayer: String = if (multiInits.nonEmpty) x(simulParam, "multiInit", "@layer") else null
+    val iter: String = x(simulParam, "display", "@iter") //what we iterate on
 
     def totalIter: Int = iter match {
       case "CAsize" => gridSizes.size
@@ -154,16 +166,14 @@ object SimulatorUtil {
     new Iterable[Env] {
       val iterator: Iterator[Env] = new Iterator[Env] {
         var nbIter = 0 //counter
-
         /** the parameter on which we iterate */
 
-
         /** coded as a double so that we do not loose precision when multiplying by sqrt(2) */
-        var nbLineCA: Int = xInt(paramCA, "machine", "@nbLine")
-        var nbColCA: Int = xInt(paramCA, "machine", "@nbCol")
+        var nbLineCA: Int = xInt(simulParam, "machine", "@nbLine")
+        var nbColCA: Int = xInt(simulParam, "machine", "@nbCol")
         var initRoot: HashMap[String, String] = HashMap.empty
         /** coded as a method because when iterating through the CAsizes, nbColCA is modified */
-        val arch: String = x(paramCA, "machine", "@arch")
+        val arch: String = x(simulParam, "machine", "@arch")
         var randomRoot = 0
 
         /** @return `true` if there is a next element, `false` otherwise */
@@ -194,7 +204,7 @@ object SimulatorUtil {
     }
     catch {
       case e: ClassNotFoundException =>
-        System.out.println("la classe " + path + " n'existe même pas");
+        System.out.println("la classe " + path + " n'existe  pas");
     }
     return res;
   }
@@ -228,6 +238,9 @@ object SimulatorUtil {
       def fillPolygon(p: Polygon): Unit
 
       def drawPolygon(p: Polygon): Unit
+
+      def drawText(s: String, i: Int, j: Int): Unit
+
     }
 
   }

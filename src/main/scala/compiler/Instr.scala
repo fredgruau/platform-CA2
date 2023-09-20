@@ -26,10 +26,10 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
    * @param heap       initial state of heap
    * @param funs       function that could be called
    * @param occupied   number of global variables
-   * @param allCoalesc corespondance between parameters, and also memory adresses
+   * @param allCoalesc corespondance between formal parameters, and effective parameter including also  memory adresses
    * @return
    */
-  def codeGen(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int, allCoalesc: iTabSymb[String]): List[CallProc] = null
+  def codeGenInstr(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int, allCoalesc: iTabSymb[String]): List[CallProc] = null
 
   /**
    *
@@ -373,13 +373,48 @@ case class CallProc(var procName: String, names: List[String], exps: List[AST[_]
 
   }
 
-  override def codeGen(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int, allCoalesc: iTabSymb[String]):
+  /**
+   * list of calls generated from a call to either a CA loop or list of calls
+   *
+   * @param heap       initial state of heap
+   * @param funs       function that could be called
+   * @param occupied   number of global variables
+   * @param allCoalesc corespondance from formal parameters, to effective parameters, including  also memory adresses
+   * @return
+   */
+  override def codeGenInstr(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int, allCoalesc: iTabSymb[String]):
   List[CallProc] =
     procName match { //specific processing of the system calls
       case "memo" | "bug" | "show" | "copy" =>
         val l = List(this.coalesc(allCoalesc).asInstanceOf[CallProc])
         l
-      case _ => val fun: DataProgLoop[_] = funs(procName)
+      case _ => val fun: DataProgLoop[_] = funs(procName) //we get the dataProgLoop
+        if (fun.isLeafCaLoop) {
+          //we just need to coalesc this by replacing names used either using param or using adress
+          List(this.coalesc(allCoalesc).asInstanceOf[CallProc])
+        }
+        else {
+          //we build the correspondance from formal paramter to effective
+          var params: iTabSymb[String] = HashMap()
+          for ((pdata, exp) <- fun.paramD zip exps) {
+            val nameOp: String = exp.asInstanceOf[Read[_]].which
+            params = params + (pdata -> allCoalesc.getOrElse(nameOp, nameOp)) //realizes a transitive closure, by using $assed effective parameter value?
+          }
+          for ((pres, name) <- fun.paramR zip names) {
+            params = params + (pres -> allCoalesc.getOrElse(name, name))
+          }
+          fun.codeGen(heap, occupied, params) //here there are many elements in the  List.
+        }
+
+    }
+
+  def codeGenInstrOld(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int, allCoalesc: iTabSymb[String]):
+  List[CallProc] =
+    procName match { //specific processing of the system calls
+      case "memo" | "bug" | "show" | "copy" =>
+        val l = List(this.coalesc(allCoalesc).asInstanceOf[CallProc])
+        l
+      case _ => val fun: DataProgLoop[_] = funs(procName) //we get the dataProgLoop
         if (fun.isLeafCaLoop) {
           //we just need to coalesc this by replacing names used either using param or using adress
           List(this.coalesc(allCoalesc).asInstanceOf[CallProc])
@@ -652,8 +687,8 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
 
   //affectation are replace by call to the copy macro, which just  copies *
   // data
-  override def codeGen(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int,
-                       allCoalesc: iTabSymb[String]): List[CallProc] = {
+  override def codeGenInstr(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int,
+                            allCoalesc: iTabSymb[String]): List[CallProc] = {
 
 
     val res = List(CallProc("copy", List(allCoalesc.getOrElse(name, name)),

@@ -5,17 +5,18 @@ import compiler.ASTL._
 import compiler.ASTLt._
 import compiler.Circuit.hexagon
 import compiler._
-import macros.Compute._
-import macros.SReduce._
+import progOfmacros.Compute._
+import progOfmacros.SReduce._
 
 
 trait Dddist {
   self: Layer[(V, B)] =>
   val theDist = new Dist(self)
-  show(theDist) //if this is not in class Dist, then class Dist is not compiled because not used from SRC
+  show(theDist)
+  show(theDist.tslope) //if this is not in class Dist, then class Dist is not compiled because not used from SRC
 }
 
-class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3) with ASTLt[V, SI] {
+class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[V, SI] {
   val level: BoolV = elem(2, this);
   /*
   val tepred = transfer(e(pred))
@@ -39,7 +40,7 @@ class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3) with ASTLt[V, SI
   bugif(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
   val next: ASTLt[V, SI] = this + cond(source.asInstanceOf[BoolV], sign(-this), delta) //faudrait en faire une macro qui prends delta, source et dist et renvoie distNext
   // val temp: BoolfV = xorR2(transfer(slope)) ;  val vortex: BoolF = orR(transfer(temp));   bugif(vortex);
-  show(tslope)
+
 
 }
 
@@ -48,8 +49,7 @@ object Dist2 extends App {
   val myInput: AST.Param[(V, B)] with ASTLt[V, B] = p[V, B]("input")
   new Circuit[V, B]() { //pour l'instant on teste sans parametres
     // new Circuit[V, SI](myInput) {
-    val src = new ConstLayer[V, B](1) with Dddist {}
-
+    val src = new ConstLayer[V, B](1, "global") with Dddist {}
     def computeRoot: ASTLt[V, B] = src
   }.compile(hexagon)
 }

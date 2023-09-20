@@ -3,7 +3,7 @@ package triangulation
 import compiler.{T, _}
 import simulator.CAtype.pointLines
 import simulator.UtilBitJava.{propagateBit14and1, propagateBit6and1, propagateBitxand1}
-import simulator.{Env, PrShift, UtilBitJava}
+import simulator.{Controller, Env, PrShift, UtilBitJava}
 import triangulation.Medium._
 import triangulation.Utility._
 
@@ -455,6 +455,9 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
   private lazy val yaxisInit: InitMold = new InitMold(V(), 1) {
     for (i <- 0 until nbLineCA) setBoolVField(i, 0)
   }
+  private lazy val zeroInit: InitMold = new InitMold(V(), 1) {
+    for (i <- 0 until nbLineCA) setBoolVField(i, 0)
+  }
   private lazy val dottedBorderInit: InitMold = new InitMold(V(), 1) {
     for (i <- 0 until nbLineCA) if (i % 2 == 0) {
       setBoolVField(i, 0)
@@ -498,7 +501,9 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
    * @param initMethodName indicates which init is to be  applied, based on this medium
    * @return an  "Init" which can initialize a layer
    */
-  def initSelect(initMethodName: String, l: Locus): Init = initMethodName match {
+  def initSelect(initMethodName: String, l: Locus): Init = {
+    (if (initMethodName == "global") env.controller.globalInitList.selection.item else
+      initMethodName) match {
     case "center" => l match { //the init method willBe used for different layers
       case V() => centerInitV
       case E() => centerInitE
@@ -512,6 +517,8 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
     case "dottedBorder" => dottedBorderInit
     case "border" => borderInit
     case "random" => randomInit
+    case "false" => zeroInit
+    }
   }
 
 

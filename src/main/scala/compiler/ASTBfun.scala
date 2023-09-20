@@ -364,6 +364,7 @@ object ASTBfun {
   // def notNull[R <: I](x: ASTB[R]) = FoldLeft1(x, Or[B])
 
   //(orI.asInstanceOf[Fundef2[R, R, R]], False[R]
+  /** a reduction operator is a function taking two arguement of the same type R, and returning a result also of type R. plus a neutral value */
   type redop[R <: Ring] = (Fundef2R[R], ASTBt[R])
 
   def concatRedop[R <: Ring](implicit n: repr[R]): redop[R] = {

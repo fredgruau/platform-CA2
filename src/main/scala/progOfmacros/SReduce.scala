@@ -1,10 +1,11 @@
-package macros
+package progOfmacros
 
 import compiler.AST.{p, _}
-import compiler.ASTL._
+import compiler.ASTL.{v, _}
 import compiler.repr.nomV
 import compiler.{B, E, F, V}
-import macros.SReduce.existF2V
+import progOfmacros.RedS.{exist, inside}
+import progOfmacros.SReduce.existF2V
 
 /** Contains elementary loops doing simple reduction combined with a broacast from VEF to VEF */
 object SReduce {
@@ -12,13 +13,23 @@ object SReduce {
   /** From a boolE, computes adjacent vertices */
   val existE2VDef: Fundef1[(E, B), (V, B)] = {
     val e = p[E, B]("edge")
-    val existV: BoolV = orR(transfer(v(e)))
+    val existV: BoolV = orRdef(transfer(v(e)))
     existV.setName("existV");
     Fundef1("existE2V", existV, e)
   }
 
+  /** From a boolE, computes adjacent vertices */
+  val insideE2VDef: Fundef1[(E, B), (V, B)] = {
+    val e = p[E, B]("edge")
+    val insideV: BoolV = andRdef(transfer(v(e)))
+    insideV.setName("insideV");
+    Fundef1("insideE2V", insideV, e)
+  }
+
   /** wrapper to  Call existE2V. */
   def existE2V(e: BoolE): BoolV = new Call1(existE2VDef, e) with BoolV
+
+  def insideE2V(e: BoolE): BoolV = new Call1(insideE2VDef, e) with BoolV
 
 
   /** From a boolE, computes adjacent vertices */
@@ -79,20 +90,20 @@ object SReduce {
   /** wrapper to  Call existV2E. */
   def existV2F(v: BoolV): BoolF = new Call1(existV2FDef, v) with BoolF
 
+  /** wrapper to  Call neighborhood. */
+  def neighborhood(b: BoolV): BoolV = new Call1(neighborhoodDef, b) with BoolV
 
   /** From a boolV, computes the neighborhoodV radius 2 */
   val neighborhoodDef: Fundef1[(V, B), (V, B)] = {
     val b = p[V, B]("blob")
-    //  val neighbEE=orR(transfer(e(b)))
-    // val neighbor: BoolV = orR(transfer(v(neighbEE)))
-    val neighbEE: BoolE = existV2E(b)
-    val neighbor: BoolV = existE2V(neighbEE)
+    val neighbEE: BoolE = exist(b)
+    val neighbor1: BoolV = exist(neighbEE)
+    val neighbor2: BoolV = inside(neighbEE)
+    val neighbor = neighbor1 | neighbor2
     neighbor.setName("neighbVV");
     Fundef1("neighborhood", neighbor, b)
   }
 
-  /** wrapper to  Call neighborhood. */
-  def neighborhood(b: BoolV): BoolV = new Call1(neighborhoodDef, b) with BoolV
 
   /** From a boolF, computes the neighborhoodF radius 2 by going through edges */
   val neighborhoodfDef: Fundef1[(V, B), (V, B)] = {

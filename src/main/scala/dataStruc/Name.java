@@ -41,6 +41,7 @@ public class Name {
 		if( Named.OkToUseForName(fieldName) )
 		{	if (!conteneurName.equals("")) 	fieldName = ("" + fieldName.charAt(0)).toUpperCase() + fieldName.substring(1).toLowerCase();
 		    //if(fieldToName.ignoreForName)  	fieldName="";
+			//We will change the name if new proposed name is shorter in the hierarchy
 	     	if (fieldToName.name() == null || fieldToName.name() != null && nbCap(fieldToName.name()) > nbCap(conteneurName + fieldName)	)
 	        	{ //System.out.println("continue");
 	        	fieldToName.setName(conteneurName + fieldName);setName(fieldToName, fieldToName.name()); 

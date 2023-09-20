@@ -1,0 +1,18 @@
+<displayParam>
+    <expandedLayer>
+        <Layer>
+            def
+        </Layer>
+        <Layer>
+            layer
+        </Layer>
+        <Layer>
+            grow
+        </Layer>
+    </expandedLayer>
+    <colorOfField>
+        <layer color="0xFFC800">
+            llgrow
+        </layer>
+    </colorOfField>
+</displayParam>

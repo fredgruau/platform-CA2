@@ -11,6 +11,7 @@ import Instr.{a, affectizeReturn}
 import ASTB.Tminus1
 import ASTBfun.{ASTBg, Fundef2R, redop}
 import ASTL.ASTLg
+import Named.noDollarNorHashtag
 
 import java.util
 import scala.collection.{Iterable, IterableOnce, Map, MapView, Set, immutable, mutable}
@@ -28,7 +29,7 @@ object DataProg {
   /**
    * @param f function to be compiled
    * @tparam T type of result returned by f.
-   * @return A dataProg in highly compact forrm with four type of instructions which  are callProc to:
+   * @return A dataProg in highly compact form with four type of instructions which  are callProc to:
    *         -1 return (for the main)   2-show 3 -bug-4 memo (affectation to the next field for layers)
    *         Expression includes the following constructors:
    *         -1  AST Constructor: Delayed  Param | Call1 Call2 Call3 Coons Heead Taail | Read
@@ -42,7 +43,8 @@ object DataProg {
      * @param l list of newly visited  AST Nodes
      * @return elements of $l which are layers.
      */
-    def getLayers(l: List[AST[_]]) = l.collect { case la: Layer[_] => la }
+    def getLayers(l: List[AST[_]]) =
+      l.collect { case la: Layer[_] => la }
 
     def getSysInstr(l: List[AST[_]]): List[CallProc] = getLayers(l).flatMap(_.systInstr)
     //def getHierarchyDisplay:HashMap[Layer[_],ASTL[_ <: Locus,_ <: Ring]]=new HashMap()++
@@ -56,12 +58,7 @@ object DataProg {
     var instrsCur = List(main)
     /** contains the current instructions to be explored for retrieving new DagNodes */
     var layers: List[Layer[_]] = List()
-    if (isRootMain) {
-      isRootMain = false
-      val bugLayer = ASTLt.constLayerBool[V].asInstanceOf[Layer[_]]
-      bugLayer.setName("bug")
-      layers = bugLayer :: layers
-    }
+
     do try {
       val l: List[Layer[_]] = getLayers(dag.addGreaterOf(instrsCur.flatMap(_.exps)))
       layers :::= l;
@@ -80,14 +77,34 @@ object DataProg {
     dataStruc.Name.setName(f, ""); //for ''grad'' to appear as a name, it should be a field of an object extending the fundef.
     val funs: iTabSymb[Fundef[_]] = immutable.HashMap.empty ++ dag.visitedL.collect { case l: Call[_] => (l.f.name, l.f) }
     /** second  gathering of SysInstr which can now access  the layer's name, because  setName has been called   */
-    val instrs = main :: getSysInstr(dag.visitedL)
+    val instrs: List[CallProc] = main :: getSysInstr(dag.visitedL)
+
+
+    /** adding bug layers */
+    if (isRootMain) {
+      isRootMain = false //the next dataProg will therefore not execute the comming code
+      //we add the bug layers, we must find out firt on what kind of locus we do have possible bugs.
+      layers = bugLayers(instrs) ++ layers.asInstanceOf[List[Layer[_]]]
+    }
     /** Symbol table  */
     val tsb: TabSymb[InfoType[_]] = mutable.HashMap.empty
     tsb ++= f.p.toList.map(a => ("p" + a.name, InfoType(a, ParamD()))) // stores parameters  in the symbol table.
-    tsb ++= layers.map(a => (Named.lify(a.name), InfoType(a, LayerField(a.nbit)))) // stores layers with bit size, in the symbol table.
-
+    tsb ++= layers.map(a => (Named.lify(a.name), InfoType(a, LayerField(a.nbit, a.init)))) // stores layers with bit size, in the symbol table.
     new DataProg[InfoType[_]](new DagInstr(instrs, dag), funs.map { case (k, v) ⇒ k -> DataProg(v) },
       tsb, f.p.toList.map("p" + _.name), List())
+  }
+
+  def bugLayers(lesInstr: List[CallProc]) = {
+    val bugInstr = lesInstr.filter(_.procName == "bug")
+    //we add the byug layers, we must find out firt on what kind of locus we do have possible bugs.
+    var locusBug: Set[Locus] = bugInstr.map(_.exps.head.mym.name.asInstanceOf[(Locus, Ring)]._1).toSet
+    //we artificially add V, so as to be able to identify the main entry point by testing it has a llbugV
+    locusBug = locusBug + V()
+    locusBug.map((l: Locus) => {
+      val la = (ASTLt.constLayerBool("false")(new repr(l))).asInstanceOf[Layer[_]]
+      la.setName("bug" + l.shortName);
+      la
+    }).toList
   }
 }
 
@@ -125,10 +142,16 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
                                  val paramD: List[String], val paramR: List[String],
                                  val coalesc: iTabSymb[String] = null) {
   /** all the coalesced register must be defined in the symbol table */
+
+  def allLayers: Iterable[String] = {
+    def isLayer(name: String) = tSymbVar(name).k.isLayerField
+
+    tSymbVar.keys.filter(isLayer(_))
+  }
   def invariantCoalesc =
     if (coalesc != null)
       for (c <- coalesc.values)
-        if (!tSymbVar.contains(c) && !c.startsWith("Mem[")) //!(Try(c.toInt).isSuccess))
+        if (!tSymbVar.contains(c) && !c.startsWith("mem[")) //!(Try(c.toInt).isSuccess))
           throw new Exception("colesced register:" + c + " not present in symbol table")
 
   invariantCoalesc
@@ -137,7 +160,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   def invariantVariable =
     for (i: Instr <- dagis.visitedL)
       for (v <- i.usedVars())
-        if (!tSymbVarExists(v) && !tSymbVarExists("p" + v) && !v.startsWith("Mem["))
+        if (!tSymbVarExists(v) && !tSymbVarExists("p" + v) && !v.startsWith("mem["))
           throw new Exception("variable:" + v + " not present in symbol table")
 
   invariantVariable
@@ -152,7 +175,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   //invariantSingleMain
 
   /** the main root is characterized by the fact that it has a bug layer. */
-  def isRootMain: Boolean = tSymbVar.contains("llbug")
+  def isRootMain: Boolean = tSymbVar.contains("llbugV")
 
   /** used to tranform leafCAloops which have no subfun. */
   val noSubFun = immutable.HashMap[String, DataProg[InfoNbit[_]]]()
@@ -223,9 +246,9 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     case _: ClassCastException => List()
   } // tabSymb may not contains InfoNbit if bit size was not yet computed
 
-  def isScalar(s: String): Boolean = tSymbVar(s).t.isInstanceOf[Ring]
+  def isScalar(s: String): Boolean = !isSpatial(s)
 
-  def isSpatial(s: String): Boolean = !tSymbVar(s).t.isInstanceOf[Ring]
+  def isSpatial(s: String): Boolean = !tSymbVar(s).t.isInstanceOf[Ring] //j'en ai fait une autre qui regarde si le nom contient des diese ou des dollars
 
   /** in order to also avoid repeating the spatial type, we also regroup identifiers by  spatial or scalar type */
   def indexingByType(s: List[String], p: String => Boolean) = s.filter(p).groupBy(tSymbVar(_).t)
@@ -273,8 +296,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   }
   /** register which are not coalesced, and shoud be defined. */
   lazy val standaloneRegister: Iterable[String] =
-
-    tSymbVar.keys.filter((s: String) => (!coalesc.contains(s) && !tSymbVar(s).k.isParam && !coalesced.contains(s) && !(s(0) == '_')))
+    tSymbVar.keys.filter((s: String) => (!coalesc.contains(s) && !tSymbVar(s).k.isParam && !tSymbVar(s).k.isLayerField && !coalesced.contains(s) && !(s(0) == '_')))
 
   /** @return coalesced registers in textual form with alphabetic ordering on the keys
    *          so that the register r1,r2... stand out together */
@@ -793,7 +815,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
    *         no scheduling needed.
    *         retruns also the symbol table with added scalar
    */
-  private def muInstrMain(d: DagInstr) = { //: (Map[String, List[Instr]],TabSymb[InfoNbit[_]] )
+  private def muInstrMain(d: DagInstr): (List[Instr], TabSymb[InfoNbit[_]]) = { //: (Map[String, List[Instr]],TabSymb[InfoNbit[_]] )
     val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
     var tSymbScalar: TabSymb[InfoNbit[_]] = mutable.HashMap.empty
     for ((name, info: InfoNbit[_]) <- p.tSymbVar) {
@@ -878,7 +900,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     //adds paramD to symbol Table WITH the suffx for specifying direction, since paramD will be deployed.
     //paramR are also deployed but their case is already  handled correctly in the symboltable
     for ((name, info: InfoNbit[_]) <- p.tSymbVar)
-      if (info.k == ParamD() || info.k.isInstanceOf[ParamRR]) { //we unfold paramD and paramR
+      if (info.k == ParamD() || info.k.isInstanceOf[ParamRR] || info.k.isInstanceOf[LayerField]) { //we unfold paramD and paramR and also layerField, which can be there for constant layers
         for (nameWithSufx <- deploySpace(name))
           tSymbScalar2.addOne(nameWithSufx -> info)
         //if (info.locus != V()) tSymbScalar2.remove(name) //the prior infoTab must be removed from the symbol Table, for V there is no suffixes, this is why it is special
@@ -1395,7 +1417,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       val nameStillUsed = p.dagis.visitedL.flatMap(_.names).toSet.diff(idCand4Simplnotsdwich)
       val coalescedStillUsed = nameStillUsed.map((str: String) => coalesc.getOrElse(str, str))
       for (str <- newTsymbar.keys) //we remove from the table the now useless symbols
-        if (!coalescedStillUsed.contains(str) && !(newTsymbar(str).k == ParamD()) && !(newTsymbar(str).k isParam)) {
+        if (!coalescedStillUsed.contains(str) && !(newTsymbar(str).k == ParamD()) && !(newTsymbar(str).k.isParam) && !(newTsymbar(str).k.isLayerField)) {
           //  if (!coalescedStillUsed.contains(str) && !(newTsymbar(str).k == ParamD()) && !(newTsymbar(str).k == ParamD())) {
           newTsymbar.remove(str)
         }

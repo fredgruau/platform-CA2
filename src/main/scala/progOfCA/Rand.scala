@@ -7,7 +7,7 @@ import compiler._
 import progOfCA.Rand.randDef
 
 /** Layer implementing a random bit */
-class Rand() extends Layer[(V, B)](1) with ASTLt[V, B] {
+class Rand() extends Layer[(V, B)](1, "rand") with ASTLt[V, B] {
   val next: BoolV = new Call1(randDef, this) with BoolV //randDef is used only here, no need for a wrapper!
   show(this)
 }

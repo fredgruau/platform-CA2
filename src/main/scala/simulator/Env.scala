@@ -1,12 +1,16 @@
 package simulator
 
+import compiler.ASTB.False
 import compiler.Locus
 import triangulation.Utility.halve
 import triangulation.{Init, Medium}
 
+import scala.collection.JavaConverters._
 import java.awt.Color
 import java.lang.Thread.sleep
+import scala.collection.convert.ImplicitConversions.`map AsScala`
 import scala.collection.immutable.HashMap
+import scala.collection.mutable
 import scala.util.Random
 
 /**
@@ -39,10 +43,11 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
 
   /** visit all layers that should be initialized directly,  and init the layers using the designated initMethod */
   private def initMemCA(): Unit = {
-    for (layerName: String <- controller.progCA.directInit()) {
+    //for (layerName: String <- controller.progCA.directInit()) {
+    for (layerName: String <- controller.progCA.init().keys) {
       /** fields layerName's components */
       val memFields2Init = memFields(layerName)
-      val initNameFinal = initName.getOrElse(layerName, controller.initName(layerName)) //either it is the root layer and we find it in env
+      val initNameFinal = initName.getOrElse(layerName, controller.initName(layerName)) //either it is the root layer or we find it in env
       val initMethod: Init = medium.initSelect(initNameFinal, controller.locusDisplayedOrDirectInitField(layerName))
       initMethod.init(memFields2Init.toArray)
     }
@@ -91,6 +96,7 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
         while (controller.isPlaying) //no pause asked by the user, no bugs detected
         {
           forward()
+          if (bugs.size > 0) controller.isPlaying = false
           repaint()
           sleep(50) // slow the loop down a bit
         }
@@ -100,12 +106,14 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
   }
 
 
+  var bugs: mutable.Buffer[String] = mutable.Buffer.empty
+
   /** does one CA iteration on the memory */
   def forward(): Unit = {
 
     //controller.progCA.theLoops(mem, medium.propagate4Shift)
     controller.progCA.anchorFieldInMem(mem) //todo a faire seulement si meme change (quand on display ou qu'on display plus)
-    controller.progCA.theLoops(medium.propagate4Shift)
+    bugs = controller.progCA.theLoops(medium.propagate4Shift).asScala //we retrieve wether there was a bug
     t += 1
   }
 

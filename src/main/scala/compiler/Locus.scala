@@ -14,7 +14,9 @@ sealed abstract class Locus {
   }
   def javaName: String
 
-  def parentheseLessToString = ("" + this).dropRight(2)
+  def shortName: String
+
+  def parentheseLessToString = ("" + this).dropRight(2) //should be the locus name!
 
   def isTransfer = false
 
@@ -36,8 +38,8 @@ sealed abstract class Locus {
 
   /** does also a deploy between O and nbit-1 */
   def deploy(n: String, nbit: Int): Array[String] =
-    if (nbit == 1) deploy(n)
-    else deploy(n).flatMap((s: String) => (0 until nbit).map(s + "#" + _))
+    if (nbit == 1) deploy(n) //on ajoute des $ d'abord
+    else deploy(n).flatMap((s: String) => (0 until nbit).map(s + "#" + _)) //on rajoute des # si c'est un entier
 
   /** encodes a neutral permutation with the right number of elements. */
   lazy val neutral: Array[Int] = Array.range(0, density) //we put lazy otherwise pb in initialization order
@@ -46,6 +48,7 @@ sealed abstract class Locus {
 abstract class Modifier {
   def invert: Modifier
 }
+
 
 final case class Perimeter() extends Modifier {
   def invert = Radial()
@@ -65,6 +68,8 @@ object Modifier {
 
 abstract class S extends Locus with Ordered[S] {
   def javaName: String = "locus" + toString
+
+  def shortName: String = toString.dropRight(2)
 
   override def deploy(n: String): Array[String] = sufx.map(n + "$" + _)
 
@@ -149,6 +154,8 @@ abstract class TT extends Locus{
 /** T stands for Transfer, and uses two simplicial locus. The first is the simplicial. T[V,E] corresponds to  eV  */
 final case class T[+S1 <: S, +S2 <: S](from: S1, to: S2) extends TT {
   def javaName: String = "locus" + from.parentheseLessToString + to.parentheseLessToString.toLowerCase + "()"
+
+  def shortName: String = from.parentheseLessToString + to.parentheseLessToString.toLowerCase
 
   override def deploy(n: String) =
     from.sufx.map((suf1: String) => sufx.map(n + "$" + suf1 + _).toList).toList.flatten.toArray

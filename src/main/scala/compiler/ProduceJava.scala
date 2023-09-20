@@ -1,212 +1,309 @@
 package compiler
 
 import compiler.AST.Read
-import compiler.Circuit.TabSymb
-import compiler.DataProgLoop2.{fatherOfVar, indexOfLastUpperCase, radicalOfVar, removeAfterChar, shortenedSig}
+import compiler.Circuit.{TabSymb, iTabSymb}
 import compiler.Instr.deployInt
-import compiler.Locus.allLocus
+import compiler.Locus.{all2DLocus, allLocus}
+import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp, radicalOfVar, radicalOfVar2, removeAfterChar, rootOfVar, shortenedSig, writeFile}
+import compiler.VarKind.LayerField
 import dataStruc.Named
+import dataStruc.Named.noDollarNorHashtag
+import simulator.XMLutilities.readXML
 
 import java.util.regex.Pattern
 import scala.::
 import scala.collection.convert.ImplicitConversions.`collection asJava`
 import scala.collection.{Map, mutable}
 import scala.collection.immutable.{HashMap, HashSet}
-import scala.xml.Elem
+import scala.jdk.CollectionConverters._
+import scala.xml.{Elem, Node, NodeSeq, XML}
 
-/** contains the code needed to produce the final java code */
+/** provide method in order to  produce the final java code */
 trait ProduceJava[U <: InfoNbit[_]] {
   self: DataProgLoop[U] =>
-  def javaCode: String = { //we need to generate spatial signature for macros before we can adress the main.
-    val loops: Map[String, DataProgLoop[U]] = allCAloop
-    val codeLoops: String = loops.map { case (k, v) => v.asInstanceOf[ProduceJava[U]].javaCodeCAloop(k) }.mkString("\n")
+  /** returns  a big string  storing the code for CAloops, and the code for main calling those CAloops on arrays */
+  def produceAllJavaCode: Unit = { //we need to generate spatial signature for macros before we can adress the main.
+    val leafLoops: Map[String, DataProgLoop[U]] = subDataProgs.filter(p => p._2.isLeafCaLoop)
+    val codeLoops: iTabSymb[String] = leafLoops.map({ case (k, v) => (k -> v.asInstanceOf[ProduceJava[U]].javaCodeCAloop(k)) }) //retrieves all the CA loops
+    /*   val anonymousKeys: Iterable[String] = loops.keys.filter(_.startsWith("_fun"))
+       val macroKeys: Iterable[String] = loops.keys.filter(! _.startsWith("_fun"))
+      l codeLoopsMacro =macroKeys.map (s=>loops(s).asInstanceOf[ProduceJava[U]].javaCodeCAloop(s))
+       val codeLoopsAnonymous: String = anonymousKeys.map (s=>loops(s).asInstanceOf[ProduceJava[U]].javaCodeCAloop(s)) //anonymous loop need to be grouped with the main java
+      */
+    val (codeLoopsMacro, codeLoopsAnonymous) = codeLoops.partition({ case (k, v) => !k.startsWith("_fun") })
+    val codeMain: String = javaCodeMain(codeLoopsAnonymous.values.mkString("\n"));
+    val nameCA = paramR(0) + "CA" //name of the produced java file is equal to the name of the layer wrapping around all the compiled prog
+    val nameCAjava = nameCA.capitalize + ".java"
+    val nameLoops = "RedS.java"
+    val nameDirCompilCA = "src/main/scala/compiledCA/"
+    val nameDirCompilLoops = "src/main/scala/compiledMacro/"
+    val preambule = "package compiledMacro;\n import simulator.PrShift;\n public class RedS {\n"
+    val postambule = "}"
 
-    def sptyp(st: Tuple2[String, DataProgLoop[U]]) = (st._1, st._2.spatialSig)
-
-    def nbittyp(st: Tuple2[String, DataProgLoop[U]]) = (st._1, st._2.nbitSig)
-
-    val spatialTypeParamLoops: Map[String, List[(Locus, Ring)]] = loops.map(sptyp(_)) //
-    val nbitTypeParamLoops: Map[String, List[Int]] = loops.map(nbittyp(_))
-    val codeMain: String = javaCodeMain(spatialTypeParamLoops, nbitTypeParamLoops)
-    codeLoops + codeMain
-  }
-
-  /** Produce the code to inintialize 1D array from 2D arrays */
-  def anchorParam(shortened: List[String], original: List[String]): List[String] = {
-    var res: List[String] = List()
-    var i = 0
-    for (s: String <- shortened) {
-      if (isBoolV(s)) i += 1
-      else {
-        var j = 0
-        try while (removeAfterChar(original(i), '$') == s) {
-          res = original(i) + "=" + s + "[" + j + "]" :: res //ish=isE[0]
-          j += 1;
-          i += 1
-        } catch {
-          case _: IndexOutOfBoundsException =>
-        }
-      }
-    }
-    res
-  }
-
-  /** declares all the variables local to the loops, and initializes them to zero if needed */
-  def declInitParam = {
-    val intReg = (standaloneRegister ++ coalesced.keys) //should be declared
-    val boolReg: Iterable[String] = intReg.flatMap((s: String) => deployInt(s, tSymbVarSafe(s).nb)) //intReg which have a single component are not deployed
-
-    /** variable which are delayed must be indentified so as to be initialized */
-    def isDelayed(s: String) = delayed.contains(removeAfterChar(s, '#'))
-
-    "int " + boolReg.map((s: String) => if (isDelayed(s)) s + "=0" else s).mkString(",")
-  }
-
-  def javaCodeCAloop(nameMacro: String): String = {
-    val shortSigIn = shortenedSig(paramD);
-    val shortSigOut = shortenedSig(paramR)
-
-    /** add type to parameters, either int[] or int[][],
-     * one dimension is enough for spatial type boolV, two dimensions are needed for other locus */
-    def javaIntArray(s: String) = (if (isBoolV(s)) ("int [] ") else ("int [][] ")) + s
-
-    val parameters = (shortSigIn ::: shortSigOut).map(javaIntArray(_))
-
-    replaceAll("src/main/scala/compHandCA/templateCAloop.txt", Map(
-      "NAMEMACRO" -> nameMacro,
-      "PARAMETERS" -> parameters.mkString(","),
-      "ANCHORPARAM" -> (anchorParam(shortSigIn, paramD) ::: anchorParam(shortSigOut, paramR)).reverse.mkString(","),
-      "PROPAGATEFIRSTBIT" -> paramD.map((s: String) => "p.propagate4shift(" + s + ")").mkString(";"),
-      "FIRSTPARAM" -> (paramD ::: paramR)(0), //There must be at least one param,
-      // we need to read it so as to know the length which is the number of CA lines.
-      //  "READPARAM"->paramD.map((s:String)=>s+"i"+"="+s+"[i]").mkString(";"),
-      "DECLINITPARAM" -> declInitParam,
-      "LOOPBODY" -> totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ")
-
-    ))
-  }
-
-  /** number of bits for non boolean variables. */
-  def fieldBitSize(names: Iterable[String]): HashMap[String, Int] =
-    HashMap[String, Int]() ++ names.filter(tSymbVar(_).nb > 1).map((s: String) => s -> tSymbVar(s).nb)
-
-  def fieldLocus(names: Iterable[String]): HashMap[String, Locus] = {
-    val res = HashMap[String, Locus]() ++ names.map((s: String) => s -> tSymbVar(s).t.asInstanceOf[(Locus, Ring)]._1)
-    val u = 0
-    res
-  }
-
-  var mainCallCode: List[String] = null
-
-  def javaCodeMain(spatialTypes: Map[String, List[(Locus, Ring)]], nbitType: Map[String, List[Int]]): String = {
-    /** use  locus and parameter occurence order to create parameter names */
-    val offfsetsInt = offsetsInt
-    val (theCallCode, decompositionLocus) = theCalllCode(spatialTypes, nbitType)
-    mainCallCode = theCallCode
-    val l = layerXML
-    System.out.println(l)
-    replaceAll("src/main/scala/compHandCA/templateCA.txt", Map(
-      "NAMECA" -> paramR(0).capitalize,
-      "MEMWIDTH" -> ("" + mainHeapSize + "\n"), //TODO on calcule pas bien la memwidth)
-      "DECLNAMED" -> ("" + DeclNamed(offfsetsInt)),
-      "DECLNOTNAMED" -> ("" + declNotNamed(decompositionLocus)),
-      "LISTCALL" -> theCallCode.reverse.mkString("\n"),
-      "ANCHORNAMED" -> anchorNamed(offfsetsInt), //anchorNamed,
-      "ANCHORNOTNAMED" -> anchorNotNamed(decompositionLocus),
-      "FIELDOFFSET" -> fieldOffset(offfsetsInt),
-      "FIELDLOCUS" -> fieldLocus(offfsetsInt.keys).map((kv: (String, Locus)) =>
-        " map.put(\"" + kv._1 + "\"," + kv._2.javaName + ")").mkString("\n"),
-      "BITSIZE" -> fieldBitSize(offfsetsInt.keys).map((kv: (String, Int)) =>
-        " map.put(\"" + kv._1 + "\"," + kv._2 + ")").mkString("\n"),
-    ))
-
+    writeFile(nameDirCompilCA + nameCAjava, codeMain + "\n")
+    writeFile(nameDirCompilLoops + nameLoops, preambule + codeLoopsMacro.values.mkString("\n") + postambule)
+    // codeLoopsMacro + codeMain
   }
 
   /**
-   * it uses the mainCallCode to get the display command
    *
-   * @return keys are names of Layers, value are names of fields or Layers
+   * @param nameMacro name of a macro CAloop
+   * @return codes of the loop
    */
-  def hierarchyDisplayedField: Map[String, List[String]] = {
-    var res: Map[String, List[String]] = new HashMap()
-    for (v <- theDispayed) {
-      val f = fatherOfVar(v)
-      val l = if (res.contains(f)) res(f) else List()
-      res = res + (f -> (v :: l))
-    }
-    res
+  def javaCodeCAloop(nameMacro: String): String = {
+    val shortSigIn = shortenedSig(paramD);
+    val shortSigOut = shortenedSig(paramR)
+    val localSpatialLayers = tSymbVar.filter(x => x._2.k.isLayerField && noDollarNorHashtag(x._1))
+    val layerNames = localSpatialLayers.keys.toSeq.sorted.toList
+
+    //we proceed by filling slot in a template named templateCAloop.txt, each slot is filled using a specific method
+    replaceAll("src/main/scala/compiledCA/template/templateCAloop.txt", Map(
+      "NAMEMACRO" -> nameMacro,
+      "PARAMETERS" -> {
+        /** add type to parameters, either int[] or int[][],
+         * one dimension is enough for spatial type boolV, two dimensions are needed for other locus */
+        def javaIntArray(s: String) = (if (isBoolV(s)) ("int [] ") else ("int [][] ")) + s
+
+        val parameters = (shortSigIn ::: (shortSigOut ::: layerNames)).map(javaIntArray(_))
+        parameters.mkString(",")
+      },
+      "ANCHORPARAM" -> {
+        /** @param shortened name of spatial parameters
+         * @param original   names of scalar parameters, in same order
+         * @return Produce the code to inintialize 1D array from 2D arrays */
+        def anchorParam(shortened: List[String], original: List[String]): List[String] = {
+          var res: List[String] = List();
+          var i = 0
+          for (s: String <- shortened) {
+            if (isBoolV(s)) i += 1
+            else {
+              var j = 0;
+              try while (removeAfterChar(original(i), '$') == s) {
+                res = original(i) + "=" + s + "[" + j + "]" :: res;
+                j += 1;
+                i += 1
+              } catch {
+                case _: IndexOutOfBoundsException =>
+              }
+            }
+          }
+          res
+        }
+
+        val anchor = (anchorParam(shortSigIn, paramD) ::: anchorParam(shortSigOut, paramR) ::: anchorParam(layerNames, layerNames.flatMap(s => tSymbVar(s).locus.deploy(s)))).reverse.mkString(",")
+        if (anchor.size > 0) "int[] " + anchor + ";" else ""
+      },
+      "PROPAGATEFIRSTBIT" -> paramD.map((s: String) => "p.propagate4shift(" + s + ")").mkString(";"), //for the moment we do the propagation on all data parameters
+      "CALINENUMBER" -> (paramD ::: paramR)(0), //There must be at least one param,we need to read it so as to know the length which is the number of CA lines.
+      "DECLINITPARAM" -> {
+        /** declares all the variables local to the loops, and initializes them to zero if needed */
+        def declInitParam = {
+          val intReg = (standaloneRegister ++ coalesced.keys).filter(noDollarNorHashtag(_)) //should be declared todo gestion plus precise des dieses
+          val boolReg: Iterable[String] = intReg.flatMap((s: String) => deployInt(s, tSymbVarSafe(s).nb)) //intReg which have a single component are not deployed
+
+          /** variable which are delayed must be indentified so as to be initialized */
+          def isDelayed(s: String) = delayed.contains(removeAfterChar(s, '#'))
+
+          boolReg.map((s: String) => if (isDelayed(s)) s + "=0" else s).mkString(",")
+        }
+
+        val dip = declInitParam;
+        if (dip.size > 0) "int " + dip + ";" else ""
+      },
+      "LOOPBODY" -> totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ")))
   }
 
-  def layerXML = {
-    val h = hierarchyDisplayedField
-    val rootLayers: Iterable[String] = h.keys.filter(indexOfLastUpperCase(_) == -1).toSet - ""
 
-    /** recursive traversing of hierarchy */
-    def xmll(s: String): Elem = {
-      <Layer>
-        {s}{if (theDispayed.contains(s)) //if layer is printed, adds the field storing the former layer's value
-      {
-        <Field>
-          {Named.lify(s)}
-        </Field>
-      }}{h(s).map(nameFieldorLayer => if (h.contains(nameFieldorLayer)) xmll(nameFieldorLayer) else {
-        <Field>
-          {nameFieldorLayer}
-        </Field>
+  def javaCodeMain(codeLoopAnonymous: String): String = {
+    /** use  locus and parameter occurence order to create parameter names */
+    // val spatialLayerSubProg=layerSubProg2
+
+    /**
+     *
+     * @param tSymbVarAndConstLayer tSymbVar plus names of constant Layers defined in subProgram (should be declared in the main)
+     * @return list of offset for all named fields. Used for 1-to anchor named 1D arrays, 2-to list memory planes
+     * */
+    def offsetsInt(tSymbVarAndConstLayer: iTabSymb[InfoNbit[_]]): Map[String, List[Int]] = {
+      tSymbVarAndConstLayer.map { case (k, v) => (k,
+        if (v.t == (V(), B())) List(adress(coalesc(k)))
+        else {
+          val offsetstring = v.locus.deploy(k, tSymbVarSafe(k).nb)
+          offsetstring.map((s: String) => adress(coalesc(s))).toList
+        })
       }
-      )}
-      </Layer>
     }
 
-    <layers>layers
-      {rootLayers.map(nameLayer => xmll(nameLayer))}
-    </layers>
+    val spatialOfffsetsInt = offsetsInt((tSymbVar ++ layerSubProgStrict).filter(x => noDollarNorHashtag(x._1)))
+    val (theCallCode, decompositionLocus, theDisplayed) = javaOfTheCallInTheMain()
+    //we use the same template technique as the one used for CAloops
+    replaceAll("src/main/scala/compiledCA/template/templateCA.txt", Map(
+      "NAMECA" -> paramR(0).capitalize,
+      "MEMWIDTH" -> ("" + mainHeapSize + "\n"), //TODO on calcule pas bien la memwidth)
+      "DECLNAMED" -> {
+        /** code that declares all the named arrays 1D and 2D */
+        def DeclNamed(offset: Map[String, List[Int]]): String = {
+          val (var1D, var2D) = offset.keys.partition(offset(_).size == 1) //we distinguish 1D arrays from 2D arrays.
+          (if (var1D.nonEmpty) "public static int[]" + var1D.mkString(",") + ";\n" else "") +
+            (if (var2D.nonEmpty) "public static int[][]" + var2D.mkString(",") + ";\n" else "")
+        }
+
+        ("" + DeclNamed(spatialOfffsetsInt))
+      },
+      "DECLNOTNAMED" -> {
+        /** Codes that declares unamed arrays */
+        def declNotNamed(decomposition: Map[Locus, Map[List[Int], Int]]): String = { //todo queskispass si c'est un tableau 1D?
+          val var1D = (0 until decomposition(V()).size).map("V" + _) //name of unamed points to its locus.
+          var var2D: List[String] = List() //needs 2D arrays
+          for (l: Locus <- all2DLocus) {
+            var2D = var2D ++ (0 until decomposition(l).size).map(l.shortName + _)
+          }
+          (if (var1D.nonEmpty) "public static int[] " + var1D.mkString(",") + ";\n" else "") +
+            (if (var2D.nonEmpty) "public static int[][] " + var2D.mkString(",") + ";\n" else "")
+        }
+
+        ("" + declNotNamed(decompositionLocus))
+      },
+      "LISTCALL" -> theCallCode.reverse.mkString("\n"),
+      "ANCHORNAMED" -> {
+        /** code that anchors named arrays on memory */
+        def anchorNamed(offset: Map[String, List[Int]]): String = {
+          def anchorOneVar(oneVar: (String, List[Int])) = {
+            val ints = oneVar._2
+            var res = ints.map("m[" + _ + "]").mkString(",")
+            if (ints.size > 1) res = " new int[][]{" + res + "}" //we have a 2D array
+            res = oneVar._1 + "=" + res;
+            res
+          }
+
+          offset.map(anchorOneVar(_)).mkString(";\n") + ";"
+        }
+
+        anchorNamed(spatialOfffsetsInt)
+      },
+      "ANCHORNOTNAMED" -> {
+        /** Codes that decompose array 2D into memory slices */
+        def anchorNotNamed(decomposition: Map[Locus, Map[List[Int], Int]]): String = { //todo queskispass si c'est un tableau 1D?
+          var codeDecl: List[String] = List()
+          for (l: Locus <- allLocus)
+            for ((li, i) <- decomposition(l))
+              codeDecl = l.shortName + i + "= new int[][]{" + li.map("m[" + _ + "]").mkString(", ") + "};" :: codeDecl
+          // seedE = new int[][]{m[8], m[9], m[10]};
+          codeDecl.mkString("\n")
+        }
+
+        anchorNotNamed(decompositionLocus)
+      },
+      "FIELDOFFSET" -> {
+        def fieldOffset(offset: Map[String, List[Int]]): String = {
+          def offsetOneVar(oneVar: (String, List[Int])) = {
+            val ints = oneVar._2
+            var res = ints.map("" + _).mkString(",")
+            res = "map.put(\"" + oneVar._1 + "\", li(" + res + "));";
+            res
+          }
+
+          offset.map(offsetOneVar(_)).mkString("\n")
+        }
+
+        fieldOffset(spatialOfffsetsInt)
+      },
+      "FIELDLOCUS" -> {
+        /**
+         *
+         * @param names
+         * @param spatialLayer
+         * @return
+         */
+        def fieldLocus(names: Iterable[String], spatialLayer: Map[String, InfoNbit[_]]): HashMap[String, Locus] = {
+          val l: Map[String, Locus] = spatialLayer.map({ case (k, v) => k -> v.t.asInstanceOf[(Locus, Ring)]._1 })
+          // .filter(x => !tSymbVar.contains(x._1)) //removes  layers defined in main
+          HashMap[String, Locus]() ++ names.map((s: String) => s -> tSymbVar(s).t.asInstanceOf[(Locus, Ring)]._1) ++ l
+        }
+
+        fieldLocus(spatialOfffsetsInt.keys, layerSubProgStrict).map((kv: (String, Locus)) => //we need to know the locus, as soon as  we need to know the bit planes
+          " map.put(\"" + kv._1 + "\"," + "Locus." + kv._2.javaName + ")").mkString(";\n")
+      },
+      "BITSIZE" -> {
+        /** number of bits for non boolean variables. */
+        def fieldBitSize(names: Iterable[String], spatialLayer: Map[String, InfoNbit[_]]): HashMap[String, Int] = {
+          val l: Map[String, Int] = spatialLayer.filter(_._2.nb > 1).map({ case (k, v) => k -> v.nb })
+            .filter(x => !tSymbVar.contains(x._1)) //removes integer layers defined in main
+          HashMap[String, Int]() ++ names.filter(tSymbVar(_).nb > 1).map((s: String) => s -> tSymbVar(s).nb) ++ l
+        }
+
+        fieldBitSize(spatialOfffsetsInt.keys, layerSubProg2).map((kv: (String, Int)) =>
+          " map.put(\"" + kv._1 + "\"," + kv._2 + ")").mkString("\n")
+      },
+      "DISPLAYABLE" -> //theDisplayed contains two kinds of name:aux and segmented, first step should separate the segmented
+        parenthesizedExp(rootOfVar(theDisplayed.head), hierarchyDisplayedField(theDisplayed)),
+      "INITLAYER" -> {
+        def initLayer(spatialLayer: Map[String, InfoNbit[_]]): HashMap[String, String] = {
+          HashMap[String, String]() ++ spatialLayer.map({ case (s, i) => (s -> i.k.asInstanceOf[LayerField].init) })
+        }
+
+        initLayer(layerSubProg2).map((kv: (String, String)) =>
+          " map.put(\"" + kv._1 + "\",\"" + kv._2 + "\")").mkString(";\n") + ";\n"
+      },
+      "ANONYMOUSLOOP" -> {
+        codeLoopAnonymous
+      }
+    ))
+
   }
 
 
-  /** names of displayed variables */
-  var theDispayed: Set[String] = HashSet()
-
-  def theCalllCode(spatialTypes: Map[String, List[(Locus, Ring)]], nbitType: Map[String, List[Int]]): (List[String], Map[Locus, Map[List[Int], Int]]) = {
-    var decompositionLocus: Map[Locus, Map[List[Int], Int]] = HashMap() ++ allLocus.map(_ -> HashMap())
-    val theCalls = dagis.visitedL.reverse.asInstanceOf[List[CallProc]]
+  /** the sequence of calls of macros realizing the desired CA computation,
+   *
+   * @return the calls, plus a map called "decompositionLocus", which for each locus, and each group of memory plane,
+   *         associates a number identifying an array of bit planes, used in the program.
+   *         plus the set of  Displayed fields, which are simply arguments of calls to show */
+  def javaOfTheCallInTheMain(): (List[String], Map[Locus, Map[List[Int], Int]], Set[String]) = {
+    var lastCallCode: String = null //used to avoid generating many copy or many memo
+    /** names of displayed variables,  updated as a side effect when generating the call Codes, each time we meet a call to display */
+    var theDisplayed: Set[String] = HashSet()
+    var decompositionLocus: Map[Locus, Map[
+      List[Int], Int]] = HashMap() ++ allLocus.map(_ -> HashMap()) //empty map for each locus
+    val theCalls = dagis.visitedL.reverse.asInstanceOf[List[CallProc]] //compiled calls
     var theCallCode: List[String] = List()
-    for (call <- theCalls) { //réecrit les calls.
-      val paramsD: List[String] = call.exps.map(_.asInstanceOf[Read[_]].which)
+    for (call <- theCalls) { //rewrite the calls, by regroupping parameters
+      var paramsD: List[String] = call.exps.map(_.asInstanceOf[Read[_]].which) //names of parameters passed
+      //on rajoute les layers si y en a
       val paramsR: List[String] = call.names
       val params = paramsD ::: paramsR
       var i = 0 //counter of scalar parameter
-      var callCode = call.procName + "(" //we now need to add the params
-      var paramCode: List[String] = List()
+      var callCode = call.procName + "(" //we always put the called procedure name.we now need to add the params
+      var paramCode: List[String] = List() //code of the param for the current considered call
       call.procName match {
-        case "show" =>
-          val callCodeArg = radicalOfVar(call.usedVars().toList.head)
-          theDispayed += callCodeArg //display has allways a single arg which is the field to be displayed
-          callCode += callCodeArg + ")"
-        case "copy" | "memo" | "bug" => //
-        case _ =>
-          for ((spatialType, nbit) <- spatialTypes(call.procName) zip nbitType(call.procName)) {
+        //we first consider specific system call show, copy, memo, debug
+        case "show" => val callCodeArg = radicalOfVar(call.usedVars().toList.head) //we take the radical for diminishing the number of parameters
+          theDisplayed += callCodeArg //sideeffect, update theDisplayed. display has allways a single arg which is the field to be displayed
+          callCode += callCodeArg //in fact we could supress calls to show, we leave it, so that we can check those in the compiled java.
+        case "copy" | "memo" => callCode += params.map(radicalOfVar2(_)).mkString(",") //copy and memo have the same effect
+        case "bug" => val nameBug = radicalOfVar(call.exps.head.asInstanceOf[Read[_]].which) //on apelle bug avec un read, c'est obligé
+          val locusBug = tSymbVar(nameBug).locus.toString.dropRight(2) //dropRight enleve les deux parenthéses
+          paramCode = List(nameBug, "bug" + locusBug, "\"" + nameBug + "\"", "bugs").reverse
+        case _ => //we now consided a call to a real CAloop
+          paramCode = List("p") //this is a method PrShift that does a preliminary shift if radius is >0yyy
+          val localprog = subDataProgs(call.procName) //gets the called dataProg
+          for ((spatialType, nbit) <- localprog.spatialSig zip localprog.nbitSig) { //retrieve spatial type and  bitSize   of parameters.
             val locus: Locus = spatialType._1
             val density = nbit * locus.density
             if (spatialType == (V(), B())) {
-              paramCode = params(i) :: paramCode; //same processing wether it is a name or a heap variable
+              paramCode = params(i) :: paramCode;
               i += 1
-            }
-            else { //we prooceed differently depending wether the params are mem (isheap) or name
-              if (isHeap(params(i))) { //its a mem
+            } //same processing wether it is a name or a heap variable
+            else { //we prooceed differently depending wether the params are mem (isheap) or name of fields
+              if (isHeap(params(i))) { //its a "mem[x]
                 var indexesMem: List[Int] = List()
                 for (j <- 0 until density) { //iterate over the nbit scalar parameters of the form mem[2]
-                  indexesMem = adress(params(i)) :: indexesMem; i += 1 //builds the list of memory offset associated to the locus
-                }
-                //check if that array2D of memory slices has already been used
+                  indexesMem = adress(params(i)) :: indexesMem; i += 1
+                } //builds the list of memory offset associated to the locus
                 indexesMem = indexesMem.reverse
-                if (!decompositionLocus(locus).contains(indexesMem)) {
+                if (!decompositionLocus(locus).contains(indexesMem)) { //check wether that array2D of memory slices has already been used
                   val newMapOfLocus = decompositionLocus(locus) + (indexesMem -> decompositionLocus(locus).size)
                   decompositionLocus = decompositionLocus + (locus -> newMapOfLocus)
                 }
-                // decompositionLocus=decompositionLocus+(locus->(indexesMem::decompositionLocus(locus)))
-                paramCode = "" + locus.parentheseLessToString + //the drop right removes parenthesis
-                  (decompositionLocus(locus)(indexesMem)) :: paramCode //name of formal paramer is locus plus rank
+                paramCode = locus.shortName + (decompositionLocus(locus)(indexesMem)) :: paramCode //name of formal paramer is locus plus rank stored in decompositionLocus
               }
               else //its not  a mem
               {
@@ -215,47 +312,14 @@ trait ProduceJava[U <: InfoNbit[_]] {
               }
             }
           }
+          val loops: Iterable[String] = localprog.allLayers.filter(noDollarNorHashtag(_))
+          if (loops.nonEmpty)
+            paramCode = loops.toList ++ paramCode
       }
       callCode += paramCode.reverse.mkString(",") + ");"
-      theCallCode = callCode :: theCallCode
+      if (!callCode.equals(lastCallCode)) theCallCode = callCode :: theCallCode //in case of copy or memo of integer, several times the same call code will be generated
+      lastCallCode = callCode //in which  case we keep only the first one by ignoring the following
     }
-    (theCallCode, decompositionLocus)
-  }
-}
-
-object DataProgLoop2 {
-  def removeAfterChar(s: String, c: Char): String = if (s.contains(c)) s.substring(0, s.indexOf(c)) else s
-
-  private def truncateBefore(s: String, p: String) = {
-    if (s.indexOf(p) == -1) s else s.substring(0, s.indexOf(p))
-  }
-
-  def radicalOfVar(s: String): String = {
-    truncateBefore(truncateBefore(s, "$"), "#")
-  }
-
-  def radicalOfVar2(s: String): String = {
-    truncateBefore(s, "#")
-  }
-
-  def indexOfLastUpperCase(v: String) = {
-    val pat = Pattern.compile("[A-Z][^A-Z]*$")
-    val `match` = pat.matcher(v)
-    var lastCapitalIndex = -1
-    if (`match`.find) lastCapitalIndex = `match`.start
-    lastCapitalIndex
-  }
-
-  /** returns the name of the layers containing var, or empty string if there is none */
-  def fatherOfVar(v: String): String = {
-    val i = indexOfLastUpperCase(v)
-    if (i == -1) ""
-    else v.substring(0, i)
-  }
-
-  def shortenedSig(param: List[String]): List[String] = {
-    val res: mutable.LinkedHashSet[String] = mutable.LinkedHashSet()
-    for (p <- param) res += radicalOfVar(p)
-    return res.toList;
+    (theCallCode, decompositionLocus, theDisplayed)
   }
 }

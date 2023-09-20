@@ -41,6 +41,7 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
 
       override def drawPolygon(p: Polygon): Unit = g.drawPolygon(p)
 
+      override def drawText(s: String, i: Int, j: Int) = g.drawString(s, i, j)
       override def drawPoint(x: Int, y: Int): Unit = {
         g.setStroke(new BasicStroke(2))
         g.drawLine(x, y, x, y)
@@ -59,7 +60,11 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
       g.setColor(c);
       for (p <- env.medium.displayedPoint)
         g.drawPoint(p.x.toInt, p.y.toInt)
+    }
 
+    def drawText(c: Color) = {
+      g.setColor(c);
+      g.drawText(env.bugs.mkString(","), 0, height - 10)
     }
 
     def drawTriangles(c: Color) = {
@@ -121,6 +126,7 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
     drawCA1DborderContour(white)
     //drawTriangles(gray)
     drawPoints(white)
+    drawText(white)
   }
 
 }

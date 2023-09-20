@@ -1,8 +1,0 @@
- public static void {{NAMEMACRO}}(PrShift p,{{PARAMETERS}}){
-        int [] {{ANCHORPARAM}}  ;
-        {{PROPAGATEFIRSTBIT}} ; //si on le fait la, pas besoin de repropager pour grow
-        {{DECLINITPARAM}};
-        for (int i = 1; i < {{FIRSTPARAM}}.length; i++) {
-           {{LOOPBODY}};
-        }
-    }

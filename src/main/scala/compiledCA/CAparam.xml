@@ -5,9 +5,6 @@
         <display iter="CAsize" CAwidth="650" nbCol="2"/>
         <simul t0="0" isPlaying="false"/>
         <inits>
-            <layer init="center">llseed</layer>
-            <layer init="border">tmp1</layer>
-            <layer init="center">tmp2</layer>
             <layer init="def">defE</layer>
             <layer init="def">defF</layer>
             <layer init="def">defVe</layer>
@@ -19,29 +16,16 @@
             <size nbCol="60" nbLine="12"/>
         </sizes>
         <layers>layers
-            <layer>seed
-                <field>llseed</field>
-                <field>tmp1</field>
-                <field>tmp2</field>
-            </layer>
-            <layer>def
-                <field>defE</field>
-                <field>defF</field>
-                <field>defVe</field>
-            </layer>
         </layers>
     </fixed>
     <expandedLayer>
         <Layer>
             layers
         </Layer>
-        <Layer>
-            def
-        </Layer>
     </expandedLayer>
     <colorOfField>
-        <layer color="0x0080FF">
-            llseed
+        <layer color="0x0000FF">
+            seed
         </layer>
     </colorOfField>
 </paramCA>

@@ -4,6 +4,7 @@ import AST._
 import ASTB.{Tminus1, shiftL, shiftR}
 import ASTBfun.ASTBg
 import Circuit._
+import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp}
 
 import scala.collection._
 import scala.collection.immutable.HashMap
@@ -44,19 +45,19 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     body = computeRoot //we pretend that the circuit is a function which returns compute Root
 
     val prog1: DataProg[InfoType[_]] = DataProg(this);
-    // print(prog1)
+    //print(prog1)
 
     val prog2 = prog1.treeIfy();
-    //  print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
+    //   print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
 
     val prog3 = prog2.procedurIfy();
-    // print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
+    //print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
     val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
     //   print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
     val prog5: DataProg[InfoNbit[_]] = prog4.macroIfy();
-    //    print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
+    //   print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
     //  print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
@@ -65,25 +66,26 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     // print("radiusify555555555555555555555555555555\n"+prog5ter)
 
     val prog6 = prog5ter.unfoldSpace(m);
-    // print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
+    //  print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
 
     val prog7 = prog6.treeIfy(); //spatiall unfolding generates reused expression that need to be affected again
     //print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
     val prog7bis = prog7.simplify(); //this will remove id which are read only once.
-    //    print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
+    // print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
 
     val prog8: DataProg[InfoType[_]] = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
     // print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
     val prog10: DataProgLoop[InfoNbit[_]] = prog8.loopIfy()
-    //   print(prog10)
+    // print(prog10)
 
     val prog11 = prog10.unfoldInt()
-    // print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
+    //print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
     val prog12 = prog11.coaalesc()
-    // print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc\n" + prog12)
-    print("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].javaCode)
+    // System.out.println(prog12.allLayers)
+    print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
+    print("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaCode)
   }
 }
 
@@ -91,6 +93,16 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
  * contains singletons uses trhoughout the compilation.
  */
 object Circuit {
+  /** we restrict ourself to circuit returning a boolV, for the moment */
+  def main(args: Array[String]) {
+    val compRoot = Class.forName("progOfCA." + args(0)).newInstance.asInstanceOf[ASTLt[V, B]] //asInstanceOf[{ def hello(name: String): String }]
+    compRoot.setName(args(0).toLowerCase)
+    new Circuit[V, B]() {
+      def computeRoot = compRoot
+    }.compile(hexagon)
+  }
+
+
   type TabSymb[T] = mutable.HashMap[String, T]
   type AstMap[T] = mutable.HashMap[AST[_], T]
   type TabConstr = TabSymb[Constraint]
@@ -185,6 +197,7 @@ object Circuit {
     };
     r
   })
+
   //print(hexPermut)
 }
 

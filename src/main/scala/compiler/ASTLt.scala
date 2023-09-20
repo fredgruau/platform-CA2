@@ -9,7 +9,7 @@ import dataStruc.DagNode._
 import scala.collection._
 import ASTBfun.ASTBg
 import compiler.ASTLt.ConstLayer
-import compiler.VarKind.{MacroField, ParamD}
+import compiler.VarKind.{LayerField, MacroField, ParamD}
 import dataStruc.Named
 
 
@@ -65,8 +65,8 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
       case _ => this.asInstanceOf[AST[_]] match {
         //  case Param(_) => new Read[(L, R)]("p" + idRepr(this))(mym) with ASTLt[L, R]
         case u@Param(_) => new Read[(L, R)]("p" + u.nameP)(mym) with ASTLt[L, R]
-
-        case l: Layer[_] => new Read[(L, R)](Named.lify(idRepr(this)))(mym) with ASTLt[L, R]
+        //just revu
+        case l: Layer[_] => new Read[(L, R)](Named.lify(idRepr.getOrElse(this, name)))(mym) with ASTLt[L, R]
         case Read(_) => this //throw new RuntimeException("Deja dedagifié!")
         case Delayed(arg) => //arg.asInstanceOf[ASTLt[L, R]].propagate(rewrite)
           arg().asInstanceOf[ASTLt[L, R]].setReadNode(usedTwice, idRepr /* + (arg()->name)*/) //the useless delayed node is supressed
@@ -193,7 +193,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
   def radiusify2(r: TabSymb[Int], t: TabSymb[InfoNbit[_]]): Int =
     this.asInstanceOf[AST[_]] match {
       case Read(s) => t(s).k match {
-        case ParamD() => 0
+        case ParamD() | LayerField(_, _) => 0
         case MacroField() => r(s) //we should have computed it before, and stored it in r
       }
     }
@@ -270,18 +270,18 @@ object ASTLt {
    * @param nbit integer's number of bits
    * @return integer constant layer, used for testing!
    */
-  def constLayerInt[L <: Locus, R <: I](nbit: Int)(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = new ConstLayer[L, R](nbit)
+  def constLayerInt[L <: Locus, R <: I](nbit: Int, c: Int)(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = new ConstLayer[L, R](nbit, c.toString)
 
   /**
    *
    * @return boolean constant layer, used for testing, and implementing circuit border
    */
-  def constLayerBool[L <: Locus](implicit m: repr[L]): ASTLt[L, B] = new ConstLayer[L, B](1)
+  def constLayerBool[L <: Locus](init: String)(implicit m: repr[L]): ASTLt[L, B] = new ConstLayer[L, B](1, init)
 
 
   /** constant layer. */
   //private[ASTLt]
-  class ConstLayer[L <: Locus, R <: Ring](nbit: Int)(implicit m: repr[L], n: repr[R]) extends Layer[(L, R)](nbit) with ASTLt[L, R] {
+  class ConstLayer[L <: Locus, R <: Ring](nbit: Int, init: String)(implicit m: repr[L], n: repr[R]) extends Layer[(L, R)](nbit, init) with ASTLt[L, R] {
     val next: ASTLt[L, R] = delayedL(this) //yes
   }
 

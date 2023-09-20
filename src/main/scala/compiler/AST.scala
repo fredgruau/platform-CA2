@@ -2,10 +2,12 @@ package compiler
 
 import dataStruc.DagNode._
 import AST.{Layer, _}
+import compiler.ASTL.delayedL
 import compiler.Circuit.{TabSymb, iTabSymb}
 import compiler.VarKind.MacroField
 import dataStruc.{DagNode, Named}
 
+import scala.Console.out
 import scala.collection._
 import scala.collection.immutable.HashSet
 
@@ -268,13 +270,14 @@ object AST {
 
   /**
    * @param nbit the number of bits
+   * @param init the method used to initialize the layer, set to global if left open
    * @tparam T
    * Unlike other constructors,  Layer is not defined as a case class,
    * otherwise equality would allways hold between any two layer of identical bit size
    * Layer is an AST constructor, because it is used both in ASTL and ASTB
    * it stores system instructions.
    **/
-  abstract class Layer[T](val nbit: Int)(implicit m: repr[T]) extends AST[T]() with EmptyBag[AST[_]] with Strate[T] {
+  abstract class Layer[T](val nbit: Int, val init: String)(implicit m: repr[T]) extends AST[T]() with EmptyBag[AST[_]] with Strate[T] {
     /** avoid a scala bug */
     val v2 = 1
     /** the value at t, which  is represented as  the layer itself. */
@@ -293,9 +296,17 @@ object AST {
 
     /** @return all the user system call, plus the memorized call which is automatically added
      *          must be launched after seting names */
-    def systInstr: List[CallProc] = CallProc("memo", List(Named.lify(name)), List(next)) :: sysInstr
+    def oldDystInstr: List[CallProc] = CallProc("memo", List(Named.lify(name)), List(next)) :: sysInstr
 
-
+    def systInstr: List[CallProc] = {
+      val normal = CallProc("memo", List(Named.lify(name)), List(next)) :: sysInstr
+      next match {
+        case u@Delayed(x) =>
+          if (u.arg == this) return sysInstr //next is ourself, so this is a constant layer, so we do not need memo instructions
+        case _ =>
+      }
+      normal
+    }
   }
 }
 

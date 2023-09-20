@@ -1,0 +1,8 @@
+ public static void {{NAMEMACRO}}(PrShift p,{{PARAMETERS}}){
+        {{ANCHORPARAM}}
+        {{PROPAGATEFIRSTBIT}} ;
+        {{DECLINITPARAM}}
+        for (int i = 1; i < {{CALINENUMBER}}.length; i++) {
+           {{LOOPBODY}};
+        }
+    }

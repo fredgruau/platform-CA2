@@ -4,10 +4,10 @@ import compiler.AST._
 import compiler.ASTL._
 import compiler.Circuit.hexagon
 import compiler._
-import macros.SReduce._
-import macros.BlobMacro._
-import macros.Comm
-import macros.Compute._
+import progOfmacros.SReduce._
+import progOfmacros.BlobMacro._
+import progOfmacros.Comm
+import progOfmacros.Compute._
 
 /** computes  V-meeting points and E-meeting points in the case of a brave simple BoolV  Blob  */
 trait BlobV extends BoolV { //the blob is not necessarily a layer

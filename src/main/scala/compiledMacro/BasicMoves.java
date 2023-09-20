@@ -1,7 +1,11 @@
-package compiledLoops;
+package compiledMacro;
 
 import simulator.PrShift;
 
+/**
+ * Contains hand coded ca loop of general interest,
+ * used as a goal for what the compiler should produce.
+ */
 public class BasicMoves {
     /**
      * should go to the west which is left
@@ -67,8 +71,8 @@ public class BasicMoves {
     /**
      * @param p  how to do the communication implementing rotation
      * @param is current configuration
+     *           direct implementation of grow using only six ors.
      */
-    //public static void grow(PrShift p, int[] is, int[] defe, int[] defse, int[] defsw, int[] defw, int[] defnw, int[] defne) {
     public static void grow(PrShift p, int[] is, int[][] defVe) {
         int[] defe = defVe[0], defse = defVe[1], defsw = defVe[2], defw = defVe[3], defnw = defVe[4], defne = defVe[5];
         p.propagate4shift(is);
@@ -81,6 +85,34 @@ public class BasicMoves {
             is[i - 1] = isNe | isNw | // last
                     isE | isW | llistm1  //now
                     | isSe | isSw //next
+            ;
+            isE = (llis << 1) & defe[i];
+            isW = (llis >>> 1) & defw[i];
+            isNe = (llistm1 << 1) & defne[i];
+            isNw = llistm1 & defnw[i];
+            defswtm1 = defsw[i];
+            defsetm1 = defse[i];
+            llistm1 = llis;
+        }
+    }
+
+    /**
+     * @param p  how to do the communication implementing rotation
+     * @param is current configuration
+     *           direct implementation of shrink using only six ands.
+     */
+    public static void shrink(PrShift p, int[] is, int[][] defVe) {
+        int[] defe = defVe[0], defse = defVe[1], defsw = defVe[2], defw = defVe[3], defnw = defVe[4], defne = defVe[5];
+        p.propagate4shift(is);
+        int llistm1 = 0, llis = 0, isNe = 0, isNw = 0, isE = 0, isW = 0, isSe = 0, defsetm1 = 0, isSw = 0, defswtm1 = 0;
+        for (int i = 1; i < is.length; i++) {
+            llis = is[i];
+            isSe = llis & defsetm1;
+            isSw = llis >>> 1 & defswtm1;
+
+            is[i - 1] = isNe & isNw & // last
+                    isE & isW & llistm1  //now
+                    & isSe & isSw //next
             ;
             isE = (llis << 1) & defe[i];
             isW = (llis >>> 1) & defw[i];
@@ -116,7 +148,7 @@ public class BasicMoves {
      * @param is
      * @param existh
      * @param existd
-     * @param existad Computes a boolE true on the neighborhood of the blob
+     * @param existad Computes a boolE true on the neighborhood of the blob, handcoded
      */
     public static void existE(PrShift p, int[] is, int[] existh, int[] existd, int[] existad) {
         p.propagate4shift(is); //si on le fait la, pas besoin de repropager pour grow
@@ -129,6 +161,46 @@ public class BasicMoves {
             isim1 = isi;
         }
     }
+
+
+    /**
+     * produced by the compiler
+     */
+    public static void eexistV2E_1(PrShift p, int[] pvertice, int[][] existER) {
+        int[] existER$h = existER[0], existER$d = existER[1], existER$ad = existER[2];
+        p.propagate4shift(pvertice);
+        int auxL04 = 0, auxL05 = 0;
+        for (int i = 1; i < pvertice.length; i++) {
+            existER$h[i - 1] = auxL05 | (auxL05 << 1);
+            auxL05 = pvertice[i];
+            existER$d[i - 1] = auxL04 | auxL05;
+            existER$ad[i - 1] = auxL04 | (auxL05 >>> 1);
+            auxL04 = auxL05;
+        }
+    }
+
+    public static void eexistE2V_1(PrShift p, int[][] pedge, int[] existVR, int[][] defVe) {
+        int[] defe = defVe[0], defse = defVe[1], defsw = defVe[2], defw = defVe[3], defnw = defVe[4], defne = defVe[5];
+        int[] pedge$h = pedge[0], pedge$d = pedge[1], pedge$ad = pedge[2];
+        p.propagate4shift(pedge$h);
+        p.propagate4shift(pedge$d);
+        p.propagate4shift(pedge$ad);
+        int auxL02, auxL03, auxL01, tmun00 = 0, auxLO2tm1 = 0, auxLO3tm1 = 0;
+        for (int i = 1; i < pedge$h.length; i++) {
+            auxL01 = pedge$h[i];
+            auxL02 = pedge$d[i];
+            auxL03 = pedge$ad[i];
+            existVR[i] = auxL01 & defe[i] |   //en parti gauche on retrouve EtoV en partie droite les composante de defEv
+                    auxL02 & defse[i] |
+                    auxL03 & defsw[i] |
+                    (auxL01 >>> 1) & defw[i] |
+                    auxLO2tm1 & defnw[i] |
+                    auxLO3tm1 << 1 & defne[i];
+            auxLO2tm1 = auxL02;
+            auxLO3tm1 = auxL03;  //on pourrait lire deux fois pedge, en i, et en i+1 pour economiser 5 registres
+        }
+    }
+
 
     /**
      * @param p

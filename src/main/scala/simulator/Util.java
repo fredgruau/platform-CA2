@@ -4,27 +4,108 @@ import scala.collection.immutable.$colon$colon;
 import scala.collection.immutable.List;
 import scala.collection.immutable.List$;
 
+import java.util.ArrayList;
+
 /**
  * static methods of general utility plus
  * also static variablle such as defVE which are allways used, and allways the same
  */
 public class Util {
-    public static int[][] defVe;
+    /**
+     * @param shouldBeZero should allways be false
+     * @param bugV         accumulates vertic bug
+     * @param bugName      identifies the bug
+     * @param bugs         stores detected bug
+     *                     records bugName in bugs, should toBeTested be not null
+     *                     updates the bugV field whish shows all the bug,
+     */
+    public static void bug(int[] shouldBeZero, int[] bugV, String bugName, ArrayList<String> bugs) {
+        boolean bug = false;
+        for (int i = 0; i < shouldBeZero.length; i++) {
+            bug = bug || shouldBeZero[i] != 0;
+            bugV[i] |= shouldBeZero[i];
+        }
+        if (bug) bugs.add(bugName);
+    }
+
+    /**
+     * @param test    should allways be false, 2D arrays
+     * @param bugE    accumulates edge or face or transfer bug, 2D arrays
+     * @param bugName identifies the bug
+     * @param bugs    stores detected bug
+     */
+    public static void bug(int[][] test, int[][] bugE, String bugName, ArrayList<String> bugs) {
+        boolean bug = false;
+        for (int i = 0; i < test.length; i++)
+            for (int j = 0; i < test[0].length; i++) {
+                bug = bug || test[i][j] != 0;
+                bugE[i][j] |= test[i][j];
+            }
+        if (bug) bugs.add(bugName);
+    }
+
+/*
+
+   public static int[][] defVe;
     public static int[] defe, defse, defsw, defw, defnw, defne;
     public static int[] bug;
+*/
 
+    /**
+     * @param src field to be displayed
+     */
+    public static void show(int[] src) {
+    }
+    public static void show(int[][] src) {
+    }
+
+
+    /**
+     * System call
+     * @param src source array
+     * @param dest destination array toward which we duplicate
+     */
     public static void copy(int[] src, int[] dest) {
         assert (src.length == dest.length);
         System.arraycopy(src, 0, dest, 0, src.length);
     }
 
-    public static void copy2(int[][] src, int[][] dest) {
+    /**
+     * System call
+     *
+     * @param src  source array
+     * @param dest destination array toward which we duplicate
+     */
+    public static void copy(int[][] src, int[][] dest) {
         assert (src.length == dest.length);
         for (int i = 0; i < src.length; i++)
             copy(src[i], dest[i]);
     }
 
-    public static void anchorFixedInMem(int[][] m) {
+    /**
+     * System call used to update layers, same as copy, we use demo for clarity
+     *
+     * @param src  source array
+     * @param dest destination array toward which we duplicate
+     */
+    public static void memo(int[] src, int[] dest) {
+        assert (src.length == dest.length);
+        System.arraycopy(src, 0, dest, 0, src.length);
+    }
+
+    /**
+     * System call used to update layers, same as copy, we use demo for clarity
+     *
+     * @param src  source array
+     * @param dest destination array toward which we duplicate
+     */
+    public static void memo(int[][] src, int[][] dest) {
+        assert (src.length == dest.length);
+        for (int i = 0; i < src.length; i++)
+            copy(src[i], dest[i]);
+    }
+
+/*    public static void anchorFixedInMem(int[][] m) {
         bug = m[0];
         defVe = new int[][]{m[1], m[2], m[3], m[4], m[5], m[6]};
         defe = defVe[0];
@@ -33,7 +114,7 @@ public class Util {
         defw = defVe[3];
         defnw = defVe[4];
         defne = defVe[5];
-    }
+    }*/
 
     // programme pour convertir un array d'entiers primitifs en liste d'entiers
     public static Integer[] toInts(int[] arr) {

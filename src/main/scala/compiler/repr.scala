@@ -1,5 +1,8 @@
 package compiler
 
+import compiler.AST.Layer
+import compiler.ASTLt.ConstLayer
+
 /**
  *
  * used to compute a string encoding the locus,and Ring at compile time. needs to be covariant, so that AST can also be.
@@ -11,9 +14,30 @@ package compiler
 
 class repr[+L](val name: L)
 
+/**
+ * used to compute the transfer field modeling the chip's frontier
+ *
+ * @param border boolean false when neighbor  is not definied
+ * @tparam S1 main simplicial locus
+ * @tparam S2 secondary simplicial locus
+ */
+class chipBorder[S1 <: S, S2 <: S](val border: ASTLt[T[S1, S2], B])
+
+object chipBorder {
+  /** defines the chip's border */
+  val defVe = new ConstLayer[T[V, E], B](1, "def") with ASTLt[T[V, E], B]
+  defVe.setName("defVe")
+  /** most used border */
+  implicit val borderVe: chipBorder[V, E] = {
+    new chipBorder[V, E](defVe)
+  }
+  //todo inclure to les transfer locus, pas seulement Ve
+
+}
 object repr {
   def apply(a:Any)=new repr(a)
   implicit val nomV: repr[V] = new repr[V](V()); implicit val nomE: repr[E] = new repr[E](E()); implicit val nomF: repr[F] = new repr[F](F())
+
 
   implicit def nomT[L1 <: S, L2 <: S](implicit m1: repr[L1], m2: repr[L2]): repr[T[L1, L2]] = new repr[T[L1, L2]](T(m1.name, m2.name))
 
@@ -29,6 +53,7 @@ object repr {
  implicit val nomUISI: repr[UISI] = new repr[UISI](UISI()); //nomI is not declared  as implicit, otherwise it would offer ambiguous implicit values.
  implicit val nomUISIB: repr[UISIB] = new repr[UISIB](UISIB()); //nomI is not declared  as implicit, otherwise it would offer ambiguous implicit values.
  implicit val nomToto: repr[Int] = new repr[Int](33); //used when we do not care anymore.
+
 }
 
 class CentralSym[S2, S1, S2new]

@@ -5,30 +5,26 @@ import scala.collection.immutable.$colon$colon;
 import scala.collection.immutable.List;
 import scala.collection.immutable.List$;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
- * method that  should be produced by the compiler in order to describe a CA
- * on top of the program itself, in java, we find information needed to display
+ * contains all the methods that  should be produced by the compiler in order to describe a CA
+ * it is the program itself, in java, but also much more information,
+ * for example information needed for memorization, for display
  */
 public interface CAloops2 {
 
-    // void theLoops(int[][] mem, PrShift p);
-
     /**
+     *
+     * @param p prepare for a loop of radius one by doing the necessary shift
+     * @return names of detected bug, if any
      * applies a set of loops realizing one iteration on the CA.
      */
-    void theLoops(PrShift p);
+
+    ArrayList<String> theLoops(PrShift p);
 
 
-    /**
-     * @return the layer for which an init method is programmed in the medium
-     * all layers which starts by def have a similar method of being initalized, so as
-     * to indicate wether a neighbor in a given direction is or is not defined.
-     * This method is called "def" and defE,defF, defVe are initialized with def,
-     * because it is mentionned as such in the paramCA xml file associated to grow CA.
-     */
-    public List<String> directInit();
 
     /**
      * first dimension of the memory
@@ -50,8 +46,13 @@ public interface CAloops2 {
     /**
      * @return for integer fields, we need to knwo the bit size
      */
+
     public HashMap<String, Integer> fieldBitSize();
 
+    /**
+     * @return how to init each layer
+     */
+    public HashMap<String, String> init();
 
     int[] arr = {1, 2, 3, 4, 5};
 
@@ -79,8 +80,12 @@ public interface CAloops2 {
         }
         return result;
     }
+/*
 
     public static List<Integer> li(int... ts) {
         return list(toInts(ts));
     }
+*/
+
+    String displayableLayerHierarchy();
 }

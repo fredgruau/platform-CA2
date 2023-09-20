@@ -57,7 +57,7 @@ object InfoNbit {
  * @tparam T toto
  */
 class InfoNbit[+T](override val t: T, override val k: VarKind, val nb: Int) extends InfoType(t, k) {
-
+  def density = locus.density * nb
   def radiusify(r: Int): InfoNbit[_] = new InfoNbit(t, ParamRR(r), nb)
 
   /** sets varKind to macroField */

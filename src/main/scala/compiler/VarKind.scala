@@ -3,11 +3,11 @@ package compiler
 import VarKind._
 
 sealed class VarKind extends Comparable[VarKind] {
-  def compareTo(t: VarKind): Int = vkMap(this) - vkMap(t)
+  def compareTo(t: VarKind): Int = rank(this) - rank(t)
 
   /** @return True if field needs to be stored in CA memory  */
   def needStored: Boolean = this match {
-    case ParamD() | ParamR() | ParamRR(_) | StoredField() | LayerField(_) //|ParamDR()
+    case ParamD() | ParamR() | ParamRR(_) | StoredField() | LayerField(_, _) //|ParamDR()
     => true;
     case _ => false
   }
@@ -34,23 +34,35 @@ sealed class VarKind extends Comparable[VarKind] {
   }
 
   def isLayerField: Boolean = this match {
-    case LayerField(_) => true;
+    case LayerField(_, _) => true;
     case _ => false
   }
 }
 
 object VarKind {
-  val vkMap: Map[VarKind, Int] = Map(ParamD() -> 1, ParamR() -> 2, ParamRR(0) -> 3, ParamRR(1) -> 4,
+  /** puts an order so as to sort */
+  def rank(v: VarKind) = v match {
+    case ParamD() => 1
+    case ParamR() => 2
+    case ParamRR(0) => 3
+    case ParamRR(1) => 4
+    case ParamRR(2) => 5
+    case ParamRR(3) => 6
+    case MacroField() => 9
+    case StoredField() => 10
+    case LayerField(nbit, _) => nbit + 10
+  }
+  /*val vkMap: Map[VarKind, Int] = Map(ParamD() -> 1, ParamR() -> 2, ParamRR(0) -> 3, ParamRR(1) -> 4,
     ParamRR(2) -> 5, ParamRR(3) -> 6, MacroField() -> 9, StoredField() -> 10,
-    LayerField(1) -> 11, LayerField(2) -> 12, LayerField(3) -> 13, LayerField(4) -> 14)
-
+    LayerField(1,_) -> 11, LayerField(2,_) -> 12, LayerField(3,_) -> 13, LayerField(4,_) -> 14)
+*/
   /** Default type of variable which will not be stored in the CA memory,
    * instead, it will be temporarily hold in a java longint register.
    * Used to compute liveness at the beginning and at the end of the loop body */
   final case class MacroField() extends VarKind {}
 
-  /** used only at the very beginning, when constructing the Dag */
-  final case class LayerField(nb: Int) extends VarKind
+  /** used only at the very beginning, when constructing the Dag, allows to remember bit size, and init method */
+  final case class LayerField(nb: Int, init: String) extends VarKind
 
   /** used when a Param AST node is replaced by a Read */
   final case class ParamD() extends VarKind

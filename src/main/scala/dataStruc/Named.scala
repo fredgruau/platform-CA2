@@ -10,7 +10,7 @@ object Named {
 
   def pify(s: String): String = "p" + s
 
-  def isLayer(s: String): Boolean = s.charAt(0) == 'l' && s.charAt(1) == 'l'
+  def isLayer(s: String): Boolean = s.startsWith("ll")
 
 
   private var compteurAux: Int = 0
@@ -62,6 +62,8 @@ object Named {
     //p1 is the name of the variable used for the parameter in funDef1, fuck it.
     doNotUseForName(List("arg", "arg2", "body", "op", "p1", "p2", "p3", "p4"))
   }
+
+  def noDollarNorHashtag(s: String) = !s.contains('$') && !s.contains('#')
 }
 
 trait Named {
@@ -75,7 +77,9 @@ trait Named {
 
   def pify() = name = "p" + name
 
-  def isLayer: Boolean = name != null && name.charAt(0) == 'l' && name.charAt(1) == 'l'
+  def isLayer: Boolean = isLayer(name)
+
+  def isLayer(s: String): Boolean = s != null && s.startsWith("ll")
 
 
   /**

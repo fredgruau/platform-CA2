@@ -42,7 +42,7 @@ class DagTest extends FunSuite with BeforeAndAfter {
   }
 
   /** Builds a cycle in the DAG */
-  class CycleLayer2(nbit: Int)(implicit m: repr[V]) extends Layer[(V, SI)](nbit) with ASTLt[V, SI] {
+  class CycleLayer2(nbit: Int)(implicit m: repr[V]) extends Layer[(V, SI)](nbit, "global") with ASTLt[V, SI] {
     lazy val x: IntV = next + pred.asInstanceOf[ASTLt[V, SI]]
     val next: ASTLt[V, SI] = delayedL(x)
   }

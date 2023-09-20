@@ -76,8 +76,8 @@ public interface CAloops {
         }
         return result;
     }
-
+/*
     public static List<Integer> li(int... ts) {
         return list(toInts(ts));
-    }
+    }*/
 }
