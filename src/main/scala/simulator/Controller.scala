@@ -141,7 +141,7 @@ class Controller(val nameCA: String, val globalInit: Array[String], var simulPar
       updateAndSaveXMLparamCA()
       layerTree.hideRoot
       layerTree.repaint()
-      mf.pack() //resize the space allocated to the tree so that it prints entirely
+      mf.pack() //resize the window allocated to the tree so that the tree prints entirely
     // mf.unmaximize()
     // we hope it recomputes size of tree windows so as to accomodate
     //this.repaint()

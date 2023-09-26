@@ -34,7 +34,7 @@ object Compute {
     tepred.setName("tepred");
     slope.setName("slope");
     delta.setName("delta"); //vortex.setName("vortex")
-    Fundef1("boolgrad", Cons(slope, delta), d)
+    Fundef1("integer.grad", Cons(slope, delta), d)
   }
 
   /** Calls boolgrad, and separate the two results.  */

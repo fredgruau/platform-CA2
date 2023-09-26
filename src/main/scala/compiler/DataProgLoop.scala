@@ -105,7 +105,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   /**
    * entire binary code of CAloop, before coalesc
    */
-  lazy val totalCode: List[ASTBt[B]] = if (loops != null) loops.flatMap(_.loops.flatMap(_.boboolAST)) else null
+  lazy val totalCode: List[ASTBt[B]] = if (loops != null)
+    loops.flatMap(_.loops.flatMap(_.boboolAST)) else null
 
   /** name of scan variables, that should enter the symbol table. */
   var scNames: List[String] = null
@@ -131,7 +132,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
    */
   def isMacro(s: String): Boolean = tSymbVarSafe(removeAfterChar(s, '#')).k == MacroField()
 
-  lazy val totalNames: Set[String] = ASTB.names(totalCode).filter(isMacro(_))
+  lazy val totalNames: Set[String] =
+    ASTB.names(totalCode).filter(isMacro(_))
 
   private def registerCount: Int = {
     assert(loops != null)
@@ -175,7 +177,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   override def toString =
     super.toString +
       // (if(coalescTMP!= null&&coalescTMP.size>0) "tmp registers:" + toStringCoalesc(coalescTMP) else "" ) +
-      (if (loops != null) "Total code of macro: " + totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ") else "")
+      (if (loops != null) "Total code of macro: " + totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]], ' ', ' ')).grouped(4).map(_.mkString(";")).mkString(";\n ") else "")
 
   /**
    * @return generates a list of list of boolean affectations for each instruction

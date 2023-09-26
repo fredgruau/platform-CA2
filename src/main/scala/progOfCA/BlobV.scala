@@ -16,7 +16,7 @@ trait BlobV extends BoolV { //the blob is not necessarily a layer
   // val borderE:BoolE= xorR(transfer(e(this))) //pour tester le calcul du rayon
   val nbCh: UintV = nbccBis(Comm.apexV(f(brdE))) //first use of brdE
   // val nbCh: UintV =nbcc(Comm.apexV(f(brdE))) //first use of brdE
-  val meetV = nbCh > 1 //makes an implicit conversion of nbCh from unsigned int to signed int. shoudl take into acount only nbch#1
+  val meetV = nbCh > 1 //makes an implicit conversion of nbCh from unsigned int to signed int. shoudl take into acount only nbch$1
   //meetV.setName("meetV")
   val emptyRhomb: BoolE = insideErhombusE(notE(brdE)) //second use of brdE, check that there is a totally empty rhombus between two blobs
   emptyRhomb.setName("emptyRhomb")

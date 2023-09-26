@@ -64,8 +64,13 @@ object ASTL {
     override def redExpr: List[AST[_]] = List(arg)
   }
 
-  /** how to build the name of simplicial reduction. The name informs about source and target simplicial locus, as well as reduction operation */
-  def redsfunName[S1 <: S, S2 <: S](r: redop[B], l: S1)(implicit m: repr[S1], n: repr[S2]) = "" + "red" + r._1.name + l.shortName + n.name.shortName
+  /** how to build the name of simplicial reduction. The name informs about
+   * name of the file where macro is to be stored
+   * source and target simplicial locus, as well as reduction operation */
+  def redsfunName[S1 <: S, S2 <: S](r: redop[B], l: S1)(implicit m: repr[S1], n: repr[S2]) = {
+    val y = 0
+    ("" + "redS." + r._1.name + l.shortName + n.name.shortName).toLowerCase
+  }
 
   /** computes the scala code of a whole  simplicial reduction, is done here because Broadcast Transfer and Redop are private to ASTL. */
   def redSfunDef[S1 <: S, S2 <: S](r: redop[B], l: S1)(implicit m: repr[S1], n: repr[S2]): Fundef1[(S1, B), (S2, B)] = {

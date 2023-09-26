@@ -73,7 +73,7 @@ object DataProg {
         throw new dag.CycleException(Vector.empty)
     }
     while (!instrsCur.isEmpty)
-
+    // we now descend starting from the main circuit, to explore all the field, and then fields of fields.....
     dataStruc.Name.setName(f, ""); //for ''grad'' to appear as a name, it should be a field of an object extending the fundef.
     val funs: iTabSymb[Fundef[_]] = immutable.HashMap.empty ++ dag.visitedL.collect { case l: Call[_] => (l.f.name, l.f) }
     /** second  gathering of SysInstr which can now access  the layer's name, because  setName has been called   */
@@ -96,7 +96,7 @@ object DataProg {
 
   def bugLayers(lesInstr: List[CallProc]) = {
     val bugInstr = lesInstr.filter(_.procName == "bug")
-    //we add the byug layers, we must find out firt on what kind of locus we do have possible bugs.
+    //we add the bug layers, we must find out firt on what kind of locus we do have possible bugs.
     var locusBug: Set[Locus] = bugInstr.map(_.exps.head.mym.name.asInstanceOf[(Locus, Ring)]._1).toSet
     //we artificially add V, so as to be able to identify the main entry point by testing it has a llbugV
     locusBug = locusBug + V()

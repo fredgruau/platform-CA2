@@ -172,7 +172,7 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
      */
     def setNameIfNullandAddtoT(arg: AST[_]) = {
       if (arg.name == null) {
-        arg.setNameIfNull("auxL")
+        arg.setNameIfNull("auxl")
         t += arg.name -> new InfoType(arg.mym, StoredField())
       }
     }
@@ -210,7 +210,7 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
      */
     def setNameIfNullandAddtoT(arg: AST[_]) = {
       if (arg.name == null) {
-        arg.setNameIfNull("auxL")
+        arg.setNameIfNull("auxl")
         t += arg.name -> new InfoType(arg.mym, StoredField())
       }
     }
@@ -670,7 +670,8 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
    */
   override def unfoldInt(t: TabSymb[InfoNbit[_]]): List[Instr] = {
     val decall = exp.asInstanceOf[ASTBg].deCallify(HashMap.empty[String, ASTBt[B]])
-    if (decall.ring == B()) List(Affect[B](name, decall.unfoldInt(t).head))
+    val res =
+      if (decall.ring == B()) List(Affect[B](name, decall.unfoldInt(t).head))
     else {
       val boolNames = Instr.deployInt(name, t(name).nb) //affectation of int has not been tested yet
       //updates t
@@ -678,6 +679,7 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
       boolNames.zip(decall.asInstanceOf[ASTBt[_]].unfoldInt(t)).map(
         (namee: (String, ASTBt[B])) => Affect[B](namee._1, namee._2).asInstanceOf[Instr])
     }
+    res
   }
 
 

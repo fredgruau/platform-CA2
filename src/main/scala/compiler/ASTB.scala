@@ -211,7 +211,7 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
 
   override def toString: String =
     this.asInstanceOf[ASTB[_]] match {
-      case AffBool(nameb, _) => nameb + "="
+      case AffBool(nameb, _) => nameb + "=" //+"["
       case Intof(v) => "" + v
       case True() => "truue"
       case False() => "faalse"
@@ -221,7 +221,7 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
       case Xor(x, y) => "^"
       case Or(x, y) => "|"
       case And(x, y) => "&"
-      case Neg(x) => "!"
+      case Neg(x) => "~"
       case Mapp1(op, x) => "Mapp1" + op.name //+ mym.name
       case Mapp2(x, y, op) => "Mapp2" + op.name //+ mym.name
       case Scan1(x, op, _, dir, _) => "Scan1" + op.name + dir //+ mym.name

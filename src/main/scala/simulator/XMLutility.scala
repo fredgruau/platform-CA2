@@ -14,21 +14,20 @@ object XMLutilities {
   /**
    *
    * @param s encoding of one tree with parenthesis
-   * @return an xml hierarchy with branch representing layers, and leaf representing fields,
+   * @return an xml hierarchy with branch getting the label "layer", and leaf geting the label  "fields",
    */
   def readXmlTree(s: String): Elem = {
-    assert(s(0) == '(')
-    var iCur: Int = 1 //iCur parcourt all of s
+    var iCur: Int = 0 //iCur parcourt all the characters of s
 
     /** Read one Layer or one field starting at index iCur no parenthesis */
     def readOne(): Elem = {
       //meet next parenthesis so as to retrieve the name
       val i0 = iCur
-      while (!isParenthesis(s(iCur))) iCur += 1
+      while (iCur < s.size && !isParenthesis(s(iCur))) iCur += 1
       val name = s.substring(i0, iCur)
-      assert(name.size > 0)
+      assert(name.size > 0) //we must have a non empty name of layer
       s(iCur) match {
-        case ')' => // iCur+=1 //consumes ')'
+        case ')' | '.' => // iCur+=1 //consumes ')'
           <field>
             {name}
           </field>
@@ -36,7 +35,7 @@ object XMLutilities {
           val nodes: List[Node] = readMany(); //iCur+=1 //consumes closing parenthesis
           <layer>
             {name}{nodes}
-          </layer> //y a pas de node layers.
+          </layer> //y a plus de node layers.
       }
     }
 
@@ -48,7 +47,7 @@ object XMLutilities {
         res ::= readOne() //repeat read one node until matching ')'is found
         iCur += 1 //consume the ')'
       }
-      assert(iCur == s.length || s(iCur) == ')') //we  have gone through the list, so it must be closing, or the whole string has been gore
+      assert(iCur == s.length || s(iCur) == ')' || s(iCur) == '.') //we  have gone through the list, so it must be closing, or the whole string has been gore
       return res
     }
 

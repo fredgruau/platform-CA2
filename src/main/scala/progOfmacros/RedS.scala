@@ -1,27 +1,27 @@
 package progOfmacros
 
-import compiler.AST.{p, _}
+import compiler.AST._
 import compiler.ASTBfun.{andRedop, orRedop, redop, xorRedop}
-import compiler.ASTL.{v, _}
+import compiler.ASTL._
 import compiler.Circuit.iTabSymb
 import compiler.repr.{nomB, nomCons, nomV}
 import compiler.{AST, ASTLt, B, E, F, Ring, S, T, V, repr}
-import progOfmacros.RedS.getFun
+import progOfmacros.RedS.getRedSFun
 
 import scala.collection.immutable.HashMap
 
 object RedS {
   /** memoizes all the already used Boolean reduction */
-  var redSmem: iTabSymb[Fundef1[(S, B), (S, B)]] = HashMap()
+  private var redSmem: iTabSymb[Fundef1[(S, B), (S, B)]] = HashMap()
 
   /**
    *
    * @param S1 origine simplicial type
    * @param S2 target simplicial type
    * @param r  reduction applied
-   * @return function in scala which does that reduction,  memoised in redSmem
+   * @return function in scala which does the corresponding simplicial reduction,  memoised in redSmem
    */
-  def getFun[S1 <: S, S2 <: S](r: redop[B], l: S1)(implicit m: repr[S1], n: repr[S2]): Fundef1[(S1, B), (S2, B)] = {
+  def getRedSFun[S1 <: S, S2 <: S](r: redop[B], l: S1)(implicit m: repr[S1], n: repr[S2]): Fundef1[(S1, B), (S2, B)] = {
     val funName = redsfunName(r, l)(m, n)
     if (!redSmem.contains(funName))
       redSmem = redSmem + (funName -> redSfunDef(r, l)(m, n))
@@ -30,19 +30,19 @@ object RedS {
 
   /** @return a call to an or reduction, exist is a more explicit name */
   def exist[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2]): ASTLt[S2, B] = {
-    val f = getFun(orRedop(repr.nomB), arg.locus)(m, n)
+    val f = getRedSFun(orRedop(repr.nomB), arg.locus)(m, n)
     new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
   }
 
   /** @return a call to an and reduction, inside is a more explicit name */
   def inside[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2]): ASTLt[S2, B] = {
-    val f = getFun(andRedop(repr.nomB), arg.locus)(m, n)
+    val f = getRedSFun(andRedop(repr.nomB), arg.locus)(m, n)
     new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
   }
 
   /** @return a call to an xor reduction, frontier is a more explicit name */
   def frontier[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2]): ASTLt[S2, B] = {
-    val f = getFun(xorRedop(repr.nomB), arg.locus)(m, n)
+    val f = getRedSFun(xorRedop(repr.nomB), arg.locus)(m, n)
     new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
   }
 

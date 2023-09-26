@@ -1,16 +1,19 @@
 package progOfCA
 
 import compiler.AST.{Layer, p}
-import compiler.ASTL._
+import compiler.ASTL.{BoolV, _}
 import compiler.Circuit.hexagon
 import compiler.{AST, ASTLt, B, Circuit, F, V}
+import progOfmacros.RedS.exist
 import progOfmacros.SReduce._
 
 /** Simple growth one of the most simple circuit that can be conceived, used for debug */
 class Grow extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
   // val GrowE= existV2E(this);  val next: BoolV = existE2V(GrowE)
-  val next: BoolV = neighborhood(this)
-  next.setName("growNext")
+  val neighbEE: BoolE = exist(this)
+  override val next: BoolV = exist(neighbEE) // neighborhood(this) //nb if overrid is not written, it does not work!
+  // next.setName("growNext")
+  show(neighbEE)
   show(this) //shown field will get the name "grow", because we did grow=new Grow
   show(next)
 }
@@ -48,9 +51,6 @@ object Grow extends App {
   }.compile(hexagon)
 }
 
-class Foo {
-  def hello(name: String): String = "Hello there, %s".format(name)
-}
 
 
 /*object GrowDec extends App {

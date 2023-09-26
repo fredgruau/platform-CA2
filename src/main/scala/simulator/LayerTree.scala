@@ -49,7 +49,7 @@ class LayerTree(val xmlLayerTree: Node, val controller: Controller) extends Tree
   reactions += {
     case MouseClicked(_, pp, _, _, _) =>
       val p = peer.getPathForLocation(pp.x, pp.y) //we resorted to that Jtree utility that allows to retrieve the node clicked
-      if (p != null && p.last.label == "field") { //only field"s node can have a color
+      if (p != null && (p.last.label == "field" || (p.last.label == "layer"))) { //only field"s node can have a color
         val s = extractNodeText(p.last)
         // println("mouseClick  " + s)
         publish(ToggleColorEvent(s)) //forward the event to the controller in a clean way, so that it can update what is dipalayed.
@@ -57,7 +57,8 @@ class LayerTree(val xmlLayerTree: Node, val controller: Controller) extends Tree
   }
   expandExpandedDescendant(xmlLayerTree, Vector(xmlLayerTree)) //exands already expanded node. Vector(n) is the path to n.
   hideRoot
-  private def isLayer(n: Node): Boolean = n.label == "layer"
+
+  private def isLayer(n: Node): Boolean = n.label == "layer" //being a layer or not is determined by the label in the xml file
 
   // Required by TreeExpansionListener interface.
   override def treeExpanded(e: TreeExpansionEvent): Unit = publish(ExpandLayer(extractNodeText(e.getPath.last))) //Forwards a clean ScalaSwing event

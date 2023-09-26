@@ -58,9 +58,15 @@ object Util {
   def parenthesizedExp(root: String, father2son: Map[String, Set[String]]): String = {
     if (!father2son.contains(root)) return "(" + root + ")"
     val sons = father2son(root)
-    "(" + root + sons.map(parenthesizedExp(_, father2son)).mkString("") + ")"
+    root + sons.map(parenthesizedExp(_, father2son)).mkString("") + "." //the point is necessaru when the tree is reduced to a single root
   }
 
+  /**
+   *
+   * @param s string to be processed
+   * @param c character after which everything should  be removed
+   * @return result of the processin
+   */
   def removeAfterChar(s: String, c: Char): String = if (s.contains(c)) s.substring(0, s.indexOf(c)) else s
 
   private def truncateBefore(s: String, p: String) = {

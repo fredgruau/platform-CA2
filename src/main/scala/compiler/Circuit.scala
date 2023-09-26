@@ -4,7 +4,9 @@ import AST._
 import ASTB.{Tminus1, shiftL, shiftR}
 import ASTBfun.ASTBg
 import Circuit._
+import compiler.ASTLt.ConstLayer
 import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp}
+import progOfCA.{Dddist, Grow}
 
 import scala.collection._
 import scala.collection.immutable.HashMap
@@ -48,7 +50,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //print(prog1)
 
     val prog2 = prog1.treeIfy();
-    //   print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
+    //print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
 
     val prog3 = prog2.procedurIfy();
     //print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
@@ -66,7 +68,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     // print("radiusify555555555555555555555555555555\n"+prog5ter)
 
     val prog6 = prog5ter.unfoldSpace(m);
-    //  print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
+    // print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
 
     val prog7 = prog6.treeIfy(); //spatiall unfolding generates reused expression that need to be affected again
     //print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
@@ -81,24 +83,35 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     // print(prog10)
 
     val prog11 = prog10.unfoldInt()
-    //print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
+    print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
     val prog12 = prog11.coaalesc()
     // System.out.println(prog12.allLayers)
-    print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
+    //print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
     print("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaCode)
   }
 }
 
-/**
- * contains singletons uses trhoughout the compilation.
- */
+
 object Circuit {
   /** we restrict ourself to circuit returning a boolV, for the moment */
   def main(args: Array[String]) {
-    val compRoot = Class.forName("progOfCA." + args(0)).newInstance.asInstanceOf[ASTLt[V, B]] //asInstanceOf[{ def hello(name: String): String }]
-    compRoot.setName(args(0).toLowerCase)
     new Circuit[V, B]() {
-      def computeRoot = compRoot
+      val root = Class.forName("progOfCA." + args(0)).newInstance.asInstanceOf[ASTLt[V, B]] //asInstanceOf[{ def hello(name: String): String }]
+      root.setName(args(0).toLowerCase)
+      val j = 0
+
+      def computeRoot = root
+    }.compile(hexagon)
+  }
+
+
+  object Dist extends App {
+    val myInput: AST.Param[(V, B)] with ASTLt[V, B] = p[V, B]("input")
+    new Circuit[V, B]() { //pour l'instant on teste sans parametres
+      // new Circuit[V, SI](myInput) {
+      val src = new ConstLayer[V, B](1, "global") with Dddist {}
+
+      def computeRoot: ASTLt[V, B] = src
     }.compile(hexagon)
   }
 

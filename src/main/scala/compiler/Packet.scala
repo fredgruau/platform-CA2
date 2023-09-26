@@ -11,7 +11,7 @@ import scala.collection.immutable.HashMap
 
 /**
  *
- * @param instrs        the instructions that can be executed in a single loop
+ * @param instrs the instructions that can be executed in a single loop, and that we will compile
  * @param tSymbVar      needed to find about bit size
  * @param coalesc
  * @param constantTable contains constant values, in order to fold constants
@@ -305,7 +305,7 @@ object Packet {
         i = i + step
       }
       while (i != fin)
-      result
+      result // contains one affectgation
     }
 
   }

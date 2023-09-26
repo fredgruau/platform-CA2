@@ -64,6 +64,8 @@ object Named {
   }
 
   def noDollarNorHashtag(s: String) = !s.contains('$') && !s.contains('#')
+
+  def noHashtag(s: String) = !s.contains('#')
 }
 
 trait Named {

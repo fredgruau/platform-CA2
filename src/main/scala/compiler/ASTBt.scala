@@ -171,6 +171,7 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
    * @return same tree except target is replaced by src   */
 
   def coalesc(newName: iTabSymb[String]): ASTBt[R] = {
+    val u = 0
     val rewrite: rewriteASTBt[R] = (d: ASTBt[R]) => d.coalesc(newName)
     val newD: ASTBt[R] = this match {
       case a: ASTB[R] => a.asInstanceOf[ASTB[_]] match {

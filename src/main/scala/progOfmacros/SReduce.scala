@@ -97,6 +97,7 @@ object SReduce {
   val neighborhoodDef: Fundef1[(V, B), (V, B)] = {
     val b = p[V, B]("blob")
     val neighbEE: BoolE = exist(b)
+
     val neighbor1: BoolV = exist(neighbEE)
     val neighbor2: BoolV = inside(neighbEE)
     val neighbor = neighbor1 | neighbor2

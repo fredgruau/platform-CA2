@@ -34,8 +34,18 @@ trait DagNode[+T <: DagNode[T]] {
 
   def isShift(s: String) = s.equals("<<") || s.equals(">>>")
 
-  /** returns either the second neighbor or the value 1. */
-  private def neighbor1or1(t: TabSymb[InfoType[_]]) = if (isShift(toString)) " 1" else inputNeighbors(1).toStringTreeInfixPar(t)
+  /** returns either the second neighbor code or the value 1. */
+  /*
+    private def neighbor1or1(t: TabSymb[InfoType[_]]) = //todo simplify
+      if (isShift(toString)) " 1"
+      else if (inputNeighbors(1).isInstanceOf[AffBool]) " " + "(" + inputNeighbors(1).toStringTreeInfixPar(t) + ")"
+      else inputNeighbors(1).toStringTreeInfixPar(t)
+  */
+
+  private def neighbor1or1(t: TabSymb[InfoType[_]]) = //todo simplify
+  if (isShift(toString)) " 1"
+  else if (inputNeighbors(1).isInstanceOf[AffBool]) " " + "(" + inputNeighbors(1).toStringTreeInfix(t, '(', ')') + ")"
+  else inputNeighbors(1).toStringTreeInfix(t, ' ', ' ')
 
   /** * @param t symbol Table needed to check if variable is a parameter
    *
@@ -58,24 +68,60 @@ trait DagNode[+T <: DagNode[T]] {
     toString
   }
 
+  /**
+   * @param t
+   * @return java code ready to be compiled by javac
+   *         in case of a boolean affect, we need to wrap it with parenthesis
+   * @param PARL left partenthesis or space, to be inserted at next recursive call for binop or shift (shift is implemented like a binop)
+   * @param PARR left partenthesis or space, to be inserted at next recursive call for binop or shift (shift is implemented like a binop)
+   * @return the expression where unary operator like - or ~ precede the expression on which they apply, so that we can combine
+   *         them without parenthesis, and therefore much less parenthesis, and much more readable expression
+   */
 
-  def toStringTreeInfix(t: TabSymb[InfoType[_]]): String = {
+  def toStringTreeInfix(t: TabSymb[InfoType[_]], PARL: String = "", PARR: String = ""): String = {
     assert {
       inputNeighbors.size <= 2
     }
-    if (inputNeighbors.size == 2 || (inputNeighbors.size == 1 && isShift(toString)))
-      inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1(t)
-    else " " + toStringParam(t) + " " + (if (inputNeighbors.size == 1) inputNeighbors.head.toStringTreeInfix(t) else " ")
+    inputNeighbors.size match {
+      case 0 => " " + toStringParam(t) + " "
+      case 1 => if (isShift(toString))
+        "" + PARL + inputNeighbors.head.toStringTreeInfix(t, '(', ')') + " " + toString + " " + neighbor1or1(t) + PARR
+      else if (inputNeighbors.head.isInstanceOf[AffBool])
+        " " + toString + "(" + inputNeighbors.head.toStringTreeInfix(t, ' ', ' ') + ")" //toString comes before the parameter
+      else " " + toStringParam(t) + " " + inputNeighbors.head.toStringTreeInfix(t, ' ', ' ')
+      case 2 => "" + PARL + inputNeighbors.head.toStringTreeInfix(t, '(', ')') + " " + toString + " " + neighbor1or1(t) + PARR
+
+    }
   }
 
-  private def toStringTreeInfixPar(t: TabSymb[InfoType[_]]): String = {
-    assert {
-      inputNeighbors.size <= 2
+  /*def toStringTreeInfixOld(t: TabSymb[InfoType[_]]): String = {
+    assert {  inputNeighbors.size <= 2   }
+    inputNeighbors.size match {
+      case 0 => " " + toStringParam(t) + " "
+      case 1=> if (isShift(toString))
+        inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1(t)
+      else if(inputNeighbors.head.isInstanceOf[AffBool])
+        " " + toString+"("+inputNeighbors.head.toStringTreeInfix(t) + ")" //toString comes before the parameter
+        else " " + toStringParam(t) + " "+inputNeighbors.head.toStringTreeInfix(t)
+      case 2 =>     inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1(t)
+
     }
-    if (inputNeighbors.size == 2 || (inputNeighbors.size == 1 && isShift(toString)))
-      "(" + inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1(t) + ")"
-    else " " + toStringParam(t) + " " + (if (inputNeighbors.size == 1) inputNeighbors.head.toStringTreeInfix(t) else " ")
   }
+
+  /** the suffix Par means that we will now add parenthesis unless  */
+  def toStringTreeInfixParOld(t: TabSymb[InfoType[_]]): String = {
+    assert {     inputNeighbors.size <= 2   }
+    inputNeighbors.size match {
+      case 0 => " " + toStringParam(t) + " " //no need to add parenthesis finally
+      case 1 => if (isShift(toString))  //its like a bin op  we do add parenthesis
+        "(" +inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1(t)+")"
+                else if (inputNeighbors.head.isInstanceOf[AffBool])  //we have got an affectation v1 = needs to be separated,  v2 or (v1 =  ....)
+        " " + toString + "(" + inputNeighbors.head.toStringTreeInfix(t) + ")" //toString comes before the parameter
+                else " " + toStringParam(t) + " " + inputNeighbors.head.toStringTreeInfix(t) //noneed for parenthesis,finally
+      case 2 => "(" +inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1(t)+")"
+
+    }
+  }*/
 
   /**
    * Tries to find a cycle
