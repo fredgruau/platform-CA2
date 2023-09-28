@@ -64,23 +64,6 @@ object ASTL {
     override def redExpr: List[AST[_]] = List(arg)
   }
 
-  /** how to build the name of simplicial reduction. The name informs about
-   * name of the file where macro is to be stored
-   * source and target simplicial locus, as well as reduction operation */
-  def redsfunName[S1 <: S, S2 <: S](r: redop[B], l: S1)(implicit m: repr[S1], n: repr[S2]) = {
-    val y = 0
-    ("" + "redS." + r._1.name + l.shortName + n.name.shortName).toLowerCase
-  }
-
-  /** computes the scala code of a whole  simplicial reduction, is done here because Broadcast Transfer and Redop are private to ASTL. */
-  def redSfunDef[S1 <: S, S2 <: S](r: redop[B], l: S1)(implicit m: repr[S1], n: repr[S2]): Fundef1[(S1, B), (S2, B)] = {
-    val param = p[S1, B]("p" + l.shortName + n.name.shortName) //parameter names inform about locus
-    val broadcasted = Broadcast[S1, S2, B](param, repr.nomT(m, n), repr.nomB) //step 1 is broadcast
-    val transfered = transfer[S1, S2, B](broadcasted)(repr.nomT(n, m), repr.nomB) //step 2 is transfer
-    val res = Redop[S2, S1, B](r, transfered, n, nomB) // orRdef(transfer(v(param))) //step 3 is reduce
-    Fundef1(redsfunName(r, l)(m, n), res, param) // we compute a function of one argument. res is the body, param are the single parameter
-  }
-
   def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[UI]): RedopConcat[S1, S2] =
     RedopConcat[S1, S2](arg, m, n)
 
@@ -171,7 +154,14 @@ object ASTL {
   //  def sendf[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, F]], n: repr[R]) = Send[S1, F, R](args) ;
 
   //def castB2R[L<:Locus,R<:I]( arg: AST[L,B] )(implicit m : repr[L])  = Unop[L,B,R] (castB2RN[R],arg );
-  def transfer[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S2, S1]], n: repr[R]): Transfer[S1, S2, R] = Transfer(arg, m, n)
+  def transfer[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S2, S1]], n: repr[R]):
+  ASTLt[T[S2, S1], R] = Transfer(arg, m, n)
+
+
+  //def v[S1 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, V]], n: repr[R]): Broadcast[S1, V, R] = Broadcast[S1, V, R](arg, m, n); // for broadcast, we want to specify only the direction where broadcasting takes place.
+
+  def broadcast[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, S2]], n: repr[R]): ASTLt[T[S1, S2], R] =
+    Broadcast[S1, S2, R](arg, m, n) //step 1 is broadcast
 
   //def unop[L <: Locus, Ri <: Ring, Ro <: Ring](f: Fundef1[Ri, Ro])(implicit m: repr[L], n: repr[Ro]) = (arg1: ASTLt[L, Ri]) => Unop[L, Ri, Ro](f, arg1, m, n)
   def sign[L <: Locus](arg1: ASTLt[L, SI])(implicit m: repr[L]): ASTLt[L, SI] = Unop[L, SI, SI](ASTBfun.sign, arg1, m, nomSI)
@@ -249,15 +239,14 @@ object ASTL {
    *            with defVE which is true when the value is defined.
    *            When it is not defined, the binop result shoudl take the neutral value (O for Or, 1 for and...)
    */
-  def redopDef[S1 <: S, S2 <: S](op: redop[B], arg: ASTLt[T[S1, S2], B])
+  def redopDef[S1 <: S, S2 <: S](op: redop[B], arg: ASTLt[T[S1, S2], B]) //S1=V
                                 (implicit m: repr[S1], m2: repr[S2], n: repr[B], d: chipBorder[S1, S2]): Redop[S1, S2, B] = {
-    op match {
+    val newArg: ASTLt[T[S1, S2], B] = if (d.border == null) arg //d.border null means we do not need it.
+    else op match {
       case (orb, _) => //todo inclure to les transfer locus, pas seulement Ve
-        val newArg: ASTL[T[S1, S2], B] = and[T[S1, S2], B](d.border, arg.asInstanceOf[ASTLt[T[S1, S2], B]])(nomT(m, m2), nomB)
-        //   val newArg2 = newArg.asInstanceOf[ASTLt[T[S1, S2], R]]
-        Redop[S1, S2, B](op, newArg, m, n)
+        and[T[S1, S2], B](d.border, arg)(nomT(m, m2), nomB)
     }
-
+    Redop[S1, S2, B](op, newArg, m, n)
   }
 
   /** version that shoud be used if we want to condider reduction with integers, such as add.
@@ -275,7 +264,7 @@ object ASTL {
   def orR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): Redop[S1, S2, R] =
     Redop[S1, S2, R](orRedop[R], arg, m, n)
 
-  /** version of or reduction taking into account undefined value on chip's border */
+  /** version of or reduction taking into account undefined value on chip's border using an implici d:chipBorder */
   def orRdef[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])
                               (implicit m: repr[S1], m2: repr[S2], d: chipBorder[S1, S2]): Redop[S1, S2, B] =
     redopDef[S1, S2](orRedop[B], arg)
@@ -736,6 +725,8 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case Binop(_, arg, arg2, _, _) =>
         val r1 = arg.radiusify2(r, t)
         val r2 = arg2.radiusify2(r, t)
+        if (r1 < r2) for (i <- 0 until r2 - r1) //arg=tm1(arg)
+
         assert(r1 == r2 || r1 < 0 || r2 < 0, "binop should processe variables of identical index i") //todo introduce delays
         math.max(r1, r2)
 

@@ -4,7 +4,7 @@ import compiler.AST.{p, _}
 import compiler.ASTL.{v, _}
 import compiler.repr.nomV
 import compiler.{B, E, F, V}
-import progOfmacros.RedS.{exist, inside}
+import progOfmacros.RedS.{exist}
 import progOfmacros.SReduce.existF2V
 
 /** Contains elementary loops doing simple reduction combined with a broacast from VEF to VEF */
@@ -15,8 +15,13 @@ object SReduce {
     val e = p[E, B]("edge")
     val existV: BoolV = orRdef(transfer(v(e)))
     existV.setName("existV");
-    Fundef1("existE2V", existV, e)
+    Fundef1("reds.existE2V", existV, e) //will be stored as a static function "existE2V_1" of reds javafile
   }
+
+
+  /** wrapper to  Call existE2V. */
+  def existE2V(e: BoolE): BoolV = new Call1(existE2VDef, e) with BoolV
+
 
   /** From a boolE, computes adjacent vertices */
   val insideE2VDef: Fundef1[(E, B), (V, B)] = {
@@ -25,10 +30,6 @@ object SReduce {
     insideV.setName("insideV");
     Fundef1("insideE2V", insideV, e)
   }
-
-  /** wrapper to  Call existE2V. */
-  def existE2V(e: BoolE): BoolV = new Call1(existE2VDef, e) with BoolV
-
   def insideE2V(e: BoolE): BoolV = new Call1(insideE2VDef, e) with BoolV
 
 
@@ -58,9 +59,9 @@ object SReduce {
   /** From a boolV, computes adjacent edges */
   val existV2EDef: Fundef1[(V, B), (E, B)] = {
     val v = p[V, B]("vertice")
-    val existE: BoolE = orR(transfer(e(v)))
+    val existE: BoolE = orR(transfer(e(v))) //pas besoin de defEv
     existE.setName("existE");
-    Fundef1("existV2E", existE, v)
+    Fundef1("reds.existV2E", existE, v)
   }
 
   /** wrapper to  Call existV2E. */
@@ -96,11 +97,11 @@ object SReduce {
   /** From a boolV, computes the neighborhoodV radius 2 */
   val neighborhoodDef: Fundef1[(V, B), (V, B)] = {
     val b = p[V, B]("blob")
-    val neighbEE: BoolE = exist(b)
+    val neighbEE: BoolE = existV2E(b)
 
     val neighbor1: BoolV = exist(neighbEE)
-    val neighbor2: BoolV = inside(neighbEE)
-    val neighbor = neighbor1 | neighbor2
+    // val neighbor2: BoolV = inside(neighbEE)
+    val neighbor = neighbor1 //| neighbor2
     neighbor.setName("neighbVV");
     Fundef1("neighborhood", neighbor, b)
   }

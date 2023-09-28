@@ -3,33 +3,43 @@ package progOfCA
 import compiler.AST.{Layer, p}
 import compiler.ASTL.{BoolV, _}
 import compiler.Circuit.hexagon
-import compiler.{AST, ASTLt, B, Circuit, F, V}
+import compiler.{AST, ASTLt, B, Circuit, E, F, V}
 import progOfmacros.RedS.exist
 import progOfmacros.SReduce._
 
 /** Simple growth one of the most simple circuit that can be conceived, used for debug */
 class Grow extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
-  // val GrowE= existV2E(this);  val next: BoolV = existE2V(GrowE)
-  val neighbEE: BoolE = exist(this)
-  override val next: BoolV = exist(neighbEE) // neighborhood(this) //nb if overrid is not written, it does not work!
-  // next.setName("growNext")
-  show(neighbEE)
-  show(this) //shown field will get the name "grow", because we did grow=new Grow
+  val neighbEE: BoolE = exist(this);
+  show(neighbEE) //pas besoin de faire intervenir defVe
+  override val next: BoolV = exist(neighbEE) //  make use of defVe brough to us implicitely,nb if overrid is not written, it does not work!
+  show(this) //shown field will get the name "grow", because we set the name of root to arg(0).lowercase
   show(next)
 }
 
+class GrowF extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
+  val neighbFF: BoolF = exist(this); //no use of  defEv
+  show(neighbFF)
+  override val next: BoolV = exist(neighbFF) //  make use of defVf brough to us implicitely,nb if overrid is not written, it does not work!
+  show(this) //shown field will get the name "grow", because we set the name of root to arg(0).lowercase
+  show(next)
+}
+
+class GrowEF extends Layer[(E, B)](1, "global") with ASTLt[E, B] {
+  val neighbFF: BoolF = exist(this); //no use of defFe
+  show(neighbFF) //uses defEf
+  override val next: BoolE = exist(neighbFF) //  make use of defVe brough to us implicitely,nb if overrid is not written, it does not work!
+  show(this) //shown field will get the name "grow", because we set the name of root to arg(0).lowercase
+  show(next)
+}
+
+
 // implement the intermediate stage in main, so that we have name variables as 2D arrays.
-/*class GrowDec extends Layer[(V, B)](1,"global") with ASTLt[V, B] {
+class GrowDec extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
   // val GrowE= existV2E(this);  val next: BoolV = existE2V(GrowE)
 
   val neighbEE: BoolE = existV2E(this)
   show(neighbEE)
   val next: BoolV = existE2V(neighbEE)
-  show(this)
-}
-
-class GrowF extends Layer[(F, B)](1,"global") with ASTLt[F, B] {
-  val next: BoolF = neighborhoodfe(this)
   show(this)
 }
 
@@ -39,7 +49,7 @@ class GrowVor() extends Layer[(V, B)](1,"global") with ASTLt[V, B] with BlobV {
   show(this)
   show(meetE)
   show(meetV)
-}*/
+}
 
 /** Code for compiling Grow */
 object Grow extends App {

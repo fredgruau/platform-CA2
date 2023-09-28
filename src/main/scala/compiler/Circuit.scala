@@ -62,7 +62,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //   print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
-    //  print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
+    print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
 
     val prog5ter = prog5bis.radiusify2
     // print("radiusify555555555555555555555555555555\n"+prog5ter)

@@ -5,6 +5,7 @@ import simulator.XMLutilities._
 import triangulation.Vector2D
 
 import java.awt.{Color, Polygon}
+import java.io.{FileNotFoundException, IOException}
 import java.net.URL
 import javax.swing.{ImageIcon, JTree}
 import scala.swing.Swing.Icon
@@ -16,33 +17,33 @@ import scala.collection.immutable.HashMap
 object Simulator extends SimpleSwingApplication {
   /** name of Cellular automaton being simulated, to be set by method startUp, and then used by method top */
   var nameCA: String = " "
+  /** parameters defining sizes, t0, isPlaying, common to all simulations */
   var simulParam: Node = null
+  /** contains info about which layers are expanded, what where the already  used colors. */
   var displayParam: Node = null
-
-  var globalInit: Array[String] = null
-
-  private var nameCAparam: String = null
+  var globalInit: Node = null
+  var selectedGlobalInit: Int = -1 //it will bug if we forget to read it.
+  var nameGlobalInit: String = null
   /**
-   * startup is called before top is launched,so that
-   * it can access the nameCA and store it in order to open the appropriate files
-   *
    * @param args command line argument, contains the name of CA being simulated
+   *             startup is called before top is launched,so that
+   *             it can access args which nameCA as well as other names of files containing parameters for simulation
+   *             and store them in order to later be able to open the files with the CA program, and parameters
    */
   override def startup(args: Array[String]): Unit = {
     nameCA = args(0) //name of the CA program
-    val nameGlobalInit = args(1)
-    val nodeGlobalInit: Node = readXML("src/main/scala/compiledCA/globalInit/" + nameGlobalInit)
-    globalInit = fromXMLasList((nodeGlobalInit \\ "inits").head).toArray
+    nameGlobalInit = args(1)
+    globalInit = readXML("src/main/scala/compiledCA/globalInit/" + nameGlobalInit)
     val nameSimulParam = args(2)
-
-    /** parameters common to all simulations */
     simulParam = readXML("src/main/scala/compiledCA/simulParam/" + nameSimulParam)
+    displayParam = try {
+      readXML("src/main/scala/compiledCA/displayParam/" + nameCA + ".xml")
+    }
+    catch {
+      case _: FileNotFoundException => readXML("src/main/scala/compiledCA/displayParam/default.xml")
+    }
 
-    /** which layers are expanded, what are the used colors. */
-    displayParam = readXML("src/main/scala/compiledCA/displayParam/" + nameCA + ".xml")
 
-    if (args.size > 2) //we supplied a file of parameter name with a name that is not <progName>+"param"
-      nameCAparam = args(2)
     super.startup(args)
   }
 
@@ -55,34 +56,27 @@ object Simulator extends SimpleSwingApplication {
   def top: MainFrame = new MainFrame {
     title = "spatial computation"
 
-    if (nameCAparam == null)
-      nameCAparam = nameCA + "param.xml" //standard name of file containing parameters, if not supplied.
-    /** contains XML code representing many parameters */
+    /** possible directories where CA can be found */
     val directories = List("compiledCA") //, "compHandCA")
     //find  the right directory
     val possibleDir = directories.filter((s: String) => loadClass(s + "." + nameCA) != null)
     assert(possibleDir.size > 0, nameCA + "could not be found in any of the directories " + directories)
     assert(possibleDir.size < 2, nameCA + "could  be found two times in the directories " + directories)
-    val chosenDir: String = possibleDir.head
+    val chosenDir: String = possibleDir.head //we take the first found directory
     val classCA: Class[CAloops2] = loadClass(chosenDir + "." + nameCA)
     /** contains the loops but also many other parameters */
-    val progCA: CAloops2 = getProg(classCA)
-
-    //val paramCA: Node =   readXML("src/main/scala/" + chosenDir + "/" + nameCAparam)
+    val progCA: CAloops2 = getProg(classCA) //will be used to create the controller, but also the browsable treeLayers.
 
 
-
-    /** process the signal we create controller first in order to instanciate state variable used by tree */
-    val controller = new Controller(nameCA, globalInit, simulParam, displayParam, progCA, chosenDir, this)
+    /** process the signal we create controller first in order to instanciate state variable used by layerTree */
+    val controller = new Controller(nameCA, globalInit, nameGlobalInit, simulParam, displayParam, progCA, chosenDir, this)
     /** Tree for browsing the hierarchy of layers and which field to display */
     val xmlLayerTree = readXmlTree(progCA.displayableLayerHierarchy())
-    System.out.println(xmlLayerTree)
-    //val xmlLayerTree2: Node = (simulParam \\ "layers").head
+    System.out.println("the displayable layers are\n" + xmlLayerTree)
+    //creation of layerTree needs controller, in order to be able to send signal of expansion and coloring/uncoloring
     val layerTree: LayerTree = new LayerTree(xmlLayerTree, controller)
-    // val layerTree: LayerTree = new LayerTree(xmlLayerTree.head, controller)
-    val scrollableXmlTree = new ScrollPane(layerTree) //we put it scrollable because it can become big
-
-    controller.init(layerTree) //now we can pass it to the controller which needs to listen to exansion and coloration events
+    val scrollableXmlTree = new ScrollPane(layerTree) //we put it scrollable because it can become big, when many fields can potentially get displayed
+    controller.init(layerTree) //now we can pass it to the controller which needs to listen to expansion and coloration events
 
     /** We simulate several CA simultaneously. We generate a list of environement using an iterator */
     val iterEnvs: Iterable[Env] = envs(controller)
@@ -98,11 +92,11 @@ object Simulator extends SimpleSwingApplication {
         c
       }
 
-      var numEnv = 0
+      var numEnv = 0;
       var numCell = 0
       //how many columns
       val nbColPannel: Int = xInt(simulParam, "display", "@nbCol")
-      for (env: Env <- iterEnvs) {
+      for (env: Env <- iterEnvs) { //effectivement, lorsque on crée les envs, il n'ont as encore leur panner
         controller.envList = controller.envList :+ env //we will need to acess the list of env, from the controler
         env.pannel = new CApannel(controller.CAwidth, controller.CAheight, env, progCA) // the number of CAlines is 1/ sqrt(2) the number of CA colomns.
         if (env.nbColCA >= 30) { // if the CA has too many columns, it get displayed on multiple columns
@@ -110,13 +104,15 @@ object Simulator extends SimpleSwingApplication {
           add(env.pannel, constraints(numCell % nbColPannel, numCell / nbColPannel, nbColPannel, GridBagPanel.Fill.Horizontal)) //adds the pannel using the Grid layout (GridBagPnnel)
           numCell += nbColPannel
         }
-        else { //adds the pannel in a signel cell
-          add(env.pannel, constraints(numCell % nbColPannel, numCell / nbColPannel))
+        else {
+          add(env.pannel, constraints(numCell % nbColPannel, numCell / nbColPannel)) //adds the pannel in a single cell
           numCell += 1
-        }
-        numEnv += 1
+        }; numEnv += 1
+        // controller.progCA.anchorFieldInMem(env.mem)
+        //should be env.init
+        //controller.progCA.initLayer(env.mem)
+        env.init() // could not be done in the creation of the env, because pannel was not create yet
       }
-
     }
     val scrollablPannels = new ScrollPane(pannels) // we generate many pannels and the mouse wheel will allow to easily scroll
     /** this way of doing make the toolbar floatable */
@@ -128,9 +124,10 @@ object Simulator extends SimpleSwingApplication {
   }
 }
 
+/**
+ * retrieve  icons stored in the ressources directory
+ */
 object ExampleData {
-  // retrieve  icons stored in the ressources directory
-  //  def getIconUrl(path: String): URL = resourceFromClassloader(path) ensuring(_ != null, "Couldn't find icon " + path)
   val fileIcon: ImageIcon = Icon("src/ressources/file.png")
   val folderIcon: ImageIcon = Icon("src/ressources/folder.png")
   val playNormalIcon: ImageIcon = Icon("src/ressources/play_black.gif")
@@ -145,7 +142,7 @@ object SimulatorUtil {
    *
    * @param gridSizes  the different posible CA sizes
    * @param controller the controler
-   * @return we generates  the env Iterator in a separate method because it is big
+   * @return env Iterator implemented  separately  method because it is big
    */
   def envs(controller: Controller): Iterable[Env] = {
     val simulParam = controller.simulParam

@@ -31,9 +31,12 @@ public final class GrowCA2 implements CAloops2 {
         defVe = new int[][]{mem[3], mem[4], mem[5], mem[6], mem[7], mem[8]};
         seedE = new int[][]{mem[16], mem[17], mem[18]};
     }
+    @Override
+    public void copyLayer(int[][] m) {
+    }
 
     @Override
-    public ArrayList<String> theLoops(PrShift p) {
+    public ArrayList<String> theLoops(PrShift p, int[][] m) {
         ArrayList<String> bugs = new ArrayList<>();
         // grow(p, seed, defVe);
         eexistV2E_1(p, seed, seedE);

@@ -7,7 +7,7 @@ import compiler.Locus.{all2DLocus, allLocus}
 import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp, radicalOfVar, radicalOfVar2, removeAfterChar, rootOfVar, shortenedSig, writeFile}
 import compiler.VarKind.LayerField
 import dataStruc.Named
-import dataStruc.Named.{noDollarNorHashtag, noHashtag}
+import dataStruc.Named.{isLayer, noDollarNorHashtag, noHashtag}
 import simulator.XMLutilities.readXML
 
 import java.util.regex.Pattern
@@ -125,7 +125,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
         val dip = declInitParam;
         if (dip.size > 0) "// initialisation \n int " + dip + ";" else ""
       },
-      "LOOPBODY" -> totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]], ' ', ' ')).grouped(4).map(_.mkString(";")).mkString(";\n ")))
+      "LOOPBODY" -> totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ")))
   }
 
   /**
@@ -152,16 +152,28 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
     val spatialOfffsetsInt = offsetsInt((tSymbVar ++ layerSubProgStrict).filter(x => noDollarNorHashtag(x._1)))
     val (theCallCode, decompositionLocus, theDisplayed) = javaOfTheCallInTheMain()
+
+    def initLayer(spatialLayer: Map[String, InfoNbit[_]]): HashMap[String, String] = {
+      HashMap[String, String]() ++ spatialLayer.map({ case (s, i) => (s -> i.k.asInstanceOf[LayerField].init) })
+    }
+
+    def anchorOneVar(oneVar: (String, List[Int])) = {
+      val ints = oneVar._2
+      var res = ints.map("m[" + _ + "]").mkString(",")
+      if (ints.size > 1) res = " new int[][]{" + res + "}" //we have a 2D array
+      res = oneVar._1 + "=" + res;
+      res
+    }
     //we use the same template technique as the one used for CAloops
     replaceAll("src/main/scala/compiledCA/template/templateCA.txt", Map(
       "NAMECA" -> paramR(0).capitalize,
-      "MEMWIDTH" -> ("" + mainHeapSize + "\n"), //TODO on calcule pas bien la memwidth)
+      "MEMWIDTH" -> ("" + mainHeapSize), //TODO on calcule pas bien la memwidth)
       "DECLNAMED" -> {
         /** code that declares all the named arrays 1D and 2D */
         def DeclNamed(offset: Map[String, List[Int]]): String = {
           val (var1D, var2D) = offset.keys.partition(offset(_).size == 1) //we distinguish 1D arrays from 2D arrays.
-          (if (var1D.nonEmpty) "public static int[]" + var1D.mkString(",") + ";\n" else "") +
-            (if (var2D.nonEmpty) "public static int[][]" + var2D.mkString(",") + ";\n" else "")
+          (if (var1D.nonEmpty) "int[]" + var1D.mkString(",") + ";\n" else "") +
+            (if (var2D.nonEmpty) "int[][]" + var2D.mkString(",") + ";\n" else "")
         }
         ("" + DeclNamed(spatialOfffsetsInt))
       },
@@ -173,8 +185,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
           for (l: Locus <- all2DLocus) {
             var2D = var2D ++ (0 until decomposition(l).size).map(l.shortName + _)
           }
-          (if (var1D.nonEmpty) "public static int[] " + var1D.mkString(",") + ";\n" else "") +
-            (if (var2D.nonEmpty) "public static int[][] " + var2D.mkString(",") + ";\n" else "")
+          (if (var1D.nonEmpty) "int[] " + var1D.mkString(",") + ";\n" else "") +
+            (if (var2D.nonEmpty) "int[][] " + var2D.mkString(",") + ";\n" else "")
         }
 
         ("" + declNotNamed(decompositionLocus))
@@ -183,31 +195,40 @@ trait ProduceJava[U <: InfoNbit[_]] {
       "ANCHORNAMED" -> {
         /** code that anchors named arrays on memory */
         def anchorNamed(offset: Map[String, List[Int]]): String = {
-          def anchorOneVar(oneVar: (String, List[Int])) = {
-            val ints = oneVar._2
-            var res = ints.map("m[" + _ + "]").mkString(",")
-            if (ints.size > 1) res = " new int[][]{" + res + "}" //we have a 2D array
-            res = oneVar._1 + "=" + res;
-            res
-          }
-          offset.map(anchorOneVar(_)).mkString(";\n") + ";"
+          val (offset1D, offset2D) = offset.partition(x => x._2.size == 1)
+          "int[]" + offset1D.map(anchorOneVar(_)).mkString(",") + ";\n" +
+            (if (offset2D.nonEmpty) "int[][]" + offset2D.map(anchorOneVar(_)).mkString(",") + ";\n" else "")
         }
-
         anchorNamed(spatialOfffsetsInt)
       },
       "ANCHORNOTNAMED" -> {
         /** Codes that decompose array 2D into memory slices */
         def anchorNotNamed(decomposition: Map[Locus, Map[List[Int], Int]]): String = { //todo queskispass si c'est un tableau 1D?
+
           var codeDecl: List[String] = List()
-          for (l: Locus <- allLocus)
-          //if(decomposition(l).nonEmpty)
-            for ((li, i) <- decomposition(l))
-              codeDecl = l.shortName + i + "= new int[][]{" + li.map("m[" + _ + "]").mkString(",") + "};" :: codeDecl
+          for (l: Locus <- allLocus) if (decomposition(l).nonEmpty) {
+            val (offset1D, offset2D) = decomposition(l).partition(x => x._1.size == 1) //separates  BoolV which are stored on one plane
+            if (offset1D.nonEmpty) codeDecl ::= "int[]" + offset1D.map(x => anchorOneVar((l.shortName + x._2, x._1))).mkString(",") + ";\n"
+            if (offset2D.nonEmpty) codeDecl ::= "int[][]" + offset2D.map(x => anchorOneVar((l.shortName + x._2, x._1))).mkString(",") + ";\n"
+          }
           // seedE = new int[][]{m[8], m[9], m[10]};
           codeDecl.mkString("\n")
         }
-
         anchorNotNamed(decompositionLocus)
+      },
+      "COPYLAYER" -> {
+        def anchorNamed(offset: Map[String, List[Int]]): String = {
+          val (offset1D, offset2D) = offset.partition(x => x._2.size == 1)
+          "int[]" + offset1D.map(anchorOneVar(_)).mkString(",") + ";\n" +
+            (if (offset2D.nonEmpty) "int[][]" + offset2D.map(anchorOneVar(_)).mkString(",") + ";\n" else "")
+        }
+
+        //iL contains only the variable totoll not toto
+        val iL = initLayer(layerSubProg2).keys.filter(isLayer(_)).filter(x => tSymbVar.contains(x.drop(2))) //we check that the layer without ll exists
+        //anchoring both lltoto and toto in memory.
+        val llandNotll = spatialOfffsetsInt.filter(x => iL.contains(x._1) || iL.contains("ll" + x._1))
+        "" + anchorNamed(llandNotll) +
+          iL.toList.map(s => "copy(" + s + "," + s.drop(2) + ");").mkString("")
       },
       "FIELDOFFSET" -> {
         def fieldOffset(offset: Map[String, List[Int]]): String = {
@@ -253,13 +274,11 @@ trait ProduceJava[U <: InfoNbit[_]] {
       "DISPLAYABLE" -> //theDisplayed contains two kinds of name:aux and segmented, first step should separate the segmented
         parenthesizedExp(rootOfVar(theDisplayed.head), hierarchyDisplayedField(theDisplayed)),
       "INITLAYER" -> {
-        def initLayer(spatialLayer: Map[String, InfoNbit[_]]): HashMap[String, String] = {
-          HashMap[String, String]() ++ spatialLayer.map({ case (s, i) => (s -> i.k.asInstanceOf[LayerField].init) })
-        }
-
-        initLayer(layerSubProg2).map((kv: (String, String)) =>
+        val iL = initLayer(layerSubProg2)
+        iL.map((kv: (String, String)) =>
           " map.put(\"" + kv._1 + "\",\"" + kv._2 + "\")").mkString(";\n") + ";\n"
       },
+
       "ANONYMOUSLOOP" -> {
         codeLoopAnonymous
       }

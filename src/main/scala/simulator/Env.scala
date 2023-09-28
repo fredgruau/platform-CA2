@@ -39,16 +39,26 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
   /** associated pannel */
   var pannel: CApannel = null //to be set latter due to mutual recursive definition
 
-  init() // this initialization can be called at runtime, when the user restarts the whole simulation from the restart button
+  //init() // this initialization is to be called after creation, because pannes cannot be set at creation
+  // at runtime, when the user restarts the whole simulation from the restart button
 
+
+  /**
+   * The memory is set back to virgin
+   */
+  private def resetMem(): Unit =
+    for (bitPlane <- mem)
+      for (i <- 0 until bitPlane.length)
+        bitPlane(i) = 0;
   /** visit all layers that should be initialized directly,  and init the layers using the designated initMethod */
   private def initMemCA(): Unit = {
     //for (layerName: String <- controller.progCA.directInit()) {
+    resetMem()
     for (layerName: String <- controller.progCA.init().keys) {
       /** fields layerName's components */
-      val memFields2Init = memFields(layerName)
+      val memFields2Init: Seq[Array[Int]] = memFields(layerName)
       val initNameFinal = initName.getOrElse(layerName, controller.initName(layerName)) //either it is the root layer or we find it in env
-      val initMethod: Init = medium.initSelect(initNameFinal, controller.locusDisplayedOrDirectInitField(layerName))
+      val initMethod: Init = medium.initSelect(initNameFinal, controller.locusOfDisplayedOrDirectInitField(layerName))
       initMethod.init(memFields2Init.toArray)
     }
   }
@@ -56,11 +66,13 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
   def init(): Unit = {
     rand = new Random(randomRoot) //we reinitialize the random number in order to reproduce exactly the same random sequence
     initMemCA() //invariant stipulates that memory should be filled so we fill it already right when we create it
+    controller.progCA.copyLayer(mem)
     if (medium.voronoi.isEmpty)
       medium.initVoronoi(controller.displayedLocus) //we have to compute the voronoi upon medium's creation
     for (_ <- 0 until controller.t0) //forward till to
       forward()
     computeVoronoirColors() // for the initial painting
+    repaint() //  cannot be called now, because the associated pannel has not been created yet.
     if (controller.isPlaying) //lauch the threads
       play()
   }
@@ -77,7 +89,7 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
   private def computeVoronoirColors(): Unit = {
     medium.resetColorVoronoi(controller.displayedLocus)
     for ((layerName, color) <- controller.colorDisplayedField) { //process fiedls to be displayed, one by one
-      val locus: Locus = controller.locusDisplayedOrDirectInitField(layerName)
+      val locus: Locus = controller.locusOfDisplayedOrDirectInitField(layerName)
       val bitSize: Int = controller.bitSizeDisplayedOrDirectInitField.getOrElse(layerName, 1) //default bitsize is one, for boolean
       val bitPlane: List[Array[Int]] = memFields(layerName)
       val density = locus.density * bitSize
@@ -110,10 +122,8 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
 
   /** does one CA iteration on the memory */
   def forward(): Unit = {
-
-    //controller.progCA.theLoops(mem, medium.propagate4Shift)
-    controller.progCA.anchorFieldInMem(mem) //todo a faire seulement si meme change (quand on display ou qu'on display plus)
-    bugs = controller.progCA.theLoops(medium.propagate4Shift).asScala //we retrieve wether there was a bug
+    //  controller.progCA.anchorFieldInMem(mem) //todo a refaire seulement si meme change (quand on display ou qu'on display plus)
+    bugs = controller.progCA.theLoops(medium.propagate4Shift, mem).asScala //we retrieve wether there was a bug
     t += 1
   }
 

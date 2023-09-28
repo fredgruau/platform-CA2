@@ -177,7 +177,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   override def toString =
     super.toString +
       // (if(coalescTMP!= null&&coalescTMP.size>0) "tmp registers:" + toStringCoalesc(coalescTMP) else "" ) +
-      (if (loops != null) "Total code of macro: " + totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]], ' ', ' ')).grouped(4).map(_.mkString(";")).mkString(";\n ") else "")
+      (if (loops != null) "Total code of macro: " +
+        totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ") else "")
 
   /**
    * @return generates a list of list of boolean affectations for each instruction
@@ -342,7 +343,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   /** does not take into account the layers of this */
   lazy val layerSubProgStrict = layers(subDataProgs.values.toList) //: Predef.Map[String, U] = ( subDataProgs.values.toList).flatMap(_.tSymbVar.filter(x => x._2.k.isLayerField).toList).toMap
   /** takes into account the layer of this */
-  lazy val layerSubProg2 = layers(this :: subDataProgs.values.toList) //(this :: subDataProgs.values.toList).flatMap(_.tSymbVar.filter(x =>  x._2.k.isLayerField).toList).toMap
+  lazy val layerSubProg2: Predef.Map[String, U] = layers(this :: subDataProgs.values.toList) //(this :: subDataProgs.values.toList).flatMap(_.tSymbVar.filter(x =>  x._2.k.isLayerField).toList).toMap
 
   /**
    *

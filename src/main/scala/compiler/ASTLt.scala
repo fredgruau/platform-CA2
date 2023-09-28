@@ -281,7 +281,9 @@ object ASTLt {
 
   /** constant layer. */
   //private[ASTLt]
-  class ConstLayer[L <: Locus, R <: Ring](nbit: Int, init: String)(implicit m: repr[L], n: repr[R]) extends Layer[(L, R)](nbit, init) with ASTLt[L, R] {
+  class ConstLayer[L <: Locus, R <: Ring](nbit: Int, init: String)
+                                         (implicit m: repr[L], n: repr[R]) extends Layer[(L, R)](nbit, init) with ASTLt[L, R] {
+    this.setName(init + m.name.asInstanceOf[Locus].shortName)
     val next: ASTLt[L, R] = delayedL(this) //yes
   }
 

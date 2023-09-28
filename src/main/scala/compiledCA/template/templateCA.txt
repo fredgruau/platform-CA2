@@ -13,15 +13,16 @@ import static simulator.Util.*;
 public final class {{NAMECA}}CA implements CAloops2 {
 {{ANONYMOUSLOOP}}
 public int CAmemWidth() {return {{MEMWIDTH}};}
-public int[][]mem; //we will need to access the whole memory
-{{DECLNAMED}}{{DECLNOTNAMED}}
-@Override public void anchorFieldInMem(int[][] m) {  mem=m;
-{{ANCHORNAMED}}
-{{ANCHORNOTNAMED}} }
+
+@Override public ArrayList<String> theLoops(PrShift p,int[][] m) {ArrayList<String> bugs=new ArrayList<>();
+{{ANCHORNAMED}}{{ANCHORNOTNAMED}}
+{{LISTCALL}} return bugs;}
+@Override   public void copyLayer(int[][] m) {
+{{COPYLAYER}}  }
+
+
 @Override public HashMap<String, List<Integer>> fieldOffset() {HashMap<String, List<Integer>> map = new HashMap<>(); //for layer's initialization and update, as well as displayed fields.
 {{FIELDOFFSET}} return (map);}
-@Override public ArrayList<String> theLoops(PrShift p) {ArrayList<String> bugs=new ArrayList<>();
-{{LISTCALL}} return bugs;}
 @Override public HashMap<String, Locus> fieldLocus() {HashMap<String, Locus> map = new HashMap<>();
 {{FIELDLOCUS}}; return (map);}
 @Override public HashMap<String, Integer> fieldBitSize() { HashMap<String, Integer> map = new HashMap<>();
@@ -29,4 +30,5 @@ public int[][]mem; //we will need to access the whole memory
 @Override  public String displayableLayerHierarchy() { return "{{DISPLAYABLE}}";}
 @Override public HashMap<String, String> init() {HashMap<String, String> map = new HashMap<>();
  {{INITLAYER}} return (map);}
+
 }

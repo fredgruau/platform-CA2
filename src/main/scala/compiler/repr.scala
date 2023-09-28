@@ -24,28 +24,31 @@ class repr[+L](val name: L)
 class chipBorder[S1 <: S, S2 <: S](val border: ASTLt[T[S1, S2], B])
 
 object chipBorder {
-  /** defines the chip's border */
-  val defVe = new ConstLayer[T[V, E], B](1, "def") with ASTLt[T[V, E], B]
-  defVe.setName("defVe")
-  /** most used border */
-  implicit val borderVe: chipBorder[V, E] = {
-    new chipBorder[V, E](defVe)
-  }
-  //todo inclure to les transfer locus, pas seulement Ve
+  /** trahsfer field near the  chip's border, can be undefined, the contant def layers indicates where it is defined,
+   * so as to neutralize artefacts, when doing reductions. */
+  implicit val borderVe = new chipBorder[V, E](new ConstLayer[T[V, E], B](1, "def"))
+  implicit val borderEv = new chipBorder[E, V](null)
+  implicit val borderVf = new chipBorder[V, F](new ConstLayer[T[V, F], B](1, "def"))
+  implicit val borderFv = new chipBorder[F, V](null)
+  implicit val borderFe = new chipBorder[F, E](new ConstLayer[T[F, E], B](1, "def"))
+  implicit val borderEf = new chipBorder[E, F](null)
+  //todo inclure tout les transfer locus, pas seulement Ve
 
 }
 object repr {
   def apply(a:Any)=new repr(a)
-  implicit val nomV: repr[V] = new repr[V](V()); implicit val nomE: repr[E] = new repr[E](E()); implicit val nomF: repr[F] = new repr[F](F())
 
+  implicit val nomV: repr[V] = new repr[V](V());
+  implicit val nomE: repr[E] = new repr[E](E());
+  implicit val nomF: repr[F] = new repr[F](F())
 
   implicit def nomT[L1 <: S, L2 <: S](implicit m1: repr[L1], m2: repr[L2]): repr[T[L1, L2]] = new repr[T[L1, L2]](T(m1.name, m2.name))
-
   implicit def nomCons[T1, T2](implicit m1: repr[T1], m2: repr[T2]): repr[(T1, T2)] = new repr[(T1, T2)]((m1.name, m2.name))
 
   implicit def nomLR[L <: Locus, R <: Ring](implicit m1: repr[L], m2: repr[R]): repr[(L, R)] = new repr[(L, R)]((m1.name, m2.name))
   def lpart[L <: Locus, R <: Ring](n: repr[(L, R)]): repr[L] = new repr[L](n.name._1)
   def rpart[L <: Locus, R <: Ring](n: repr[(L, R)]): repr[R] = new repr[R](n.name._2)
+
   implicit val nomB: repr[B] = new repr[B](B())
   implicit val nomR: repr[Ring] = new repr[Ring](new Ring())
   implicit val nomSI: repr[SI] = new repr[SI](SI())

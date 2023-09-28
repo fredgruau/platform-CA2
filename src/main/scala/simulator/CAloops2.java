@@ -15,6 +15,7 @@ import java.util.HashMap;
  */
 public interface CAloops2 {
 
+    void copyLayer(int[][] m);
     /**
      *
      * @param p prepare for a loop of radius one by doing the necessary shift
@@ -22,7 +23,7 @@ public interface CAloops2 {
      * applies a set of loops realizing one iteration on the CA.
      */
 
-    ArrayList<String> theLoops(PrShift p);
+    ArrayList<String> theLoops(PrShift p, int[][] m);
 
 
 
@@ -34,7 +35,7 @@ public interface CAloops2 {
     /**
      * @return the offset where to find the data in the CA memory, for a given field
      */
-    public void anchorFieldInMem(int[][] m);
+    //public void anchorFieldInMem(int[][] m);
 
     public HashMap<String, List<Integer>> fieldOffset();
 

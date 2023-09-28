@@ -44,8 +44,8 @@ trait DagNode[+T <: DagNode[T]] {
 
   private def neighbor1or1(t: TabSymb[InfoType[_]]) = //todo simplify
   if (isShift(toString)) " 1"
-  else if (inputNeighbors(1).isInstanceOf[AffBool]) " " + "(" + inputNeighbors(1).toStringTreeInfix(t, '(', ')') + ")"
-  else inputNeighbors(1).toStringTreeInfix(t, ' ', ' ')
+  else if (inputNeighbors(1).isInstanceOf[AffBool]) " " + "(" + inputNeighbors(1).toStringTreeInfix(t, "(", ")") + ")"
+  else inputNeighbors(1).toStringTreeInfix(t)
 
   /** * @param t symbol Table needed to check if variable is a parameter
    *
@@ -78,18 +78,18 @@ trait DagNode[+T <: DagNode[T]] {
    *         them without parenthesis, and therefore much less parenthesis, and much more readable expression
    */
 
-  def toStringTreeInfix(t: TabSymb[InfoType[_]], PARL: String = "", PARR: String = ""): String = {
+  def toStringTreeInfix(t: TabSymb[InfoType[_]], PARL: String = "", PARR: String = ""): String = { //default value for PARL and PARE is no parenthesis
     assert {
       inputNeighbors.size <= 2
     }
     inputNeighbors.size match {
       case 0 => " " + toStringParam(t) + " "
       case 1 => if (isShift(toString))
-        "" + PARL + inputNeighbors.head.toStringTreeInfix(t, '(', ')') + " " + toString + " " + neighbor1or1(t) + PARR
+        "" + PARL + inputNeighbors.head.toStringTreeInfix(t, "(", ")") + " " + toString + " " + neighbor1or1(t) + PARR //parenthesis
       else if (inputNeighbors.head.isInstanceOf[AffBool])
-        " " + toString + "(" + inputNeighbors.head.toStringTreeInfix(t, ' ', ' ') + ")" //toString comes before the parameter
-      else " " + toStringParam(t) + " " + inputNeighbors.head.toStringTreeInfix(t, ' ', ' ')
-      case 2 => "" + PARL + inputNeighbors.head.toStringTreeInfix(t, '(', ')') + " " + toString + " " + neighbor1or1(t) + PARR
+        " " + toString + "(" + inputNeighbors.head.toStringTreeInfix(t) + ")" //toString comes before the parameter
+      else " " + toStringParam(t) + " " + inputNeighbors.head.toStringTreeInfix(t)
+      case 2 => "" + PARL + inputNeighbors.head.toStringTreeInfix(t, "(", ")") + " " + toString + " " + neighbor1or1(t) + PARR //parenthesis
 
     }
   }

@@ -59,7 +59,7 @@ object XMLutilities {
    * @param path acces vers un fichier
    * @return le xml contenu dans ce fichier
    */
-  def readXML(path: String): Node = {
+  def readXMLold(path: String): Node = {
     val lecteur = new BufferedReader(new FileReader(path))
     try {
       XML load lecteur
@@ -68,6 +68,9 @@ object XMLutilities {
       case _: IOException => <error>Error reading XML file.</error>
     }
   }
+
+  def readXML(path: String): Node = XML load new BufferedReader(new FileReader(path))
+
 
   /**
    *
@@ -119,6 +122,13 @@ object XMLutilities {
   def xArrayString(node: scala.xml.Node, tag: String, attrb: String): Array[String] =
     ((node \\ tag) \ attrb).text.trim.split(",")
 
+  /**
+   *
+   * @param node  an XML node
+   * @param tag   ' name such as display in <display nbCol="2" CAwidth="650" iter="CAsize"/>
+   * @param attrb an attribute's name such as    "@CAwidth") in <display nbCol="2" CAwidth="650" iter="CAsize"/>
+   * @returns the value 650
+   */
   def xInt(node: scala.xml.Node, tag: String, attrb: String) =
     x(node, tag, attrb).toInt
 

@@ -439,7 +439,10 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
 
   /** different possible inits
    * declared with lazy to spare memory, since only one or two will be instanciated
-   * make use of primitives fields declared in medium to simplify the programming */
+   * make use of primitives fields declared in medium to simplify the programming
+   * todo  there is a pb in that we need different init field, in case of random init.=> no val
+   * */
+
   private lazy val centerInitV: InitMold = new InitMold(V(), 1) {
     setBoolVField(center)
   }
@@ -483,8 +486,8 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
           setBoolVField(i, j)
   }
 
-  /** the defVe fields is generated for each locus,  ?? not necessary for V() */
-  private val defInit: HashMap[Locus, InitMold] = HashMap() ++ List(E(), F(), T(V(), E())).map((l: Locus) =>
+  /** the defVe fields is also generated for each locus,  ?? not necessary for V() */
+  private val defInit: HashMap[Locus, InitMold] = HashMap() ++ List(E(), F(), T(V(), E()), T(V(), F()), T(E(), F()), T(F(), V())).map((l: Locus) =>
     l -> new InitMold(l, 1) {
       for (d <- 0 until l.density)
         for (i <- 0 until nbLineCA)
@@ -502,8 +505,9 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
    * @return an  "Init" which can initialize a layer
    */
   def initSelect(initMethodName: String, l: Locus): Init = {
-    (if (initMethodName == "global") env.controller.globalInitList.selection.item else
-      initMethodName) match {
+    (if (initMethodName == "global") env.controller.globalInitList.selection.item //pointe sur le premier de la liste
+    else initMethodName) match {
+      case "0" => null
     case "center" => l match { //the init method willBe used for different layers
       case V() => centerInitV
       case E() => centerInitE
@@ -512,7 +516,7 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
         centerInitV
     }
     case "debug" => debugInit
-    case "def" => defInit(l)
+      case "def" => defInit(l) //here we must take into account the locus
     case "yaxis" => yaxisInit
     case "dottedBorder" => dottedBorderInit
     case "border" => borderInit

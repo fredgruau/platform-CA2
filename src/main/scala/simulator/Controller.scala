@@ -4,7 +4,7 @@ import compiler.{Locus, V}
 import simulator.Controller.disableBinding
 import simulator.CAtype._
 import simulator.ExampleData._
-import simulator.Simulator.{displayParam, simulParam}
+import simulator.Simulator.{displayParam, nameGlobalInit, simulParam}
 import simulator.XMLutilities._
 import simulator.colors.mainColors
 
@@ -24,20 +24,24 @@ import scala.xml.{Node, NodeSeq, XML}
  * @param progCA    contains the code for the loops
  * @param chosenDir directory containing the CA code
  */
-class Controller(val nameCA: String, val globalInit: Array[String], var simulParam: Node, var displayParam: Node,
+class Controller(val nameCA: String, var globalInit: Node, val globalInitName: String,
+                 var simulParam: Node, var displayParam: Node,
                  val progCA: CAloops2, val chosenDir: String, val mf: MainFrame)
   extends ToolBar() { //the controller inherits the toolBar, so that it can easily identifies which button was ckicqued, using the button's variable  name
   /** we need to know the locus of fields which are either displayed or initialized */
-  val locusDisplayedOrDirectInitField: Map[String, Locus] = progCA.fieldLocus.asScala.toMap
+  val locusOfDisplayedOrDirectInitField: Map[String, Locus] = progCA.fieldLocus.asScala.toMap
   /** we need to know the number of ints of fields which are either displayed or initialized */
   val bitSizeDisplayedOrDirectInitField: Map[String, Int] = progCA.fieldBitSize().asScala.mapValues(_.toInt).toMap
   /** the method used to initialize the direct init fields. */
-  // val initName: Map[String, String] = fromXMLasHashMap(simulParam, "inits", "@init")
   val initName: util.HashMap[String, String] = progCA.init() //fromXMLasHashMap(displayParam, "inits", "@init")
   /** memory offset of the bit planes  representing  field, the size of the list corresponds to the density of the field */
   val memFieldsOffset: Map[String, List[Integer]] = progCA.fieldOffset().asScala.toMap
   /** this is for the display, this is not the number of lines and columns. */
   val CAwidth: Int = xInt(simulParam, "display", "@CAwidth")
+
+  val globalInitNames = fromXMLasList((globalInit \\ "inits").head).toArray
+  val selectedGlobalInit: Int = xInt(globalInit, "selected", "@rank") //which is the starting value for global init
+
 
   /** by default, if not supplied, number of lignes is 1/sqrt(2) number of columns */
   def CAheight: Int = {
@@ -68,8 +72,10 @@ class Controller(val nameCA: String, val globalInit: Array[String], var simulPar
   /** associate a color to each displayed field , fiedls names are the keys, colors are the values which need ot be decoded from hexadecimal */
   var colorDisplayedField: Map[String, Color] = colorCode.mapValues((s: String) => new Color(Integer.decode(s))).toMap
   /** We 'll have to generate the voronoi in space. We consider that V() is allways displayed */
+  colorDisplayedField = colorDisplayedField.filter(x => locusOfDisplayedOrDirectInitField.contains(x._1)) //if a field is nolonger defined and used to be colored, it has to be removed from the displayed
   var displayedLocus: Set[Locus] =
-    colorDisplayedField.keys.map(locusDisplayedOrDirectInitField(_)).toSet + V()
+    colorDisplayedField.keys.map(locusOfDisplayedOrDirectInitField(_)).toSet + V()
+
   /** we'll applies t0 iterations upon initialization to speed up going directly to the interesting cases */
   val t0: Int = xInt(simulParam, "simul", "@t0")
   /** true if we start to play immediately */
@@ -99,6 +105,16 @@ class Controller(val nameCA: String, val globalInit: Array[String], var simulPar
     XML.save("src/main/scala/" + chosenDir + "/displayParam/" + nameCA + ".xml", displayParam)
   }
 
+
+  private def updateAndSaveXMLGlobalInit(): Unit = {
+    val newGlobalInit =
+      <initMethod>
+        {globalInit \\ "inits"}<selected rank={"" + globalInitNames.indexOf(globalInitList.selection.item)}/>
+      </initMethod>
+    XML.save("src/main/scala/" + chosenDir + "/globalInit/" + nameGlobalInit, newGlobalInit)
+  }
+
+
   private class SimpleButton(ic: javax.swing.Icon) extends Button() {
     icon = ic
     contents += this
@@ -114,8 +130,8 @@ class Controller(val nameCA: String, val globalInit: Array[String], var simulPar
 
   //Create the combo box, select the item at index 3.
   //Indices start at 0, so 3 specifies blackHole.
-  val globalInitList = new ComboBox[String](globalInit) {
-    selection.item = globalInit(3)
+  val globalInitList = new ComboBox[String](globalInitNames) {
+    selection.item = globalInitNames(selectedGlobalInit)
   }
   contents += globalInitList
   listenTo(globalInitList.selection)
@@ -152,12 +168,12 @@ class Controller(val nameCA: String, val globalInit: Array[String], var simulPar
       layerTree.repaint()
       mf.pack()
     case ToggleColorEvent(s) =>
-      val l = locusDisplayedOrDirectInitField(s)
+      val l = locusOfDisplayedOrDirectInitField(s)
       colorDisplayedField =
         if (colorDisplayedField.contains(s)) //we supress a color
         {
           colorDisplayedField -= s
-          displayedLocus = colorDisplayedField.keys.map(locusDisplayedOrDirectInitField(_)).toSet + V()
+          displayedLocus = colorDisplayedField.keys.map(locusOfDisplayedOrDirectInitField(_)).toSet + V()
           if (!displayedLocus.contains(l))
             for (env <- envList)
               env.medium.removeLocus(l)
@@ -198,7 +214,9 @@ class Controller(val nameCA: String, val globalInit: Array[String], var simulPar
       initEnv()
       repaintEnv()
       requestFocus() //necessary to enable listening to the keys again.
-    case SelectionChanged(`globalInitList`) => InitButton.doClick()
+    case SelectionChanged(`globalInitList`) =>
+      InitButton.doClick()
+      updateAndSaveXMLGlobalInit()
   }
   focusable = true
   requestFocus
