@@ -1,0 +1,15 @@
+<displayParam>
+    <expandedLayer>
+        <Layer>
+            growev
+        </Layer>
+    </expandedLayer>
+    <colorOfField>
+        <layer color="0x00FFFF">
+            growevNv
+        </layer>
+        <layer color="0x00FF00">
+            growev
+        </layer>
+    </colorOfField>
+</displayParam>
