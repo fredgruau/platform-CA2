@@ -48,7 +48,7 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
       case _ => inputNeighbors.map(e => e.symbolsExcepLayers).foldLeft(HashSet.empty[String])((x, y) => x.union(y))
     }
 
-  def fLayersofLayers: immutable.HashSet[String] =
+  def symbolsofLayers: immutable.HashSet[String] =
     this match {
       case Read(s) => if (Named.isLayer(s)) HashSet(s) else HashSet()
       case Param(s) => HashSet()

@@ -622,7 +622,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
       val constantLayers = newDagis.visitedL
       /** newly built macro may use layer such as constant layers to model the border, when doing reductions */
-      val usedLayers = toSet(newDagis.visitedL.flatMap(_.exps).flatMap(_.symbolsOfLayers))
+      val usedLayers = toSet(newDagis.visitedL.flatMap(_.exps).flatMap(_.symbolsofLayers))
       for (name <- usedLayers)
         newtSymbVar.addOne((name -> p.tSymbVar(name)))
 

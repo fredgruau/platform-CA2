@@ -6,7 +6,10 @@
     <init>
         border
     </init>
-    <init>
+        <init>
+            xaxis
+        </init>
+        <init>
         yaxis
     </init>
     </inits>
