@@ -487,7 +487,7 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
   }
 
   /** the defVe fields is also generated for each locus,  ?? not necessary for V() */
-  private val defInit: HashMap[Locus, InitMold] = HashMap() ++ List(E(), F(), T(V(), E()), T(V(), F()), T(E(), F()), T(F(), V())).map((l: Locus) =>
+  private val defInit: HashMap[Locus, InitMold] = HashMap() ++ List(E(), V(), T(V(), E()), T(V(), F()), T(F(), V()), T(E(), F()), T(F(), E())).map((l: Locus) =>
     l -> new InitMold(l, 1) {
       for (d <- 0 until l.density)
         for (i <- 0 until nbLineCA)
@@ -505,8 +505,9 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
    * @return an  "Init" which can initialize a layer
    */
   def initSelect(initMethodName: String, l: Locus): Init = {
-    (if (initMethodName == "global") env.controller.globalInitList.selection.item //pointe sur le premier de la liste
-    else initMethodName) match {
+    val finalInitMethodName = if (initMethodName == "global") env.controller.globalInitList.selection.item //currently selected init method
+    else initMethodName
+    finalInitMethodName match {
       case "0" => null
     case "center" => l match { //the init method willBe used for different layers
       case V() => centerInitV
@@ -546,9 +547,6 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
      * @param CAmemFields memory fields to fill
      */
     override def init(CAmemFields: Array[Array[Int]]): Unit = {
-      if (CAmemFields.length != memFields.length)
-        System.out.println("the number of fields used in CA memory does not corresponds " +
-          CAmemFields.length + " " + memFields.length)
       assert(CAmemFields.length == memFields.length, "the number of fields used in CA memory does not corresponds " +
         CAmemFields.length + " " + memFields.length)
       for ((lCA, lCAmem: Array[Int]) <- memFields zip CAmemFields) { //dot iteration, we iterate on the dot product of the two ranges
@@ -690,21 +688,15 @@ object Medium {
 
       override val propagate4Shift: PrShift = new PrShift() {
         def propagate4shift(t: Array[Int]): Unit = {
-          val last = t(t.length - 2) //last integer
+          val tlength = t.length - 1
+          val last = t(tlength - 2) //last integer
           val first = t(2) //first integer. normal bits start at t[2]
           t(1) = last >>> (nbColCA + 2) //we start by computing  the very first integer t[1]
-          t(t.length - 1) = first << (nbColCA + 2) //and then the very last integer t[t.length - 2]
-
+          t(tlength - 1) = first << (nbColCA + 2) //and then the very last integer t[tlength - 2]
           val masks: Map[Integer, Integer] = UtilBitJava.mask.asScala.toMap
           val m: Integer = masks(new Integer(nbColCA)).toInt
-          for (i <- 1 until t.length)
+          for (i <- 1 until tlength)
             t(i) = propagateBitxand1(t(i), nbColCA, m)
-          /*for(i <- 1 until t.length)
-            if(nbColCA==6)propagateBit6and1(t,i)
-            else propagateBit14and1(t,i)
- */
-
-
         }
       }
       //PrepareShift.prepareShiftGte30

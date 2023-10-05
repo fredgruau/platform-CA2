@@ -369,6 +369,9 @@ object ASTB {
   private[ASTB] case class Tminus1[R <: Ring](arg: ASTBt[R])(implicit n: repr[R]) extends ParOp[R](Both()) with Singleton[AST[_]]
 
 
+  case class IncreaseRadius[R <: Ring](arg: ASTBt[R])(implicit n: repr[R]) extends ParOp[R](Both()) with Singleton[AST[_]]
+
+
   /** Bolean Constructor */
   class Bool extends ASTB[B] with EmptyBag[AST[_]]
 
@@ -395,7 +398,8 @@ object ASTB {
   final case class Or(arg: ASTBt[B], arg2: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Doubleton[AST[_]] //{assert(y.nbit==x.nbit)}
   final case class Neg(arg: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Singleton[AST[_]]
 
-  /** ¯Boolean Affectation are also considered as  expression , they have a value */
+  /** ¯Boolean Affectation are also considered as  expression ,because an affectation in java does have a value, which is the expresion
+   * itself being affected */
   final case class AffBool(nameb: String, arg: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Singleton[AST[_]]
 
   def affBool(nameb: String, arg: ASTBt[B]) = if (nameb == null) arg else AffBool(nameb, arg)
@@ -457,8 +461,6 @@ object ASTB {
   /** will copy the msb until nbits are obtained, we inherit parOpScan in order to enjoy a register to store that last bit */
   case class Extend[R <: Ring](i: Int, arg: ASTBt[R])(implicit n: repr[R]) extends ParOpScan[R](Left()) with Singleton[AST[_]]
 
-  case class IncreaseRadius[R <: Ring](arg: ASTBt[R])(implicit n: repr[R]) extends ParOp[R](Both()) with Singleton[AST[_]]
-
   /** Iterates on one int */
   case class Mapp1Old[R <: I](arg: ASTBt[R], op: Fundef1[B, B])(implicit n: repr[R]) extends ParOp[R](Both()) with Singleton[AST[_]]
 
@@ -488,7 +490,7 @@ object ASTB {
                           (implicit n: repr[R]) extends ParOpScan[R](dir) with Doubleton[AST[_]]
 
   /** *****Wrapping *********/
-  def tm1(e: ASTBt[Ring])(implicit m: repr[Ring]) = new Tminus1(e)(m) with ASTBt[Ring]
+  def tm1[R <: Ring](e: ASTBt[R])(implicit m: repr[R]) = new Tminus1(e)(m) with ASTBt[R]
 
   def shiftL[R <: Ring](arg: ASTBt[R])(implicit n: repr[R]): Shift[R] = Shift(arg, right = false)
 

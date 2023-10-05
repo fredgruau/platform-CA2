@@ -187,16 +187,25 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
    *
    * @param r for computation of all the radius, collect the radius of identifier , plus a modifier making it precise for Edge and Face wether
    *          they are perimeter or radial
-   * @param t symbol table to be updated for paramR() to paramRR(Int) where int indicate the radius of result param
+   * @param t mutable symbol table to be updated for paramR() to paramRR(Int) where int indicate the radius of result param, so that we
+   *          know where to store it.
    * @return radius and modifier of expression
    */
   def radiusify2(r: TabSymb[Int], t: TabSymb[InfoNbit[_]]): Int =
     this.asInstanceOf[AST[_]] match {
       case Read(s) => t(s).k match {
         case ParamD() | LayerField(_, _) => 0
-        case MacroField() => r(s) //we should have computed it before, and stored it in r
+        case MacroField() => r(s) //we must have computed it before, and stored it in r
       }
     }
+
+  def radiusify3(r: TabSymb[Int], t: TabSymb[InfoNbit[_]]): (Int, ASTLt[L, R]) =
+    (this.asInstanceOf[AST[_]] match {
+      case Read(s) => t(s).k match {
+        case ParamD() | LayerField(_, _) => 0
+        case MacroField() => r(s) //we must have computed it before, and stored it in r
+      }
+    }, this)
 
   def radiusify(r: TabSymb[(Int, Option[Modifier])], t: TabSymb[InfoNbit[_]]): (Int, Option[Modifier]) =
     this.asInstanceOf[AST[_]] match {

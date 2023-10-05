@@ -49,7 +49,7 @@ trait DagNode[+T <: DagNode[T]] {
 
   /** * @param t symbol Table needed to check if variable is a parameter
    *
-   * @return code of boolean instruction, adds a [i] if isParam is true, or i-1 if result parameter of radius 1
+   * @return code of boolean instruction, adds a [i] if isParam is true, or [i-1] if result parameter of radius 1
    */
   def toStringParam(t: TabSymb[InfoType[_]]): String = {
     if (t != null) if (isInstanceOf[AST[_]])
@@ -61,7 +61,9 @@ trait DagNode[+T <: DagNode[T]] {
           val nameRad = radicalOfVar2(name)
           if (t(nameRad).k.isParam)
             if (t(nameRad).k.isRadius1)
-              return name + "[i-1]=" //Radius can be either 0 or 1
+              return name + "[i-1]=" //Radius can be either 0 or 1 here we should also take into account the store.
+            else if (t(nameRad).k.isRadiusm1)
+              return name + "[i+1]=" //Radius can be either 0 or 1 here we should also take into account the store.
             else return name + "[i]="
         case _ => toString
       };
@@ -70,11 +72,11 @@ trait DagNode[+T <: DagNode[T]] {
 
   /**
    * @param t
-   * @return java code ready to be compiled by javac
-   *         in case of a boolean affect, we need to wrap it with parenthesis
    * @param PARL left partenthesis or space, to be inserted at next recursive call for binop or shift (shift is implemented like a binop)
    * @param PARR left partenthesis or space, to be inserted at next recursive call for binop or shift (shift is implemented like a binop)
-   * @return the expression where unary operator like - or ~ precede the expression on which they apply, so that we can combine
+   * @return java code ready to be compiled by javac
+   *         in case of a boolean affect, we need to wrap it with parenthesis
+   *         the expression where unary operator like - or ~ precede the expression on which they apply, so that we can combine
    *         them without parenthesis, and therefore much less parenthesis, and much more readable expression
    */
 
@@ -86,42 +88,13 @@ trait DagNode[+T <: DagNode[T]] {
       case 0 => " " + toStringParam(t) + " "
       case 1 => if (isShift(toString))
         "" + PARL + inputNeighbors.head.toStringTreeInfix(t, "(", ")") + " " + toString + " " + neighbor1or1(t) + PARR //parenthesis
-      else if (inputNeighbors.head.isInstanceOf[AffBool])
+      else if (inputNeighbors.head.isInstanceOf[AffBool]) //here we need to take into account delays
         " " + toString + "(" + inputNeighbors.head.toStringTreeInfix(t) + ")" //toString comes before the parameter
       else " " + toStringParam(t) + " " + inputNeighbors.head.toStringTreeInfix(t)
       case 2 => "" + PARL + inputNeighbors.head.toStringTreeInfix(t, "(", ")") + " " + toString + " " + neighbor1or1(t) + PARR //parenthesis
 
     }
   }
-
-  /*def toStringTreeInfixOld(t: TabSymb[InfoType[_]]): String = {
-    assert {  inputNeighbors.size <= 2   }
-    inputNeighbors.size match {
-      case 0 => " " + toStringParam(t) + " "
-      case 1=> if (isShift(toString))
-        inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1(t)
-      else if(inputNeighbors.head.isInstanceOf[AffBool])
-        " " + toString+"("+inputNeighbors.head.toStringTreeInfix(t) + ")" //toString comes before the parameter
-        else " " + toStringParam(t) + " "+inputNeighbors.head.toStringTreeInfix(t)
-      case 2 =>     inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1(t)
-
-    }
-  }
-
-  /** the suffix Par means that we will now add parenthesis unless  */
-  def toStringTreeInfixParOld(t: TabSymb[InfoType[_]]): String = {
-    assert {     inputNeighbors.size <= 2   }
-    inputNeighbors.size match {
-      case 0 => " " + toStringParam(t) + " " //no need to add parenthesis finally
-      case 1 => if (isShift(toString))  //its like a bin op  we do add parenthesis
-        "(" +inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1(t)+")"
-                else if (inputNeighbors.head.isInstanceOf[AffBool])  //we have got an affectation v1 = needs to be separated,  v2 or (v1 =  ....)
-        " " + toString + "(" + inputNeighbors.head.toStringTreeInfix(t) + ")" //toString comes before the parameter
-                else " " + toStringParam(t) + " " + inputNeighbors.head.toStringTreeInfix(t) //noneed for parenthesis,finally
-      case 2 => "(" +inputNeighbors.head.toStringTreeInfixPar(t) + " " + toString + " " + neighbor1or1(t)+")"
-
-    }
-  }*/
 
   /**
    * Tries to find a cycle

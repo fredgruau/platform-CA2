@@ -33,8 +33,10 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
   val medium: Medium = arch match {
     case "christal" => Medium(nbLineCA, nbColCA, controller.CAwidth, this) //default medium is christal
   }
-  /** Memory of the CA, it is being rewritten by the running thread, not touched if being displayed */
-  val mem: Array[Array[Int]] = Array.ofDim[Int](controller.progCA.CAmemWidth(), medium.nbInt32CAmem)
+  /** Memory of the CA, it is being rewritten by the running thread, not touched if being displayed
+   * we add 1 to the column size  medium.nbInt32CAmem +1 so as to avoid catching ArrayIndexOutOfBoundsException
+   * when  we write at i+1 instead of i, (we do that in order to avoid memorizing register introudced for tm1s, and save local memory */
+  val mem: Array[Array[Int]] = Array.ofDim[Int](controller.progCA.CAmemWidth(), medium.nbInt32CAmem + 1)
 
   /** associated pannel */
   var pannel: CApannel = null //to be set latter due to mutual recursive definition
@@ -54,12 +56,12 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
   private def initMemCA(): Unit = {
     //for (layerName: String <- controller.progCA.directInit()) {
     resetMem()
-    for (layerName: String <- controller.progCA.init().keys) {
+    for (layerName: String <- controller.progCA.init().keys) { //iterate over the layers to be initalized
       /** fields layerName's components */
-      val memFields2Init: Seq[Array[Int]] = memFields(layerName)
+      val memFields2Init: Seq[Array[Int]] = memFields(layerName) //gets the memory plane
       val initNameFinal = initName.getOrElse(layerName, controller.initName(layerName)) //either it is the root layer or we find it in env
       val initMethod: Init = medium.initSelect(initNameFinal, controller.locusOfDisplayedOrDirectInitField(layerName))
-      initMethod.init(memFields2Init.toArray)
+      initMethod.init(memFields2Init.toArray) //we pass the locus here, several init are reused with different locus, such as def/center/yaxis
     }
   }
 

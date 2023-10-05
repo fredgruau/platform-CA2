@@ -42,6 +42,10 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
 
   def radiusify2(radius: TabSymb[Int], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {}
 
+  def radiusify3(radius: TabSymb[Int], tSymbVar: TabSymb[InfoNbit[_]]): Instr = {
+    null
+  } //implemented only in  Affect
+
   def radiusify(radius: TabSymb[(Int, Option[Modifier])], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {}
 
   protected def show(x: Option[Locus]) = x match {
@@ -468,7 +472,7 @@ case class ShiftInstr(name: String, shifted: String, perm: Array[Int]) extends I
 }
 
 
-/** allows to remove tm1s by storing latter. */
+/** allows to remove tm1s by storing later. */
 case class Store(name: String, delay: Int, exp: AST[_]) extends Instr {
   override def toString(): String = pad(name, 25) + "Store" + delay + " " + exp.toStringTree + show(locus) + show2(locus2)
 
@@ -481,7 +485,7 @@ case class Store(name: String, delay: Int, exp: AST[_]) extends Instr {
 
   override def usedVars(): HashSet[String] = exp.symbolsExcepLayers
 
-  override def unfoldInt(t: TabSymb[InfoNbit[_]]): List[Instr] = List() //we do not need it
+  override def unfoldInt(t: TabSymb[InfoNbit[_]]): List[Instr] = List() //we do not need it, here it is forgotten!!!!
 }
 
 
@@ -648,18 +652,25 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
    * @param tSymbVar
    */
   override def radiusify2(radius: TabSymb[Int], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {
-
-    val r = exp.asInstanceOf[ASTLt[_ <: Locus, _ <: Ring]].radiusify2(radius, tSymbVar)
+    val r: Int = exp.asInstanceOf[ASTLt[_ <: Locus, _ <: Ring]].radiusify2(radius, tSymbVar)
     radius.addOne(name -> r) //we store radius of identifier for future use.
     if (tSymbVar(name).k.isParamR)
-      tSymbVar.addOne(name -> tSymbVar(name).radiusify(r)) //for paramR, we modify the symbol table
+      tSymbVar.addOne(name -> tSymbVar(name).radiusify2(r)) //for paramR, we modify the symbol table
+  }
+
+  override def radiusify3(radius: TabSymb[Int], tSymbVar: TabSymb[InfoNbit[_]]): Instr = {
+    val (r, newExp) = exp.asInstanceOf[ASTLt[_ <: Locus, _ <: Ring]].radiusify3(radius, tSymbVar)
+    radius.addOne(name -> r) //we store radius of identifier for future use.
+    if (tSymbVar(name).k.isParamR)
+      tSymbVar.addOne(name -> tSymbVar(name).radiusify3(r)) //for paramR, we modify the symbol table
+    new Affect(name, newExp)
   }
 
   override def radiusify(radius: TabSymb[(Int, Option[Modifier])], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {
     val (r, modifier): (Int, Option[Modifier]) = exp.asInstanceOf[ASTLt[_ <: Locus, _ <: Ring]].radiusify(radius, tSymbVar)
     radius.addOne(name -> (r, modifier)) //we store radius of identifier for future use.
     if (tSymbVar(name).k.isParamR)
-      tSymbVar.addOne(name -> tSymbVar(name).radiusify(r)) //for paramR, we modify the symbol table
+      tSymbVar.addOne(name -> tSymbVar(name).radiusify2(r)) //for paramR, we modify the symbol table
   }
 
   /**
@@ -699,7 +710,12 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
 }
 }
 
-
+object CallProc {
+  def apply(s: String, p: DataProg[InfoNbit[_]]): Instr = {
+    val call = CallProc(s, p.paramR, p.paramD.map(x => readLR(x, repr(p.tSymbVar(x).t).asInstanceOf[repr[(_ <: Locus, _ <: Ring)]])))
+    call
+  }
+}
 object Instr {
 
   val isBoolean = (r: Instr) => a(r).exp.asInstanceOf[ASTBg].ring == B()
@@ -741,7 +757,7 @@ object Instr {
   //  def apply(s: String, p: ProgData2): Instr = CallProc(s, p.paramR,
   //    p.paramD.map(x => read(x, repr(p.tSymbVar(x).t).asInstanceOf[repr[(_ <: Locus, _ <: Ring)]])))
 
-  /**
+  /*/**
    * @param s name of function
    * @param p the function itself
    * @return call to that function. effective parameter's name, are identical to formal.
@@ -749,7 +765,7 @@ object Instr {
   def apply(s: String, p: DataProg[InfoNbit[_]]): Instr = {
     val call = CallProc(s, p.paramR, p.paramD.map(x => readLR(x, repr(p.tSymbVar(x).t).asInstanceOf[repr[(_ <: Locus, _ <: Ring)]])))
     call
-  }
+  }*/
 
   /**
    *

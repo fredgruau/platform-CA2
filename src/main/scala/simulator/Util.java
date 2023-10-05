@@ -76,10 +76,19 @@ public class Util {
      * @param src  source array
      * @param dest destination array toward which we duplicate
      */
-    public static void copy(int[][] src, int[][] dest) {
+    public static void copyOld(int[][] src, int[][] dest) {
         assert (src.length == dest.length);
         for (int i = 0; i < src.length; i++)
             copy(src[i], dest[i]);
+    }
+
+    public static void copy(int[][] src, int[][] dest) {
+        assert (src.length <= dest.length);
+        assert (dest.length % src.length == 0);
+        int rapport = dest.length / src.length;
+        for (int i = 0; i < src.length; i++)
+            for (int j = 0; j < rapport; j++)
+                copy(src[i], dest[i * rapport + j]);
     }
 
     /**

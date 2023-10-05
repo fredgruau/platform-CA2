@@ -22,9 +22,18 @@ sealed class VarKind extends Comparable[VarKind] {
     case _ => false
   }
 
+  def isParamD = this match {
+    case ParamD() => true
+    case _ => false
+  }
   //def isParam = isInstanceOf[ParamRR] || isInstanceOf[ParamD] || isInstanceOf[ParamR]
   def isRadius1: Boolean = this match {
     case ParamRR(1) => true
+    case _ => false
+  }
+
+  def isRadiusm1: Boolean = this match {
+    case ParamRR(-1) => true
     case _ => false
   }
 
@@ -42,8 +51,9 @@ sealed class VarKind extends Comparable[VarKind] {
 object VarKind {
   /** puts an order so as to sort */
   def rank(v: VarKind) = v match {
-    case ParamD() => 1
-    case ParamR() => 2
+    case ParamD() => 0
+    case ParamR() => 1
+    case ParamRR(-1) => 2
     case ParamRR(0) => 3
     case ParamRR(1) => 4
     case ParamRR(2) => 5
@@ -70,7 +80,8 @@ object VarKind {
   /** fields which are returned by a macro, */
   final case class ParamR() extends VarKind
 
-  /** fields which are returned by a macro, with the radius included (we need to know the radius only for those, ) */
+  /** fields which are returned by a macro, with the radius included (we need to know the radius only for those,
+   * in order to know wether we store at i or i-1 ) */
   final case class ParamRR(radius: Int) extends VarKind
 
   /** the famous data-result param. It could be used in the specific case when a layer is passed and updated by the same macro,

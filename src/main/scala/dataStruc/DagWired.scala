@@ -325,7 +325,7 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
   }
 
   /**
-   * @param rewrite    each instruction into instruction,
+   * @param rewrite each instruction into instruction, in the order of visitedL which is reverse order.
    * @param otherInstr more instructions to be be added
    * @return Like propagate instead we work only on visitedL, because we want to keep the schedule.
    * */
@@ -335,6 +335,16 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
     insertBeforeFirstUse(otherInstr)
   }
 
+  /**
+   * @param rewrite    each instruction into instruction, in reverse order of visitedL, which is therefore the natural topological order.
+   * @param otherInstr more instructions to be be added
+   * @return Like propagate instead we work only on visitedL, because we want to keep the schedule.
+   * */
+  def propagateUnitKeepSchedulereverse(rewrite: T => T, otherInstr: List[T] = List()): List[T] = {
+    visitedL = visitedL.reverse.map(rewrite).reverse
+    WiredInOut.setInputAndOutputNeighbor(visitedL ::: otherInstr)
+    insertBeforeFirstUse(otherInstr)
+  }
   /**
    * @param tm1Instrs instructions affecting a tm1 variable (set at the end of the preceding loop)
    *                  they should be inserted within the existing instruction

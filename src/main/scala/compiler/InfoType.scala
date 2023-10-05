@@ -12,6 +12,9 @@ import VarKind.{MacroField, ParamRR, StoredField}
  */
 class InfoType[+T](val t: T, val k: VarKind) {
   override def toString: String = t.toString + " " + k.toString
+  //def radiusify3(r: Int): InfoType[_] = new InfoType(t, ParamRR(r))
+
+
 
   val repr1 = new repr(t)
 
@@ -58,8 +61,15 @@ object InfoNbit {
  */
 class InfoNbit[+T](override val t: T, override val k: VarKind, val nb: Int) extends InfoType(t, k) {
   def density = locus.density * nb
-  def radiusify(r: Int): InfoNbit[_] = new InfoNbit(t, ParamRR(r), nb)
 
+  def radiusify2(r: Int): InfoNbit[_] = new InfoNbit(t, ParamRR(r), nb)
+
+  def radiusify3(r: Int): InfoNbit[_] = new InfoNbit(t, ParamRR(r), nb)
+
+  def decrementRadius(): InfoNbit[_] = {
+    val formerRadius = k.asInstanceOf[ParamRR].radius
+    new InfoNbit(t, ParamRR(formerRadius - 1), nb)
+  }
   /** sets varKind to macroField */
   def macroFieldise: InfoNbit[_] = new InfoNbit(t, MacroField(), nb)
 

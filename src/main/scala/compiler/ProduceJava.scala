@@ -27,7 +27,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
     val codeLoops: iTabSymb[String] = leafLoops.map({ case (k, v) => (k -> v.asInstanceOf[ProduceJava[U]].javaCodeCAloop(k)) }) //retrieves all the CA loops
     val (codeLoopsMacro, codeLoopsAnonymous) = codeLoops.partition({ case (k, v) => !k.startsWith("_fun") }) //anonymous functions start with _fun
     val codeMain: String = javaCodeMain(codeLoopsAnonymous.values.mkString("\n")).replace('#', '$'); //'#' is not a valid char for id
-    val nameCA = paramR(0) + "CA" //name of the produced java file is equal to the name of the layer wrapping around all the compiled prog
+    val nameCA = radicalOfVar(paramR(0)) + "CA" //name of the produced java file is equal to the name of the layer wrapping around all the compiled prog
 
     val nameDirCompilCA = "src/main/scala/compiledCA/"
     val nameCAjava = nameCA.capitalize + ".java"
@@ -166,7 +166,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
     }
     //we use the same template technique as the one used for CAloops
     replaceAll("src/main/scala/compiledCA/template/templateCA.txt", Map(
-      "NAMECA" -> paramR(0).capitalize,
+      "NAMECA" -> radicalOfVar(paramR(0)).capitalize,
       "MEMWIDTH" -> ("" + mainHeapSize), //TODO on calcule pas bien la memwidth)
       "DECLNAMED" -> {
         /** code that declares all the named arrays 1D and 2D */
@@ -219,7 +219,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
       "COPYLAYER" -> {
         def anchorNamed(offset: Map[String, List[Int]]): String = {
           val (offset1D, offset2D) = offset.partition(x => x._2.size == 1)
-          "int[]" + offset1D.map(anchorOneVar(_)).mkString(",") + ";\n" +
+          (if (offset1D.nonEmpty) "int[]" + offset1D.map(anchorOneVar(_)).mkString(",") + ";\n" else "") +
             (if (offset2D.nonEmpty) "int[][]" + offset2D.map(anchorOneVar(_)).mkString(",") + ";\n" else "")
         }
 
@@ -313,11 +313,16 @@ trait ProduceJava[U <: InfoNbit[_]] {
         case "show" => val callCodeArg = radicalOfVar(call.usedVars().toList.head) //we take the radical for diminishing the number of parameters
           theDisplayed += callCodeArg //sideeffect, update theDisplayed. display has allways a single arg which is the field to be displayed
           callCode += callCodeArg //in fact we could supress calls to show, we leave it, so that we can check those in the compiled java.
-        case "copy" | "memo" => callCode += params.map(radicalOfVar2(_)).mkString(",") //copy and memo have the same effect
+        case "copy" | "memo" =>
+          val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet() ++ params.map(radicalOfVar(_))
+          callCode += l.toList.mkString(",")
+
+
+        //copy and memo have the same effect
         case "bug" => val nameBug = radicalOfVar(call.exps.head.asInstanceOf[Read[_]].which) //on apelle bug avec un read, c'est obligé
           val locusBug = tSymbVar(nameBug).locus.toString.dropRight(2) //dropRight enleve les deux parenthéses
           paramCode = List(nameBug, "llbug" + locusBug, "\"" + nameBug + "\"", "bugs").reverse
-        case _ => //we now consided a call to a real CAloop
+        case _ => //we now consider a call to a real CAloop
           paramCode = List("p") //this is a method PrShift that does a preliminary shift if radius is >0yyy
           val localprog = subDataProgs(call.procName) //gets the called dataProg
           for ((spatialType, nbit) <- localprog.spatialSig zip localprog.nbitSig) { //retrieve spatial type and  bitSize   of parameters.
@@ -352,7 +357,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
             paramCode = loops.toList ++ paramCode
       }
       callCode += paramCode.reverse.mkString(",") + ");"
-      if (!callCode.equals(lastCallCode)) theCallCode = callCode :: theCallCode //in case of copy or memo of integer, several times the same call code will be generated
+      if (!callCode.equals(lastCallCode))
+        theCallCode = callCode :: theCallCode //in case of copy or memo of integer, several times the same call code will be generated
       lastCallCode = callCode //in which  case we keep only the first one by ignoring the following
     }
     (theCallCode, decompositionLocus, theDisplayed)

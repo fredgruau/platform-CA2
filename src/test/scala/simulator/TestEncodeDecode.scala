@@ -78,7 +78,16 @@ class TestEncodeDecode extends FunSuite with BeforeAndAfter {
     m.decode(lCAmem, lCAoutput)
     assert(list(lCAinput) == list(lCAoutput))
   }
-
+  test("encodeDecode<=32 camem plus grand") {
+    val lCAinput = Array.ofDim[Boolean](12, 14)
+    randomFill(lCAinput)
+    val lCAoutput = Array.ofDim[Boolean](12, 14)
+    val lCAmem = Array.ofDim[Int](10)
+    val m = Medium(12, 14, 30, null)
+    m.encode(lCAinput, lCAmem)
+    m.decode(lCAmem, lCAoutput)
+    assert(list(lCAinput) == list(lCAoutput))
+  }
   test("encodeDecodeSingleInt") {
     val lCAinput = Array.ofDim[Boolean](4, 6)
     randomFill(lCAinput)
@@ -112,6 +121,16 @@ class TestEncodeDecode extends FunSuite with BeforeAndAfter {
     assert(list(lCAoutput) == list(lCAinput))
   }
 
+  /** a different algorithm is used, when the number of column is > 32 Plus camem plus gran */
+  test("encodeDecodeInterleavedRorate>32 mem plus grand") {
+    val lCAinput = Array.ofDim[Boolean](10, 60)
+    randomFill(lCAinput)
+    val lCAoutput = Array.ofDim[Boolean](10, 60)
+    val lCAmem = Array.ofDim[Int](24)
+    encodeInterleavRot(10, 60, lCAinput, lCAmem)
+    decodeInterleavRot(10, 60, lCAmem, lCAoutput)
+    assert(list(lCAoutput) == list(lCAinput))
+  }
 
   test("exchangeOand31") {
     val input = -4 >>> 1 //01111111111111111111111111111110

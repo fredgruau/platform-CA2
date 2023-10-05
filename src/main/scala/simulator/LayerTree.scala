@@ -25,7 +25,7 @@ class LayerTree(val xmlLayerTree: Node, val controller: Controller) extends Tree
     peer.setShowsRootHandles(true) //marche pas
   }
 
-  hideRoot
+  //hideRoot
 
   peer.addTreeExpansionListener(this) //we had to resort to directly use javax swing for listening to expansion event, because we failed to use scala swing
   model = TreeModel(xmlLayerTree)(_.child filterNot (isSpurious(_))) //text are also nodes, we do not want those
@@ -43,9 +43,9 @@ class LayerTree(val xmlLayerTree: Node, val controller: Controller) extends Tree
       else fileIcon //those are not yet displayed field
     (icon, reducedText(extractNodeText(n))) //we also display layers or field's name
   }
-  hideRoot
+  //hideRoot
   listenTo(mouse.clicks)
-  hideRoot
+  //hideRoot
   reactions += {
     case MouseClicked(_, pp, _, _, _) =>
       val p = peer.getPathForLocation(pp.x, pp.y) //we resorted to that Jtree utility that allows to retrieve the node clicked
@@ -56,7 +56,7 @@ class LayerTree(val xmlLayerTree: Node, val controller: Controller) extends Tree
       }
   }
   expandExpandedDescendant(xmlLayerTree, Vector(xmlLayerTree)) //exands already expanded node. Vector(n) is the path to n.
-  hideRoot
+  // hideRoot
 
   private def isLayer(n: Node): Boolean = n.label == "layer" //being a layer or not is determined by the label in the xml file
 

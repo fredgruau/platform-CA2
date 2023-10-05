@@ -43,6 +43,8 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
   extends Dag[Instr](generators) //reconstruct the whole Dag
     with DagWired[Instr] {
 
+  /** all the variables used by the program */
+  def usedVars = new HashSet[String]() ++ visitedL.flatMap(_.usedVars()).toList.toSet
   def imposeSchedule(scheduled: List[Instr]) = {
     visitedL = scheduled.reverse
   }
@@ -110,8 +112,6 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
       this
     } //dagdag should be recomputed because the expressions have changed
     else propagateUnitKeepGenerators(rewrite, newAffect) //computes input and output neighbors
-
-
   }
 
 

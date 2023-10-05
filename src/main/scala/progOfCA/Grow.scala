@@ -25,9 +25,29 @@ class GrowF extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
 }
 
 class GrowEF extends Layer[(E, B)](1, "global") with ASTLt[E, B] {
-  val neighbFF: BoolF = exist(this); //no use of defFe
+  // val neighbFF: BoolF = exist(this); //no use of defFe
+
+  val broadcasted = f(this) //step 1 is broadcast
+  val transfered = transfer(broadcasted) //step 2 is transfer
+  val neighbFF = orRB(transfered) //(n,m,d) yzeté implicit killerest
+  show(broadcasted)
+  show(transfered)
   show(neighbFF) //uses defEf
   override val next: BoolE = exist(neighbFF) //  make use of defVe brough to us implicitely,nb if overrid is not written, it does not work!
+  show(this) //shown field will get the name "grow", because we set the name of root to arg(0).lowercase
+  show(next)
+}
+
+class GrowEV extends Layer[(E, B)](1, "global") with ASTLt[E, B] {
+  // val neighbFF: BoolF = exist(this); //no use of defFe
+
+  val broadcasted = v(this) //step 1 is broadcast
+  val transfered = transfer(broadcasted) //step 2 is transfer
+  val nv: BoolV = orRB(transfered) //(n,m,d) yzeté implicit killerest
+  show(broadcasted)
+  show(transfered)
+  show(nv) //uses defEf
+  override val next: BoolE = exist(nv) //  make use of defVe brough to us implicitely,nb if overrid is not written, it does not work!
   show(this) //shown field will get the name "grow", because we set the name of root to arg(0).lowercase
   show(next)
 }
