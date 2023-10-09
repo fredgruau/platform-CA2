@@ -32,7 +32,8 @@ import scala.swing.Swing.pair2Dimension
  *
  */
 abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val boundingBox: Dimension,
-                      val vertice: pointLines, val neighbors: Array[Array[Array[(Int, Int)]]]) {
+                      val vertice: pointLines, val neighbors: Array[Array[Array[(Int, Int)]]])
+  extends InitSelect {
   /** number of Int32 needed for the boolean of one bit plane  * */
   def nbInt32: Int
 
@@ -222,7 +223,7 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
           }
       res
     }
-  locusPlane += T(E(), F()) -> {
+  locusPlane += T(E(), F()) -> { //bugici
     val res = Array.ofDim[Option[Vector2D]](6, nbLineCA, nbColCA) //first is down, second is up
     for (i <- 0 until nbLineCA) for (j <- 0 until nbColCA) {
       def face(d: Int, i: Int, j: Int) = if (inside(i, j)) locusPlane(F())(d)(i)(j) else None //computes the four faces framing the three edges
@@ -425,163 +426,8 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
     res
   }
 
-  //geometric primitive fields used to construct initial configurations
-  private val origin = new Vector2D(0, 0)
-  private val center = new Vector2D(nbLineCA / 2, nbColCA / 2)
-
-  /** different possible inits, non static fields of the medium class, because they use data from the mediium
-   * be it only the number of lines and columns.
-   * declared with lazy to spare memory, since only one or two will be instanciated
-   * make use of primitives fields declared in medium to simplify the programming
-   * todo  there is a pb in that we need different init field, in case of random init.=> no val
-   *
-   * contains material for creating "Init" object which can initialize a layer
-   * sub class of medium because for amorphous medium we will need to access the topology of the medium
-   *
-   * @param locus locus of field being initialized
-   * @param nbit  equals to 1 now, could be allowed to become >1 if we make Init for integer layer.
-   */
-
-  private lazy val centerInit: InitMaald = new InitMaald(1) {
-    setBoolVField(center)
-  }
-  private lazy val yaxisInit: InitMaald = new InitMaald(1) {
-    for (i <- 0 until nbLineCA) setBoolVField(i, 0)
-  }
-  private lazy val xaxisInit: InitMaald = new InitMaald(1) {
-    for (j <- 0 until nbColCA) setBoolVField(0, j)
-  }
-  private lazy val zeroInit: InitMaald = new InitMaald(1) {} //nothing to do, the boolV field would be zero by default.
-  private lazy val dottedBorderInit: InitMold = new InitMold(V(), 1) {
-    for (i <- 0 until nbLineCA) if (i % 2 == 0) {
-      setBoolVField(i, 0); setBoolVField(i, nbColCA - 1)
-    }
-    for (i <- 0 until nbColCA) if (i % 2 == 0) {
-      setBoolVField(0, i); setBoolVField(nbLineCA - 1, i)
-    }
-  }
-  private lazy val borderInit: InitMaald = new InitMaald(1) {
-    for (i <- 0 until nbLineCA) {
-      setBoolVField(i, 0); setBoolVField(i, nbColCA - 1)
-    }
-    for (i <- 0 until nbColCA) {
-      setBoolVField(0, i); setBoolVField(nbLineCA - 1, i)
-    }
-  }
-  private lazy val randomInit: InitMold = new InitMold(V(), 1) {
-    override def init(CAmemFields: Array[Array[Int]]): Unit = { // init is redefined becase instead of encode, we write into the CA
-      for (lCAmem: Array[Int] <- CAmemFields) { //dot iteration, we iterate on the dot product of the two ranges
-        for (i <- 0 until lCAmem.size) lCAmem(i) = env.rand.nextInt()
-      }
-    }
-  }
-  /** the def fields have to be generated for each locus todo compute it when we init, on the fly, in order to save memory */
-  private val defInit: HashMap[Locus, InitMold] = HashMap() ++ List(E(), V(), T(V(), E()), T(V(), F()), T(F(), V()), T(E(), F()), T(F(), E())).map((l: Locus) =>
-    l -> new InitMold(l, 1) {
-      for (d <- 0 until l.density)
-        for (i <- 0 until nbLineCA)
-          for (j <- 0 until nbColCA)
-            if (locusPlane(l)(d)(i)(j).isDefined)
-              setMemField(d, i, j)
-    }
-    //we have to iterate on the 6 memFields, and check on line points to see if the neighbor is available.
-  )
-
-  /**
-   *
-   * @param initMethodName indicates which init is to be  applied, based on this medium
-   * @return an  "Init" which can initialize a layer, because of lazy, this init is created once and then reused
-   */
-  def initSelect(initMethodName: String, l: Locus): Init = {
-    val finalInitMethodName = if (initMethodName == "global") env.controller.globalInitList.selection.item //currently selected init method
-    else initMethodName
-    finalInitMethodName match {
-      case "0" => zeroInit
-      case "center" => centerInit
-      case "debug" => zeroInit
-      case "def" => defInit(l) //here we must take into account the locus
-      case "xaxis" => xaxisInit
-      case "yaxis" => yaxisInit
-      case "dottedBorder" => dottedBorderInit
-      case "border" => borderInit
-      case "random" => randomInit
-      case "false" => zeroInit
-    }
-  }
-
-  /** contains material used for InitMaald */
-  trait BoolVField {
-    val boolVField: Array[Array[Boolean]] = Array.ofDim[Boolean](nbLineCA, nbColCA)
-
-    /**
-     *
-     * @param p a point within the medium
-     * @return set the corresponding value of the boolVfield being initialized
-     */
-    def setBoolVField(p: Vector2D): Unit = setBoolVField(p.x.toInt, p.y.toInt)
-
-    def setBoolVField(i: Int, j: Int): Unit = boolVField(i)(j) = true
-  }
-
-  /** initalize all the scalar component of a locus in the same way */
-  class InitMaald(val nbit: Int) extends Init with BoolVField {
-    assert(nbit == 1, "we assume that we do not initalize int fields, only boolean fields")
-
-    /** fills the set of memory fields corresponding to a CA field, according to a given init wished for
-     *
-     * @param CAmemFields memory fields to fill
-     */
-    override def init(CAmemFields: Array[Array[Int]]): Unit = {
-      for (lCAmem: Array[Int] <- CAmemFields) { //dot iteration, we iterate on the dot product of the two ranges
-        encode(boolVField, lCAmem)
-      }
-    }
-  }
-
-  class InitMold(val locus: Locus, val nbit: Int) extends Init {
-    assert(nbit == 1, "we assume that we do not initalize int fields, only boolean fields")
-    /** use as a tmp list of arrays of booleans, to more  easily computes the initial values */
-    val memFields: Array[Array[Array[Boolean]]] = Array.ofDim[Boolean](locus.density * nbit, nbLineCA, nbColCA)
-    /** simplification for the common case which is a boolV field */
-    val boolVField: Array[Array[Boolean]] = if (locus == V()) memFields(0) else null
-
-    /**
-     * @param CAmemFields memory fields to fill
-     * fills the set of memory fields corresponding to a CA field, according to a given init wished for
-     */
-    override def init(CAmemFields: Array[Array[Int]]): Unit = {
-      assert(CAmemFields.length == memFields.length, "count of CA bit planes does not corresponds " + CAmemFields.length + " " + memFields.length)
-      for ((lCA, lCAmem: Array[Int]) <- memFields zip CAmemFields) { //dot iteration, we iterate on the dot product of the two ranges
-        encode(lCA, lCAmem)
-      }
-    }
 
 
-    def setMemField(d: Int, i: Int, j: Int): Unit = memFields(d)(i)(j) = true
-
-    def setAllMemField(i: Int, j: Int): Unit = {
-      for (f <- memFields)
-        f(i)(j) = true
-    }
-
-    /**
-     *
-     * @param p a point within the medium
-     * @return set the corresponding value of the boolVfield being initialized
-     */
-    def setAllMemField(p: Vector2D): Unit = setAllMemField(p.x.toInt, p.y.toInt)
-
-    /**
-     *
-     * @param p a point within the medium
-     * @return set the corresponding value of the boolVfield being initialized
-     */
-    def setBoolVField(p: Vector2D): Unit = setBoolVField(p.x.toInt, p.y.toInt)
-
-    def setBoolVField(i: Int, j: Int): Unit = boolVField(i)(j) = true
-
-
-  }
 
 }
 
@@ -786,3 +632,169 @@ trait Init {
   def init(CAmemFields: Array[Array[Int]]): Unit
 }
 
+/** adds to a medium, the possibity of choosing an init */
+trait InitSelect {
+  self: Medium =>
+
+  /**
+   *
+   * @param initMethodName name of the init chosen
+   * @param l              Locus of the layer to be initalized we do not need to pass a bit size, since integer field are usually initialized to zero
+   * @return an  "Init" which can initialize a layer, because of lazy, this init is created once and then reused
+   *         this is the only public method provided by the initSelect trait,
+   */
+  def initSelect(initMethodName: String, l: Locus): Init = {
+    val finalInitMethodName = if (initMethodName == "global") env.controller.globalInitList.selection.item //currently selected init method
+    else initMethodName
+    finalInitMethodName match {
+      case "0" => zeroInit
+      case "center" => centerInit
+      case "debug" => zeroInit
+      case "def" => defInit(l) //here we must take into account the locus, we use a method instead of a lazy val in order to save space
+      case "xaxis" => xaxisInit
+      case "yaxis" => yaxisInit
+      case "dottedBorder" => dottedBorderInit
+      case "border" => borderInit
+      case "random" => randomInit
+      case "false" => zeroInit
+    }
+  }
+
+  //geometric primitive fields used to construct initial configurations
+  private val origin = new Vector2D(0, 0)
+  private val center = new Vector2D(nbLineCA / 2, nbColCA / 2)
+
+  /** different possible inits, non static fields of the medium class, because they use data from the mediium
+   * be it only the number of lines and columns.
+   * declared with lazy to spare memory, since only one or two will be instanciated
+   * make use of primitives fields declared in medium to simplify the programming
+   * todo  there is a pb in that we need different init field, in case of random init.=> no val
+   *
+   * contains material for creating "Init" object which can initialize a layer
+   * sub class of medium because for amorphous medium we will need to access the topology of the medium
+   *
+   * @param locus locus of field being initialized
+   * @param nbit  equals to 1 now, could be allowed to become >1 if we make Init for integer layer.
+   */
+
+  private lazy val yaxisInit: InitMaald = new InitMaald(1) {
+    for (i <- 0 until nbLineCA) setBoolVField(i, 0)
+  }
+  private lazy val xaxisInit: InitMaald = new InitMaald(1) {
+    for (j <- 0 until nbColCA) setBoolVField(0, j)
+  }
+  private lazy val zeroInit: InitMaald = new InitMaald(1) {} //nothing to do, the boolV field would be zero by default.
+  private lazy val dottedBorderInit: InitMold = new InitMold(V(), 1) {
+    for (i <- 0 until nbLineCA) if (i % 2 == 0) {
+      setBoolVField(i, 0);
+      setBoolVField(i, nbColCA - 1)
+    }
+    for (i <- 0 until nbColCA) if (i % 2 == 0) {
+      setBoolVField(0, i);
+      setBoolVField(nbLineCA - 1, i)
+    }
+  }
+  private lazy val borderInit: InitMaald = new InitMaald(1) {
+    for (i <- 0 until nbLineCA) {
+      setBoolVField(i, 0); setBoolVField(i, nbColCA - 1)
+    }
+    for (i <- 0 until nbColCA) {
+      setBoolVField(0, i); setBoolVField(nbLineCA - 1, i)
+    }
+  }
+  private lazy val randomInit: InitMold = new InitMold(V(), 1) {
+    override def init(CAmemFields: Array[Array[Int]]): Unit = { // init is redefined becase instead of encode, we write into the CA
+      for (lCAmem: Array[Int] <- CAmemFields) { //dot iteration, we iterate on the dot product of the two ranges
+        for (i <- 0 until lCAmem.size) lCAmem(i) = env.rand.nextInt()
+      }
+    }
+  }
+
+  /** the def fields have to be generated for each locus. Hence, it is computed on the fly, in order to save memory */
+  private def defInit(l: Locus): Init = new InitMold(l, 1) {
+    for (d <- 0 until l.density)
+      for (i <- 0 until nbLineCA)
+        for (j <- 0 until nbColCA)
+          if (locusPlane(l)(d)(i)(j).isDefined)
+            setMemField(d, i, j)
+  }
+
+
+  /** contains material used for InitMaald */
+  trait BoolVField {
+    val boolVField: Array[Array[Boolean]] = Array.ofDim[Boolean](nbLineCA, nbColCA)
+
+    /**
+     *
+     * @param p a point within the medium
+     * @return set the corresponding value of the boolVfield being initialized
+     */
+    def setBoolVField(p: Vector2D): Unit = setBoolVField(p.x.toInt, p.y.toInt)
+
+    def setBoolVField(i: Int, j: Int): Unit = boolVField(i)(j) = true
+  }
+
+  /** initalize all the scalar component of a locus in the same way */
+  private class InitMaald(val nbit: Int) extends Init with BoolVField {
+    assert(nbit == 1, "we assume that we do not initalize int fields, only boolean fields")
+
+    /** fills the set of memory fields corresponding to a CA field, according to a given init wished for
+     *
+     * @param CAmemFields memory fields to fill
+     */
+    override def init(CAmemFields: Array[Array[Int]]): Unit = {
+      for (lCAmem: Array[Int] <- CAmemFields) { //dot iteration, we iterate on the dot product of the two ranges
+        encode(boolVField, lCAmem)
+      }
+    }
+  }
+
+  private class InitMold(val locus: Locus, val nbit: Int) extends Init {
+    assert(nbit == 1, "we assume that we do not initalize int fields, only boolean fields")
+    /** use as a tmp list of arrays of booleans, to more  easily computes the initial values */
+    val memFields: Array[Array[Array[Boolean]]] = Array.ofDim[Boolean](locus.density * nbit, nbLineCA, nbColCA)
+    /** simplification for the common case which is a boolV field */
+    val boolVField: Array[Array[Boolean]] = if (locus == V()) memFields(0) else null
+
+    /**
+     * @param CAmemFields memory fields to fill
+     *                    fills the set of memory fields corresponding to a CA field, according to a given init wished for
+     */
+    override def init(CAmemFields: Array[Array[Int]]): Unit = {
+      assert(CAmemFields.length == memFields.length, "count of CA bit planes does not corresponds " + CAmemFields.length + " " + memFields.length)
+      for ((lCA, lCAmem: Array[Int]) <- memFields zip CAmemFields) { //dot iteration, we iterate on the dot product of the two ranges
+        encode(lCA, lCAmem)
+      }
+    }
+
+
+    def setMemField(d: Int, i: Int, j: Int): Unit = memFields(d)(i)(j) = true
+
+    def setAllMemField(i: Int, j: Int): Unit = {
+      for (f <- memFields)
+        f(i)(j) = true
+    }
+
+    /**
+     *
+     * @param p a point within the medium
+     * @return set the corresponding value of the boolVfield being initialized
+     */
+    def setAllMemField(p: Vector2D): Unit = setAllMemField(p.x.toInt, p.y.toInt)
+
+    /**
+     *
+     * @param p a point within the medium
+     * @return set the corresponding value of the boolVfield being initialized
+     */
+    def setBoolVField(p: Vector2D): Unit = setBoolVField(p.x.toInt, p.y.toInt)
+
+    def setBoolVField(i: Int, j: Int): Unit = boolVField(i)(j) = true
+
+
+  }
+
+  private lazy val centerInit: InitMaald = new InitMaald(1) {
+    setBoolVField(center)
+  }
+}
