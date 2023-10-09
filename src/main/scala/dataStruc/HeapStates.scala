@@ -16,11 +16,12 @@ import scala.collection.mutable.ArrayBuffer
  * @tparam T
  */
 class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class for the mainRoot's adress
-                                     var heap: immutable.Vector[String] = Vector(null) //we put one value
+                                     var heap: immutable.Vector[String] = Vector(null), //we put one value
+                                     val shown: HashSet[String] = HashSet()
                                     ) extends Iterable[(Vector[String], iTabSymb[Int])] {
-  /** computes the set of variables live after each packet */
+  /** computes the Hashset of variables live after each packet */
   def livVars: List[HashSet[String]] = {
-    var liveVar: HashSet[String] = HashSet() //last liveVar are empty!
+    var liveVar: HashSet[String] = shown //shown variable are live at the end, because we need to access their state in order to display them
     var liveVars: List[HashSet[String]] = List(liveVar) //strings contained in buffer
     for (p <- packets.reverse) { //we compute live vars, starting from the end towards the beginning
       liveVar = liveVar.union(p.usedVars()).diff(p.names.toSet)
