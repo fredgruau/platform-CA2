@@ -12,6 +12,16 @@ import compiler._
 /** Contains the code of locus function used as a layer of  building blocks of small bits of spatial operators, compiled with optimal perf. */
 object Compute {
 
+  val incDef: Fundef1[(V, SI), (V, SI)] = {
+    val d = p[V, SI]("dis")
+    val newd = inc(d)
+    Fundef1("integer.inc", newd, d)
+  }
+
+  def callInc(d: IntV): IntV = {
+    new Call1(incDef, d) with IntV;
+  }
+
 
   /** From an IntV, computes the gradient sign, and the delta to be added to make it a distance
    * */

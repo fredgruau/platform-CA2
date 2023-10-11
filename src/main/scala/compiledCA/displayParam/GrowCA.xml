@@ -11,11 +11,14 @@
         </Layer>
     </expandedLayer>
     <colorOfField>
-        <layer color="0xFF00FF">
-            growNext
-        </layer>
         <layer color="0x80FF00">
             grow
+        </layer>
+        <layer color="0xFF0080">
+            growNeighbee
+        </layer>
+        <layer color="0xFF00FF">
+            growNext
         </layer>
     </colorOfField>
 </displayParam>

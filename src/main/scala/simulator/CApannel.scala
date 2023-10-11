@@ -87,28 +87,30 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
         if (v.sides.nonEmpty)
           g.drawPolygon(v.polygon)
     }
+    /*
 
-    def drawCAtestInitBoolV(initMethod: env.medium.InitMold, c: Color) = {
-      g.setColor(c)
-      for (i <- 0 until initMethod.boolVField.size)
-        for (j <- 0 until initMethod.boolVField(0).size)
-          if (initMethod.boolVField(i)(j)) {
-            val v: Vector2D = env.medium.vertice(i)(j).get
-            g.fillPolygon(env.medium.voronoi(v).polygon)
-          }
-    }
+        def drawCAtestInitBoolV(initMethod: env.medium.InitMold, c: Color) = {
+          g.setColor(c)
+          for (i <- 0 until initMethod.boolVField.size)
+            for (j <- 0 until initMethod.boolVField(0).size)
+              if (initMethod.boolVField(i)(j)) {
+                val v: Vector2D = env.medium.vertice(i)(j).get
+                g.fillPolygon(env.medium.voronoi(v).polygon)
+              }
+        }
 
-    def drawCAtestInit(initMethod: env.medium.InitMold, c: Color) = {
-      g.setColor(c)
-      for (d <- 0 until initMethod.locus.density)
-        for (i <- 0 until env.medium.nbLineCA)
-          for (j <- 0 until env.medium.nbColCA)
-            if (initMethod.memFields(d)(i)(j)) {
-              assert(env.medium.locusPlane(initMethod.locus)(d)(i)(j).isDefined, "defined is defined exactly when the point exists")
-              val v: Vector2D = env.medium.locusPlane(initMethod.locus)(d)(i)(j).get
-              g.fillPolygon(env.medium.voronoi(v).polygon)
-            }
-    }
+        def drawCAtestInit(initMethod: env.medium.InitMold, c: Color) = {
+          g.setColor(c)
+          for (d <- 0 until initMethod.locus.density)
+            for (i <- 0 until env.medium.nbLineCA)
+              for (j <- 0 until env.medium.nbColCA)
+                if (initMethod.memFields(d)(i)(j)) {
+                  assert(env.medium.locusPlane(initMethod.locus)(d)(i)(j).isDefined, "defined is defined exactly when the point exists")
+                  val v: Vector2D = env.medium.locusPlane(initMethod.locus)(d)(i)(j).get
+                  g.fillPolygon(env.medium.voronoi(v).polygon)
+                }
+        }
+    */
 
     def drawCAcolorVoronoi() = {
       //env.computeVoronoirColors() //painting allways need to recompute the colors, it would seem

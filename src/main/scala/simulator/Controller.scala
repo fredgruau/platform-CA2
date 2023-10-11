@@ -42,7 +42,17 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   val globalInitNames = fromXMLasList((globalInit \\ "inits").head).toArray
   val selectedGlobalInit: Int = xInt(globalInit, "selected", "@rank") //which is the starting value for global init
 
-
+  def invariantFieldOffset = {
+    val varOfMyCell: Array[String] = new Array(progCA.CAmemWidth)
+    for ((s, l) <- memFieldsOffset) //we check no more than two variables allocated on a given cell
+      for (offset <- l) {
+        assert(varOfMyCell(offset) == null, "two variabels " + varOfMyCell(offset) + " " + s + " in cell " + offset)
+        varOfMyCell(offset) = s
+      }
+    for (i <- 0 until varOfMyCell.length)
+      assert(varOfMyCell(i) != null, "unusedMemoryCell " + i)
+  };
+  invariantFieldOffset
   /** by default, if not supplied, number of lignes is 1/sqrt(2) number of columns */
   def CAheight: Int = {
     try {

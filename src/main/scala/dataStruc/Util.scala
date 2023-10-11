@@ -15,6 +15,16 @@ object Util {
     bw.close()
   }
 
+  def append2File(filePath: String, s: String): Unit = {
+    import java.nio.file.Files
+    import java.nio.file.Paths
+    val former = new String(Files.readAllBytes(Paths.get(filePath)))
+    val file = new File(filePath)
+    val bw = new BufferedWriter(new FileWriter(file))
+    bw.write(former.dropRight(1) + "\n" + s + "}") //we remove the former parenthesis, which has to be the last char,  and add a new one
+    bw.close()
+  }
+
   /**
    *
    * @param displayed a list of displayed fiedl,
@@ -54,11 +64,11 @@ object Util {
    *
    * @param root       internal node on which to start
    * @param father2son relates a father to its list of sons, within  chain caracterizing path to displayed fields.
-   * @return a parenthesized expression encoding the subtree starting at "roor". */
+   * @return a parenthesized expression encoding the subtree starting at "root". */
   def parenthesizedExp(root: String, father2son: Map[String, Set[String]]): String = {
-    if (!father2son.contains(root)) return "(" + root + ")"
+    if (!father2son.contains(root)) return root //"(" + root + ")"
     val sons = father2son(root)
-    root + sons.map(parenthesizedExp(_, father2son)).mkString("") + "." //the point is necessaru when the tree is reduced to a single root
+    root + "(" + sons.map(parenthesizedExp(_, father2son)).mkString(")(") + ")" // + "." //the point is necessaru when the tree is reduced to a single root
   }
 
   /**

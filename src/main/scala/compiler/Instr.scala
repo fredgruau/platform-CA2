@@ -357,7 +357,7 @@ case class CallProc(var procName: String, names: List[String], exps: List[AST[_]
 
     var resb: List[String] = List()
     for (nameInt <- names) {
-      val boolNames = deployInt(nameInt, t(nameInt).nb)
+      val boolNames = deployInt2(nameInt, t(nameInt))
       resb = resb ::: boolNames
       for (boolName <- boolNames) {
         if (!t.contains(boolName)) //if name is already in symbol table, adding it anew will replace a spatial type by a scalar type
@@ -684,7 +684,7 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
     val res =
       if (decall.ring == B()) List(Affect[B](name, decall.unfoldInt(t).head))
     else {
-      val boolNames = Instr.deployInt(name, t(name).nb) //affectation of int has not been tested yet
+        val boolNames = Instr.deployInt2(name, t(name)) //affectation of int has not been tested yet
       //updates t
       boolNames.map((nameb: String) => t.addOne(nameb -> new InfoNbit[B](B(), t(name).k, 1)))
       boolNames.zip(decall.asInstanceOf[ASTBt[_]].unfoldInt(t)).map(
@@ -821,9 +821,12 @@ object Instr {
    * @return list of names, one for each bit, obtained by appending the bit index.
    *         if name was already a boolean, nothing is changed.
    */
-  def deployInt(n: String, nb: Int): List[String] =
-    if (nb == 1) List(n)
-    else (0 to nb - 1).map(n + "#" + _).toList
+  def deployInt2(n: String, i: InfoNbit[_]): List[String] = {
+    if (i.t == B() || (i.t.isInstanceOf[Tuple2[_, _]] && i.ring == B()))
+      List(n)
+    else
+      (0 to i.nb - 1).map(n + "#" + _).toList
+  } //if nb=1, and locus is Int, we will still generate a deploy
 }
 
 

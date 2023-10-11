@@ -37,9 +37,13 @@ sealed abstract class Locus {
   def deploy(n: String): Array[String]
 
   /** does also a deploy between O and nbit-1 */
-  def deploy(n: String, nbit: Int): Array[String] =
-    if (nbit == 1) deploy(n) //on ajoute des $ d'abord
-    else deploy(n).flatMap((s: String) => (0 until nbit).map(s + "#" + _)) //on rajoute des # si c'est un entier
+  def deploy2(n: String, i: InfoNbit[_]): Array[String] = {
+    if (i.t == B() || (i.t.isInstanceOf[Tuple2[_, _]] && i.ring == B()))
+      deploy(n)
+    else
+      deploy(n).flatMap((s: String) => (0 until i.nb).map(s + "#" + _)) //on rajoute des # si c'est un entier
+
+  }
 
   /** encodes a neutral permutation with the right number of elements. */
   lazy val neutral: Array[Int] = Array.range(0, density) //we put lazy otherwise pb in initialization order

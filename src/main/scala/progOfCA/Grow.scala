@@ -11,7 +11,8 @@ import progOfmacros.SReduce._
 class Grow extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
   val neighbEE: BoolE = exist(this);
   show(neighbEE) //pas besoin de faire intervenir defVe
-  override val next: BoolV = exist(neighbEE) //  make use of defVe brough to us implicitely,nb if overrid is not written, it does not work!
+  override val next: BoolV = exist(neighbEE) //  make use of defVe brough to us implicitely,
+  // nb if overrid is not written, it does not work!
   show(this) //shown field will get the name "grow", because we set the name of root to arg(0).lowercase
   show(next)
 }
@@ -72,14 +73,14 @@ class GrowVor() extends Layer[(V, B)](1,"global") with ASTLt[V, B] with BlobV {
 }
 
 /** Code for compiling Grow */
-object Grow extends App {
+/*object Grow extends App {
   new Circuit[V, B]() {
 
     val grow = new Grow().asInstanceOf[ASTLt[V, B]];
 
     def computeRoot = grow //will be the name of this. if we print this in class Grow
   }.compile(hexagon)
-}
+}*/
 
 
 

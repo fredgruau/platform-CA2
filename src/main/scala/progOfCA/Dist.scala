@@ -8,14 +8,14 @@ import compiler._
 import progOfmacros.Compute._
 import progOfmacros.SReduce._
 
-/** adds a distance */
-trait Dddist {
-  self: Layer[(V, B)] =>
-  val dist = new Dist(self)
-  show(dist)
-  show(dist.tslope) //this show must appear in class Dist, otherwise, class Dist is not compiled because not used from SRC
-}
+class Tdis extends ConstLayer[V, B](1, "global") with Dddist {} //classe compilable
 
+trait Dddist {
+  self: Layer[(V, B)] => //adds a distance to a LayerV todo, it should also limit its movement
+  val diiist = new Dist(self);
+  show(diiist);
+  show(diiist.tslope)
+} //this show must appear here, otherwise, class Dist is not compiled because not used from SRC
 class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[V, SI] {
   val level: BoolV = elem(2, this);
   /*
@@ -29,31 +29,27 @@ class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[
    */
   val (tslope, delta) = slopeDelta(this)
   // val tslope = transfer(slope)
+
+
+  /*  //a decommenter un peu plus tard pour
+   1-tester les reduction T
+   2- mettre en place bugif
   val temp: BoolfV = clock(tslope)
   val temp2: BoolfV = anticlock(tslope)
-  // val vortex: BoolF = andR(transfer(xor(temp, temp2)));
-  val vortex: BoolF = andR(transfer(xor(temp, temp2))); //faudrait en faire une marco
-  vortex.setName("vortex")
+     val vortex: BoolF = andR(transfer(xor(temp, temp2))); //faudrait en faire une marco
+    vortex.setName("vortex");  bugif(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
+   */
+
   // val test= vortex |   andR(transfer(temp5)) ;  slope.bugif(test)
   // ceci provoque bien l'erreur attendue java.lang.RuntimeException: Debug exp is allzero=>not usable for compute
   //ca montre que debug ne peut etre réutilisé.
-  bugif(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
+
   val next: ASTLt[V, SI] = this + cond(source.asInstanceOf[BoolV], sign(-this), delta) //faudrait en faire une macro qui prends delta, source et dist et renvoie distNext
   // val temp: BoolfV = xorR2(transfer(slope)) ;  val vortex: BoolF = orR(transfer(temp));   bugif(vortex);
 }
 
-class Tdis extends ConstLayer[V, B](1, "global") with Dddist {}
-
-object Dist extends App {
-
-
-
-  val myInput: AST.Param[(V, B)] with ASTLt[V, B] = p[V, B]("input")
-  new Circuit[V, B]() { //pour l'instant on teste sans parametres
-    // new Circuit[V, SI](myInput) {
-    val seed = new ConstLayer[V, B](1, "global") with Dddist {}
-
-    def computeRoot: ASTLt[V, B] = seed
-  }.compile(hexagon)
+class Cycle() extends Layer[(V, SI)](3, "0") with ASTLt[V, SI] {
+  override val next: AST[(V, SI)] = inc(this); show(this)
 }
+
 

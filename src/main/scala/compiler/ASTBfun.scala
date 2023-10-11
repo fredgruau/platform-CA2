@@ -186,7 +186,7 @@ object ASTBfun {
   def increaseRadius2[R <: Ring]()(implicit m: repr[R]): Fundef1[R, R] = {
     val x: Param[R] with ASTBt[R] = p[R]("x");
     Fundef1("increaseRadius",
-      tm1(x), x) //can ge decalified early, upon spatial unfolding, so that it can be removed at the detmize stage.
+      tm1(x), x) //can be decalified early, upon spatial unfolding, so that it can be removed at the detmize stage.
   }
 
   /** @param i final number of bits */

@@ -134,7 +134,7 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
 
     /** returns the newly generated affect instruction */
     newAffect = affectExpList.map((e: AST[_]) => Affect(e.name, e.asInstanceOf[ASTBt[_]].detm1ise))
-    val rewrite: Instr => Instr = (i: Instr) => i.propagate(deDagRewrite)
+    val rewrite: Instr => Instr = (i: Instr) => i.propagate(deDagExclude)
     propagateUnit3(rewrite, newAffect);
     this
   }

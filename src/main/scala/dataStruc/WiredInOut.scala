@@ -121,10 +121,11 @@ object WiredInOut {
 
     /** computes the set of variables live after each packet */
     def livVars: List[HashSet[String]] = {
-      var liveVar: HashSet[String] = HashSet() //last liveVar are empty!
+      var liveVar: HashSet[String] = HashSet() //last liveVar are empty! we should put displayed variables, so that they remain accessible
       var liveVars: List[HashSet[String]] = List(liveVar) //strings contained in buffer
       for (p <- packets.reverse) { //we compute live vars, starting from the end towards the beginning
-        liveVar = liveVar.union(p.usedVars()).diff(p.names.toSet)
+        liveVar = liveVar.union(p.usedVars()).diff(p.names.toSet) //if packet p is using it , they should be live before
+        //if it defines it, theyshould not
         liveVars ::= liveVar
       }
       liveVars

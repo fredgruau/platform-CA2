@@ -361,7 +361,8 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
       tm1Instrs.map((instr: T) => (instr -> (instr.outputNeighbors.size + (instr.inputNeighbors.toSet.diff(tm1Instrs.toSet)).size))) //compte les output
 
     val myUser: HashMap[T, T] = HashMap.empty ++ tm1Instrs.map((instr: T) => {
-      if (instr.outputNeighbors.size != 1) throw new Exception("we here assume there is a single user, which is true for tm1s")
+      if (instr.outputNeighbors.size != 1)
+        throw new Exception("we here assume there is a single user, which is true for tm1s")
       instr.outputNeighbors.head -> instr
     }) //we here assume there is a single user, which is true for tm1s
 

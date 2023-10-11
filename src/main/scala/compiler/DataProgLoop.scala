@@ -7,12 +7,13 @@ import compiler.ASTBfun.ASTBg
 import compiler.ASTL.BoolV
 import compiler.Circuit.{TabSymb, iTabSymb}
 import dataStruc.Util.{radicalOfVar, removeAfterChar, shortenedSig}
-import compiler.Instr.{a, deployInt}
+import compiler.Instr.{a, deployInt2}
 import compiler.Locus.{all2DLocus, allLocus}
 import compiler.VarKind.{MacroField, StoredField}
 import dataStruc.{DagInstr, DagNode, HeapStates, Named, WiredInOut}
 
 import scala.::
+import scala.collection.IterableOnce.iterableOnceExtensionMethods
 import scala.collection.immutable.Nil.:::
 import scala.collection.{Map, Set, immutable, mutable}
 import scala.collection.immutable.{HashMap, HashSet}
@@ -22,7 +23,8 @@ import scala.io.Source
 /** wrapper to instructions that redefines usedVar and names by supressing layers, so that we can use the heap fonctionality */
 class InstrNoLayersNorParam(val instr: Instr, val t: TabSymb[InfoNbit[_]]) extends DagNode[InstrNoLayersNorParam] with WiredInOut[InstrNoLayersNorParam] {
 
-  /** Layers and param, do not need to be stored in the heap, they ve got a fixed place */
+  /** Layers and param, do not need to be stored in the heap, they ve got a fixed place
+   * data Parameters to show, they also do need to be stored */
   def needAdressInHeap(s: String): Boolean = {
     !s.startsWith("ll") && (t(s).k == StoredField())
   }
@@ -43,7 +45,8 @@ class InstrNoLayersNorParam(val instr: Instr, val t: TabSymb[InfoNbit[_]]) exten
 class InstrLoop(val affect: Instr, val loops: List[Packet], val instrNumber: Int) {
   //set the live variables of each packet
   var tmpLiveIntVars: Predef.Set[String] = Predef.Set()
-  for (p <- loops.reverse) tmpLiveIntVars = p.tmpLiveBefore(tmpLiveIntVars) //compute the tmpVariables live after the loops
+  for (p <- loops.reverse)
+    tmpLiveIntVars = p.tmpLiveBefore(tmpLiveIntVars) //compute the tmpVariables live after the loops
 
   /**
    *
@@ -145,7 +148,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
    */
   def isHeap(s: String): Boolean = s.startsWith("mem[")
 
-  /** if variables is "mem[14]" returns 14 */
+  /** if variables s  is "mem[14]" returns 14 */
   def adress(s: String) = s.substring(4, s.length - 1).toInt
 
   lazy val totalNamesSubMain: Set[String] = dagis.visitedL.flatMap(_.names).filter(isHeap(_)).toSet //we look at the call
@@ -184,8 +187,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
    * @return generates a list of list of boolean affectations for each instruction
    */
   def unfoldInt(): DataProgLoop[U] = {
-    val newParamD = paramD.flatMap((name: String) => deployInt(name, tSymbVarSafe(name).nb)) //generates boolean parameter from int parameters
-    val newParamR = paramR.flatMap((name: String) => deployInt(name, tSymbVarSafe(name).nb)) //generates boolean parameter from int parameters
+    val newParamD = paramD.flatMap((name: String) => deployInt2(name, tSymbVarSafe(name))) //generates boolean parameter from int parameters
+    val newParamR = paramR.flatMap((name: String) => deployInt2(name, tSymbVarSafe(name))) //generates boolean parameter from int parameters
     if (isLeafCaLoop) {
       loops.map(_.unfoldInt())
       new DataProgLoop[U](dagis, funs, tSymbVar, newParamD, newParamR, coalesc, loops)
@@ -259,7 +262,11 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
       paramR, allCoalesc, loops) with ProduceJava[U]
   }
 
-
+  def shown = dagis.visitedL.flatMap({ case i: CallProc =>
+    if (i.procName.eq("show"))
+      i.exps.map(_.asInstanceOf[Read[_]].which) else List()
+  case _ => List()
+  })
   /**
    * to be executed only by the main dataProg
    *
@@ -276,11 +283,12 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
       tSymbVar.addOne((s, layerSubProg2(s))) //adds to tSymbVar, constant layers defined in subProgram in tSymbVar
     val layerSpace = layerSubProg2.map(l => l._2.asInstanceOf[InfoNbit[_]].density).sum
     //we store all the adresses, layers and heap, as strings so as to store them in allcoalesc
-    allAdresses ++= (layerSubProg2.toList.flatMap(l => l._2.locus.deploy(l._1, l._2.asInstanceOf[InfoNbit[_]].nb)) zip (0 to layerSpace - 1)) //adress of layers
+    allAdresses ++= (layerSubProg2.toList.flatMap(l => l._2.locus.deploy2(l._1, l._2.asInstanceOf[InfoNbit[_]])) zip (0 to layerSpace - 1)) //adress of layers
     allAdresses ++= (paramR zip (layerSpace to layerSpace + paramR.length)) //adresses of  result parameter to the mainRoot
     val nbGlobals = allAdresses.size //the number of variables allways in the heap,
     // where morover, the distincts bit planes are found in sequence in the heap
-    val hs = new HeapStates[InstrNoLayersNorParam](noLayersInstr)
+    val isshownAndNotGlobal: HashSet[String] = HashSet() ++ shown diff allAdresses.keys.toSet //some shown variable are already in the globals, we do not need to show them
+    val hs = new HeapStates[InstrNoLayersNorParam](noLayersInstr, Vector(null), isshownAndNotGlobal)
     //On itere sur hs. cela est complexe, on recupere pour chaque instr, l'état courant du heap pour modeliser un appel a une autre CAbranche      res = res ++ instr.codeGen(heapCur, funs, nbGlobals, emptyCoalesc)
     for ((instr, (heapCur, adresses)) <- dagis.visitedL.reverse zip hs) {
       res = res ++ instr.codeGenInstr(heapCur, funs, nbGlobals, emptyCoalesc)
@@ -321,6 +329,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
 
   def isBoolV(str: String) = tSymbVarSafe(str).t == (V(), B()) // .isInstanceOf[BoolV]
 
+  // def isIntV1(str: String) = tSymbVarSafe(str).t == (V(), Int(1)) // .isInstanceOf[BoolV]
 
   // data computed only once from the mainDataProgLoop, using def and lazy
   private def subDP: iTabSymb[DataProg[U]] = funs ++ funs.flatMap({ case (k, v) => v.subDP })

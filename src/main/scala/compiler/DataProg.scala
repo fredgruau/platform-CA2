@@ -76,7 +76,10 @@ object DataProg {
     while (!instrsCur.isEmpty)
     // we now descend starting from the main circuit, to explore all the field, and then fields of fields.....
     dataStruc.Name.setName(f, ""); //for ''grad'' to appear as a name, it should be a field of an object extending the fundef.
-    val funs: iTabSymb[Fundef[_]] = immutable.HashMap.empty ++ dag.visitedL.collect { case l: Call[_] => (l.f.name, l.f) }
+    val funs: iTabSymb[Fundef[_]] = immutable.HashMap.empty ++ dag.visitedL.collect {
+      case l: Call[_] =>
+        (l.f.name, l.f)
+    }
     /** second  gathering of SysInstr which can now access  the layer's name, because  setName has been called   */
     val instrs: List[CallProc] = main :: getSysInstr(dag.visitedL)
 
@@ -1595,7 +1598,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   private def ruleAandB(candReg: Map[String, String], instrs: List[Instr]) = {
     var candA = candReg.keys.toSet //candidR1.keys.toSet //candidate for simplest rule
     //data parameters need to be delayed.
-    candA = candA.filter(r => !tSymbVar(candReg(r)).k.isParamD)
+    candA = candA.filter(r => !tSymbVarSafe(candReg(r)).k.isParamD)
     var candB = candA //candidate for the second a bit more complex rule
     /** lastUse(x)=instruction where x was used last if x is in cand2, x=exp should be inserted after lastuse(x) */
     var lastUse: HashMap[String, String] = HashMap()

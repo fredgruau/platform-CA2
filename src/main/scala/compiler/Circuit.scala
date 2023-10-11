@@ -62,10 +62,10 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //   print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
-    // print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
+    //  print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
 
     val prog5ter = prog5bis.radiusify3
-    // print("radiusify555555555555555555555555555555\n"+prog5ter)
+    //  print("radiusify555555555555555555555555555555\n"+prog5ter)
 
     val prog6 = prog5ter.unfoldSpace(m); //ajoute les tm1s!!
     // print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
@@ -74,19 +74,19 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //  print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
     val prog7bis = prog7.simplify(); //this will remove id which are read only once.
-    //  print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
+    //print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
 
     val prog8: DataProg[InfoNbit[_]] = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
-    print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
+    //  print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
     val prog10: DataProgLoop[InfoNbit[_]] = prog8.loopIfy()
-    //  print(prog10)
+    // print(prog10)
 
     val prog11 = prog10.unfoldInt()
     print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
-    val prog12 = prog11.coaalesc()
+    val prog12 = prog11.coaalesc() //allocates memory
     // System.out.println(prog12.allLayers)
-    print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
+    //print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
     print("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaCode)
   }
 }
@@ -97,21 +97,8 @@ object Circuit {
   def main(args: Array[String]) {
     new Circuit[V, B]() {
       val root = Class.forName("progOfCA." + args(0)).newInstance.asInstanceOf[ASTLt[V, B]] //asInstanceOf[{ def hello(name: String): String }]
-      root.setName(args(0).toLowerCase)
-      val j = 0
-
+      root.setName(args(0).toLowerCase) //so that the name of the variables start with the name of the CA
       def computeRoot = root
-    }.compile(hexagon)
-  }
-
-
-  object Dist extends App {
-    val myInput: AST.Param[(V, B)] with ASTLt[V, B] = p[V, B]("input")
-    new Circuit[V, B]() { //pour l'instant on teste sans parametres
-      // new Circuit[V, SI](myInput) {
-      val src = new ConstLayer[V, B](1, "global") with Dddist {}
-
-      def computeRoot: ASTLt[V, B] = src
     }.compile(hexagon)
   }
 

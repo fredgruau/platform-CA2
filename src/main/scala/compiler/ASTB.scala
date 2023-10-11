@@ -211,7 +211,8 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
 
   override def toString: String =
     this.asInstanceOf[ASTB[_]] match {
-      case AffBool(nameb, _) => nameb + "=" //+"["
+      case AffBool(nameb, e) =>
+        nameb + "=" //+"["
       case Intof(v) => "" + v
       case True() => "truue"
       case False() => "faalse"

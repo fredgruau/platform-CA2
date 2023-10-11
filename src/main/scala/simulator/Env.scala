@@ -95,9 +95,10 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
       val bitSize: Int = controller.bitSizeDisplayedOrDirectInitField.getOrElse(layerName, 1) //default bitsize is one, for boolean
       val bitPlane: List[Array[Int]] = memFields(layerName)
       val density = locus.density * bitSize
-      var colorAjusted: Color = if (bitSize > 1) color else halve(color) //if we print int, we have to make a sum of colors, so we first take halve
+      var colorAjusted: Color = if (bitSize > 1) halve(color) else color //if we print int, we have to make a sum of colors, so we first take halve
       assert(density == bitPlane.size, "the number of bit plane should be equal to the field's density")
-      for (i <- 0 until bitSize) { //we decompose an int into its bits
+      for (i <- (0 until bitSize).reverse) { //reverse so that bit 0 gets smallest color
+        //we decompose an int into its bits, first bit are strongest bit
         medium.sumColorVoronoi(locus, colorAjusted, bitPlane.slice(i * locus.density, (i + 1) * locus.density))
         colorAjusted = halve(colorAjusted)
       }

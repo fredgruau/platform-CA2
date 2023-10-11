@@ -23,7 +23,7 @@ object XMLutilities {
     def readOne(): Elem = {
       //meet next parenthesis so as to retrieve the name
       val i0 = iCur
-      while (iCur < s.size && !isParenthesis(s(iCur))) iCur += 1
+      while (iCur < s.size && !isParenthesis(s(iCur)) && s(iCur) != '.') iCur += 1
       val name = s.substring(i0, iCur)
       assert(name.size > 0) //we must have a non empty name of layer
       s(iCur) match {

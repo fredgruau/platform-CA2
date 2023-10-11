@@ -6,7 +6,5 @@
     <sizes>
         <size nbLine="6" nbCol="8"/>
         <size nbLine="12" nbCol="14"/>
-        <size nbLine="12" nbCol="30"/>
-        <size nbLine="12" nbCol="60"/>
     </sizes>
 </fixed>

@@ -5,17 +5,20 @@
         </Layer>
     </expandedLayer>
     <colorOfField>
-        <layer color="0x8000FF">
-            growefNext
-        </layer>
         <layer color="0x0000FF">
             growef
+        </layer>
+        <layer color="0xFF00FF">
+            growefTransfered
+        </layer>
+        <layer color="0x00FF00">
+            growefBroadcasted
         </layer>
         <layer color="0x80FF00">
             growefNeighbff
         </layer>
-        <layer color="0x00FF00">
-            growefBroadcasted
+        <layer color="0x8000FF">
+            growefNext
         </layer>
     </colorOfField>
 </displayParam>

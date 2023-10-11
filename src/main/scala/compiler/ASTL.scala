@@ -267,12 +267,9 @@ object ASTL {
     Redop[S1, S2, R](orRedop[R], arg, m, n)
   }
 
-  /** version of orR specific to boolean with treatement of the implicit on the border, should be extended to include integers */
+  /** or reduction processing the border, should be extended to include integers */
   def orRB[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S1, S2]): Redop[S1, S2, B] =
     redopDef[S1, S2](orRedop[B], arg)(m, n, nomB, d)
-
-  //redopDef[S2, S1](r, transfered)
-  // orRedop(repr.nomB)
 
 
   /** version of or reduction taking into account undefined value on chip's border using an implici d:chipBorder */
@@ -378,6 +375,9 @@ object ASTL {
 
   def opp[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, SI, SI] =
     Unop[L, SI, SI](oppSI, arg.asInstanceOf[ASTLt[L, SI]], m, repr.nomSI)
+
+  def inc[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, SI, SI] =
+    Unop[L, SI, SI](incSI, arg.asInstanceOf[ASTLt[L, SI]], m, repr.nomSI)
 
 
   /** uses a fixed val addUISI, and let the compiler believe that this val has the appropriate expected  type R=UI or R=SI  */
@@ -783,14 +783,13 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         val T(src, target) = arg.locus //we get the source and target locus knowing that arg is a transfer locus
         (increaseRadius(rad, src, target), trans.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
       }
-
       case binop@Binop(_, arg, arg2, _, _) =>
         var (r1, newArg) = arg.radiusify3(r, t)
         var (r2, newArg2) = arg2.radiusify3(r, t)
         assert(r1 == r2 || r1 < 0 || r2 < 0 || Math.abs(r1 - r2) == 1, "binop should processe variables of near identical index i") //todo introduce delays)
-        if (r1 < r2)
+        if (r1 < r2 && r1 >= 0) //negative radius means constant
           newArg = increaseRadiuus(newArg)(new repr(newArg.locus), new repr(newArg.ring)) //we augment radius of arg by delaying it
-        else if (r2 < r1)
+        else if (r2 < r1 && r2 >= 0) //negative radius means constant
           newArg2 = increaseRadiuus(newArg2)(new repr(newArg2.locus), new repr(newArg2.ring)) //we augment radius of arg2 by delaying it
         // if (r1 < r2) for (i <- 0 until r2 - r1) //arg=tm1(arg)
         (math.max(r1, r2), binop.copy(arg = newArg, arg2 = newArg2).asInstanceOf[ASTL[L, R]])
@@ -805,7 +804,11 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case b@RedopConcat(arg, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
       // case b@Clock(arg, _) =>  val (rad,newArg) = arg.radiusify3(r, t);(rad,b.copy(arg=newArg).asInstanceOf[ASTL[L,R]])
       case b@Sym(arg, _, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
-      case b@Send(args) => throw new Exception("send not yet implemented"); null
+      case b@Send(args) => val radNewArgs = args.map(_.radiusify3(r, t));
+        val newRad = radNewArgs.map(_._1).reduce(Math.max(_, _)) //todo  check that all the radius are the same.
+        val newb = b.copy(args = radNewArgs.map(_._2))(lpart(b.mym), rpart(b.mym))
+        (newRad, newb.asInstanceOf[ASTL[L, R]])
+
     }
 
   }

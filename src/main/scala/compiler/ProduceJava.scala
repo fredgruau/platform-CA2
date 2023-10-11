@@ -2,14 +2,17 @@ package compiler
 
 import compiler.AST.Read
 import compiler.Circuit.{TabSymb, iTabSymb}
-import compiler.Instr.deployInt
+import compiler.Instr.deployInt2
 import compiler.Locus.{all2DLocus, allLocus}
-import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp, radicalOfVar, radicalOfVar2, removeAfterChar, rootOfVar, shortenedSig, writeFile}
+import dataStruc.Util.{append2File, hierarchyDisplayedField, parenthesizedExp, radicalOfVar, radicalOfVar2, removeAfterChar, rootOfVar, shortenedSig, writeFile}
 import compiler.VarKind.LayerField
 import dataStruc.Named
 import dataStruc.Named.{isLayer, noDollarNorHashtag, noHashtag}
+import simulator.CAloops2
+import simulator.SimulatorUtil.getProg
 import simulator.XMLutilities.readXML
 
+import java.io.File
 import java.util.regex.Pattern
 import scala.::
 import scala.collection.convert.ImplicitConversions.`collection asJava`
@@ -23,7 +26,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
   self: DataProgLoop[U] =>
   /** returns  a big string  storing the code for CAloops, and the code for main calling those CAloops on arrays */
   def produceAllJavaCode: String = { //we need to generate spatial signature for macros before we can adress the main.
-    val leafLoops: Map[String, DataProgLoop[U]] = subDataProgs.filter(p => p._2.isLeafCaLoop)
+    val leafLoops = subDataProgs.filter(p => p._2.isLeafCaLoop)
     val codeLoops: iTabSymb[String] = leafLoops.map({ case (k, v) => (k -> v.asInstanceOf[ProduceJava[U]].javaCodeCAloop(k)) }) //retrieves all the CA loops
     val (codeLoopsMacro, codeLoopsAnonymous) = codeLoops.partition({ case (k, v) => !k.startsWith("_fun") }) //anonymous functions start with _fun
     val codeMain: String = javaCodeMain(codeLoopsAnonymous.values.mkString("\n")).replace('#', '$'); //'#' is not a valid char for id
@@ -31,19 +34,38 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
     val nameDirCompilCA = "src/main/scala/compiledCA/"
     val nameCAjava = nameCA.capitalize + ".java"
-    val nameDirCompilLoops = "src/main/scala/compiledMacro/"
-    val grouped = codeLoopsMacro.groupBy({ case (k, v) => k.substring(0, k.indexOf(".")) }) //  commes before the dot is the name of the class where to regroup macros
-    val preambule = "package compiledMacro;\n import simulator.PrShift;\n public class "
-    val postambule = "}";
+    writeFile(nameDirCompilCA + nameCAjava, codeMain + "\n") //stores the code of the main plujs anonmymous loop
+    //we now process non anonymous macro loop
+    val nameDirCompilLoops = "src/main/scala/compiledMacro/" //where thew will be stored
+    val grouped = codeLoopsMacro.groupBy({ case (k, v) => k.substring(0, k.indexOf(".")) }) //  what comes before the dot is the name of the class where to regroup macros
+
+
+    /** returns name of already defined macro of type macrosType */
+    def alreadyDefined(macrosTypeFile: String): Array[String] = Class.forName(macrosTypeFile).getDeclaredMethods.map(_.getName())
+
+    /** contains the loops but also many other parameters */
     var codeAllLoops = ""
-    writeFile(nameDirCompilCA + nameCAjava, codeMain + "\n")
     for (k4 <- grouped.keys) { //for loops, the code is distributed in several file, for clarity
       val fileName = k4 + ".java"
-      val codeOneLoop = (preambule + k4 + "{\n" + grouped(k4).values.mkString("\n") + postambule).replace('#', '$'); //'#' is not a valid char for id
-      codeAllLoops = codeOneLoop + codeAllLoops
-      writeFile(nameDirCompilLoops + fileName, codeOneLoop)
+      //if macro file does not exists, creates it (preambule + k4 + "{\n" + notYetDefined.values.mkString("\n") + postambule).replace('#', '$'); //'#' is not a valid char for id
+      val ard = if (!new File(nameDirCompilLoops + fileName).exists()) {
+        val preambule = "package compiledMacro;\n import simulator.PrShift;\n public class "
+        writeFile(nameDirCompilLoops + fileName, preambule + k4 + "{\n }")
+        new HashSet[String]() //there is no macro yet defined, since the class was not even existing
+      }
+      else
+        alreadyDefined("compiledMacro." + k4).toSet //name of class contains a dot
+      val notYetDefined = grouped(k4).filter(x => !ard.contains(x._1.drop(x._1.indexOf(".") + 1))) //name of the macro = we drop what's before the dot
+      //we generate the code of the loops correcponding to k4 keys
+
+      if (notYetDefined.nonEmpty) {
+        val codeK4Loops = (notYetDefined.values.mkString("\n")).replace('#', '$'); //'#' is not a valid char for id
+        codeAllLoops = codeK4Loops + codeAllLoops
+        append2File(nameDirCompilLoops + fileName, codeK4Loops) //we add the code of the macro which was not yet defined.
+      }
+
     }
-    "" + codeMain + codeAllLoops
+    "" + codeMain + codeAllLoops //returns for direct printing
   }
 
   /**
@@ -83,13 +105,14 @@ trait ProduceJava[U <: InfoNbit[_]] {
           var res: List[String] = List();
           var i = 0
           for (s: String <- shortened) {
-            if (isBoolV(s)) i += 1 //no need to anchor, parameter is already a 1D arrau
+            if (isBoolV(s))
+              i += 1 //no need to anchor, parameter is already a 1D arrau
             else {
               var j = 0; //j iterates on the indexes of the different scalar componendt
               try while (radicalOfVar(original(i)) == s) { //we scan through the parameter having same radical
                 res = original(i) + "=" + s + "[" + j + "]" :: res;
                 j += 1;
-                i += 1 //afect each scala component
+                i += 1 //affect each scala component
               } catch {
                 case _: IndexOutOfBoundsException =>
               }
@@ -117,7 +140,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
           val testCoalesc = coalesced
           val intReg = (standaloneRegister ++ coalesced.keys).filter(noHashtag(_)) //should be declared todo gestion plus precise des dieses
           // val intReg = (standaloneRegister ++ coalesced.keys).filter(noDollarNorHashtag(_)) //should be declared todo gestion plus precise des dieses
-          val boolReg: Iterable[String] = intReg.flatMap((s: String) => deployInt(s, tSymbVarSafe(s).nb)) //intReg which have a single component are not deployed
+          val boolReg: Iterable[String] = intReg.flatMap((s: String) => deployInt2(s, tSymbVarSafe(s))) //intReg which have a single component are not deployed
 
           boolReg.toList.sorted.map((s: String) => if (isDelayed(s) || true) s + "=0" else s).mkString(",") //todo preciser keski est delayed
         }
@@ -142,9 +165,9 @@ trait ProduceJava[U <: InfoNbit[_]] {
      * */
     def offsetsInt(tSymbVarAndConstLayer: iTabSymb[InfoNbit[_]]): Map[String, List[Int]] = {
       tSymbVarAndConstLayer.map { case (k, v) => (k,
-        if (v.t == (V(), B())) List(adress(coalesc(k)))
-        else {
-          val offsetstring = v.locus.deploy(k, tSymbVarSafe(k).nb)
+        //   if (v.t == (V(), B()) /*|| v.t == B()*/)   List(adress(coalesc(k))) else
+        {
+          val offsetstring = v.locus.deploy2(k, tSymbVarSafe(k))
           offsetstring.map((s: String) => adress(coalesc(s))).toList
         })
       }
@@ -164,6 +187,13 @@ trait ProduceJava[U <: InfoNbit[_]] {
       res = oneVar._1 + "=" + res;
       res
     }
+
+    def anchorNamed(offset: Map[String, List[Int]]): String = {
+      val (offset1D, offset2D) = offset.partition(x => x._2.size == 1)
+      (if (offset1D.nonEmpty) "int[]" + offset1D.map(anchorOneVar(_)).mkString(",") + ";\n" else "") +
+        (if (offset2D.nonEmpty) "int[][]" + offset2D.map(anchorOneVar(_)).mkString(",") + ";\n" else "")
+    }
+
     //we use the same template technique as the one used for CAloops
     replaceAll("src/main/scala/compiledCA/template/templateCA.txt", Map(
       "NAMECA" -> radicalOfVar(paramR(0)).capitalize,
@@ -175,6 +205,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
           (if (var1D.nonEmpty) "int[]" + var1D.mkString(",") + ";\n" else "") +
             (if (var2D.nonEmpty) "int[][]" + var2D.mkString(",") + ";\n" else "")
         }
+
         ("" + DeclNamed(spatialOfffsetsInt))
       },
       "DECLNOTNAMED" -> {
@@ -194,17 +225,11 @@ trait ProduceJava[U <: InfoNbit[_]] {
       "LISTCALL" -> theCallCode.reverse.mkString("\n"),
       "ANCHORNAMED" -> {
         /** code that anchors named arrays on memory */
-        def anchorNamed(offset: Map[String, List[Int]]): String = {
-          val (offset1D, offset2D) = offset.partition(x => x._2.size == 1)
-          "int[]" + offset1D.map(anchorOneVar(_)).mkString(",") + ";\n" +
-            (if (offset2D.nonEmpty) "int[][]" + offset2D.map(anchorOneVar(_)).mkString(",") + ";\n" else "")
-        }
         anchorNamed(spatialOfffsetsInt)
       },
       "ANCHORNOTNAMED" -> {
         /** Codes that decompose array 2D into memory slices */
         def anchorNotNamed(decomposition: Map[Locus, Map[List[Int], Int]]): String = { //todo queskispass si c'est un tableau 1D?
-
           var codeDecl: List[String] = List()
           for (l: Locus <- allLocus) if (decomposition(l).nonEmpty) {
             val (offset1D, offset2D) = decomposition(l).partition(x => x._1.size == 1) //separates  BoolV which are stored on one plane
@@ -214,16 +239,10 @@ trait ProduceJava[U <: InfoNbit[_]] {
           // seedE = new int[][]{m[8], m[9], m[10]};
           codeDecl.mkString("\n")
         }
+
         anchorNotNamed(decompositionLocus)
       },
-      "COPYLAYER" -> {
-        def anchorNamed(offset: Map[String, List[Int]]): String = {
-          val (offset1D, offset2D) = offset.partition(x => x._2.size == 1)
-          (if (offset1D.nonEmpty) "int[]" + offset1D.map(anchorOneVar(_)).mkString(",") + ";\n" else "") +
-            (if (offset2D.nonEmpty) "int[][]" + offset2D.map(anchorOneVar(_)).mkString(",") + ";\n" else "")
-        }
-
-        //iL contains only the variable totoll not toto
+      "COPYLAYER" -> { //iL contains only the variable totoll not toto
         val iL = initLayer(layerSubProg2).keys.filter(isLayer(_)).filter(x => tSymbVar.contains(x.drop(2))) //we check that the layer without ll exists
         //anchoring both lltoto and toto in memory.
         val llandNotll = spatialOfffsetsInt.filter(x => iL.contains(x._1) || iL.contains("ll" + x._1))
@@ -256,7 +275,6 @@ trait ProduceJava[U <: InfoNbit[_]] {
           // .filter(x => !tSymbVar.contains(x._1)) //removes  layers defined in main
           HashMap[String, Locus]() ++ names.map((s: String) => s -> tSymbVar(s).t.asInstanceOf[(Locus, Ring)]._1) ++ l
         }
-
         fieldLocus(spatialOfffsetsInt.keys, layerSubProgStrict).map((kv: (String, Locus)) => //we need to know the locus, as soon as  we need to know the bit planes
           " map.put(\"" + kv._1 + "\"," + "Locus." + kv._2.javaName + ")").mkString(";\n")
       },
@@ -267,18 +285,18 @@ trait ProduceJava[U <: InfoNbit[_]] {
             .filter(x => !tSymbVar.contains(x._1)) //removes integer layers defined in main
           HashMap[String, Int]() ++ names.filter(tSymbVar(_).nb > 1).map((s: String) => s -> tSymbVar(s).nb) ++ l
         }
-
         fieldBitSize(spatialOfffsetsInt.keys, layerSubProg2).map((kv: (String, Int)) =>
           " map.put(\"" + kv._1 + "\"," + kv._2 + ")").mkString(";\n") + ";"
       },
       "DISPLAYABLE" -> //theDisplayed contains two kinds of name:aux and segmented, first step should separate the segmented
-        parenthesizedExp(rootOfVar(theDisplayed.head), hierarchyDisplayedField(theDisplayed)),
+        {
+          val s = parenthesizedExp(rootOfVar(theDisplayed.head), hierarchyDisplayedField(theDisplayed)); s + "."
+        },
       "INITLAYER" -> {
         val iL = initLayer(layerSubProg2)
         iL.map((kv: (String, String)) =>
           " map.put(\"" + kv._1 + "\",\"" + kv._2 + "\")").mkString(";\n") + ";\n"
       },
-
       "ANONYMOUSLOOP" -> {
         codeLoopAnonymous
       }
