@@ -50,22 +50,22 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //print(prog1)
 
     val prog2 = prog1.treeIfy();
-    //print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
+    //  print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
 
     val prog3 = prog2.procedurIfy();
     //print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
     val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
-    // print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
+    print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
-    val prog5: DataProg[InfoNbit[_]] = prog4.macroIfy();
-    //   print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
+    val prog5: DataProg[InfoNbit[_]] = prog4.macroify();
+    //    print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
     //  print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
 
     val prog5ter = prog5bis.radiusify3
-    //  print("radiusify555555555555555555555555555555\n"+prog5ter)
+    //   print("radiusify555555555555555555555555555555\n"+prog5ter)
 
     val prog6 = prog5ter.unfoldSpace(m); //ajoute les tm1s!!
     // print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
@@ -80,10 +80,10 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //  print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
     val prog10: DataProgLoop[InfoNbit[_]] = prog8.loopIfy()
-    // print(prog10)
+    // print("loopify1010101010101010101010101010101010101010"+prog10)
 
     val prog11 = prog10.unfoldInt()
-    print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
+    //  print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
     val prog12 = prog11.coaalesc() //allocates memory
     // System.out.println(prog12.allLayers)
     //print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)

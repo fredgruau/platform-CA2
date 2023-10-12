@@ -379,8 +379,11 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     // dividing into layerfields and macrofields, perturbate this order.
     if (!dagisScheduleMatters) {
       updateTsymb(macroFields, MacroField()) // when a variable is used twice it should be evaluated in a macro => its type = MacroField,
-      updateTsymb(layerFields, StoredField()) // excepted for affectation of the form dist<-lldist, the type of dist is set to storedLayer, the varKind Layer will be replaced by stored field, and no longer used at all
-    }
+      if (!isLeafCaLoop)
+        updateTsymb(layerFields, StoredField()) // for the main , excepted for affectation of the form dist<-lldist, the type of dist is set to storedLayer,
+      // the varKind Layer is replaced by stored field, and no longer used at all,Except for constant layers
+      else updateTsymb(layerFields, MacroField()) // for the loop macro, the only layers passed are constant layers,
+    } //  we set the type to macro because we do not need to store them again.
     else {
       //val g = new CodeGen(tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]], coalesc)
       updateTsymbNbit(macroFields, MacroField()) // if affectify happens after unfold int, we provide the number of bits
@@ -577,7 +580,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
    *         and non leaf main, later to be compiled in a single sequence of calls to CA loops.
    *         pure main should contains only affectation between variables, concat, and calls to other macros
    */
-  def macroIfy(): DataProg[InfoNbit[_]] = {
+  def macroify(): DataProg[InfoNbit[_]] = {
     /** @param s field identifier
      * @return True if field  with id s needs to be stored in CA memory  */
     def needStored(s: String): Boolean = tSymbVar(s).k.needStored
@@ -706,7 +709,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       else if (stillUsed.contains(name)) //due to the fact that some operator can be processed on the main(broadcast, elem, even clock and anticlock)
       //some of the macroField are not macroified. we check which one, just by lookikng wether they are still in use in the new main instructions
       newTsymbVar.addOne(name -> info.storedFieldise2)
-    new DataProg(newDagis, newFuns ++ funs.map { case (k, v) ⇒ k -> v.macroIfy() }, newTsymbVar, paramD, paramR)
+    new DataProg(newDagis, newFuns ++ funs.map { case (k, v) ⇒ k -> v.macroify() }, newTsymbVar, paramD, paramR)
   }
 
 
@@ -967,6 +970,16 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
      *
      */
     def permuteAndFixScheduledMu2(name: String): List[Instr] = {
+      def isJustReadingLayer(i: Instr): Boolean = {
+        i match {
+          case Affect(name, exp) => exp match {
+            case Read(which) => tSymbVarSafe(which).k.isLayerField
+            case _ => false
+          }
+          case _ => false
+        }
+      }
+
       if (!defI.contains(name))
         throw new Exception("pas trouvé" + name)
       val i = defI(name) //instruction
@@ -989,7 +1002,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       if (!a(i).isRedop) { //for redop the coalesc mapping and tSymbScalar are already done
         val l = a(i).locus.get
         val names = l.deploy(i.names.head)
-        if (i.isFolded2(tZ, myRoot) && !tSymbVar(i.names.head).k.isInstanceOf[ParamRR]) {
+
+        if (i.isFolded2(tZ, myRoot) && !tSymbVar(i.names.head).k.isInstanceOf[ParamRR] &&
+          !isJustReadingLayer(i)
+        ) {
           for (n <- names)
             coalesc += (n -> i.names.head) //we coalesc several symbol
           //and we add the single coalesced symbol

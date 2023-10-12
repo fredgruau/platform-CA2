@@ -326,8 +326,10 @@ object ASTBfun {
 
 
   def andLBtoRUISI(r: Ring) = r match {
-    case SI() => andLBtoRSI
-    case UI() => andLBtoRUI
+    case SI() =>
+      andLBtoRSI
+    case UI() =>
+      andLBtoRUI
     case _ => throw new Exception("decide between signed or unsigned integer")
   }
 

@@ -48,8 +48,5 @@ class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[
   // val temp: BoolfV = xorR2(transfer(slope)) ;  val vortex: BoolF = orR(transfer(temp));   bugif(vortex);
 }
 
-class Cycle() extends Layer[(V, SI)](3, "0") with ASTLt[V, SI] {
-  override val next: AST[(V, SI)] = inc(this); show(this)
-}
 
 

@@ -1,6 +1,7 @@
 package compiler
 
 import compiler.AST.Read
+import compiler.ASTB.{False, True}
 import compiler.Circuit.{TabSymb, iTabSymb}
 import compiler.Instr.deployInt2
 import compiler.Locus.{all2DLocus, allLocus}
@@ -148,7 +149,14 @@ trait ProduceJava[U <: InfoNbit[_]] {
         val dip = declInitParam;
         if (dip.size > 0) "// initialisation \n int " + dip + ";" else ""
       },
-      "LOOPBODY" -> totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ")))
+      "LOOPBODY" -> {
+        /* val t = totalCode
+         val removeFalse = t.filter(e=> e != False()&&e != True()) */
+        //certaine expression se simplifie sur false ou true
+        totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]]))
+          .grouped(4).map(_.mkString(";")).mkString(";\n ")
+      }
+    ))
   }
 
   /**

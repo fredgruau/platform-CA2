@@ -39,7 +39,7 @@ object RedS {
     val param = p[S1, B]("p" + l.shortName + n.name.shortName) //parameter names inform about locus
     val broadcasted = broadcast[S1, S2, B](param) //step 1 is broadcast
     val transfered: ASTLt[T[S2, S1], B] = transfer[S1, S2, B](broadcasted)(repr.nomT(n, m), repr.nomB) //step 2 is transfer
-    val res = redopDef[S2, S1](r, transfered) //(n,m,d) yzeté implicit killerest
+    val res = reduce[S2, S1, B](r, transfered) //(n,m,d) yzeté implicit killerest
     //val res = Redop[S2, S1, B](r, transfered, n, nomB) // orRdef(transfer(v(param))) //step 3 is reduce
     Fundef1(redsfunName(r, l)(m, n), res, param) // we compute a function of one argument. res is the body, param are the single parameter
   }

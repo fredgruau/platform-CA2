@@ -11,6 +11,7 @@ import repr._
 import dataStruc.Dag
 import dataStruc.DagNode._
 
+import scala.annotation.unused
 import scala.collection.{mutable, _}
 import scala.reflect.ClassTag
 import scala.language.implicitConversions
@@ -24,7 +25,7 @@ import scala.language.implicitConversions
 object ASTL {
   val u = 1
 
-  private[ASTL] case class Coonst[L <: Locus, R <: Ring](cte: ASTB[R], m: repr[L], n: repr[R]) extends ASTL[L, R]()(repr.nomLR(m, n)) with EmptyBag[AST[_]]
+  private[ASTL] case class Coonst[L <: Locus, R <: Ring](cte: ASTBt[R], m: repr[L], n: repr[R]) extends ASTL[L, R]()(repr.nomLR(m, n)) with EmptyBag[AST[_]]
 
   private[ASTL]
   final case class Broadcast[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[S1, R], m: repr[T[S1, S2]], n: repr[R])
@@ -130,14 +131,13 @@ object ASTL {
 
   /** ***************the wrapper *******************/
 
-  def const[L <: Locus, R <: Ring](cte: ASTB[R])(implicit m: repr[L], n: repr[R]): Coonst[L, R] = Coonst(cte, m, n)
+  def const[L <: Locus, R <: Ring](cte: ASTBt[R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = Coonst(cte, m, n)
 
   def sym[S1 <: S, S2 <: S, S2new <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S1, S2new]], t: CentralSym[S2, S1, S2new], n: repr[R]): Sym[S1, S2, S2new, R] = Sym(arg, m, t, n)
 
   def v[S1 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, V]], n: repr[R]): Broadcast[S1, V, R] = Broadcast[S1, V, R](arg, m, n); // for broadcast, we want to specify only the direction where broadcasting takes place.
   def e[S1 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, E]], m2: repr[T[E, S1]], n: repr[R]): Broadcast[S1, E, R] = Broadcast[S1, E, R](arg, m, n); // this is done using three function e,v,f.
   def f[S1 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, F]], m2: repr[T[F, S1]], n: repr[R]): Broadcast[S1, F, R] = Broadcast[S1, F, R](arg, m, n)
-
 
   def clock[S1 <: S, S2 <: S, S2new <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S1, S2new]], n: repr[R]): Clock[S1, S2, S2new, R] = Clock[S1, S2, S2new, R](arg, dir = true)
 
@@ -227,6 +227,7 @@ object ASTL {
    */
 
   /**
+   * version obsolete car il faudrait faire un match pour chaque op, ce qu'on peut eviter.
    *
    * @param op  reduction operator
    * @param arg arguement being reduced
@@ -239,26 +240,25 @@ object ASTL {
    *            with defVE which is true when the value is defined.
    *            When it is not defined, the binop result shoudl take the neutral value (O for Or, 1 for and...)
    */
-  def redopDef[S1 <: S, S2 <: S](op: redop[B], arg: ASTLt[T[S1, S2], B]) //S1=V
-                                (implicit m: repr[S1], m2: repr[S2], n: repr[B], d: chipBorder[S1, S2]): Redop[S1, S2, B] = {
+  def reduceBool[S1 <: S, S2 <: S](op: redop[B], arg: ASTLt[T[S1, S2], B]) //S1=V
+                                  (implicit m: repr[S1], m2: repr[S2], n: repr[B], d: chipBorder[S1, S2]): Redop[S1, S2, B] = {
     val newArg: ASTLt[T[S1, S2], B] = if (d.border == null) arg //d.border null means we do not need it.
     else op match {
       case (orb, _) => //todo inclure to les transfer locus, pas seulement Ve
-        and[T[S1, S2], B](d.border, arg)(nomT(m, m2), nomB)
+        and[T[S1, S2], B](d.border, arg)(nomT(m, m2), nomB) //met a zero is pas border
     }
     Redop[S1, S2, B](op, newArg, m, n)
   }
 
-  /** version that shoud be used if we want to condider reduction with integers, such as add.
+
+  /** version that works both for reduction with booleans or reduction with integers, such as min, or addOnes.
    * for the moment it seems boolean is the most important, so we consider only this one */
-  def redopDefOld[S1 <: S, S2 <: S, R <: Ring](op: redop[R], arg: ASTLt[T[S1, S2], R])
-                                              (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chipBorder[S1, S2]): Redop[S1, S2, R] = {
-    op match {
-      case (orb, _) => //todo inclure aussi le cas ou on fait un reduce sur des entiers
-        val newArg: ASTL[T[S1, S2], B] = and[T[S1, S2], B](d.border, arg.asInstanceOf[ASTLt[T[S1, S2], B]])(nomT(m, m2), nomB)
-        val newArg2 = newArg.asInstanceOf[ASTLt[T[S1, S2], R]]
-        Redop[S1, S2, R](op, newArg2, m, n)
-    }
+  def reduce[S1 <: S, S2 <: S, R <: Ring](op: redop[R], arg: ASTLt[T[S1, S2], R])
+                                         (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chipBorder[S1, S2]): ASTL[S1, R] = {
+    val neutralElt: ASTL[T[S1, S2], R] = const[T[S1, S2], R](op._2)
+    val newArg: ASTLt[T[S1, S2], R] = if (d.border == null) arg else
+      cond[T[S1, S2], R](d.border, arg, neutralElt)
+    Redop[S1, S2, R](op, newArg, m, n)
   }
 
   /** or Reduction which works both for boolean and integers, but does not use the border so it is obsolote */
@@ -269,17 +269,17 @@ object ASTL {
 
   /** or reduction processing the border, should be extended to include integers */
   def orRB[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S1, S2]): Redop[S1, S2, B] =
-    redopDef[S1, S2](orRedop[B], arg)(m, n, nomB, d)
+    reduceBool[S1, S2](orRedop[B], arg)(m, n, nomB, d)
 
 
   /** version of or reduction taking into account undefined value on chip's border using an implici d:chipBorder */
   def orRdef[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])
                               (implicit m: repr[S1], m2: repr[S2], d: chipBorder[S1, S2]): Redop[S1, S2, B] =
-    redopDef[S1, S2](orRedop[B], arg)
+    reduceBool[S1, S2](orRedop[B], arg)
 
   def andRdef[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])
                                (implicit m: repr[S1], m2: repr[S2], d: chipBorder[S1, S2]): Redop[S1, S2, B] =
-    redopDef[S1, S2](andRedop[B], arg)
+    reduceBool[S1, S2](andRedop[B], arg)
 
   def andR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): Redop[S1, S2, R] =
     Redop[S1, S2, R](andRedop[R], arg, m, n)
@@ -322,11 +322,23 @@ object ASTL {
     new Delayed[(L, R)](() => delayed) with ASTLt[L, R]
   }
 
-  def cond[L <: Locus, R <: I](b: ASTLt[L, B], arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] =
-    andLB2R[L, R](b, arg1) | andLB2R(~b, arg2)
 
   def condOld[L <: Locus, R <: I](b: ASTLt[L, B], arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] =
     andLB2R[L, R](b, arg1) | andLB2R(~b, arg2)
+
+  /** cond behavees differently for boolean, we are obliged to rewrite it. */
+  /*  def condB[L <: Locus](b: ASTLt[L, B], arg1: ASTLt[L, B], arg2: ASTLt[L,B])(implicit m: repr[L]): ASTL[L, B] = {
+      val res=(b & arg1 )| (~b & arg2)
+      res
+    }*/
+
+
+  /** we designed a cond that makes an internal test to decide wether it applies for int or for bool. */
+  def cond[L <: Locus, R <: Ring](b: ASTLt[L, B], arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] =
+    if (n.name.isInstanceOf[SI])
+      (andLB2R[L, SI](b, arg1.asInstanceOf[ASTLt[L, SI]]) | andLB2R(~b, arg2.asInstanceOf[ASTLt[L, SI]])).asInstanceOf[ASTLt[L, R]]
+    else
+      ((b & arg1.asInstanceOf[ASTLt[L, B]]) | (~b & arg2.asInstanceOf[ASTLt[L, B]])).asInstanceOf[ASTLt[L, R]]
 
   /**
    * computes an int with a single non zero bit which is the highest rank for which operand's bit is one if operand is null, output O.

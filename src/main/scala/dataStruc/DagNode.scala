@@ -1,7 +1,7 @@
 package dataStruc
 
 import compiler.AST.Read
-import compiler.ASTB.AffBool
+import compiler.ASTB.{AffBool, False}
 import compiler.{AST, ASTB, Affect, InfoType}
 import compiler.Circuit.TabSymb
 import dataStruc.Util.{radicalOfVar, radicalOfVar2}
@@ -53,6 +53,8 @@ trait DagNode[+T <: DagNode[T]] {
         case Read(name) => val rad = radicalOfVar2(name)
           if (t(rad).k.isParamD || t(rad).k.isLayerField) name + "[i]" //no delays for the moment being, when we read
           else name //operand is a loop register.
+        case False() =>
+          "/* False*/" //by simplification a whole expression may reduce to false after simplification.
       }
     }
 

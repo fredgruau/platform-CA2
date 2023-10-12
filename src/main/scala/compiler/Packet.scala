@@ -1,7 +1,7 @@
 package compiler
 
 import compiler.AST.Read
-import compiler.ASTB.{Dir, Elt, Reduce, Scan1, Scan2, affBoolConst, fromBoolB}
+import compiler.ASTB.{Dir, Elt, False, Reduce, Scan1, Scan2, True, affBoolConst, fromBoolB}
 import compiler.ASTBfun.ASTBg
 import compiler.Circuit.{TabSymb, iTabSymb}
 import dataStruc.{Named, WiredInOut}
@@ -85,7 +85,7 @@ abstract class Packet(val instrs: List[Instr],
    * will store the boolification in the boolAst field, for future printing and code generation
    */
   def addUnfoldInt() = {
-    boolAST = unfoldInt().reverse
+    boolAST = unfoldInt().reverse.filter(e => e != False() && e != True()) //whole expression may reduce to False() or True() after simplification. We remove those débris
   } // unfoldInt return affectations in reverse order because last affectation are inserted on the head, so it must be reversed
 
   def addCoalesc(c: iTabSymb[String]) = {
@@ -305,7 +305,8 @@ object Packet {
         i = i + step
       }
       while (i != fin)
-      result // contains one affectgation
+      result = result.filter(e => e != False() && e != True()) //sometimes true or false do not get simplified and appear as leftover debris that we should remove
+      result // contains boolean register affectation to interpret one affectation
     }
 
   }

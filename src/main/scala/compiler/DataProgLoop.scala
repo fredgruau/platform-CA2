@@ -2,7 +2,7 @@
 package compiler
 
 import compiler.AST.{Read, isNotRead}
-import compiler.ASTB.{AffBool, Dir, Elt, Reduce, outputStored}
+import compiler.ASTB.{AffBool, Dir, Elt, False, Reduce, outputStored}
 import compiler.ASTBfun.ASTBg
 import compiler.ASTL.BoolV
 import compiler.Circuit.{TabSymb, iTabSymb}
@@ -177,12 +177,13 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
    *
    * @return we need to add the coalescing of temporary variables.
    */
-  override def toString =
+  override def toString = {
     super.toString +
       // (if(coalescTMP!= null&&coalescTMP.size>0) "tmp registers:" + toStringCoalesc(coalescTMP) else "" ) +
       (if (loops != null) "Total code of macro: " +
         totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ") else "")
 
+  }
   /**
    * @return generates a list of list of boolean affectations for each instruction
    */
