@@ -12,6 +12,8 @@ import compiler.ASTLt.ConstLayer
 import compiler.VarKind.{LayerField, MacroField, ParamD}
 import dataStruc.Named
 
+import scala.collection.immutable.HashSet
+
 
 /**
  * Adds boolean spatial operator to AST of spatial types
@@ -43,9 +45,26 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
   /** @return tabulation for printing instructions returning type T */
   override def tabulations = locus.tabul
 
-  def extendMe(n: Int): ASTLt[L, R] =
+  def extendMeDirect(n: Int): ASTLt[L, R] =
     ASTL.extend[L, R](n, this)(new repr(locus), new repr(ring))
 
+  /** first go get the unique grand child having same bit size */
+  def extendMeOld(n: Int): ASTLt[L, R] = {
+    var tooSmallBitSize = this
+    var candidateForExtend: Set[ASTLg] = HashSet()
+    do {
+      candidateForExtend = tooSmallBitSize.childSameBitSize
+      if (candidateForExtend.size == 1)
+        tooSmallBitSize = candidateForExtend.head.asInstanceOf[ASTLt[L, R]]
+    }
+    while (candidateForExtend.size == 1)
+
+    ASTL.extend[L, R](n, this)(new repr(locus), new repr(ring))
+  }
+
+  def extendMe(n: Int): ASTLt[L, R] = extendMeDirect(n)
+
+  def childSameBitSize: Set[ASTLg] = HashSet()
   def isRedop: Boolean = false
 
 

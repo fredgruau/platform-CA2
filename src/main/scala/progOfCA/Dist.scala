@@ -1,6 +1,7 @@
 package progOfCA
 
 import compiler.AST._
+import compiler.ASTBfun.{eqSI, minSignRedop}
 import compiler.ASTL._
 import compiler.ASTLt._
 import compiler.Circuit.hexagon
@@ -8,13 +9,20 @@ import compiler._
 import progOfmacros.Compute._
 import progOfmacros.SReduce._
 
-class Tdis extends ConstLayer[V, B](1, "global") with Dddist {} //classe compilable
+class Seed extends ConstLayer[V, B](1, "global") with Dddist {} //classe compilable
 
 trait Dddist {
   self: Layer[(V, B)] => //adds a distance to a LayerV todo, it should also limit its movement
-  val diiist = new Dist(self);
-  show(diiist);
-  show(diiist.tslope)
+  val dist = new Diist(self);
+  show(dist);
+  show(this)
+  show(dist.symed)
+  show(dist.delta) //in order to break in two.
+  show(dist.adjust)
+  show(dist.theMins)
+  show(dist.ready)
+  show(dist.notzero)
+  show(dist.next)
 } //this show must appear here, otherwise, class Dist is not compiled because not used from SRC
 class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[V, SI] {
   val level: BoolV = elem(2, this);
@@ -48,5 +56,18 @@ class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[
   // val temp: BoolfV = xorR2(transfer(slope)) ;  val vortex: BoolF = orR(transfer(temp));   bugif(vortex);
 }
 
+/** we here only update the distance */
+class Diist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[V, SI] {
+  val level: BoolV = elem(2, this);
 
+  val meVois: IntEv = transfer(e(this))
+  val symed: IntEv = sym(meVois)
+  val ready: IntVe = transfer(symed)
+  val extendDiff = extend(4, ready - e(this)) //on ajoute un bit a la difference
+  val theMins: IntVe = sign(extendDiff + 2)
+  val delta: IntV = reduce(minSignRedop, theMins)
+  val adjust: IntV = cond(source.asInstanceOf[BoolV], sign(-this), delta)
+  val notzero = notNull(this)
+  val next: ASTLt[V, SI] = this + adjust //faudrait en faire une macro qui prends delta, source et dist et renvoie distNext
 
+}

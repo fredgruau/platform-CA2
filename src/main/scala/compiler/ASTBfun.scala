@@ -1,12 +1,13 @@
 package compiler
-
 import AST.{Call1, _}
 import ASTB.{Elt, _}
-import compiler.ASTL.BoolV
+import compiler.ASTBfun.negB
+import compiler.ASTL.{BoolV, halve, maxSI}
 
 
-/** Contains the code of logical function
- * ACHTUNGACHTUNGACHTUNGACHTUNG FUNCTIONS ARE HERE DEFINED AS VAL, IT IS IMPORTANT THAT
+/** Contains the code of logical function defined as val, to avoid reproducting the code several times, when they are used in BINOP or UNOP
+ * todo function which use bool Constructors should be moved to ASTB, so that we can declare those constructors, private.
+ * ACHTUNGACHTUNGACHTUNGACHTUNG BECAUSE FUNCTIONS ARE HERE DEFINED AS VAL, IT IS IMPORTANT THAT
  * THEY SHOULD BE DECLARED IN THE RIGHT ORDER OTHERWISE IT WILL RESULT IN TROUBLESOME NUL VALUES
  * THAT I TAKE A LONG TIME TO SPOT */
 object ASTBfun {
@@ -43,6 +44,10 @@ object ASTBfun {
     val xi = p[SI]("xNegSi");
     Fundef1("negSi", Mapp1(negB, List(xi)), xi)
   }
+  val negUI: Fundef1R[UI] = {
+    val xi = p[UI]("xNegUI");
+    Fundef1("negUI", Mapp1(negB, List(xi)), xi)
+  }
   val orB: Fundef2R[B] = {
     val (xb, yb) = (p[B]("xb"), p[B]("yb"));
     Fundef2("orB", Or(xb, yb), xb, yb)
@@ -57,8 +62,10 @@ object ASTBfun {
   }
 
   def orUISI(r: Ring) = r match {
-    case SI() => orSI
-    case UI() => orUI
+    case SI() =>
+      orSI
+    case UI() =>
+      orUI
     case _ => throw new Exception("decide between signed or unsigned integer")
   }
 
@@ -129,7 +136,7 @@ object ASTBfun {
   }
 
   /** wrapper */
-  def uItoSI(xui: Uint): Sint = new Call1(uItoSIdef, xui) with Sint
+  def uItoSI(xui: Uint): Sint = new Call1[UI, SI](uItoSIdef, xui) with Sint
 
   /** unsigned int argument needs to be extended with one bit, in order to represent now, signed int */
   val subUI: Fundef2[UI, UI, SI] = {
@@ -139,12 +146,14 @@ object ASTBfun {
   } //could be done in a symetric way using xor, but takes more gates and more registers.
 
 
-  /*/** true if first unsigned int argument strictly smaller than second, we must convert UI to SI */
-  val ltUI2: Fundef2[UI, UI, B] = {
-    val (x, y) = (p[UI]("x"), p[UI]("y"));
-    Fundef2("ltUI2", (new Call1(ltSI1, uItoSI(x) - uItoSI(y)) with ASTBt[B]), x, y)
-  }
-*/
+  /** true if first unsigned int argument strictly smaller than second, we must convert UI to SI */
+  /*
+    val ltUI2: Fundef2[UI, UI, B] = {
+      val (x, y) = (p[UI]("x"), p[UI]("y"));
+      Fundef2[UI, UI, B]("ltUI2", (new Call1[UI, B](ltSI1, uItoSI(x) - uItoSI(y)) with ASTBt[B]), x, y)
+    }
+  */
+
   //addSI is using addUISI, it must be declared after otherwise the op will "null", we had several time this null op syndrom
   val addSI: Fundef2R[SI] = {
     val (xsi, ysi) = (p[SI]("xAddSi"), p[SI]("yAddSi"));
@@ -189,7 +198,7 @@ object ASTBfun {
       tm1(x), x) //can be decalified early, upon spatial unfolding, so that it can be removed at the detmize stage.
   }
 
-  /** @param i final number of bits */
+  /** @param i final number of bits, We generate a new funDef for each call, todo we should memoize this at least. */
   def extendSI(i: Int): Fundef1[SI, SI] = {
     val x = p[SI]("x");
     Fundef1("extend" + i, Extend[SI](i, x), x)
@@ -229,11 +238,11 @@ object ASTBfun {
   } //TODO a tester
 
 
-  //Attention, lorsq'on prend le opp d'un unsigned, faut vérifier que ca devient un signe, et que la taille augmente. (commencer par concateter 0)
+  //todo Attention, si on prends le opp d'un unsigned, faudra vérifier que ca devient un signed, et que la taille augmente. (commencer par concateter 0)
   val oppSI: Fundef1R[SI] = {
     val x = p[SI]("xOppSi");
     Fundef1("opp",
-      new Call1(incSI, (new Call1(negSI.asInstanceOf[Fundef1R[SI]], x) with ASTBt[SI]).asInstanceOf[AST[SI]]) with ASTBt[SI], x)
+      new Call1[SI, SI](incSI, (new Call1[SI, SI](negSI.asInstanceOf[Fundef1R[SI]], x) with ASTBt[SI])) with ASTBt[SI], x)
     //new Call1(negSI.asInstanceOf[Fundef1R[SI]], x) with ASTBt[SI], x)
   }
 
@@ -250,37 +259,41 @@ object ASTBfun {
     Fundef1("notNull", Reduce(x12, orB, False()), x12)
   }
 
-  /** return true if integer is  null */
+
+  /** return true if integer is  zero */
   val eqSI: Fundef1[SI, B] = {
     val x12 = p[SI]("xeqSI");
-    Fundef1("notNull", ~new Call1(neqSI, x12) with ASTBt[B], x12)
+    val noteq: Bool = new Call1[SI, B](neqSI, x12) with ASTBt[B]
+    //val neq:Bool= ~(new Call1[SI,B](neqSI, x12)(repr.nomB) with ASTBt[B])
+    val eq: Bool = ~noteq
+    Fundef1[SI, B]("notNull", eq, x12)
   }
 
 
-  /** true if integer is strictly negative */
+  /** true if signed integer is strictly negative */
   val ltSI1: Fundef1[SI, B] = eltSI(-1).asInstanceOf[Fundef1[SI, B]]
 
-  /** true if first argument strictly smaller than second */
-  val ltSI2: Fundef2[SI, SI, B] = {
+  /** true if first argument strictly smaller than second with respect to the modulo order */
+  val ltSI2Mod: Fundef2[SI, SI, B] = {
     val (x, y) = (p[SI]("xLtSi"), p[SI]("yxLtSi"));
-    Fundef2("ltSI2", (new Call1(ltSI1, x - y) with ASTBt[B]), x, y)
+    Fundef2("ltSI2", (new Call1[SI, B](ltSI1, x - y) with ASTBt[B]), x, y) //ltsi1(z) true if z strictly negative
   }
   /** true if first argument strictly greater than second */
   val gtSI2: Fundef2[SI, SI, B] = {
     val (x, y) = (p[SI]("xgtSI2"), p[SI]("ygtSI2"));
-    Fundef2("gtSI2", (new Call1(ltSI1, y - x) with ASTBt[B]), x, y)
+    Fundef2("gtSI2", (new Call1[SI, B](ltSI1, y - x) with ASTBt[B]), x, y)
   }
 
   /** true if integer is  negative or null */
   val leSI1: Fundef1[SI, B] = {
     val x18 = p[SI]("xleSI1");
     Fundef1("leSI1",
-      new Call1(ltSI1, x18) with ASTBt[B] | new Call1(eqSI, x18) with ASTBt[B], x18)
+      new Call1[SI, B](ltSI1, x18) with ASTBt[B] | new Call1[SI, B](eqSI, x18) with ASTBt[B], x18)
   }
 
   val leSI2: Fundef2[SI, SI, B] = {
     val (x, y) = (p[SI]("xleSI2"), p[SI]("yleSI2"));
-    Fundef2("leSI2", (new Call1(leSI1, x - y) with ASTBt[B]), x, y)
+    Fundef2("leSI2", (new Call1[SI, B](leSI1, x - y) with ASTBt[B]), x, y)
   }
 
 
@@ -288,16 +301,17 @@ object ASTBfun {
    * This sign is the 2 bit unsigned int corresponding to -1 (11) 0 (00) and 1 (01) ready to be extended and added   */
   val sign: Fundef1R[SI] = {
     val x = p[SI]("xsign");
-    Fundef1("sign", Concat2(new Call1(neqSI, x) with ASTBt[B], Elt(-1, x)), x)
+    Fundef1("sign", Concat2(new Call1[SI, B](neqSI, x) with ASTBt[B], Elt(-1, x)), x)
   } //TODO remplacer 2 par size.
 
 
   val minSign: Fundef2R[SI] = {
     val (xsi, ysi) = (p[SI]("xminSign"), p[SI]("yminSign"))
     Fundef2("minSign", {
-      val bitsign: ASTBt[B] = Elt(1, xsi) | Elt(1, ysi)
-      val bit0: ASTBt[B] = bitsign | ((~bitsign) &
-        ((Elt(0, xsi) | Elt(0, ysi)))
+      val bitsign: Bool = Elt(1, xsi) | Elt(1, ysi)
+      val bit0: Bool = bitsign | ((~bitsign) & //si le bit de signe est négatif ca doit etre 11
+        //sinon pour que le bit 0 soit 1, il faut que les deux bit O soit 1. car le min est soit zero soit 1
+        ((Elt(0, xsi) & Elt(0, ysi)))
         )
       Concat2(bit0, bitsign)(new repr(SI()))
     },
@@ -341,33 +355,67 @@ object ASTBfun {
       (~bbool).&(eelse)(repr.nomSI).asInstanceOf[ASTBt[SI]],
       bbool, tthen, eelse)
   }
-
-
-  val minSI: Fundef2R[SI] = {
-    val (xsi, ysi) = (p[SI]("xminSI"), p[SI]("yminSI"));
-    Fundef2("minSI", new Call3(condSI, (new Call2(ltSI2, xsi, ysi) with ASTBt[B]), xsi, ysi) with ASTBt[SI],
-      xsi, ysi).asInstanceOf[Fundef2R[SI]]
+  val condUI: Fundef3[B, UI, UI, UI] = {
+    val (bbool, tthen, eelse) = (p[B]("bbool"), p[UI]("tthen"), p[UI]("eelse"))
+    Fundef3("cond", bbool.&(tthen)(repr.nomUI).asInstanceOf[ASTBt[UI]] |
+      (~bbool).&(eelse)(repr.nomUI).asInstanceOf[ASTBt[UI]],
+      bbool, tthen, eelse)
   }
 
-  val minUI: Fundef2R[UI] = {
-    val (xui, yui) = (p[UI]("xminUI"), p[UI]("yminUI"));
-    Fundef2("minUI", Mapp2(xui, yui, xorB), xui, yui)
-  } //TODO a faire correct en utilisant ltUI.
+
+  val minRelSI: Fundef2R[SI] = {
+    val (xsi, ysi) = (p[SI]("xminSI"), p[SI]("yminSI"));
+    Fundef2("minSI", new Call3[B, SI, SI, SI](condSI, (new Call2[SI, SI, B](ltSI2Mod, xsi, ysi) with ASTBt[B]), xsi, ysi) with ASTBt[SI],
+      xsi, ysi).asInstanceOf[Fundef2R[SI]]
+  }
 
   val other: Fundef2R[B] = {
     val (xb, yb) = (p[B]("xb"), p[B]("yb"));
     Fundef2("other", yb, xb, yb)
   }
 
-  /** result in shifting bits towards the tail, entering a zero at the end of the list  */
-  val halveB: Fundef1R[UISI] = {
-    val x = p[UISI]("xhalveB");
+  /** result in shifting bits towards the tail, entering a zero at the end of the list,
+   * it would divide by two is SI was to be UI */
+  val halveBSI: Fundef1R[SI] = {
+    val x = p[SI]("xhalveB");
     Fundef1("halve", Scan1(x, other, False(), Right(), initUsed = true), x)
-  } //TODO a tester
+  } //TODO dire que c'est halveUI
+
+  val halveBUI: Fundef1R[UI] = {
+    val x = p[UI]("xhalveB");
+    Fundef1("halve", Scan1(x, other, False(), Right(), initUsed = true), x)
+  } //TODO dire que c'est halveUI
+
   val orScanRightB: Fundef1R[UISI] = {
     val x = p[UISI]("orScanRightB");
     Fundef1("orScanRight", Scan1(x, orB, False(), Right(), initUsed = false), x)
   }
+
+  /** optimal implementation of comparison between two unsigned integers */
+  val ltUI2: Fundef2[UI, UI, B] = {
+    val (xui, yui) = (p[UI]("xminUI"), p[UI]("yminUI"));
+    val difference = xui ^ yui //true for bits which differs betwen xui and yui
+    val segmentOf1: Uint = Scan1(difference, orB, False(), Right(), initUsed = false) //fills with one, starting from the rightmost 1 to the first leftmost least significant bit
+    //we have to affect segmentof1 because it is read simultaneously at two indexes, for first1.
+    val first1: Uint = ~(new Call1[UI, UI](halveBUI, segmentOf1) with ASTBt[UI]) & segmentOf1 //only the rightmost msb bits remains. halveBui must comes first otherwise it bugs
+    // true if yui was the one with most significant bit of difference set to 1, that is a strict lower than
+    Fundef2("ltUI", new Call1[UI, B](neqUI, first1 & yui) with ASTBt[B], xui, yui) //todo ecrire des xor et des and pour les ui
+  } //TODO a faire correct en utilisant ltUI.
+
+
+  val minUI: Fundef2R[UI] = {
+    val (xsi, ysi) = (p[UI]("xminUI"), p[UI]("yminUI"));
+    Fundef2("minUI", new Call3[B, UI, UI, UI](condUI, (new Call2[UI, UI, B](ltUI2, xsi, ysi) with ASTBt[B]), xsi, ysi) with ASTBt[UI],
+      xsi, ysi).asInstanceOf[Fundef2R[UI]]
+  }
+  /*
+ /** does a reduction from SintVe to SintV, not including the center. Used for distancve  */
+ val reduceMinRelSI[S1 <: S, S2 <: S](arg: ASTLt[T[S1,S2], SI])
+  (implicit m: repr[S1], n: repr[S2], d: chipBorder[S2, S1]): ASTLt[S2, SI] = {
+   val f: Fundef1[(S1, SI), (S2, SI)] = getRedSFun(minRedop[SI], arg.locus)(m, n, repr.nomSI, d)
+   new Call1[(S1, SI), (S2, SI)](f, arg)(repr.nomLR(n, compiler.repr.nomSI)) with ASTLt[S2, SI] {}
+ }*/
+
   // def notNull[R <: I](x: ASTB[R]) = FoldLeft1(x, Or[B])
 
   //(orI.asInstanceOf[Fundef2[R, R, R]], False[R]
@@ -386,6 +434,7 @@ object ASTBfun {
     else (orB.asInstanceOf[Fundef2[R, R, R]], False().asInstanceOf[ASTB[R]])
   }
 
+  val minSignRedop: redop[SI] = (minSign, Intof[SI](1))
   def andRedop[R <: Ring](implicit n: repr[R]): redop[R] = {
     if (n.name.isInstanceOf[SI]) (andSI.asInstanceOf[Fundef2[R, R, R]], Intof[SI](0).asInstanceOf[ASTB[R]])
     else if (n.name.isInstanceOf[UI]) (andUI.asInstanceOf[Fundef2[R, R, R]], Intof[UI](0).asInstanceOf[ASTB[R]])
@@ -397,4 +446,22 @@ object ASTBfun {
     else if (n.name.isInstanceOf[UI]) (xorUI.asInstanceOf[Fundef2[R, R, R]], Intof[UI](0).asInstanceOf[ASTB[R]])
     else (xorB.asInstanceOf[Fundef2[R, R, R]], False().asInstanceOf[ASTB[R]])
   }
+
+
+  /** min on signed integers is relative, min on unsigned integer is absolute */
+  def minRedop[R <: Ring](implicit n: repr[R]): redop[R] = {
+    if (n.name.isInstanceOf[UI])
+      (minUI.asInstanceOf[Fundef2[R, R, R]],
+        ~(ASTB.Intof[UI](0)(repr.nomUI)).asInstanceOf[ASTBt[R]])
+    else if (n.name.isInstanceOf[SI]) {
+      assert(false, "not defined yet, this is a relative minimum")
+      (minRelSI.asInstanceOf[Fundef2[R, R, R]],
+        (new Call1[SI, SI](halveBSI, ASTB.Intof[SI](-1)(repr.nomSI)) with ASTBt[SI]).asInstanceOf[ASTBt[R]])
+    }
+
+    else {
+      assert(false, "not SI nor UI"); null
+    }
+  }
+
 }

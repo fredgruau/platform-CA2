@@ -1,14 +1,29 @@
 package progOfCA
 
+import compiler.ASTLfun.neighbors
 import compiler.AST.{Layer, p}
 import compiler.ASTL.{BoolV, _}
 import compiler.Circuit.hexagon
-import compiler.{AST, ASTLt, B, Circuit, E, F, V}
+import compiler.{AST, ASTBfun, ASTLt, B, Circuit, E, F, T, V}
 import progOfmacros.RedS.exist
 import progOfmacros.SReduce._
 
 /** Simple growth one of the most simple circuit that can be conceived, used for debug */
 class Grow extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
+  val meVois: BoolEv = transfer(e(this))
+  val symed: BoolEv = sym(meVois)
+  val nVe = transfer(symed)
+
+  override val next: BoolV = reduce(ASTBfun.orRedop, nVe) //  make use of defVe brough to us implicitely,
+  // nb if overrid is not written, it does not work!
+  show(this) //shown field will get the name "grow", because we set the name of root to arg(0).lowercase
+  show(meVois)
+  show(symed)
+  show(nVe)
+  show(next)
+}
+
+class GrowExist extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
   val neighbEE: BoolE = exist(this);
   show(neighbEE) //pas besoin de faire intervenir defVe
   override val next: BoolV = exist(neighbEE) //  make use of defVe brough to us implicitely,

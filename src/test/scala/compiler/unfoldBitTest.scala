@@ -57,27 +57,27 @@ class unfoldBitTest extends FunSuite {
     assert(mapscan.toStringTree == "Mapp2xorB (Scan1andBLeft() Mapp1negB (toto  ), Mapp1negB (toto  ))")
   }
 
-  val totop1 = (new Call1(incSI.asInstanceOf[Fundef1R[SI]], toto) with ASTBt[SI])
+  val totop1 = (new Call1[SI, SI](incSI.asInstanceOf[Fundef1R[SI]], toto) with ASTBt[SI])
   /** to test that left and right loop can be separated */
-  val twoWays = (new Call1(orScanRightB.asInstanceOf[Fundef1R[SI]], totop1) with ASTBt[SI])
+  val twoWays = (new Call1[SI, SI](orScanRightB.asInstanceOf[Fundef1R[SI]], totop1) with ASTBt[SI])
   //A present on se lance dans le affectify d'une expression simple: Mapscan
-  val abs = new Call2(minSI, toto, -toto) with ASTBt[SI]
-  val lemin = new Call2(minSI, toto, tata) with ASTBt[SI]
-  val signm2e = new Call1(sign, m2e) with ASTBt[SI]
+  val abs = new Call2[SI, SI, SI](minRelSI, toto, -toto) with ASTBt[SI]
+  val lemin = new Call2[SI, SI, SI](minRelSI, toto, tata) with ASTBt[SI]
+  val signm2e = new Call1[SI, SI](sign, m2e) with ASTBt[SI]
 
-  val signtata = new Call1(sign, -tata) with ASTBt[SI]
+  val signtata = new Call1[SI, SI](sign, -tata) with ASTBt[SI]
 
   val sign1 = Intof[SI](1);
   val signm1 = Extend(2, Intof[SI](-1))
-  val signMin = new Call2(minSign, sign1, signm1) with ASTBt[SI]
-  val signMin2 = new Call2(minSign, sign1, signm1) with ASTBt[SI]
+  val signMin = new Call2[SI, SI, SI](minSign, sign1, signm1) with ASTBt[SI]
+  val signMin2 = new Call2[SI, SI, SI](minSign, sign1, signm1) with ASTBt[SI]
   val totom2 = toto + m2e
-  val negm2e = (~m2e) ()(new repr(SI()))
-  val negnegm2e = (~negm2e) ()(new repr(SI()))
+  val negm2e = ~m2e
+  val negnegm2e = ~negm2e
   val totogt = toto < tata
 
-  val signtotom2 = new Call1(sign, totom2) with ASTBt[SI]
-  val testMinSign = new Call2(minSI, signtotom2, sign2) with ASTBt[SI]
+  val signtotom2 = new Call1[SI, SI](sign, totom2) with ASTBt[SI]
+  val testMinSign = new Call2[SI, SI, SI](minRelSI, signtotom2, sign2) with ASTBt[SI]
 /*  test("codeGen") {
     val cod = new CodeGen(tsymb)
     // autre test effectués -toto totop1 (tata+toto) (tata-toto) (tata<=toto) (twoWays) -toto abs m2e signm2e lemin signMin totom2 totogt signtata

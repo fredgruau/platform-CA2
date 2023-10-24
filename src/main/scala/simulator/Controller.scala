@@ -46,11 +46,10 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
     val varOfMyCell: Array[String] = new Array(progCA.CAmemWidth)
     for ((s, l) <- memFieldsOffset) //we check no more than two variables allocated on a given cell
       for (offset <- l) {
-        assert(varOfMyCell(offset) == null, "two variabels " + varOfMyCell(offset) + " " + s + " in cell " + offset)
+        assert(varOfMyCell(offset) == null, "two variables " + varOfMyCell(offset) + " " + s + " in cell " + offset)
         varOfMyCell(offset) = s
       }
-    for (i <- 0 until varOfMyCell.length)
-      assert(varOfMyCell(i) != null, "unusedMemoryCell " + i)
+    //for (i <- 0 until varOfMyCell.length)       assert(varOfMyCell(i) != null, "unusedMemoryCell " + i) there can in fact be holes in the heap
   };
   invariantFieldOffset
   /** by default, if not supplied, number of lignes is 1/sqrt(2) number of columns */

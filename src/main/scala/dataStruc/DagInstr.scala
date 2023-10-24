@@ -157,8 +157,11 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
       case Read(x) => if (x == str) 1 else 0
       //case Call1(_,exp)=>
       case _ =>
-        val v1 = value.inputNeighbors.map(nbRead(_, str))
-        val v = v1.reduceLeft(_ + _)
+        val v1: Seq[Int] = value.inputNeighbors.map(nbRead(_, str))
+        val v = if (v1.size == 0)
+          0
+        else
+          v1.reduceLeft(_ + _)
         v
     }
 

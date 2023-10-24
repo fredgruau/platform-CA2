@@ -146,7 +146,11 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
             (op.p1.nameP -> firstArg) +
             (op.p2.nameP -> x.asInstanceOf[ASTBt[B]].boolifyForIndexI(iShifted, l, null, env)) +
             (op.p3.nameP -> y.asInstanceOf[ASTBt[B]].boolifyForIndexI(iShifted, l, null, env))
-          val e = op.arg.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, newEnv)
+          val optimizedOpBody = //when z is true, carry(x,y,z) = x | y which is bychance also   op.arg.inputNeighbors(1).inputNeighbors(1) in the body of carry
+            if (op.name.equals("carry") && newEnv(op.p3.nameP).equals(True()))
+              op.arg.inputNeighbors(1).inputNeighbors(1)
+            else op.arg
+          val e = optimizedOpBody.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, newEnv)
           if (l.lastIter(i)) e
           else affBoolConst(sc.scanVar, e, l)
         }
@@ -173,11 +177,16 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
       case ex@Extend(n: Int, exp: ASTBg) =>
         val nbitExp = exp.nBit(l.tSymbVar, l.coalesc, env)
         var newExp: ASTBt[B] = null
-        if (i < nbitExp) newExp = exp.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, env)
-        if (exp.mym.name == SI() && i == nbitExp - 1) affBoolConst(ex.scanVar, newExp, l) //we store the sign bit
-        else if (i < nbitExp) newExp
-        else if (exp.mym.name == UI()) ASTB.False()
-        else if (exp.mym.name == SI()) l.readWithConst(ex.scanVar) // sign bit replicates
+        if (i < nbitExp) newExp =
+          exp.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, env)
+        if (exp.mym.name == SI() && i == nbitExp - 1)
+          affBoolConst(ex.scanVar, newExp, l) //we store the sign bit
+        else if (i < nbitExp)
+          newExp
+        else if (exp.mym.name == UI())
+          ASTB.False()
+        else if (exp.mym.name == SI())
+          l.readWithConst(ex.scanVar) // sign bit replicates
         else throw new Exception("extend bordel probably is UISI and we 'd need to know wether it is SI or UI")
       case exp@Intof(value: Int) =>
         val t = exp.mym.name.asInstanceOf[I];
@@ -362,6 +371,8 @@ object ASTB {
   type Uint = ASTBt[UI];
   type Sint = ASTBt[SI];
 
+  type Bool = ASTBt[B];
+
 
   /** Communication Constructors, work for both Booleans and integers  */
   case class Shift[R <: Ring](arg: ASTBt[R], right: Boolean)(implicit n: repr[R]) extends ParOp[R](Both()) with Singleton[AST[_]]
@@ -374,7 +385,7 @@ object ASTB {
 
 
   /** Bolean Constructor */
-  class Bool extends ASTB[B] with EmptyBag[AST[_]]
+  //class Bool extends ASTB[B] with EmptyBag[AST[_]]
 
   final case class True()(implicit n: repr[B]) extends ASTB[B] with EmptyBag[AST[_]] {
     override def isConst = true
@@ -526,7 +537,8 @@ object ASTB {
    *                         an unop Extend operators
    * @return bit size of $exp
    */
-  def nbitExpAndParam(nbitASTBParam: immutable.HashMap[AST[_], Int], exp: AST[_], paramBitIncrease: mutable.HashMap[String, Int]): Int = {
+  def nbitExpAndParam(nbitASTBParam: immutable.HashMap[AST[_], Int], exp: AST[_],
+                      paramBitIncrease: mutable.HashMap[String, Int]): Int = {
     /**
      * records in  paramBitIncrease, parameters that needs to be extended, because they are combined with Ints having more bits.
      *
@@ -588,6 +600,22 @@ object ASTB {
           upwardCorr(fParamName, e.asInstanceOf[ASTBg])
           else if (f.p2.nameP == fParamName)
             upwardCorr(fParamName, e2.asInstanceOf[ASTBg])
+        nbitRes
+      case Call3(f, e, e2, e3) => //call2 is mainly used for cond, the first arg is a bool
+        val fp1 = nbitExpAndParam(nbitASTBParam, e, paramBitIncrease)
+        val fp2 = nbitExpAndParam(nbitASTBParam, e2, paramBitIncrease)
+        val fp3 = nbitExpAndParam(nbitASTBParam, e3, paramBitIncrease)
+        val nbitRes = nbitExpAndParam(nbitASTBParam + (f.p1 -> fp1) + (f.p2 -> fp2) + (f.p3 -> fp3), f.arg, paramBitIncrease)
+        //we must propagate from f.p1 and  f.p2, back to ASTL's binop parameter
+        //we look if paramBitInccrease contains parameter's name of f, and if so, tries to convert them to former parameter prsent in nbitASTBParam
+        for (fParamName <- paramBitIncrease.keys)
+          if (f.p1.nameP == fParamName) //paramBitIncrease will contain all the parameters which should be extended,
+          //in fact only the "oldest ancestor" is usefull, it will cause an Extend to be included in the ASTL node
+            upwardCorr(fParamName, e.asInstanceOf[ASTBg])
+          else if (f.p2.nameP == fParamName)
+            upwardCorr(fParamName, e2.asInstanceOf[ASTBg])
+          else if (f.p3.nameP == fParamName)
+            upwardCorr(fParamName, e3.asInstanceOf[ASTBg])
         nbitRes
 
       case e@Param(_) =>

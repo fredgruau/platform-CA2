@@ -24,7 +24,8 @@ object ASTBt {
    * @return int parameter of f, whose number of bits is equal to the number of bit of f's result
    *         we use a table  paramSameBitSize in order to avoid recomputing the value all the time
    */
-  private[ASTBt] def paramSameBitSize(f: Fundef[_]): Set[String] = {
+  // private[ASTBt]
+  def paramSameBitSize(f: Fundef[_]): Set[String] = {
     if (!paramSameBitSizeMem.contains(f.name))
       paramSameBitSizeMem.addOne(f.name -> (f.body.asInstanceOf[ASTBt[_]].sameIntBitSize()))
     paramSameBitSizeMem(f.name)
@@ -265,10 +266,10 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
     for (s <- inputNeighbors) {
       r = r.union(s.asInstanceOf[ASTBg].SetDirAndReturnChangedDir()) //retrieves already found inverted directions
       if (s.isInstanceOf[ParOp[_]])
-        dirs = dirs + s.asInstanceOf[ParOp[_]].dirNarrowed
+        dirs = dirs + s.asInstanceOf[ParOp[_]].dirNarrowed //dirs contains the narrowed dir of the children
     }
-    if (dirs.contains(ASTB.Left()) && dirs.contains(ASTB.Right())) {
-      r = r ++ inputNeighbors.filter(_.asInstanceOf[ParOp[_]].dirNarrowed == myDir.narrowed.opposite).asInstanceOf[List[ASTBg]]
+    if (dirs.contains(ASTB.Left()) && dirs.contains(ASTB.Right())) { // I added the filtering very recently
+      r = r ++ inputNeighbors.filter(_.isInstanceOf[ParOp[_]]).filter(_.asInstanceOf[ParOp[_]].dirNarrowed == myDir.narrowed.opposite).asInstanceOf[List[ASTBg]]
       me.dirNarrowed = myDir.narrowed
     }
     else if (dirs.contains(ASTB.Left()))

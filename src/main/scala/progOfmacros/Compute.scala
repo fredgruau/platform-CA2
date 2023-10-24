@@ -28,15 +28,15 @@ object Compute {
   val slopeDeltaDef: Fundef1[(V, SI), ((T[V, E], B), (V, SI))] = {
     //val x:IntV= p[V, SI]("dis")
     val d = p[V, SI]("dis")
-    val s: InteV = sende(List(d, d, d, -d, -d, -d))
+    val s: IntVe = sende(List(d, d, d, -d, -d, -d))
     // val tepred = transfer(e(x))
     val tepred = transfer(s)
     //   val g: ASTLt[E, SI] = subESI(tepred)
     val g: ASTLt[E, SI] = addESI(tepred)
-    val grad: IntvE = sendv(List(g, -g))
+    val grad: IntEv = sendv(List(g, -g))
     //val grad: IntvE = tepred - sym(tepred)
     // TODO should use opp to make only one subtraction, we need to adress selectively the two neighbors of an edge.
-    val slope: BooleV = transfer(lt(grad))
+    val slope: BoolVe = transfer(lt(grad))
 
     val delta: IntV = minR(transfer(sign(grad + -2)))
     //val temp: BoolfV = xorR2(tslope )
@@ -48,9 +48,9 @@ object Compute {
   }
 
   /** Calls boolgrad, and separate the two results.  */
-  def slopeDelta(d: IntV): (BooleV, IntV) = {
+  def slopeDelta(d: IntV): (BoolVe, IntV) = {
     val r = Call1(slopeDeltaDef, d);
-    (new Heead(r) with BooleV, new Taail(r) with IntV)
+    (new Heead(r) with BoolVe, new Taail(r) with IntV)
   }
 
 

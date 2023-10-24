@@ -27,7 +27,7 @@ object BlobMacro {
   }
 
   /** wrapper to  Call nbcc  */
-  def nbcc(b: BoolfV): UintV = new Call1(nbccDef, b) with UintV
+  def nbcc(b: BoolVf): UintV = new Call1(nbccDef, b) with UintV
 
 
   /** useless wrapper to nbcc, to test a non root main. */
@@ -39,7 +39,7 @@ object BlobMacro {
   }
 
   /** wrapper to  Call nbcc  */
-  def nbccBis(b: BoolfV): UintV = new Call1(nbccBis, b) with UintV
+  def nbccBis(b: BoolVf): UintV = new Call1(nbccBis, b) with UintV
 
 
   /** From a boolfV, computes the number of true connected components */

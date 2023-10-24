@@ -288,7 +288,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
     allAdresses ++= (paramR zip (layerSpace to layerSpace + paramR.length)) //adresses of  result parameter to the mainRoot
     val nbGlobals = allAdresses.size //the number of variables allways in the heap,
     // where morover, the distincts bit planes are found in sequence in the heap
-    val isshownAndNotGlobal: HashSet[String] = HashSet() ++ shown diff allAdresses.keys.toSet //some shown variable are already in the globals, we do not need to show them
+    val isshownAndNotGlobal = mutable.LinkedHashSet[String]() ++ shown diff allAdresses.keys.toSet //some shown variable are already in the globals, we do not need to show them
     val hs = new HeapStates[InstrNoLayersNorParam](noLayersInstr, Vector(null), isshownAndNotGlobal)
     //On itere sur hs. cela est complexe, on recupere pour chaque instr, l'état courant du heap pour modeliser un appel a une autre CAbranche      res = res ++ instr.codeGen(heapCur, funs, nbGlobals, emptyCoalesc)
     for ((instr, (heapCur, adresses)) <- dagis.visitedL.reverse zip hs) {
@@ -354,7 +354,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   lazy val layerSubProgStrict = layers(subDataProgs.values.toList) //: Predef.Map[String, U] = ( subDataProgs.values.toList).flatMap(_.tSymbVar.filter(x => x._2.k.isLayerField).toList).toMap
   /** takes into account the layer of this */
   lazy val layerSubProg2: Predef.Map[String, U] = layers(this :: subDataProgs.values.toList) //(this :: subDataProgs.values.toList).flatMap(_.tSymbVar.filter(x =>  x._2.k.isLayerField).toList).toMap
-
+  //lazy val layersMain: Predef.Map[String, U] =layers(List(this))
   /**
    *
    * @param nameFile non du fichier à trous

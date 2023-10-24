@@ -349,7 +349,8 @@ object Packet {
       val pipelined = instrs.filter(!remainAsAffects.toSet.contains(_)) //all the instructions not leading to affectation, will be pipelined.
       val (init, step, fin) = dir match {
         case ASTB.Left() => (0, 1, loopSize)
-        case ASTB.Right() => (loopSize, -1, -1)
+        case ASTB.Right() =>
+          (loopSize - 1, -1, -1) //changed very recently first assing is 2 for integer on three bits, last assign is zero
         case _ => throw new Exception("direction should have been narrowed to Left or right")
       }
       new BitLoop(t, c, const, dir, loopSize, remainAsAffects, instrs, init, step, fin)

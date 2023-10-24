@@ -480,7 +480,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     /** values being reduced must be id of variable
      * so we affectify those, before bitIfying,
      * because that puts new ids in the symbol table
-     * for  which we will also need to know the size
+     * for  which we will also need to know the bit size
      * We also affectify the reduced value in order to reuse the register
      * which accumulates the reduction */
     val dagis2 = dagis1.affectIfy(redops3(_), "auxO");
@@ -583,7 +583,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   def macroify(): DataProg[InfoNbit[_]] = {
     /** @param s field identifier
      * @return True if field  with id s needs to be stored in CA memory  */
-    def needStored(s: String): Boolean = tSymbVar(s).k.needStored
+    def needStored(s: String): Boolean =
+      tSymbVar(s).k.needStored
 
     val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
     /**
@@ -774,12 +775,18 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     val newDagNodes = groupNodes.flatMap(transform).toList
     WiredInOut.setInputAndOutputNeighbor(newDagNodes)
     val newGenerators = newDagNodes.filter({ case a: WiredInOut[_] => a.outputNeighbors.isEmpty; case _ => true }) // generators are dagNodes with no output
+    //this version does not take into account the presence of cycles
+    // generators should rather be defined as zone which contains generator of former dag.
+    val formerGenerators = dagis.allGenerators.toSet.asInstanceOf[Set[Affect[_]]]
+    val newGenerators2 = newDagNodes.filter(z => (formerGenerators.intersect(z.instrs.toSet)).nonEmpty)
     /**
-     * We here assume that the zones form a Dag, it could fail, in which case we should look back to the code
-     * and see if we can formulate the code differently so as to obtain a Dag
+     * Building of zonedag assumes that the zones form a Dag, it could fail,
+     * Possible cycles will be detected during dag constructionin
+     * in this case, we should look back to the code
+     * and split the macro in two, ( by adding an addistional show), so as to remove the cycle
      * a Dag for zones simplifies a lot the following picking phase
      */
-    val zoneDag = new Dag(newGenerators) //reconstruct dag from generators,
+    val zoneDag = new Dag(newGenerators2) //reconstruct dag from generators,
 
     zoneDag.visitedL.map(_.addPartitionOut()) //set partition constraints towards output neighbors
     //now we know if the TCC will fold, before we pick, we could try to further constrain the cycle so as to reuse
@@ -1743,7 +1750,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       val af = Affect(instr.names(0), decall) //reconstruit l'affectation sans le store
       val trueDag = new DagInstr(List(af)) //reconstruit le Dag depuis le generateur
       trueDag.dagAst.addGreaterOf(List(decall)) //add all subtree of map, scan to dags
-      val iT1: collection.Set[AST[_]] = trueDag.inputTwice.filter(isNotRead)
+      val iT0: collection.Set[AST[_]] = trueDag.inputTwice
+      val iT1 = iT0.filter(isNotRead)
       val iT: collection.Set[AST[_]] = iT1.filter(ASTB.isNotMap1Read(iT1)) //we could filter out more stuff because it consumes register and registers are a precious ressource
       val outputStoredSet = trueDag.dagAst.visitedL.filter(outputStored).toSet //affectify operators which need to store their outputs
       val chDir: Set[ASTBg] = decall.SetDirAndReturnChangedDir()

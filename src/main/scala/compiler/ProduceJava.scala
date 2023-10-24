@@ -182,6 +182,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
     }
 
     val spatialOfffsetsInt = offsetsInt((tSymbVar ++ layerSubProgStrict).filter(x => noDollarNorHashtag(x._1)))
+    // val spatialOfffsetsIntMain = offsetsInt((tSymbVar ++ layersMain).filter(x => noDollarNorHashtag(x._1)))
     val (theCallCode, decompositionLocus, theDisplayed) = javaOfTheCallInTheMain()
 
     def initLayer(spatialLayer: Map[String, InfoNbit[_]]): HashMap[String, String] = {
@@ -191,13 +192,17 @@ trait ProduceJava[U <: InfoNbit[_]] {
     def anchorOneVar(oneVar: (String, List[Int])) = {
       val ints = oneVar._2
       var res = ints.map("m[" + _ + "]").mkString(",")
-      if (ints.size > 1) res = " new int[][]{" + res + "}" //we have a 2D array
+      if (!isBoolV(oneVar._1))
+        res = " new int[][]{" + res + "}" //we have a 2D array
       res = oneVar._1 + "=" + res;
       res
     }
 
+    // def javaIntArray(s: String) = (if (isBoolV(s)) ("int [] ") else ("int [][] ")) + s
+
+
     def anchorNamed(offset: Map[String, List[Int]]): String = {
-      val (offset1D, offset2D) = offset.partition(x => x._2.size == 1)
+      val (offset1D, offset2D) = offset.partition(x => isBoolV(x._1)) //x._2.size == 1)
       (if (offset1D.nonEmpty) "int[]" + offset1D.map(anchorOneVar(_)).mkString(",") + ";\n" else "") +
         (if (offset2D.nonEmpty) "int[][]" + offset2D.map(anchorOneVar(_)).mkString(",") + ";\n" else "")
     }
@@ -213,7 +218,6 @@ trait ProduceJava[U <: InfoNbit[_]] {
           (if (var1D.nonEmpty) "int[]" + var1D.mkString(",") + ";\n" else "") +
             (if (var2D.nonEmpty) "int[][]" + var2D.mkString(",") + ";\n" else "")
         }
-
         ("" + DeclNamed(spatialOfffsetsInt))
       },
       "DECLNOTNAMED" -> {
@@ -251,8 +255,9 @@ trait ProduceJava[U <: InfoNbit[_]] {
         anchorNotNamed(decompositionLocus)
       },
       "COPYLAYER" -> { //iL contains only the variable totoll not toto
-        val iL = initLayer(layerSubProg2).keys.filter(isLayer(_)).filter(x => tSymbVar.contains(x.drop(2))) //we check that the layer without ll exists
+        val iL = initLayer(layerSubProg2).keys.filter(isLayer(_)).filter(x => !x.startsWith("lldef") && tSymbVar.contains(x.drop(2))) //we check that the layer without ll exists
         //anchoring both lltoto and toto in memory.
+        //todo faut virer def
         val llandNotll = spatialOfffsetsInt.filter(x => iL.contains(x._1) || iL.contains("ll" + x._1))
         "" + anchorNamed(llandNotll) +
           iL.toList.map(s => "copy(" + s + "," + s.drop(2) + ");").mkString("")
@@ -269,7 +274,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
           offset.map(offsetOneVar(_)).mkString("\n")
         }
 
-        fieldOffset(spatialOfffsetsInt)
+        val spatialOfffsetsInt2 = spatialOfffsetsInt.filter(x => !x._1.startsWith("def"))
+        fieldOffset(spatialOfffsetsInt2)
       },
       "FIELDLOCUS" -> {
         /**

@@ -50,13 +50,13 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //print(prog1)
 
     val prog2 = prog1.treeIfy();
-    //  print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
+    print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
 
     val prog3 = prog2.procedurIfy();
     //print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
     val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
-    print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
+    // print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
     val prog5: DataProg[InfoNbit[_]] = prog4.macroify();
     //    print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
@@ -77,17 +77,17 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
 
     val prog8: DataProg[InfoNbit[_]] = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
-    //  print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
+    //    print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
     val prog10: DataProgLoop[InfoNbit[_]] = prog8.loopIfy()
-    // print("loopify1010101010101010101010101010101010101010"+prog10)
+    print("loopify1010101010101010101010101010101010101010" + prog10)
 
     val prog11 = prog10.unfoldInt()
     //  print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
     val prog12 = prog11.coaalesc() //allocates memory
     // System.out.println(prog12.allLayers)
-    //print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
-    print("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaCode)
+    //  print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
+    ("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaCode)
   }
 }
 
@@ -148,7 +148,7 @@ object Circuit {
         case E() => /*eV->vE*/
           // val Array(e, ne, nw, w, sw, se) = t(0)
           val Array(e, se, sw, w, nw, ne) = t(0)
-          Array(Array(tm1(shiftL(w)), tm1(e)), Array(tm1(se), nw), Array(tm1(sw), shiftR(ne))) //ici on pousse les tm1s vers la fin pour factoriser les tm1 dans transfer(broadcast) de V vers vE
+          Array(Array(tm1(w), tm1(shiftL(e))), Array(tm1(se), nw), Array(tm1(sw), shiftR(ne))) //ici on pousse les tm1s vers la fin pour factoriser les tm1 dans transfer(broadcast) de V vers vE
         case F() => /*Vf->Fv*/
           val Array(se, s, sw, nw, n, ne) = t(0);
           Array(Array(n, tm1(shiftL(sw)), tm1(se)), Array(tm1(s), shiftR(ne), nw))

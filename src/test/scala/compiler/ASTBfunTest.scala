@@ -142,7 +142,7 @@ class ASTBfunTest extends FunSuite {
     assert(eval(quatrelt0, env) == List(false))
   }
 
-  val cinqLtquatre = new Call2(ltSI2, cinq, quatre) with ASTBt[B]
+  val cinqLtquatre = new Call2(ltSI2Mod, cinq, quatre) with ASTBt[B]
   test("cinq<quatre") {
     assert(eval(cinqLtquatre, env) == List(false))
   }
@@ -158,8 +158,8 @@ class ASTBfunTest extends FunSuite {
   }
 
   //test cond et min
-  val min4et5 = new Call2(minSI, quatre, cinq) with ASTBt[SI]
-  val min5et4 = new Call2(minSI, cinq, quatre) with ASTBt[SI]
+  val min4et5 = new Call2(minRelSI, quatre, cinq) with ASTBt[SI]
+  val min5et4 = new Call2(minRelSI, cinq, quatre) with ASTBt[SI]
   test("cond et min") {
     assert(eval(min4et5, env) == List(false, false, true, false))
   }
@@ -188,7 +188,7 @@ class ASTBfunTest extends FunSuite {
   }
 
   //test décalllage vers la gauche
-  val quatrebis = Call1(halveB.asInstanceOf[Fundef1R[SI]], sept)
+  val quatrebis = Call1(halveBSI.asInstanceOf[Fundef1R[SI]], sept)
   test("Halve") {
     assert(toInt(eval(quatrebis, env)) == 3)
   }

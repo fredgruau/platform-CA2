@@ -4,7 +4,7 @@ import compiler.Circuit.iTabSymb
 
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.collection.{immutable, mutable}
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.LinkedHashSet
 
 /**
  * Allows to iterates on the different values taken by the heap, during execution of the instruction of a main loop
@@ -17,12 +17,12 @@ import scala.collection.mutable.ArrayBuffer
  */
 class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class for the mainRoot's adress
                                      var heap: immutable.Vector[String] = Vector(null), //we put one value
-                                     val shown: HashSet[String] = HashSet()
+                                     val shown: LinkedHashSet[String] = LinkedHashSet()
                                     ) extends Iterable[(Vector[String], iTabSymb[Int])] {
   /** computes the Hashset of variables live after each packet */
-  def livVars: List[HashSet[String]] = {
-    var liveVar: HashSet[String] = shown //shown variable are live at the end, because we need to access their state in order to display them
-    var liveVars: List[HashSet[String]] = List(liveVar) //strings contained in buffer
+  def livVars: List[mutable.LinkedHashSet[String]] = {
+    var liveVar: mutable.LinkedHashSet[String] = shown //shown variable are live at the end, because we need to access their state in order to display them
+    var liveVars: List[mutable.LinkedHashSet[String]] = List(liveVar) //strings contained in buffer
     for (p <- packets.reverse) { //we compute live vars, starting from the end towards the beginning
       liveVar = liveVar.union(p.usedVars()).diff(p.names.toSet)
       liveVars ::= liveVar
@@ -41,21 +41,33 @@ class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class
    */
   var adress: HashMap[String, Int] = HashMap()
 
+  /** a given variables should be present a single time */
+  def checkSingleOccurence = {
+    var nbOcc = new HashSet[String]()
+    for (i <- 0 until heap.size)
+      if (heap(i) != null) {
+        assert(!nbOcc.contains(heap(i)), heap(i) + "alreadyDefined!")
+        nbOcc = nbOcc + heap(i)
+      }
+  }
+
   /**
    * @param valu new items to be stored in memory
    *             stores variables in memory, updates the mapping res
    */
-  def place(valu: Set[String]): Unit = {
+  def place(valu: LinkedHashSet[String]): Unit = {
     var value = valu
     var i: Int = 0
     while (value.nonEmpty) {
       if (i == heap.size) {
-        heap = heap :+ null //we need to extend the memory
+        heap = heap :+ null //we need to extend the memory, we add a cell with a null content
         heapSize += 1
       }
       if (heap(i) == null) { //we found an empty spot to store one of the time in value
         val e = value.head
         heap = heap.updated(i, e)
+        //System.out.println("HeapState: "+heap)
+        checkSingleOccurence
         value = value - e
         if (!adress.contains(e))
         //  it can easily be the case that several iterations on the heaps are performed; for printing for example
@@ -64,6 +76,7 @@ class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class
       }
       i = i + 1
     }
+
   }
 
   /** remove the variables from memory */
@@ -90,7 +103,7 @@ class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class
     override def next(): (Vector[String], iTabSymb[Int]) = {
       val p = packetLeft.head
       val newAllocatedAdress: List[String] = p.names
-      place(newAllocatedAdress.toSet)
+      place(new LinkedHashSet[String] ++ newAllocatedAdress)
       val res = heap //state will evolve with the following unplace, we need to point to the heap's state before that unplace.
       val l = liveVarLeft.head
       unPlace(p.names.toSet.union(liveVar).diff(l))

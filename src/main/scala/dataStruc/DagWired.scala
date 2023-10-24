@@ -471,7 +471,8 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
    * @param alignPerm alignement table for transfer variables v1 computed as exp where v2 apears in exp, a((v1,v2) indicates how to align v1 on v2
    * @return Iterable of instructions  with common root,  alignement on root for each instructions,
    */
-  def alignedComponents(p: (T, T) => Boolean, alignPerm: Map[(String, String), Array[Int]]): (Iterable[List[T]], Map[String, Array[Int]], Map[String, T]) = {
+  def alignedComponents(p: (T, T) => Boolean, alignPerm: Map[(String, String), Array[Int]]):
+  (Iterable[List[T]], Map[String, Array[Int]], Map[String, T]) = {
     /** Uses the union find algorithm with wrap */
     case class Wrap(elt: T) extends Union[Wrap] with dataStruc.Align2[Wrap] {
       /**

@@ -33,7 +33,7 @@ trait MyOpInt2[L <: Locus, R <: Ring] {
 
   /** minus  must convert UI to SI. */
   def -[U >: R <: I](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, SI] = ring match {
-    case SI() => add[L, SI](this.asInstanceOf[ASTL[L, SI]], -that)
+    case SI() => add[L, SI](this.asInstanceOf[ASTLt[L, SI]], -that)
     case UI() => add[L, SI](uItoSIL(this.asInstanceOf[ASTL[L, UI]]), -uItoSIL(that.asInstanceOf[ASTL[L, UI]]))
   }
 

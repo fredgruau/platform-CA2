@@ -648,6 +648,7 @@ trait InitSelect {
     else initMethodName
     finalInitMethodName match {
       case "0" => zeroInit
+      case "0" => unInit
       case "center" => centerInit
       case "debug" => zeroInit
       case "def" => defInit(l) //here we must take into account the locus, we use a method instead of a lazy val in order to save space
@@ -684,6 +685,10 @@ trait InitSelect {
     for (j <- 0 until nbColCA) setBoolVField(0, j)
   }
   private lazy val zeroInit: InitMaald = new InitMaald(1) {} //nothing to do, the boolV field would be zero by default.
+  private lazy val unInit: InitMaald = new InitMaald(1) {
+
+
+  } //n
   private lazy val dottedBorderInit: InitMold = new InitMold(V(), 1) {
     for (i <- 0 until nbLineCA) if (i % 2 == 0) {
       setBoolVField(i, 0);

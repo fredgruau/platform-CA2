@@ -74,7 +74,8 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
 
   def unShifted = names(0).drop(5)
 
-  def myZone2(tZone: Map[String, Zone], myRoot: Map[String, Instr]) = tZone(myRoot(names.head).names.head)
+  def myZone2(tZone: Map[String, Zone], myRoot: Map[String, Instr]) =
+    tZone(myRoot(names.head).names.head)
 
   def isFolded2(tZ: Map[String, Zone], myRoot: Map[String, Instr]) = myZone2(tZ, myRoot).folded
 
@@ -253,7 +254,7 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
     case CallProc(f, names, exps) =>
       val newexps = exps.map(_.asInstanceOf[ASTLt[_, _]].bitIfyAndExtend(cur, expBitSize, newTSymb))
       val nbitarg = newexps.map(a => expBitSize(a)) //.toList.flatten
-      val newname = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _)
+      val newname = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _) //we make precise in the function name, the number of bits of arguments
 
       //  if (f.size>2 && sysInstr.contains(f.substring(0,3)))
       if (isSysInstr(f))
