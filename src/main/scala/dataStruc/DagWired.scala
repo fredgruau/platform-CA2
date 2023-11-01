@@ -341,18 +341,40 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
    * @return Like propagate instead we work only on visitedL, because we want to keep the schedule.
    * */
   def propagateUnitKeepSchedulereverse(rewrite: T => T, otherInstr: List[T] = List()): List[T] = {
-    visitedL = visitedL.reverse.map(rewrite).reverse
+    var newGenerators: List[T] = List()
+    visitedL = visitedL.reverse.map(elt => {
+      val newElt = rewrite(elt)
+      if (allGenerators.contains(elt)) {
+        newGenerators ::= newElt
+      }
+      newElt
+    }).reverse //on le parcours dans le bon
     WiredInOut.setInputAndOutputNeighbor(visitedL ::: otherInstr)
-    insertBeforeFirstUse(otherInstr)
+    allGenerators = newGenerators
+    val res = insertBeforeFirstUse(otherInstr)
+    res
   }
+
+  private def insertJustAfterUse() = {
+    /** for each instruction i, computes the  list of affectation of tmun used by i, in the right order */
+    def tmunsof(i: T, d: Int): List[T] = {
+      //assert(d<2,"y a des tm1 emboité, méfiance, verifier si c'est correct")
+      val tmunsOfi = i.inputNeighbors.filter(_.names(0).startsWith("tmun"))
+      if (tmunsOfi.isEmpty) List(i)
+      else List(i) ::: tmunsOfi.flatMap(tmunsof(_, d + 1)) //recursive call
+    }
+
+    visitedL = visitedL.reverse.flatMap(tmunsof(_, 0)).reverse
+  }
+
   /**
    * @param tm1Instrs instructions affecting a tm1 variable (set at the end of the preceding loop)
    *                  they should be inserted within the existing instruction
    *                  more precisely  we insert newId <-exp after the affectations that uses newId
-   *                  and ALSO after the affectation that defines variable used by newId
-   *
+   *                  NOOONOOONOOO and ALSO after the affectation that defines variable used by newId NOOONOOONOOONOOO
+   *                  but BEFORE the affectation that defines variable used by newId, otherwise the exp would not be the same
    */
-  private def insertAfterLastUseWrite(tm1Instrs: List[T]) = {
+  private def insertAfterLastUseWritObsolete(tm1Instrs: List[T]) = {
 
     var nbUsed: HashMap[T, Int] = HashMap.empty ++
       //  otherInstr.map((instr: T) => (instr -> ( instr.outputNeighbors.size + instr.inputNeighbors.size))) //compte les output
@@ -411,7 +433,6 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
   }
 
 
-
   /**
    *
    * @param rewrite    each instruction is rewritten into O,1, or several instruction, preserve generators
@@ -420,6 +441,7 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
    *         in general  rewriting of generators may not produce  generators, for example, in the case of the zone dag
    **/
   def propagate(rewrite: T => List[T], otherInstr: List[T] = List()): Dag[T] = {
+    checkGenerators
     var newGenerators = (allGenerators).flatMap(rewrite)
     var newNonGenerators = nonGenerators.flatMap(rewrite)
     if (newGenerators.size == 0) //the return instruction was skipped
@@ -433,6 +455,15 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
   }
 
   /**
+   * check that  generators belong to Dag's elements
+   */
+
+  private def checkGenerators = {
+    val inter = visitedL.toSet.intersect(allGenerators.toSet)
+    assert(inter.size == allGenerators.size, "there are some generators not in the dag" + allGenerators.toSet.diff(inter) + "\n" + visitedL)
+
+  }
+  /**
    *
    * @param rewrite    each instruction is rewritten into O,1, or several instruction, preserve generators
    * @param otherInstr more instructions to be be added , we do not know where to insert them
@@ -440,10 +471,12 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
    *         the other Instructions are tm1s which must be inserted not according to topological order, but after last use
    *         so as to generate a delay.
    **/
-  def propagateUnit3(rewrite: T => T, otherInstr: List[T] = List()): Unit = {
+  def propagateUnit3InsertTmunAfterUse(rewrite: T => T, otherInstr: List[T] = List()): Unit = {
     visitedL = visitedL.map(rewrite)
     WiredInOut.setInputAndOutputNeighbor(visitedL ::: otherInstr)
-    insertAfterLastUseWrite(otherInstr)
+
+    insertJustAfterUse
+    //insertAfterLastUseWrite(otherInstr)
     //visitedL=(otherInstr.reverse):::visitedL  //this would insert  the looping on variables at the end, which is not suitable
   }
 
@@ -471,7 +504,7 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
    * @param alignPerm alignement table for transfer variables v1 computed as exp where v2 apears in exp, a((v1,v2) indicates how to align v1 on v2
    * @return Iterable of instructions  with common root,  alignement on root for each instructions,
    */
-  def alignedComponents(p: (T, T) => Boolean, alignPerm: Map[(String, String), Array[Int]]):
+  def alignedComponents(p: (T, T) => Boolean, alignPerm: Map[(String, String), Array[Int]], hasToAlign: T => Boolean):
   (Iterable[List[T]], Map[String, Array[Int]], Map[String, T]) = {
     /** Uses the union find algorithm with wrap */
     case class Wrap(elt: T) extends Union[Wrap] with dataStruc.Align2[Wrap] {
@@ -484,7 +517,11 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
         alignPerm((elt.names.head, n.elt.names.head)) //neighborAligned(n.names(0))  is an alignement from "this" to n,
         else if (alignPerm.contains((n.elt.names.head, elt.names.head))) //otherwise, it must be the opposite i.e. this is a used var of n. we find an alignement from n to "this", we invert
         Align2.invert(alignPerm((n.elt.names.head, elt.names.head)))
-        else null //throw new RuntimeException(" Not find alignement ")
+        else {
+          if (hasToAlign(elt) || (hasToAlign(n.elt)))
+            throw new RuntimeException(" Not find alignement (for updating alignperm )between " + n + " and " + this);
+          null;
+        }
       }
     }
     //computes transfer variables which are names for which some alignemnent are defined, it is orirented, this is why shift do not appear..
@@ -492,7 +529,9 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
     //println(transferVariable)
     /** mapping allowing  to find the wrapper of a given instruction */
     val wrap = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))
-    for (src <- visitedL) for (target <- src.inputNeighbors) if (p(src, target)) wrap(src).union(wrap(target)) //computes a common root for elements of one component
+    for (src <- visitedL) for (target <- src.inputNeighbors)
+      if (p(src, target))
+        wrap(src).union(wrap(target)) //computes a common root for elements of one component
     val alignToRoot = immutable.HashMap.empty[String, Array[Int]] ++ visitedL.map(x => x.names.head -> wrap(x).alignToRoot)
     val myRoot = immutable.HashMap.empty[String, T] ++ visitedL.map(x => x.names.head -> wrap(x).root.elt)
     (visitedL.groupBy(wrap(_).root).values, alignToRoot, myRoot)

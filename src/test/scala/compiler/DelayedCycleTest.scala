@@ -1,8 +1,9 @@
 package compiler
 
 import AST._
-import ASTL.{IntV, delayedL}
+import ASTL.delayedL
 import Circuit.hexagon
+import compiler.SpatialType.IntV
 import org.scalatest.FunSuite
 
 class DelayedCycleTest extends FunSuite {

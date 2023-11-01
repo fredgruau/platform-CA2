@@ -209,6 +209,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
     //we use the same template technique as the one used for CAloops
     replaceAll("src/main/scala/compiledCA/template/templateCA.txt", Map(
+      "GATECOUNT" -> totalOp.toString,
       "NAMECA" -> radicalOfVar(paramR(0)).capitalize,
       "MEMWIDTH" -> ("" + mainHeapSize), //TODO on calcule pas bien la memwidth)
       "DECLNAMED" -> {

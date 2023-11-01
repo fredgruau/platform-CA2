@@ -3,6 +3,7 @@ package compiler
 import compiler.AST.Layer
 import compiler.ASTLt.ConstLayer
 
+
 /**
  *
  * used to compute a string encoding the locus,and Ring at compile time. needs to be covariant, so that AST can also be.
@@ -59,6 +60,16 @@ object repr {
 
 }
 
+class AntiClock[S1 <: S, S2 <: S, S3 <: S]
+
+object AntiClock {
+  implicit val vef = new AntiClock[V, E, F];
+  implicit val vfe = new AntiClock[V, F, E];
+  implicit val evf = new AntiClock[E, V, F];
+  implicit val efv = new AntiClock[E, F, V];
+  implicit val fve = new AntiClock[F, V, E];
+  implicit val fev = new AntiClock[F, E, V];
+}
 class CentralSym[S2, S1, S2new]
 
 object CentralSym {

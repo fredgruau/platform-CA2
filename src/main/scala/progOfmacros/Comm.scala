@@ -1,5 +1,6 @@
 package progOfmacros
 
+import compiler.SpatialType._
 import compiler.AST._
 import compiler.ASTL._
 import compiler._

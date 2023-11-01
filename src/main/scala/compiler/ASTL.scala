@@ -8,7 +8,7 @@ import dataStruc.Align2._
 import Constraint._
 import Circuit.{iTabSymb2, _}
 import repr._
-import dataStruc.Dag
+import dataStruc.{Dag, Util}
 import dataStruc.DagNode._
 
 import scala.annotation.unused
@@ -16,38 +16,67 @@ import scala.collection.immutable.HashSet
 import scala.collection.{mutable, _}
 import scala.reflect.ClassTag
 import scala.language.implicitConversions
-
+import dataStruc.Util.{composeAll2, rot, rotPerm, rotR}
 /**
  * todo we must distinguish between the wrapper of the constructors, and the higher order function which can be defined in another object
  * At some point, we decided to store the type information for each distinct constructor, in order to have direct access to this info
  * when copying the constructor,
  * this enabled to enforce the covariance in L:Locus and R:Ring, which was intuitive and would therefore facilitate things later on.
  * but then we abandonned it, so we could come back to previous setting where type was not stored, and copied in case class copying (see ASTBs).
+ * constructors are declared private and therefore, they are associated to a wrapper which can be used to build expressions.
  */
 object ASTL {
   val u = 1
 
   private[ASTL] case class Coonst[L <: Locus, R <: Ring](cte: ASTBt[R], m: repr[L], n: repr[R]) extends ASTL[L, R]()(repr.nomLR(m, n)) with EmptyBag[AST[_]]
 
+  def const[L <: Locus, R <: Ring](cte: ASTBt[R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = Coonst(cte, m, n)
+
   private[ASTL]
   final case class Broadcast[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[S1, R], m: repr[T[S1, S2]], n: repr[R])
     extends ASTL[T[S1, S2], R]()(repr.nomLR(m, n)) with Singleton[AST[_]]
 
-  /** a bit more subtle than broadcast  */
-  private[ASTL] final case class Send[S1 <: S, S2 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, S2]], n: repr[R])
+  def broadcast[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, S2]], n: repr[R]): ASTLt[T[S1, S2], R] =
+    Broadcast[S1, S2, R](arg, m, n) //step 1 is broadcast
+
+  /** a bit more subtle than broadcast, sends a distinct component to each of T[S1,S2] */
+  private[ASTL] final case class Send[S1 <: S, S2 <: S, R <: Ring](args: List[ASTLt[S1, R]])
+                                                                  (implicit m: repr[T[S1, S2]], n: repr[R])
     extends ASTL[T[S1, S2], R]() with Neton[AST[_]]
+
+  def send[S1 <: S, S2 <: S, R <: Ring](args: List[ASTLt[S1, R]])
+                                       (implicit m: repr[T[S1, S2]], n: repr[R]): ASTLt[T[S1, S2], R] = {
+    assert(args.length == 6 / args.head.locus.density); // check that the number of args is correct
+    Send[S1, S2, R](args);
+  }
+  /*  def sendv[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, V]], n: repr[R]): Send[S1, V, R] = {
+      assert(args.length == 6 / args.head.locus.density);
+      Send[S1, V, R](args);
+    } //TODO check the length of args
+
+    def sende[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, E]], n: repr[R]) =
+      Send[S1, E, R](args);*/
 
   private[ASTL] final case class Transfer[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R], m: repr[T[S2, S1]], n: repr[R])
     extends ASTL[T[S2, S1], R]()(repr.nomLR(m, n)) with Singleton[AST[_]]
+
+  def transfer[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S2, S1]], n: repr[R]):
+  ASTLt[T[S2, S1], R] = Transfer(arg, m, n)
 
   /** Unop is not final, because we can add operators < */
   private[ASTL] case class Unop[L <: Locus, R1 <: Ring, R2 <: Ring](op: Fundef1[R1, R2], arg: ASTLt[L, R1], m: repr[L], n: repr[R2])
     extends ASTL[L, R2]()(repr.nomLR(m, n)) with Singleton[AST[_]]
 
+  def unop[L <: Locus, Ri <: Ring, Ro <: Ring](f: Fundef1[Ri, Ro], arg: ASTLt[L, Ri])(implicit m: repr[L], n: repr[Ro]): ASTLt[L, Ro]
+  = Unop[L, Ri, Ro](f, arg, m, n)
+
   private[ASTL] final case class Binop[L <: Locus, R1 <: Ring, R2 <: Ring, R3 <: Ring](
                                                                                         op: Fundef2[R1, R2, R3], arg: ASTLt[L, R1], arg2: ASTLt[L, R2], m: repr[L], n: repr[R3])
     extends ASTL[L, R3]()(repr.nomLR(m, n)) with Doubleton[AST[_]]
 
+  def binop[L <: Locus, R1 <: Ring, R2 <: Ring, R3 <: Ring](op: Fundef2[R1, R2, R3],
+                                                            arg: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n3: repr[R3]): ASTLt[L, R3]
+  = Binop[L, R1, R2, R3](op, arg, arg2, m, n3)
 
   /**
    *
@@ -67,6 +96,10 @@ object ASTL {
     override def redExpr: List[AST[_]] = List(arg)
   }
 
+  def redop[S1 <: S, S2 <: S, R <: Ring](op: redop[R], arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): ASTLt[S1, R]
+  = Redop[S1, S2, R](op, arg, m, n)
+
+
   def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[UI]): RedopConcat[S1, S2] =
     RedopConcat[S1, S2](arg, m, n)
 
@@ -77,14 +110,28 @@ object ASTL {
     override def redExpr: List[AST[_]] = List(arg)
   }
 
-  private[ASTL] final case class Clock[S1 <: S, S2 <: S, S3 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R], dir: Boolean)(implicit m: repr[T[S1, S3]], n: repr[R])
+  /** @param dir true if rotation is clockwise */
+  private[ASTL] final case class Clock[S1 <: S, S2 <: S, S3 <: S, R <: Ring](
+                                                                              arg: ASTLt[T[S1, S2], R], dir: Boolean, t: AntiClock[S1, S2, S3], m: repr[T[S1, S3]], n: repr[R])
     extends ASTL[T[S1, S3], R]()(repr.nomLR(m, n)) with Singleton[AST[_]]
 
+  def clock[S1 <: S, S2 <: S, S3 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])
+                                                 (implicit t: AntiClock[S1, S2, S3], m: repr[T[S1, S3]], n: repr[R]): ASTLt[T[S1, S3], R] =
+    Clock[S1, S2, S3, R](arg, dir = true, t, m, n)
+
+  def anticlock[S1 <: S, S2 <: S, S3 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])
+                                                     (implicit t: AntiClock[S1, S2, S3], m: repr[T[S1, S3]], n: repr[R]): ASTLt[T[S1, S3], R] =
+    Clock[S1, S2, S3, R](arg, dir = false, t, m, n)
+
   /** central symmetry, used on vertices */
-  private[ASTL] final case class Sym[S1 <: S, S2 <: S, S2new <: S, R <: Ring](arg: ASTLt[T[S1, S2], R], m: repr[T[S1, S2new]], t: CentralSym[S2, S1, S2new], n: repr[R])
+  private[ASTL] final case class Sym[S1 <: S, S2 <: S, S2new <: S, R <: Ring]
+  (arg: ASTLt[T[S1, S2], R], m: repr[T[S1, S2new]], t: CentralSym[S2, S1, S2new], n: repr[R])
     extends ASTL[T[S1, S2new], R]()(repr.nomLR(m, n)) with Singleton[AST[_]]
 
-  /** delaying so as to obtain same radius is a special unop! */
+  def sym[S1 <: S, S2 <: S, S3 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])
+                                               (implicit t: CentralSym[S2, S1, S3], m: repr[T[S1, S3]], n: repr[R]): ASTLt[T[S1, S3], R] = Sym(arg, m, t, n)
+
+
 
 
   /** Field which has a value both  at time t, and t+1 */
@@ -93,37 +140,8 @@ object ASTL {
     val next: ASTLt[L, R]
   }
 
-  def
-  rotR[T](seq: Seq[T], i: Int): Seq[T] = {
-    val size = seq.size
-    seq.drop(size - (i % size)) ++ seq.take(size - (i % size))
-  }
 
-  def rotL[T](a: Array[T])(implicit m: ClassTag[T]): Array[T] = a.drop(1) :+ a(0)
-
-  def rotR[T](a: Array[T])(implicit m: ClassTag[T]): Array[T] = a(a.length - 1) +: a.take(a.length - 1)
-
-  //def rotR[T](a: Array[T], jump: Int)(implicit m: ClassTag[T]): Array[T] = Array.concat(a.drop(jump), a.take(jump))
-
-  def rot[T](a: Array[T], dir: Boolean)(implicit m: ClassTag[T]): Array[T] = if (dir) rotR(a) else rotL(a) //dir=True correspond to trigonometric order
-  def rotPerm(dec: Int): Array[Int] = {
-    val r = new Array[Int](6);
-    for (i <- 0 to 5) r(i) = (i + dec) % 6;
-    r
-  }
-
-  def composeAll(p: Array[Int], t: iTabSymb[Array[Int]]): Map[String, Array[Int]] = t.map { case (k, v) => k -> compose(p, v) }
-
-  def composeAll2(p: Array[Int], t: iTabSymb2[Array[Int]]): iTabSymb2[Array[Int]] = t.map { case (k, v) => k -> compose(p, v) }
-
-
-  /** Allows to consider false and true as occurence of ASTLs */
-  implicit def fromBool[L <: Locus](d: Boolean)(implicit m: repr[L]): ASTLt[L, B] = Coonst(if (d == True()) True() else False(), m, repr.nomB)
-
-  /** Allows to consider integers as occurence of ASTLs */
-  implicit def fromInt[L <: Locus, R <: I](d: Int)(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = Coonst(Intof(d)(n), m, n)
-
-  /** when we subtract two UI we automatically convert to SI, bysimply adding a 0 bit on the first significant bits */
+  /** when we subtract two UI we automatically convert to SI, by simply adding a 0 bit on the first significant bits */
   implicit def uItoSIL[L <: Locus](d: ASTLt[L, UI])(implicit m: repr[L]) =
     new Unop[L, UI, SI](ASTBfun.uItoSIdef, d, m, repr.nomSI) //adds the comparison operators, which requires signed bit because we take the opposite
 
@@ -134,39 +152,15 @@ object ASTL {
 
   /** ***************the wrapper *******************/
 
-  def const[L <: Locus, R <: Ring](cte: ASTBt[R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = Coonst(cte, m, n)
-
-  def sym[S1 <: S, S2 <: S, S2new <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S1, S2new]], t: CentralSym[S2, S1, S2new], n: repr[R]): Sym[S1, S2, S2new, R] = Sym(arg, m, t, n)
-
-  def v[S1 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, V]], n: repr[R]): ASTLt[T[S1, V], R] = Broadcast[S1, V, R](arg, m, n); // for broadcast, we want to specify only the direction where broadcasting takes place.
-
-  def e[S1 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, E]], m2: repr[T[E, S1]], n: repr[R]): ASTLt[T[S1, E], R] = Broadcast[S1, E, R](arg, m, n); // this is done using three function e,v,f.
-
-  def f[S1 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, F]], m2: repr[T[F, S1]], n: repr[R]): ASTLt[T[S1, F], R] = Broadcast[S1, F, R](arg, m, n)
-
-  def clock[S1 <: S, S2 <: S, S2new <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S1, S2new]], n: repr[R]): Clock[S1, S2, S2new, R] = Clock[S1, S2, S2new, R](arg, dir = true)
-
-  def anticlock[S1 <: S, S2 <: S, S2new <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S1, S2new]], n: repr[R]): Clock[S1, S2, S2new, R] = Clock[S1, S2, S2new, R](arg, dir = false)
-
-
   //Builds a transfer, just like v,e,f, however specify a diffent Simplicial field for each component; used for substraction.
-  def sendv[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, V]], n: repr[R]): Send[S1, V, R] = {
-    assert(args.length == 6 / args.head.locus.density);
-    Send[S1, V, R](args);
-  } //TODO check the length of args
-  def sende[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, E]], n: repr[R]) = Send[S1, E, R](args);
 
   //  def sendf[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, F]], n: repr[R]) = Send[S1, F, R](args) ;
 
   //def castB2R[L<:Locus,R<:I]( arg: AST[L,B] )(implicit m : repr[L])  = Unop[L,B,R] (castB2RN[R],arg );
-  def transfer[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S2, S1]], n: repr[R]):
-  ASTLt[T[S2, S1], R] = Transfer(arg, m, n)
 
 
   //def v[S1 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, V]], n: repr[R]): Broadcast[S1, V, R] = Broadcast[S1, V, R](arg, m, n); // for broadcast, we want to specify only the direction where broadcasting takes place.
 
-  def broadcast[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, S2]], n: repr[R]): ASTLt[T[S1, S2], R] =
-    Broadcast[S1, S2, R](arg, m, n) //step 1 is broadcast
 
   //def unop[L <: Locus, Ri <: Ring, Ro <: Ring](f: Fundef1[Ri, Ro])(implicit m: repr[L], n: repr[Ro]) = (arg1: ASTLt[L, Ri]) => Unop[L, Ri, Ro](f, arg1, m, n)
   def sign[L <: Locus](arg1: ASTLt[L, SI])(implicit m: repr[L]): ASTLt[L, SI] = Unop[L, SI, SI](ASTBfun.sign, arg1, m, nomSI)
@@ -180,8 +174,6 @@ object ASTL {
   def orScanRight[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, R] = Unop[L, R, R](halveBSI.asInstanceOf[Fundef1[R, R]], arg1, m, n)
 
   //todo desUISIfy
-  def lt[L <: Locus](arg1: ASTLt[L, SI])(implicit m: repr[L]): Unop[L, SI, B] =
-    Unop[L, SI, B](ltSI1.asInstanceOf[Fundef1[SI, B]], arg1, m, repr.nomB); //-1 will be taken modulo nbit.
 
   /* def ltUI2[L <: Locus](arg1: ASTLt[L, UI], arg2: ASTLt[L, UI])(implicit m: repr[L], n: repr[B]): ASTL[L, B] =
      Binop(ASTBfun.ltUI2.asInstanceOf[Fundef2[UI, UI, B]], arg1, arg2, m, n)
@@ -196,9 +188,6 @@ object ASTL {
   //todo desUISIfy
   def notNull[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, B] = Unop[L, R, B](neqSI.asInstanceOf[Fundef1[R, B]], arg1, m, repr.nomB)
 
-  /** Instead of casting boolean to integer,  we define a logical and taking an int and a  bool */
-  def andLB2R[L <: Locus, R <: I](arg1: ASTLt[L, B], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Binop[L, B, R, R] =
-    Binop[L, B, R, R](andLBtoRUISI(arg2.ring).asInstanceOf[Fundef2[B, R, R]], arg1, arg2, m, n)
 
   /*def concat2[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[I]): ASTL[L, I] =
     Binop(concat2f.asInstanceOf[Fundef2[R1, R2, I]], arg1, arg2, m, n)
@@ -216,7 +205,7 @@ object ASTL {
   def elem[L <: Locus, R <: I](i: Int, arg: ASTLt[L, R])(implicit m: repr[L], n: repr[B]): Unop[L, R, B] =
     Unop[L, R, B](eltUISI(arg.ring, i).asInstanceOf[Fundef1[R, B]], arg, m, n)
 
-  /** binop that implements a delay */
+  /** delaying so as to obtain same radius is a special unop! */
   def increaseRadiuus[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, R] = {
     val op = ASTBfun.increaseRadius2[R]
     val lll = Unop[L, R, R](op, arg, m, n)
@@ -256,15 +245,6 @@ object ASTL {
   }
 
 
-  /** version that works both for reduction with booleans or reduction with integers, such as min, or addOnes.
-   * for the moment it seems boolean is the most important, so we consider only this one */
-  def reduce[S1 <: S, S2 <: S, R <: Ring](op: redop[R], arg: ASTLt[T[S1, S2], R])
-                                         (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chipBorder[S1, S2]): ASTL[S1, R] = {
-    val neutralElt: ASTL[T[S1, S2], R] = const[T[S1, S2], R](op._2)
-    val newArg: ASTLt[T[S1, S2], R] = if (d.border == null) arg else
-      cond[T[S1, S2], R](d.border, arg, neutralElt)
-    Redop[S1, S2, R](op, newArg, m, n)
-  }
 
 
   /** or Reduction which works both for boolean and integers, but does not use the border so it is obsolote */
@@ -303,18 +283,15 @@ object ASTL {
 
 
 
-  /** reduction betwween transfer field, using clock and anticlock */
-  def redOp2[S1 <: S, S2 <: S, S2new <: S, R <: Ring](op: redop[R], arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S1, S2new]], n: repr[R]): Binop[T[S1, S2new], R, R, R] =
-    Binop[T[S1, S2new], R, R, R](op._1, Clock[S1, S2, S2new, R](arg, dir = true), Clock[S1, S2, S2new, R](arg, dir = false), m, n)
 
-  def xorR2[S1 <: S, S2 <: S, S2new <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[T[S1, S2new]], n: repr[R]): Binop[T[S1, S2new], R, R, R] =
-    redOp2[S1, S2, S2new, R](xorRedop[R], arg)
+  /*
 
-  def subESI[S2 <: S](arg: ASTLt[T[E, S2], SI])(implicit m: repr[E]): ASTLt[E, SI] =
-    Redop[E, S2, SI]((subSI, Intof[SI](0)), arg, m, repr.nomSI).asInstanceOf[ASTLt[E, SI]]
+    def subESI[S2 <: S](arg: ASTLt[T[E, S2], SI])(implicit m: repr[E]): ASTLt[E, SI] =
+      Redop[E, S2, SI]((subSI, Intof[SI](0)), arg, m, repr.nomSI).asInstanceOf[ASTLt[E, SI]]
 
-  def addESI[S2 <: S](arg: ASTLt[T[E, S2], SI])(implicit m: repr[E]): ASTLt[E, SI] =
-    Redop[E, S2, SI]((addSI, Intof[SI](0)), arg, m, repr.nomSI).asInstanceOf[ASTLt[E, SI]]
+    def addESI[S2 <: S](arg: ASTLt[T[E, S2], SI])(implicit m: repr[E]): ASTLt[E, SI] = //todo remplacer par reduce
+      Redop[E, S2, SI]((addSI, Intof[SI](0)), arg, m, repr.nomSI).asInstanceOf[ASTLt[E, SI]]
+  */
 
 
   /** minR has two implementations depending if the integers to be compared are signed or unsigned. */
@@ -329,24 +306,7 @@ object ASTL {
   }
 
 
-  def condOld[L <: Locus, R <: I](b: ASTLt[L, B], arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] =
-    andLB2R[L, R](b, arg1) | andLB2R(~b, arg2)
 
-  /** cond behavees differently for boolean, we are obliged to rewrite it. */
-  /*  def condB[L <: Locus](b: ASTLt[L, B], arg1: ASTLt[L, B], arg2: ASTLt[L,B])(implicit m: repr[L]): ASTL[L, B] = {
-      val res=(b & arg1 )| (~b & arg2)
-      res
-    }*/
-
-
-  /** we designed a cond that makes an internal test to decide wether it applies for int or for bool. */
-  def cond[L <: Locus, R <: Ring](b: ASTLt[L, B], arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] =
-    if (n.name.isInstanceOf[SI])
-      (andLB2R[L, SI](b, arg1.asInstanceOf[ASTLt[L, SI]]) | andLB2R(~b, arg2.asInstanceOf[ASTLt[L, SI]])).asInstanceOf[ASTLt[L, R]]
-    else if (n.name.isInstanceOf[UI])
-      (andLB2R[L, UI](b, arg1.asInstanceOf[ASTLt[L, UI]]) | andLB2R(~b, arg2.asInstanceOf[ASTLt[L, UI]])).asInstanceOf[ASTLt[L, R]]
-    else
-      ((b & arg1.asInstanceOf[ASTLt[L, B]]) | (~b & arg2.asInstanceOf[ASTLt[L, B]])).asInstanceOf[ASTLt[L, R]]
 
   /**
    * computes an int with a single non zero bit which is the highest rank for which operand's bit is one if operand is null, output O.
@@ -378,8 +338,8 @@ object ASTL {
   }).asInstanceOf[ASTL[L, R]]
 
   /** Simple logical Xor */
-  def xor[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg1.ring match {
-
+  def xor[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] =
+    (arg1.ring match {
     case B() => Binop(xorB, arg1.asInstanceOf[ASTLt[L, B]], arg2.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
     case _ => Binop(xorUISI(arg1.ring).asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
   }).asInstanceOf[ASTL[L, R]]
@@ -418,12 +378,14 @@ object ASTL {
     else Binop(minRelSI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
   }
 
-  /** returns the largest constant on n bits, where n is adjusted at run time, when the constant is combined
-   * to some other integer, using a binop, and the bitify steps is able to extends, (add the correct bit number of bits
-   */
-  def maxSI[L <: Locus]()(implicit m: repr[L]): ASTLt[L, SI] = halve(-1)
 
 
+  //  def neg2[L <: Locus, R <: Ring](arg: AST2[L, R])(implicit m: repr[L], n: repr[R]) = Unop[L, R, R](negN[R], arg);
+  // implicit def fromAST2[L<:Locus,R<:Ring](x:AST2[L, R]):ASTL[L,R]=x.asInstanceOf[ASTL[L,R]
+}
+
+
+object SpatialType {
   type ASTLtG = ASTLt[_ <: Locus, _ <: Ring]
   type IntV = ASTLt[V, SI];
   type IntE = ASTLt[E, SI];
@@ -452,10 +414,8 @@ object ASTL {
   type BoolVf = ASTLt[T[V, F], B]
   type BoolEf = ASTLt[T[E, F], B];
   type BooleF = ASTLt[T[F, E], B]
-  //  def neg2[L <: Locus, R <: Ring](arg: AST2[L, R])(implicit m: repr[L], n: repr[R]) = Unop[L, R, R](negN[R], arg);
-  // implicit def fromAST2[L<:Locus,R<:Ring](x:AST2[L, R]):ASTL[L,R]=x.asInstanceOf[ASTL[L,R]
-}
 
+}
 /**
  * AST of spatial type
  *
@@ -487,7 +447,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case Unop(op, _, _, _) => op.name
       case Redop(op: (Fundef2R[Ring], ASTBt[Ring]), _, _, _) => "red" + op._1.name
       case RedopConcat(_, _, _) => "redConcat"
-      case Clock(_, dir) => if (dir) "clock" else "anticlock"
+      case Clock(_, dir, _, _, _) => if (dir) "clock" else "anticlock"
       case e@Broadcast(_, _, _) => "Broadcast" + ("" + (e.locus.asInstanceOf[T[_, _]] match {
         case T(_, y) => y
       })).charAt(0)
@@ -513,7 +473,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case e@Binop(_, a, a2, _, _) => e.copy(arg = id2(a), arg2 = id2(a2))
       case e@Redop(_, a, _, _) => e.copy(arg = id2(a))
       case e@RedopConcat(a, _, _) => e.copy(arg = id2(a))
-      case e@Clock(a, _) => e.copy(arg = id2(a))(lpart(e.mym), rpart(e.mym))
+      case e@Clock(a, _, _, _, _) => e.copy(arg = id2(a)) //(lpart(e.mym), rpart(e.mym))
       case e@Sym(a, _, _, _) => e.copy(arg = id2(a))
     };
     newD.setName(this.name);
@@ -556,7 +516,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
           // case l:Layer[_,_] =>  l.nbit
           case Coonst(cte, _, _) => ASTB.nbitExpAndParam(emptyAstMapInt, cte, paramBitIncrease)
           case Unop(op, _, _, _) => ASTB.nbitExpAndParam(emptyAstMapInt + (op.p1 -> argBitSize()), op.arg, paramBitIncrease)
-          case Redop(_, _, _, _) | Clock(_, _) | Transfer(_, _, _) | Broadcast(_, _, _) | Sym(_, _, _, _) => argBitSize() //bit size equals bit size of arg
+          case Redop(_, _, _, _) | Clock(_, _, _, _, _) | Transfer(_, _, _) | Broadcast(_, _, _) | Sym(_, _, _, _) => argBitSize() //bit size equals bit size of arg
           case Send(_) => ASTbitSize(newthis.asInstanceOf[Neton[AST[_]]].args.head)
           case RedopConcat(exp, _, _) => this.locus.fanout //for the concat redop, the number of bit must take into account the arity (2,3, or 6)
 
@@ -637,7 +597,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case Send(_) => throw new RuntimeException("Broadcast creates   a transfer type")
       case Transfer(_, _, _) => throw new RuntimeException("Transfer creates   a transfer type")
       case Unop(op, a, _, _) =>
-        if (op.name.equals("increaseRadius")) //we add the tm1s early so as to be able to remove them early
+        if (op.name.equals("increaseRadius2")) //we add the tm1s early so as to be able to remove them early
         // a.unfoldTransfer(m).map(_.map(x => tm1[R](x.asInstanceOf[ASTBt[R]])(n.asInstanceOf[repr[R]]).asInstanceOf[ASTBg]))
           a.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m).map(
             (x => tm1[R](x.asInstanceOf[ASTBt[R]])(r).asInstanceOf[ASTBg]))
@@ -660,7 +620,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
 
         a.unfoldTransfer(m).map((x: ArrAst) =>
           reduceConcatEncapsulated(x.asInstanceOf[Array[ASTBt[B]]])).asInstanceOf[ArrAst]
-      case Clock(_, _) => throw new RuntimeException("Clock creates    a transfer type")
+      case Clock(_, _, _, _, _) => throw new RuntimeException("Clock creates    a transfer type")
 
       case Sym(_, _, _, _) => throw new RuntimeException("Sym creates  a transfer type")
     }
@@ -684,19 +644,23 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         val u = 0
         val res = m(des, s1, a.unfoldTransfer(m))
         res
-      case Unop(op, a, _, n) => //todo faire le cas simplicial
-        if (op.name.equals("increaseRadius")) //we add the tm1s early so as to be able to remove them early
+      case Unop(op, a, _, n) =>
+        val k = 0
+        if (op.name.equals("increaseRadius2")) //we add the tm1s early so as to be able to remove them early
           a.unfoldTransfer(m).map(_.map(x => tm1[R](x.asInstanceOf[ASTBt[R]])(n.asInstanceOf[repr[R]]).asInstanceOf[ASTBg]))
-
-        else a.unfoldTransfer(m).map(_.map(new Call1(op.asInstanceOf[Fundef1[Any, R]], _)(n.asInstanceOf[repr[R]]) with ASTBt[R].asInstanceOf[ASTBg]))
-      case Binop(op, a, a2, _, n) => a.unfoldTransfer(m).zip(a2.unfoldTransfer(m)).map({
+        else
+          a.unfoldTransfer(m).map(_.map(new Call1(op.asInstanceOf[Fundef1[Any, R]], _)(n.asInstanceOf[repr[R]]) with ASTBt[R].asInstanceOf[ASTBg]))
+      case Binop(op, a, a2, _, n) =>
+        val arg1 = a.unfoldTransfer(m)
+        val arg2 = a2.unfoldTransfer(m)
+        arg1.zip(arg2).map({
         case (b, b2) => b.zip(b2).map({
           case (c, c2) =>
             new Call2(op.asInstanceOf[Fundef2[Any, Any, R]], c, c2)(n.asInstanceOf[repr[R]]) with ASTBt[R].asInstanceOf[ASTBg]
         })
       })
       case Redop(_, _, _, _) => throw new RuntimeException("Reduces create a simplicial type, not a transfer type")
-      case Clock(a, dir) =>
+      case Clock(a, dir, _, _, _) =>
         val T(_, src) = a.locus
         val trigo = !dir
         val atr = a.unfoldTransfer(m)
@@ -744,7 +708,8 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         r.c = permute(r.c, t, e.locus);
         r.algn = composeAll2(t, r.algn)
         e.copy(arg = newArg)
-      case e@Unop(_, arg, _, _) => e.copy(arg = arg.align(r, tt))
+      case e@Unop(_, arg, _, _) =>
+        e.copy(arg = arg.align(r, tt))
       case e@Binop(_, arg, arg2, _, _) =>
         var newArg = arg.align(r, tt)
         val algn: Map[String, Array[Int]] = r.algn
@@ -773,9 +738,12 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
           //newArg = newArg.replaceBy(nome, shiftedE)
           newArg2 = newArg2.replaceBy(nome, shiftedE)
         }
+        else //we combined the alignement from each operand of the binop
+          for ((k, v) <- algn)
+            r.algn += k -> v
         e.copy(arg = newArg, arg2 = newArg2)
       case e@Redop(_, arg, _, _) => e.copy(arg = arg.align(r, tt))
-      case e@Clock(arg, dir) =>
+      case e@Clock(arg, dir, _, _, _) =>
         val newArg = arg.align(r, tt)
         val T(_, des) = this.locus;
         val T(_, src) = arg.locus;
@@ -785,7 +753,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
           r.c = permute(r.c, atr, e.locus);
           r.algn = composeAll2(atr, r.algn)
         }
-        e.copy(arg = newArg)(lpart(e.mym), rpart(e.mym))
+        e.copy(arg = newArg) //(lpart(e.mym), rpart(e.mym))
       case e@Sym(arg, _, _, _) => val newArg = arg.align(r, tt)
         val T(_, des) = this.locus;
         val T(s1, src) = arg.locus;
@@ -831,13 +799,13 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
 
       case Unop(op, arg, _, _) =>
         arg.radiusify2(r, t) +
-          (if (op.name == "increaseRadius")
+          (if (op.name == "increaseRadius2")
             1
           else 0) //ca ne change pas
       case Broadcast(arg, _, _) => arg.radiusify2(r, t) //ca ne change pas
       case Redop(_, arg, _, _) => arg.radiusify2(r, t) //ca ne change pas
       case RedopConcat(arg, _, _) => arg.radiusify2(r, t) //ca ne change pas
-      case Clock(arg, _) => arg.radiusify2(r, t) //ca ne change pas
+      case Clock(arg, _, _, _, _) => arg.radiusify2(r, t) //ca ne change pas
       case Send(args) => args(0).radiusify2(r, t) //ca ne change pas
       case Sym(arg, _, _, _) => arg.radiusify2(r, t) //ca ne change pas
     }
@@ -845,17 +813,18 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
   }
 
   override def radiusify3(r: TabSymb[Int], t: TabSymb[InfoNbit[_]]): (Int, ASTLt[L, R]) = {
-    def increaseRadius(rad: Int, src: Locus, target: Locus): Int = {
-      val newRadius = (src, target) match {
-        case (V(), _) | (E(), F()) => rad + 1
-        case _ => rad
-      }
-      assert(newRadius < 2) // we have to do  another communication between radius=1 and radius=-2
-      newRadius
-    }
+
 
     this.asInstanceOf[ASTLg] match {
       case trans@Transfer(arg, m, n) => {
+        def increaseRadius(rad: Int, src: Locus, target: Locus): Int = {
+          val newRadius = (src, target) match {
+            case (V(), _) | (E(), F()) => rad + 1
+            case _ => rad
+          }
+          assert(newRadius < 2) // we have to do  another communication between radius=1 and radius=-2
+          newRadius
+        }
         val (rad, newArg) = arg.radiusify3(r, t)
         val T(src, target) = arg.locus //we get the source and target locus knowing that arg is a transfer locus
         (increaseRadius(rad, src, target), trans.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
@@ -873,7 +842,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case Coonst(_, _, _) => (-1000, this) //negative radius means arbitrary radius,
       case u@Unop(op, arg, _, _) =>
         var (rad, newArg) = arg.radiusify3(r, t)
-        rad = rad + (if (op.name == "increaseRadius") 1 else 0)
+        rad = rad + (if (op.name == "increaseRadius2") 1 else 0)
         (rad, u.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
       //for other cases we do nothing
       case b@Broadcast(arg, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
@@ -881,8 +850,11 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case b@RedopConcat(arg, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
       // case b@Clock(arg, _) =>  val (rad,newArg) = arg.radiusify3(r, t);(rad,b.copy(arg=newArg).asInstanceOf[ASTL[L,R]])
       case b@Sym(arg, _, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
+
+      case b@Clock(arg, _, _, _, _) => val (rad, newArg) = arg.radiusify3(r, t); //the radius needs to be augmented
+        (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]]) //the radius remains the same, just like sym.
       case b@Send(args) => val radNewArgs = args.map(_.radiusify3(r, t));
-        val newRad = radNewArgs.map(_._1).reduce(Math.max(_, _)) //todo  check that all the radius are the same.
+        val newRad = radNewArgs.map(_._1).reduce(Math.max(_, _))
         val newb = b.copy(args = radNewArgs.map(_._2))(lpart(b.mym), rpart(b.mym))
         (newRad, newb.asInstanceOf[ASTL[L, R]])
 
@@ -935,7 +907,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case Broadcast(arg, _, _) => arg.radiusify(r, t) //ca ne change pas
       case Redop(_, arg, _, _) => arg.radiusify(r, t) //ca ne change pas
       case RedopConcat(arg, _, _) => arg.radiusify(r, t) //ca ne change pas
-      case Clock(arg, _) => arg.radiusify(r, t) //ca ne change pas
+      case Clock(arg, _, _, _, _) => arg.radiusify(r, t) //ca ne change pas
       case Send(args) => args(0).radiusify(r, t) //ca ne change pas
       case Sym(arg, _, _, _) => arg.radiusify(r, t) //ca ne change pas
     }

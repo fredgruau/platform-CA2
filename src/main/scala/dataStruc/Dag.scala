@@ -41,7 +41,8 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
    * TODO checks that elements in allGenerators are indeed maximal elements.
    * */
   var allGenerators: List[T] = List() //TODO maintain nonGenerator together with allGenerator, and forget visitedL
-  /** @return non maximal dag's element */
+
+  /** @return non maximal dag's element, assuming maximals have been stored in allGenerators. */
   def nonGenerators(): List[T] = {
     val aG = HashSet.empty[T] ++ allGenerators
     visitedL.filter(!aG.contains(_))
@@ -73,7 +74,8 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
     newVisitedL = List()
     for (b <- newGenerators)
       dfs(b, Vector.empty) match {
-        case Some(path) => throw new CycleException(path)
+        case Some(path) =>
+          throw new CycleException(path)
         case None =>
       }
     visitedL = newVisitedL ::: visitedL
@@ -143,7 +145,7 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
 
 
   /**
-   * we apply the unionFind algorithme to compute connected components .
+   * we apply the unionFind algorithm to compute connected components .
    *
    * @param p   predicate which defines adjacence beetween DagNodes
    * @param all mapping associating an element to its wrapping. itcan be provided by the calling environment, it it needs it

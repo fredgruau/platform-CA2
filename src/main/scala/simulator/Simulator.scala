@@ -54,7 +54,7 @@ object Simulator extends SimpleSwingApplication {
 
   /** hierarchy of swing Jcomponents */
   def top: MainFrame = new MainFrame {
-    title = "spatial computation"
+
 
     /** possible directories where CA can be found */
     val directories = List("compiledCA") //, "compHandCA")
@@ -66,6 +66,7 @@ object Simulator extends SimpleSwingApplication {
     val classCA: Class[CAloops2] = loadClass(chosenDir + "." + nameCA)
     /** contains the loops but also many other parameters */
     val progCA: CAloops2 = getProg(classCA) //will be used to create the controller, but also the browsable treeLayers.
+    title = "spatial computation " + nameCA + " gateCount=" + progCA.gateCount() + " memory Width=" + progCA.CAmemWidth()
 
 
     /** process the signal we create controller first in order to instanciate state variable used by layerTree */

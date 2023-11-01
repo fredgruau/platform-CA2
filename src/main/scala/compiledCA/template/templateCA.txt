@@ -30,5 +30,6 @@ public int CAmemWidth() {return {{MEMWIDTH}};}
 @Override  public String displayableLayerHierarchy() { return "{{DISPLAYABLE}}";}
 @Override public HashMap<String, String> init() {HashMap<String, String> map = new HashMap<>();
  {{INITLAYER}} return (map);}
+@Override public int gateCount(){return ({{GATECOUNT}} );}
 
 }

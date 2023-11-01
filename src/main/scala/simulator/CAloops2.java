@@ -89,4 +89,6 @@ public interface CAloops2 {
 */
 
     String displayableLayerHierarchy();
+
+    public int gateCount();
 }

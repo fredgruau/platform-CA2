@@ -7,10 +7,9 @@ import Instr._
 import VarKind._
 import dataStruc.{Align2, Dag, DagInstr, DagNode, HeapStates, WiredInOut}
 import Circuit._
-import compiler.ASTL.ASTLtG
+import compiler.SpatialType.ASTLtG
 import compiler.Packet.BitLoop
 import dataStruc.Align2.{compose, invert}
-
 import scala.language.postfixOps
 import scala.collection.{mutable, _}
 import scala.collection.immutable.{HashMap, HashSet}
@@ -620,12 +619,12 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
    * @param t  updated with new symbols for shift
    * @return aligned instruction, together with shift affect
    */
-  def align2(cs: TabSymb[Constraint], t: TabSymb[InfoNbit[_]], a: mutable.Map[(String, String), Array[Int]]): List[Instr] = {
+  def align2(cs: TabSymb[Constraint], t: TabSymb[InfoNbit[_]], alignnPerm: mutable.Map[(String, String), Array[Int]]): List[Instr] = {
     val r = Result()
     val newExp = exp.asInstanceOf[ASTLt[_, _]].align(r, t)
     val newAffect = Affect(name, newExp)
     newAffect.alignPerm = r.algn //to be removed
-    r.algn.map({ case (k, v) => a.addOne((name, k), v) })
+    r.algn.map({ case (k, v) => alignnPerm.addOne((name, k), v) })
     var result: List[Instr] = List()
     if (r.c != None) {
       cs.addOne(name -> r.c.get)

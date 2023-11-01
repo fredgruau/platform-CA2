@@ -1,7 +1,9 @@
 package progOfCA
 
+import compiler.SpatialType._
 import compiler.AST.{Layer, _}
-import compiler.ASTL.{IntV, inc, _}
+import compiler.SpatialType._
+import compiler.ASTL.{inc, _}
 import compiler.{AST, ASTLt, B, SI, UI, V, repr}
 import progOfmacros.RedS.{leastUI}
 import simulator.Util.show

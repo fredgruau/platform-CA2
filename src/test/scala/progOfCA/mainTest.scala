@@ -1,8 +1,11 @@
 package progOfCA
 
+import compiler.ASTLfun._
+
 import compiler.AST._
 import compiler.ASTL._
 import compiler.Circuit.hexagon
+import compiler.SpatialType.BoolV
 import compiler.{ASTLt, B, Circuit, V}
 import progOfmacros.SReduce.{existE2V, neighborhood}
 import org.scalatest

@@ -2,14 +2,16 @@ package progOfmacros
 
 //import compiler._
 
+import compiler.SpatialType._
 import compiler.AST._
 import compiler.ASTL._
+import compiler.ASTLfun._
 import compiler.ASTB._
-import compiler.ASTBfun.{Fundef3R, p}
+import compiler.ASTBfun.{Fundef3R, addSIRedop, p}
 import compiler._
 
 
-/** Contains the code of locus function used as a layer of  building blocks of small bits of spatial operators, compiled with optimal perf. */
+/** Contains the code of spatial macro used as a layer of  building blocks of small bits of spatial operators, compiled with optimal perf. */
 object Compute {
 
   val incDef: Fundef1[(V, SI), (V, SI)] = {
@@ -28,15 +30,15 @@ object Compute {
   val slopeDeltaDef: Fundef1[(V, SI), ((T[V, E], B), (V, SI))] = {
     //val x:IntV= p[V, SI]("dis")
     val d = p[V, SI]("dis")
-    val s: IntVe = sende(List(d, d, d, -d, -d, -d))
+    val s: IntVe = send(List(d, d, d, -d, -d, -d))
     // val tepred = transfer(e(x))
     val tepred = transfer(s)
     //   val g: ASTLt[E, SI] = subESI(tepred)
-    val g: ASTLt[E, SI] = addESI(tepred)
-    val grad: IntEv = sendv(List(g, -g))
+    val g: ASTLt[E, SI] = reduce(addSIRedop, tepred) //addESI(tepred)
+    val grad: IntEv = send(List(g, -g))
     //val grad: IntvE = tepred - sym(tepred)
     // TODO should use opp to make only one subtraction, we need to adress selectively the two neighbors of an edge.
-    val slope: BoolVe = transfer(lt(grad))
+    val slope: BoolVe = transfer(ltSI(grad))
 
     val delta: IntV = minR(transfer(sign(grad + -2)))
     //val temp: BoolfV = xorR2(tslope )

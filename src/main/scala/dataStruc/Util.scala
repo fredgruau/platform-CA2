@@ -1,9 +1,13 @@
 package dataStruc
 
+import compiler.Circuit.{iTabSymb, iTabSymb2}
+import dataStruc.Align2.compose
+
 import java.io.{BufferedWriter, File, FileWriter}
 import java.util.regex.Pattern
 import scala.collection.immutable.HashMap
-import scala.collection.{Map, mutable}
+import scala.collection.{Map, Seq, mutable}
+import scala.reflect.ClassTag
 
 
 object Util {
@@ -137,4 +141,27 @@ object Util {
     return res.toList;
   }
 
+  // we now have method of generic use, which can  rotate sequences, or arrays.
+  // or compose together arrays.
+  def rotRn[T](seq: Seq[T], i: Int): Seq[T] = {
+    val size = seq.size
+    seq.drop(size - (i % size)) ++ seq.take(size - (i % size))
+  }
+
+  def rotL[T](a: Array[T])(implicit m: ClassTag[T]): Array[T] = a.drop(1) :+ a(0)
+
+  def rotR[T](a: Array[T])(implicit m: ClassTag[T]): Array[T] = a(a.length - 1) +: a.take(a.length - 1)
+
+  def rot[T](a: Array[T], dir: Boolean)(implicit m: ClassTag[T]): Array[T] = if (dir) Util.rotR(a) else Util.rotL(a)
+
+  //dir=True correspond to trigonometric order
+  def rotPerm(dec: Int): Array[Int] = {
+    val r = new Array[Int](6);
+    for (i <- 0 to 5) r(i) = (i + dec) % 6;
+    r
+  }
+
+  def composeAll2(p: Array[Int], t: iTabSymb2[Array[Int]]): iTabSymb2[Array[Int]] = t.map { case (k, v) => k -> compose(p, v) }
+
+  def composeAll(p: Array[Int], t: iTabSymb[Array[Int]]): Map[String, Array[Int]] = t.map { case (k, v) => k -> compose(p, v) }
 }

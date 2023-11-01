@@ -296,7 +296,10 @@ object AST {
     override def other: List[AST[_]] = next :: super.other
 
     /** @param v field to be displayed   */
-    protected def show(v: AST[_]) = sysInstr ::= CallProc("show", List(), List(v))
+    protected def show(v: AST[_]*) = {
+      for (f <- v)
+        sysInstr ::= CallProc("show", List(), List(f))
+    }
 
     /** @param v field that should be false everywere unless a bug appears */
     def bugif(v: AST[_]) = sysInstr ::= CallProc("bug", List(), List(v))
@@ -307,6 +310,7 @@ object AST {
 
     def systInstr: List[CallProc] = {
       val normal = CallProc("memo", List(Named.lify(name)), List(next)) :: sysInstr
+      assert(sysInstr.toSet.size == sysInstr.size, "probaly we show several time the same field")
       next match {
         case u@Delayed(x) =>
           if (u.arg == this) return sysInstr //next is ourself, so this is a constant layer, so we do not need memo instructions

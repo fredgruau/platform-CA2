@@ -2,7 +2,8 @@ package compiler
 import AST.{Call1, _}
 import ASTB.{Elt, _}
 import compiler.ASTBfun.negB
-import compiler.ASTL.{BoolV, halve, maxSI}
+import compiler.ASTL.{halve}
+import compiler.SpatialType.BoolV
 
 
 /** Contains the code of logical function defined as val, to avoid reproducting the code several times, when they are used in BINOP or UNOP
@@ -186,16 +187,16 @@ object ASTBfun {
       Extend[R](i, x), x)
   }
 
-  def increaseRadius[R <: Ring]()(implicit m: repr[R]): Fundef1[R, R] = {
-    val x = p[R]("x");
-    Fundef1("increaseRadius",
-      IncreaseRadius[R](x), x)
-  }
+  /*  def increaseRadius[R <: Ring]()(implicit m: repr[R]): Fundef1[R, R] = {
+      val x = p[R]("x");
+      Fundef1("increaseRadius",
+        IncreaseRadius[R](x), x)
+    }*/
 
-  def increaseRadius2[R <: Ring]()(implicit m: repr[R]): Fundef1[R, R] = {
+  def increaseRadius2[R <: Ring]()(implicit m: repr[R]): Fundef1[R, R] = { //todo faire un val au lieu d'un def
     val x: Param[R] with ASTBt[R] = p[R]("x");
-    Fundef1("increaseRadius",
-      tm1(x), x) //can be decalified early, upon spatial unfolding, so that it can be removed at the detmize stage.
+    Fundef1("increaseRadius2",
+      tm1(x), x) //will be decalified early, upon spatial unfolding, so that it can be removed at the detmize stage.
   }
 
   /** @param i final number of bits, We generate a new funDef for each call, todo we should memoize this at least. */
@@ -266,29 +267,29 @@ object ASTBfun {
     val noteq: Bool = new Call1[SI, B](neqSI, x12) with ASTBt[B]
     //val neq:Bool= ~(new Call1[SI,B](neqSI, x12)(repr.nomB) with ASTBt[B])
     val eq: Bool = ~noteq
-    Fundef1[SI, B]("notNull", eq, x12)
+    Fundef1[SI, B]("isZero", eq, x12)
   }
 
 
   /** true if signed integer is strictly negative */
-  val ltSI1: Fundef1[SI, B] = eltSI(-1).asInstanceOf[Fundef1[SI, B]]
+  val ltSI: Fundef1[SI, B] = eltSI(-1).asInstanceOf[Fundef1[SI, B]]
 
   /** true if first argument strictly smaller than second with respect to the modulo order */
   val ltSI2Mod: Fundef2[SI, SI, B] = {
     val (x, y) = (p[SI]("xLtSi"), p[SI]("yxLtSi"));
-    Fundef2("ltSI2", (new Call1[SI, B](ltSI1, x - y) with ASTBt[B]), x, y) //ltsi1(z) true if z strictly negative
+    Fundef2("ltSI2", (new Call1[SI, B](ltSI, x - y) with ASTBt[B]), x, y) //ltsi1(z) true if z strictly negative
   }
   /** true if first argument strictly greater than second */
   val gtSI2: Fundef2[SI, SI, B] = {
     val (x, y) = (p[SI]("xgtSI2"), p[SI]("ygtSI2"));
-    Fundef2("gtSI2", (new Call1[SI, B](ltSI1, y - x) with ASTBt[B]), x, y)
+    Fundef2("gtSI2", (new Call1[SI, B](ltSI, y - x) with ASTBt[B]), x, y)
   }
 
   /** true if integer is  negative or null */
   val leSI1: Fundef1[SI, B] = {
     val x18 = p[SI]("xleSI1");
     Fundef1("leSI1",
-      new Call1[SI, B](ltSI1, x18) with ASTBt[B] | new Call1[SI, B](eqSI, x18) with ASTBt[B], x18)
+      new Call1[SI, B](ltSI, x18) with ASTBt[B] | new Call1[SI, B](eqSI, x18) with ASTBt[B], x18)
   }
 
   val leSI2: Fundef2[SI, SI, B] = {
@@ -434,7 +435,6 @@ object ASTBfun {
     else (orB.asInstanceOf[Fundef2[R, R, R]], False().asInstanceOf[ASTB[R]])
   }
 
-  val minSignRedop: redop[SI] = (minSign, Intof[SI](1))
   def andRedop[R <: Ring](implicit n: repr[R]): redop[R] = {
     if (n.name.isInstanceOf[SI]) (andSI.asInstanceOf[Fundef2[R, R, R]], Intof[SI](0).asInstanceOf[ASTB[R]])
     else if (n.name.isInstanceOf[UI]) (andUI.asInstanceOf[Fundef2[R, R, R]], Intof[UI](0).asInstanceOf[ASTB[R]])
@@ -458,10 +458,16 @@ object ASTBfun {
       (minRelSI.asInstanceOf[Fundef2[R, R, R]],
         (new Call1[SI, SI](halveBSI, ASTB.Intof[SI](-1)(repr.nomSI)) with ASTBt[SI]).asInstanceOf[ASTBt[R]])
     }
-
     else {
-      assert(false, "not SI nor UI"); null
+      assert(false, "not SI nor UI");
+      null
     }
   }
+
+
+  val minSignRedop: redop[SI] = (minSign, Intof[SI](1))
+  //todo definir un addRedop,
+  val addSIRedop: redop[SI] = (addSI, Intof[SI](0))
+
 
 }

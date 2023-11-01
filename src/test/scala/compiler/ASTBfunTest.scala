@@ -137,7 +137,7 @@ class ASTBfunTest extends FunSuite {
   */
 
   //testLT
-  val quatrelt0 = new Call1(ltSI1, quatre) with ASTBt[B]
+  val quatrelt0 = new Call1(ltSI, quatre) with ASTBt[B]
   test("quatre<0") {
     assert(eval(quatrelt0, env) == List(false))
   }

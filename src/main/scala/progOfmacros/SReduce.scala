@@ -1,12 +1,14 @@
 package progOfmacros
 
+import compiler.ASTLfun._
+import compiler.SpatialType._
 import compiler.AST.{p, _}
-import compiler.ASTL.{v, _}
+import compiler.ASTL.{_}
 import compiler.repr.nomV
 import compiler.{B, E, F, V}
 import progOfmacros.RedS.{exist}
 import progOfmacros.SReduce.existF2V
-
+import compiler.SpatialType._
 /** Contains elementary loops doing simple reduction combined with a broacast from VEF to VEF */
 object SReduce {
 

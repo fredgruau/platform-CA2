@@ -1,11 +1,12 @@
 package progOfmacros
 
+import compiler.ASTLfun._
 import compiler.AST._
 import compiler.ASTL._
 import compiler._
 import progOfmacros.Compute._
 import progOfmacros.SReduce.frontierEDef
-
+import compiler.SpatialType._
 /** macro used specifically to compute the blob predicate */
 object BlobMacro {
 

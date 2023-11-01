@@ -9,7 +9,7 @@ import dataStruc.DagNode._
 import scala.collection._
 import ASTBfun.ASTBg
 import compiler.ASTLt.ConstLayer
-import compiler.VarKind.{LayerField, MacroField, ParamD}
+import compiler.VarKind.{LayerField, MacroField, ParamD, ParamRR}
 import dataStruc.Named
 
 import scala.collection.immutable.HashSet
@@ -223,7 +223,9 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
       case Read(s) => t(s).k match {
         case ParamD() | LayerField(_, _) => 0
         case MacroField() => r(s) //we must have computed it before, and stored it in r
+        case ParamRR(1) => 1 //we have generated a variable of radius 1, stored it, and now we read it again. ==> potential pb
       }
+
     }, this)
 
   def radiusify(r: TabSymb[(Int, Option[Modifier])], t: TabSymb[InfoNbit[_]]): (Int, Option[Modifier]) =

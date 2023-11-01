@@ -3,6 +3,7 @@ package progOfmacros
 import compiler.AST._
 import compiler.ASTBfun.{andRedop, minRedop, minUI, orRedop, p, redop, xorRedop}
 import compiler.ASTL._
+import compiler.ASTLfun._
 import compiler.Circuit.iTabSymb
 import compiler.repr.{nomB, nomCons, nomV}
 import compiler.{AST, ASTLt, B, E, F, Ring, S, SI, T, UI, V, chipBorder, repr}
@@ -47,7 +48,7 @@ object RedS {
    * source and target simplicial locus, as well as reduction operation */
   private def redsfunName[S1 <: S, S2 <: S, R <: Ring](r: redop[R], l: S1)(implicit m: repr[S1], n: repr[S2], p: repr[R]) = {
     val y = 0
-    ("" + "redS." + r._1.name + l.shortName + n.name.shortName).toLowerCase
+    ("" + "redS" + r._1.name + "." + l.shortName + n.name.shortName).toLowerCase
   }
 
   /**
@@ -93,6 +94,16 @@ object RedS {
     new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
   }
 
+  def inside[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S2, S1]): ASTLt[S2, B] = {
+    val f: Fundef1[(S1, B), (S2, B)] = getRedSFun(andRedop[B], arg.locus)(m, n, nomB, d)
+    new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
+  }
+
+
+  def border[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S2, S1]): ASTLt[S2, B] = {
+    val f: Fundef1[(S1, B), (S2, B)] = getRedSFun(xorRedop[B], arg.locus)(m, n, nomB, d)
+    new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
+  }
 
   def leastUI[S1 <: S, S2 <: S](arg: ASTLt[S1, UI])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S2, S1]): ASTLt[S2, UI] = {
     val f: Fundef1[(S1, UI), (S2, UI)] = getRedSFun(minRedop[UI], arg.locus)(m, n, repr.nomUI, d)

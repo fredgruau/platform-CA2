@@ -1,11 +1,13 @@
 package progOfCA
 
+import compiler.SpatialType._
 import compiler.AST._
 import compiler.ASTL._
+import compiler.ASTLfun._
 import compiler.Circuit.hexagon
 import compiler._
 import progOfCA.Rand.randDef
-
+import compiler.SpatialType._
 /** Layer implementing a random bit */
 class Rand() extends Layer[(V, B)](1, "rand") with ASTLt[V, B] {
   val next: BoolV = new Call1(randDef, this) with BoolV //randDef is used only here, no need for a wrapper!

@@ -1,36 +1,38 @@
 package progOfCA
 
-import compiler.ASTLfun.neighbors
+import compiler.ASTLfun.{neighbors, v}
 import compiler.AST.{Layer, p}
-import compiler.ASTL.{BoolV, _}
+import compiler.SpatialType._
+import compiler.ASTL._
 import compiler.Circuit.hexagon
 import compiler.{AST, ASTBfun, ASTLt, B, Circuit, E, F, T, V}
-import progOfmacros.RedS.exist
+import progOfmacros.RedS.{exist, border, inside}
 import progOfmacros.SReduce._
+import compiler.ASTLfun._
 
-/** Simple growth one of the most simple circuit that can be conceived, used for debug */
+/** Simple growth using redS sytematic computation */
 class Grow extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
-  val meVois: BoolEv = transfer(e(this))
-  val symed: BoolEv = sym(meVois)
-  val nVe = transfer(symed)
+  val neigh: BoolE = exist(this);
+  val in: BoolE = inside(this);
+  val brd: BoolE = border(this);
+  override val next: BoolV = exist(neigh) //   uses  defVe implicitely, the override keyword is mandatory
+  show(this, next, neigh, in, brd) //shown field will get the name "grow", because we set tbbbbbbbbbbbbbbb]
 
-  override val next: BoolV = reduce(ASTBfun.orRedop, nVe) //  make use of defVe brough to us implicitely,
+
+
+
+
+  // he name of root to arg(0).lowercase
+}
+
+/** Simple growth using directly the neighbor vertice,  and not the \edges */
+class GrowN extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
+  override val next: BoolV = reduce(ASTBfun.orRedop, neighbors(this)) //  make use of defVe brough to us implicitely,
   // nb if overrid is not written, it does not work!
   show(this) //shown field will get the name "grow", because we set the name of root to arg(0).lowercase
-  show(meVois)
-  show(symed)
-  show(nVe)
   show(next)
 }
 
-class GrowExist extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
-  val neighbEE: BoolE = exist(this);
-  show(neighbEE) //pas besoin de faire intervenir defVe
-  override val next: BoolV = exist(neighbEE) //  make use of defVe brough to us implicitely,
-  // nb if overrid is not written, it does not work!
-  show(this) //shown field will get the name "grow", because we set the name of root to arg(0).lowercase
-  show(next)
-}
 
 class GrowF extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
   val neighbFF: BoolF = exist(this); //no use of  defEv

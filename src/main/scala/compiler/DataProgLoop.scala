@@ -4,7 +4,7 @@ package compiler
 import compiler.AST.{Read, isNotRead}
 import compiler.ASTB.{AffBool, Dir, Elt, False, Reduce, outputStored}
 import compiler.ASTBfun.ASTBg
-import compiler.ASTL.BoolV
+import compiler.SpatialType.BoolV
 import compiler.Circuit.{TabSymb, iTabSymb}
 import dataStruc.Util.{radicalOfVar, removeAfterChar, shortenedSig}
 import compiler.Instr.{a, deployInt2}

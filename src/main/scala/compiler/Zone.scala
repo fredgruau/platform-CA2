@@ -163,7 +163,7 @@ object Zone {
      * @return the partitionIn constraint linking the two, if there is one.
      */
     def partitionIn(i: Instr, iInput: Instr): Option[Partition] = {
-      require(i.isTransfer ^ iInput.isTransfer) //one instruction is simplicial, and the other is transfer.
+      //require(i.isTransfer ^ iInput.isTransfer) //one instruction is simplicial, and the other is transfer. we now can have two SImplicial zone, neighbor, in order to break cycles.
       val iloc = i.locus.get
       val i2loc = iInput.locus.get
       if (iloc == V() || i2loc == V()) None //"no partitionIn towards V"
@@ -174,7 +174,7 @@ object Zone {
             iInput.locus.get.asInstanceOf[S], i.locus.get.asInstanceOf[TT]) //constraint on i 's schedule
           partition.permute(align2root(a(i).name), (myRoot(i.names.head)).locus.get).asInstanceOf[Partition]
         } //expressed with respect to the root.
-        else { // $i is simplicial, $i2 is transfer
+        else { // if $i is simplicial, $i2 is transfer
           val slocus = iloc.asInstanceOf[S]
           val partition = Partition(slocus.proj, slocus, iInput.locus.get.asInstanceOf[TT]) //when doing a reduction,
           // the mapping from Tlocus to Slocus is constant, and determined by the slocus

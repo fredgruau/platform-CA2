@@ -2,7 +2,8 @@ package compiler
 
 
 import compiler.AST.Layer
-import compiler.ASTL.{IntV, delayedL}
+import compiler.ASTL.delayedL
+import compiler.SpatialType.IntV
 import dataStruc.{Dag, DagNode}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 

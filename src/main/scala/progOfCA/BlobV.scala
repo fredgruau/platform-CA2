@@ -1,7 +1,8 @@
 package progOfCA
 
-import compiler.AST._
+import compiler.ASTLfun._
 import compiler.ASTL._
+import compiler.SpatialType._
 import compiler.Circuit.hexagon
 import compiler._
 import progOfmacros.SReduce._

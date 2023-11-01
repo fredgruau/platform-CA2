@@ -95,6 +95,16 @@ trait Named {
     if (name == null) name = prefix + twoDigit("" + Named.getCompteur(prefix))
   }
 
+  /**
+   * generates a unique name starting by prefix for AST even even if it already has a name
+   *
+   * @param prefix
+   */
+  def setNameEvenIfNull(prefix: String) = {
+    def twoDigit(s: String) = if (s.length == 1) "0" + s else s
+
+    name = prefix + twoDigit("" + Named.getCompteur(prefix))
+  }
 
   def addAfter(value: String) {
     name = name + value

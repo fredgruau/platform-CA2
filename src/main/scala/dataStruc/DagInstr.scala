@@ -122,23 +122,28 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
    * @return
    */
   def affectizeTm1(tm1s: List[ASTBt[_]]): DagInstr = { //TODO faire un seul appel pour éviter de reconstuire le DAG plusieurs fois
-    tm1s.map(_.setNameIfNull("tmun")); //creates new registers
+    tm1s.map(_.setNameEvenIfNull("tmun")); //creates new registers
     //  toBeRepl.map(_.forwardName()) //that's because we will remove tm1
     val repr = represent(tm1s) //2(toBeRepl)
+    val tm1Set = tm1s.toSet
     val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.setReadNode(tm1s.toSet.asInstanceOf[Set[AST[_]]], repr) //replaces tm1s by read
     /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
-    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.setReadNode((e2: AST[_]) => (tm1s.toSet(e2.asInstanceOf[ASTBt[_]]) && (e2 != e)), repr)
+
+    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.setReadNode((e2: AST[_]) =>
+      (tm1Set(e2.asInstanceOf[ASTBt[_]]) && (e2 != e)), repr)
+    // for affect(var<-tm1(exp)) we have  e2=e, and both are tm1s, in  this case we should replace
     /** rewrite recursively the affect expression. we use this slightly modified dedagExclude instead of dedagRewrite
      * to not generatre x=x  */
-    val affectExpList: List[AST[_]] = tm1s.map(deDagExclude).toList
+    val affectExpList: List[AST[_]] = tm1s.map(deDagExclude).toList // we have to use dedag exclude here, otherwise we will generate x=x
 
     /** returns the newly generated affect instruction */
-    newAffect = affectExpList.map((e: AST[_]) => Affect(e.name, e.asInstanceOf[ASTBt[_]].detm1ise))
-    val rewrite: Instr => Instr = (i: Instr) => i.propagate(deDagExclude)
-    propagateUnit3(rewrite, newAffect);
+    newAffect = affectExpList.map((e: AST[_]) => Affect(e.name, e.asInstanceOf[ASTBt[_]].detm1ise)) //en cas de tm1 emboité l'orde est important
+    val rewrite: Instr => Instr =
+      (i: Instr) => i.propagate(deDagRewrite) //we cannot do dedag exclude here, otherwise tm1 will remain in  intructions of the form id<-tmW1(exp]
+    propagateUnit3InsertTmunAfterUse(rewrite, newAffect); //inserte the instruction for affecting tmun, just after the instruction using them.
+
     this
   }
-
 
   /**
    * @return set of AST which are used twice within those instruction to be replaced by an affectation
@@ -172,9 +177,11 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
     u
   }
 
-
+  def resetDag = {
+    dag = null
+  }
   /**
-   * underlying dag of AST. if needed, and not computed, recompute it. */
+   * underlying dag of AST. if needed, and not computed, recomputes it. */
   def dagAst: Dag[AST[_]] = {
     if (dag == null)
       dag = new Dag(visitedL.flatMap(i => i.exps));

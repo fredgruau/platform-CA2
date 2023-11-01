@@ -6,7 +6,7 @@ import ASTBfun.ASTBg
 import Circuit._
 import compiler.ASTLt.ConstLayer
 import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp}
-import progOfCA.{Dddist, Grow}
+import progOfCA.{Grow}
 
 import scala.collection._
 import scala.collection.immutable.HashMap
@@ -59,31 +59,31 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     // print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
     val prog5: DataProg[InfoNbit[_]] = prog4.macroify();
-    //    print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
+    print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
     //  print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
 
     val prog5ter = prog5bis.radiusify3
-    //   print("radiusify555555555555555555555555555555\n"+prog5ter)
+    // print("radiusify555555555555555555555555555555\n"+prog5ter)
 
-    val prog6 = prog5ter.unfoldSpace(m); //ajoute les tm1s!!
+    val prog6 = prog5ter.unfoldSpace(m); //ajouter les tm1s!!
     // print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
 
     val prog7 = prog6.treeIfy(); //spatiall unfolding generates reused expression that need to be affected again
     //  print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
     val prog7bis = prog7.simplify(); //this will remove id which are read only once.
-    //print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
+    print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
 
     val prog8: DataProg[InfoNbit[_]] = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
-    //    print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
+    print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
     val prog10: DataProgLoop[InfoNbit[_]] = prog8.loopIfy()
     print("loopify1010101010101010101010101010101010101010" + prog10)
 
     val prog11 = prog10.unfoldInt()
-    //  print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
+    // print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
     val prog12 = prog11.coaalesc() //allocates memory
     // System.out.println(prog12.allLayers)
     //  print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
@@ -145,10 +145,10 @@ object Circuit {
     implicit val scalarType: repr[_ <: Ring] = t(0)(0).mym;
     src match {
       case V() => des match {
-        case E() => /*eV->vE*/
+        case E() => /*Ve->Ev*/
           // val Array(e, ne, nw, w, sw, se) = t(0)
           val Array(e, se, sw, w, nw, ne) = t(0)
-          Array(Array(tm1(w), tm1(shiftL(e))), Array(tm1(se), nw), Array(tm1(sw), shiftR(ne))) //ici on pousse les tm1s vers la fin pour factoriser les tm1 dans transfer(broadcast) de V vers vE
+          Array(Array(tm1(e), tm1(shiftL(w))), Array(tm1(se), nw), Array(tm1(sw), shiftR(ne))) //ici on pousse les tm1s vers la fin pour factoriser les tm1 dans transfer(broadcast) de V vers vE
         case F() => /*Vf->Fv*/
           val Array(se, s, sw, nw, n, ne) = t(0);
           Array(Array(n, tm1(shiftL(sw)), tm1(se)), Array(tm1(s), shiftR(ne), nw))
@@ -166,7 +166,8 @@ object Circuit {
         }
       case F() => des match {
         case V() => /*Fv->Vf*/
-          val Array(Array(dp, db1, db2), Array(up, ub1, ub2)) = t; Array(Array(db2, up, shiftR(db1), tm1(ub2), tm1(dp), tm1(shiftL(ub1))))
+          val Array(Array(dp, db1, db2), Array(up, ub1, ub2)) = t;
+          Array(Array(db2, up, shiftR(db1), tm1(ub2), tm1(dp), tm1(shiftL(ub1))))
         case E() => /*eF->fE*/
           val Array(Array(db, ds1, ds2), Array(ub, us1, us2)) = t;
           Array(Array(tm1(shiftL(ub)), db), Array(ds2, us2), Array(us1, shiftR(ds1)))
