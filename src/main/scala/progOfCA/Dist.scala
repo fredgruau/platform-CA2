@@ -2,14 +2,13 @@ package progOfCA
 
 import compiler.SpatialType._
 import compiler.AST._
-import compiler.ASTBfun.{addSI, addSIRedop, andRedop, eqSI, minSignRedop, orRedop, p}
+import compiler.ASTBfun.{addRedop, andRedop, eqSI, minSignRedop, orRedop, p, redop}
 import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.ASTLt._
 import compiler.Circuit.hexagon
 import compiler._
 import progOfmacros.Compute._
-import progOfmacros.SReduce._
 import compiler.SpatialType._
 
 class Seed extends ConstLayer[V, B](1, "global") with DistT {
@@ -21,7 +20,7 @@ class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[
   //val level: BoolV = elem(2, this);
   val opp = -this
   val se: IntVe = send(List(this, this, this, opp, opp, opp)) //we  apply an opp on distances comming from the center.
-  val grad3: IntE = reduce(addSIRedop, transfer(se)) //the trick here is to do the expensive operation (add) only on the three edges locus, instead of the 6 Ve transfer
+  val grad3: IntE = reduce(addRedop[SI].asInstanceOf[redop[SI]], transfer(se)) //the trick here is to do the expensive operation (add) only on the three edges locus, instead of the 6 Ve transfer
   val gap: BoolE = unop(eqSI, grad3 + 4) //the two neighbors cannot be compared if gap is true
   val grad6: IntEv = send(List(-grad3, grad3)) //when sending back the result, we have to invert again towards the center
   val lt: BoolVe = transfer(ltSI(grad6))

@@ -226,7 +226,7 @@ object AST {
 
   // @TODO we should not import compiler._, and find a way to use parameter with IntV rather than [V,SI]
   /** Creates a parameter for macro */
-  def p[L <: Locus, R <: Ring](name: String)(implicit n: repr[L], m: repr[R]) = new Param[(L, R)](name) with ASTLt[L, R]
+  def pL[L <: Locus, R <: Ring](name: String)(implicit n: repr[L], m: repr[R]) = new Param[(L, R)](name) with ASTLt[L, R]
 
   /** Replace call1, call2, call3, after the nbit stage */
   abstract class Call[T](val f: Fundef[T], val args: AST[_]*)(implicit n: repr[T]) extends AST[T]

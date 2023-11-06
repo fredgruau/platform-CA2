@@ -10,6 +10,7 @@ import scala.collection.{Map, Set, immutable, mutable}
 import scala.collection.immutable.{HashMap, HashSet}
 import Array._
 import ASTB._
+import compiler.ASTBt.checkUISI
 import compiler.Packet.{BitLoop, BitNoLoop}
 import dataStruc.Named
 
@@ -31,6 +32,11 @@ object ASTBt {
     paramSameBitSizeMem(f.name)
   }
 
+  def checkUISI(effectivPar: AST[_], opPar: AST[_]) = {
+    if (effectivPar.mym.name != opPar.mym.name //  && opPar.mym.name != UISI() && effectivPar.mym.name != UISI()
+    )
+      throw new Exception("Faut preserver SI ou UI")
+  }
 }
 
 /** Identifies AST corresponding to int or bool, excludes those obtained with cons */
@@ -145,7 +151,7 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
       case Read(x) =>
         this.asInstanceOf[ASTBt[B]]
       case u@Param(_) => env(u.nameP) //soit un read soit un readscalar soit un affectscalar suivant la nature du parametre
-      case Call1(op, x) => //il se peut quon rajute un affect et augmente la tsymb au lieu d' augmenter l'environnement
+      case Call1(op, x) => //il se peut quon rajoute un affect et augmente la tsymb au lieu d' augmenter l'environnement
         //we check that x 's type is a subtype of the paramater
         // we dlike to write something like that op.p1.mym=x.mym
         if (x.mym.name != op.p1.mym.name)
@@ -153,8 +159,10 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
         val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBg].deCallify(env))
         op.arg.asInstanceOf[ASTBg].deCallify(newEnv)
       case Call2(op, x, y) => //il se peut quon rajute un affect et augmente la tsymb
-        if ((x.mym.name != op.p1.mym.name && op.p1.mym.name != UISIB()) || (y.mym.name != op.p2.mym.name && op.p2.mym.name != UISIB()))
-          throw new Exception("Faut preserver SI ou UI")
+        checkUISI(x, op.p1);
+        checkUISI(y, op.p2)
+        // if ((x.mym.name != op.p1.mym.name && op.p1.mym.name != UISIB()) || (y.mym.name != op.p2.mym.name && op.p2.mym.name != UISIB()))
+        //null//totoa throw new Exception("Faut preserver SI ou UI")
         val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBg].deCallify(env)) +
           (op.p2.nameP -> y.asInstanceOf[ASTBg].deCallify(env))
         op.arg.asInstanceOf[ASTBg].deCallify(newEnv)

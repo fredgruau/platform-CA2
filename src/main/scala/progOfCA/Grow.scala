@@ -1,22 +1,21 @@
-package progOfCA
+package progOfCA //contains variation of grow, illustgrate redS sytematic computation
 
 import compiler.ASTLfun.{neighbors, v}
-import compiler.AST.{Layer, p}
+import compiler.AST.{Layer, pL}
 import compiler.SpatialType._
 import compiler.ASTL._
 import compiler.Circuit.hexagon
 import compiler.{AST, ASTBfun, ASTLt, B, Circuit, E, F, T, V}
-import progOfmacros.RedS.{exist, border, inside}
-import progOfmacros.SReduce._
+import progOfmacros.RedS.{exist, frontier, inside}
 import compiler.ASTLfun._
 
-/** Simple growth using redS sytematic computation */
+/** Simple growth from V to E to V; test of in, and border.we believe that at least for border, and neighbor, it will be reused */
 class Grow extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
-  val neigh: BoolE = exist(this);
+  val n: BoolE = exist(this);
   val in: BoolE = inside(this);
-  val brd: BoolE = border(this);
-  override val next: BoolV = exist(neigh) //   uses  defVe implicitely, the override keyword is mandatory
-  show(this, next, neigh, in, brd) //shown field will get the name "grow", because we set tbbbbbbbbbbbbbbb]
+  val brd: BoolE = frontier(this);
+  override val next: BoolV = exist(n) //   uses  defVe implicitely, the override keyword is mandatory
+  show(this, next, n, in, brd)
 
 
 
@@ -25,106 +24,42 @@ class Grow extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
   // he name of root to arg(0).lowercase
 }
 
-/** Simple growth using directly the neighbor vertice,  and not the \edges */
+/** Simple growth using directly the neighbor vertice,  that is a bit cheaper */
 class GrowN extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
-  override val next: BoolV = reduce(ASTBfun.orRedop, neighbors(this)) //  make use of defVe brough to us implicitely,
+  override val next: BoolV = orR(neighbors(this)) //  make use of defVe brough to us implicitely,
   // nb if overrid is not written, it does not work!
   show(this) //shown field will get the name "grow", because we set the name of root to arg(0).lowercase
   show(next)
 }
 
-
+/** Growing by passing through from V through F */
 class GrowF extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
-  val neighbFF: BoolF = exist(this); //no use of  defEv
-  show(neighbFF)
-  override val next: BoolV = exist(neighbFF) //  make use of defVf brough to us implicitely,nb if overrid is not written, it does not work!
-  show(this) //shown field will get the name "grow", because we set the name of root to arg(0).lowercase
-  show(next)
+  val nf: BoolF = exist(this); //no use of  defEv
+  override val next: BoolV = exist(nf) //  make use of defVf brough to us implicitely,nb if overrid is not written, it does not work!
+  show(this, nf, next)
+
 }
 
+/** Growing  from E through F */
 class GrowEF extends Layer[(E, B)](1, "global") with ASTLt[E, B] {
-  // val neighbFF: BoolF = exist(this); //no use of defFe
-
   val broadcasted = f(this) //step 1 is broadcast
   val transfered = transfer(broadcasted) //step 2 is transfer
-  val neighbFF = orRB(transfered) //(n,m,d) yzeté implicit killerest
-  show(broadcasted)
-  show(transfered)
-  show(neighbFF) //uses defEf
-  override val next: BoolE = exist(neighbFF) //  make use of defVe brough to us implicitely,nb if overrid is not written, it does not work!
-  show(this) //shown field will get the name "grow", because we set the name of root to arg(0).lowercase
-  show(next)
+  val nf = orR(transfered) //(n,m,d) yzeté implicit killerest
+  override val next: BoolE = exist(nf) //  make use of defVe brough to us implicitely,nb if overrid is not written, it does not work!
+  show(this, broadcasted, transfered, nf, next)
 }
 
+/** Growing  from E through V */
 class GrowEV extends Layer[(E, B)](1, "global") with ASTLt[E, B] {
-  // val neighbFF: BoolF = exist(this); //no use of defFe
-
   val broadcasted = v(this) //step 1 is broadcast
   val transfered = transfer(broadcasted) //step 2 is transfer
-  val nv: BoolV = orRB(transfered) //(n,m,d) yzeté implicit killerest
-  show(broadcasted)
-  show(transfered)
-  show(nv) //uses defEf
+  val nv: BoolV = orR(transfered) //(n,m,d) yzeté implicit killerest
   override val next: BoolE = exist(nv) //  make use of defVe brough to us implicitely,nb if overrid is not written, it does not work!
-  show(this) //shown field will get the name "grow", because we set the name of root to arg(0).lowercase
-  show(next)
+  show(this, broadcasted, transfered, nv, next)
 }
 
 
-// implement the intermediate stage in main, so that we have name variables as 2D arrays.
-class GrowDec extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
-  // val GrowE= existV2E(this);  val next: BoolV = existE2V(GrowE)
 
-  val neighbEE: BoolE = existV2E(this)
-  show(neighbEE)
-  val next: BoolV = existE2V(neighbEE)
-  show(this)
-}
-
-/** uses the blob to grow voronoi region stoping the growth just before merge happens */
-class GrowVor() extends Layer[(V, B)](1,"global") with ASTLt[V, B] with BlobV {
-  val next: BoolV = neighborhood(this) & (~meetV) & (~existE2V(meetE)) //only radius 0 computation, because communication is handled in macro
-  show(this)
-  show(meetE)
-  show(meetV)
-}
-
-/** Code for compiling Grow */
-/*object Grow extends App {
-  new Circuit[V, B]() {
-
-    val grow = new Grow().asInstanceOf[ASTLt[V, B]];
-
-    def computeRoot = grow //will be the name of this. if we print this in class Grow
-  }.compile(hexagon)
-}*/
-
-
-
-/*object GrowDec extends App {
-  new Circuit[V, B]() {
-    val grow = new GrowDec();
-
-    def computeRoot: BoolV = grow
-  }.compile(hexagon)
-}
-
-object GrowF extends App {
-  new Circuit[F, B]() {
-    val grow = new GrowF();
-
-    def computeRoot: BoolF = grow
-  }.compile(hexagon)
-}
-
-/** Code for compiling Growvor */
-object GrowVor extends App {
-  new Circuit[V, B]() {
-    val growVor = new GrowVor();
-
-    def computeRoot: BoolV = growVor
-  }.compile(hexagon)
-}*/
 
 
 

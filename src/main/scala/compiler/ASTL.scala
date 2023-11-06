@@ -1,12 +1,13 @@
 package compiler
 
-import AST.{p, _}
-import ASTB.{tm1, _}
+import AST._
+import ASTB._
 import ASTBfun.{orRedop, _}
-import ASTL.{Redop, Send, Unop, _}
+import ASTL.{redop, _}
+import ASTLfun._
 import dataStruc.Align2._
 import Constraint._
-import Circuit.{iTabSymb2, _}
+import Circuit._
 import repr._
 import dataStruc.{Dag, Util}
 import dataStruc.DagNode._
@@ -28,6 +29,11 @@ import dataStruc.Util.{composeAll2, rot, rotPerm, rotR}
 object ASTL {
   val u = 1
 
+  /** delayedL reprograms delayed, in order to add the trait ASTLt[L, R] */
+  def delayedL[L <: Locus, R <: Ring](_arg: => ASTLt[L, R])(implicit m: repr[(L, R)]): ASTLt[L, R] = {
+    lazy val delayed = _arg;
+    new Delayed[(L, R)](() => delayed) with ASTLt[L, R]
+  }
   private[ASTL] case class Coonst[L <: Locus, R <: Ring](cte: ASTBt[R], m: repr[L], n: repr[R]) extends ASTL[L, R]()(repr.nomLR(m, n)) with EmptyBag[AST[_]]
 
   def const[L <: Locus, R <: Ring](cte: ASTBt[R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = Coonst(cte, m, n)
@@ -68,27 +74,20 @@ object ASTL {
     extends ASTL[L, R2]()(repr.nomLR(m, n)) with Singleton[AST[_]]
 
   def unop[L <: Locus, Ri <: Ring, Ro <: Ring](f: Fundef1[Ri, Ro], arg: ASTLt[L, Ri])(implicit m: repr[L], n: repr[Ro]): ASTLt[L, Ro]
-  = Unop[L, Ri, Ro](f, arg, m, n)
+  = {
+    Unop[L, Ri, Ro](f, arg, m, n)
+  }
 
   private[ASTL] final case class Binop[L <: Locus, R1 <: Ring, R2 <: Ring, R3 <: Ring](
                                                                                         op: Fundef2[R1, R2, R3], arg: ASTLt[L, R1], arg2: ASTLt[L, R2], m: repr[L], n: repr[R3])
     extends ASTL[L, R3]()(repr.nomLR(m, n)) with Doubleton[AST[_]]
 
-  def binop[L <: Locus, R1 <: Ring, R2 <: Ring, R3 <: Ring](op: Fundef2[R1, R2, R3],
-                                                            arg: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n3: repr[R3]): ASTLt[L, R3]
+  def binop[L <: Locus, R1 <: Ring, R2 <: Ring, R3 <: Ring](op: Fundef2[R1, R2, R3], arg: ASTLt[L, R1], arg2: ASTLt[L, R2])
+                                                           (implicit m: repr[L], n3: repr[R3]): ASTLt[L, R3]
   = Binop[L, R1, R2, R3](op, arg, arg2, m, n3)
 
   /**
-   *
-   * @param op
-   * @param arg
-   * @param m : implicit used to compute the locus and scala type
-   *          made a lot of effort to make it covariant, but that seems useless, in fact.
-   *          I've put the type locus + ring as part of  the case construct's fields, so that it becomes very easy to copy
-   * @param n
    * @tparam S1 towards wich we reduce
-   * @tparam S2
-   * @tparam R
    */
   private[ASTL] final case class Redop[S1 <: S, S2 <: S, R <: Ring](op: redop[R], arg: ASTLt[T[S1, S2], R], m: repr[S1], n: repr[R])
     extends ASTL[S1, R]()(repr.nomLR(m, n)) with Singleton[AST[_]] {
@@ -100,15 +99,6 @@ object ASTL {
   = Redop[S1, S2, R](op, arg, m, n)
 
 
-  def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[UI]): RedopConcat[S1, S2] =
-    RedopConcat[S1, S2](arg, m, n)
-
-  /** the concat reduction has a different signature it takes a bool transfer, and produces an unsigned int. n=UI */
-  private[ASTL] final case class RedopConcat[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B], m: repr[S1], n: repr[UI])
-    extends ASTL[S1, UI]()(repr.nomLR(m, n)) with Singleton[AST[_]] {
-    /** used to compute the expression being reduced.  */
-    override def redExpr: List[AST[_]] = List(arg)
-  }
 
   /** @param dir true if rotation is clockwise */
   private[ASTL] final case class Clock[S1 <: S, S2 <: S, S3 <: S, R <: Ring](
@@ -132,256 +122,38 @@ object ASTL {
                                                (implicit t: CentralSym[S2, S1, S3], m: repr[T[S1, S3]], n: repr[R]): ASTLt[T[S1, S3], R] = Sym(arg, m, t, n)
 
 
+  def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[UI]): RedopConcat[S1, S2] =
+    RedopConcat[S1, S2](arg, m, n)
+
+  /** the concat reduction has a different signature it takes a bool transfer, and produces an unsigned int. n=UI */
+  private[ASTL] final case class RedopConcat[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B], m: repr[S1], n: repr[UI])
+    extends ASTL[S1, UI]()(repr.nomLR(m, n)) with Singleton[AST[_]] {
+    /** used to compute the expression being reduced. */
+    override def redExpr: List[AST[_]] = List(arg)
+  }
 
 
-  /** Field which has a value both  at time t, and t+1 */
+  /** Fields which have a value both  at time t, and t+1 ,todo layers should implement it */
   trait Strate[L <: Locus, R <: Ring] {
     val pred: ASTLt[L, R];
     val next: ASTLt[L, R]
   }
 
-
-  /** when we subtract two UI we automatically convert to SI, by simply adding a 0 bit on the first significant bits */
-  implicit def uItoSIL[L <: Locus](d: ASTLt[L, UI])(implicit m: repr[L]) =
-    new Unop[L, UI, SI](ASTBfun.uItoSIdef, d, m, repr.nomSI) //adds the comparison operators, which requires signed bit because we take the opposite
-
-
   type ASTLg = ASTLt[_ <: Locus, _ <: Ring]
   type rewriteASTLt[L <: Locus, R <: Ring] = ASTLt[L, R] => ASTLt[L, R]
-  //type bij2[L <: Locus, R <: Ring] = ASTL[L, R] => ASTL[L, R]
-
-  /** ***************the wrapper *******************/
-
-  //Builds a transfer, just like v,e,f, however specify a diffent Simplicial field for each component; used for substraction.
-
-  //  def sendf[S1 <: S, R <: Ring](args: List[ASTLt[S1, R]])(implicit m: repr[T[S1, F]], n: repr[R]) = Send[S1, F, R](args) ;
-
-  //def castB2R[L<:Locus,R<:I]( arg: AST[L,B] )(implicit m : repr[L])  = Unop[L,B,R] (castB2RN[R],arg );
-
-
-  //def v[S1 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, V]], n: repr[R]): Broadcast[S1, V, R] = Broadcast[S1, V, R](arg, m, n); // for broadcast, we want to specify only the direction where broadcasting takes place.
-
-
-  //def unop[L <: Locus, Ri <: Ring, Ro <: Ring](f: Fundef1[Ri, Ro])(implicit m: repr[L], n: repr[Ro]) = (arg1: ASTLt[L, Ri]) => Unop[L, Ri, Ro](f, arg1, m, n)
-  def sign[L <: Locus](arg1: ASTLt[L, SI])(implicit m: repr[L]): ASTLt[L, SI] = Unop[L, SI, SI](ASTBfun.sign, arg1, m, nomSI)
-
-
-  //todo desUISIfy
-  def halve[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = Unop[L, R, R](
-    halveBSI.asInstanceOf[Fundef1[R, R]], arg1, m, n)
-
-  //todo desUISIfy
-  def orScanRight[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, R] = Unop[L, R, R](halveBSI.asInstanceOf[Fundef1[R, R]], arg1, m, n)
-
-  //todo desUISIfy
-
-  /* def ltUI2[L <: Locus](arg1: ASTLt[L, UI], arg2: ASTLt[L, UI])(implicit m: repr[L], n: repr[B]): ASTL[L, B] =
-     Binop(ASTBfun.ltUI2.asInstanceOf[Fundef2[UI, UI, B]], arg1, arg2, m, n)
- */
-  def lt2[L <: Locus](arg1: ASTLt[L, SI], arg2: ASTLt[L, SI])(implicit m: repr[L], n: repr[B]): ASTL[L, B] =
-    Binop(ASTBfun.ltSI2Mod.asInstanceOf[Fundef2[SI, SI, B]], arg1, arg2, m, n)
-
-  def gt2[L <: Locus](arg1: ASTLt[L, SI], arg2: ASTLt[L, SI])(implicit m: repr[L], n: repr[B]): ASTL[L, B] =
-    Binop(ASTBfun.gtSI2.asInstanceOf[Fundef2[SI, SI, B]], arg1, arg2, m, n)
-
-
-  //todo desUISIfy
-  def notNull[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, B] = Unop[L, R, B](neqSI.asInstanceOf[Fundef1[R, B]], arg1, m, repr.nomB)
-
-
-  /*def concat2[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[I]): ASTL[L, I] =
-    Binop(concat2f.asInstanceOf[Fundef2[R1, R2, I]], arg1, arg2, m, n)
-*/
-  def concat2UI[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[UI]): ASTL[L, UI] =
-    Binop(concat2f.asInstanceOf[Fundef2[R1, R2, UI]], arg1, arg2, m, n)
-
-  def concat2SI[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[SI]): ASTL[L, SI] =
-    Binop(concat2f.asInstanceOf[Fundef2[R1, R2, SI]], arg1, arg2, m, n)
-
-  /** @param i final number of bit */
-  def extend[L <: Locus, R <: Ring](i: Int, arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, R] =
-    Unop[L, R, R](ASTBfun.extend[R](i).asInstanceOf[Fundef1[R, R]], arg, m, n)
-
-  def elem[L <: Locus, R <: I](i: Int, arg: ASTLt[L, R])(implicit m: repr[L], n: repr[B]): Unop[L, R, B] =
-    Unop[L, R, B](eltUISI(arg.ring, i).asInstanceOf[Fundef1[R, B]], arg, m, n)
-
-  /** delaying so as to obtain same radius is a special unop! */
-  def increaseRadiuus[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, R] = {
-    val op = ASTBfun.increaseRadius2[R]
-    val lll = Unop[L, R, R](op, arg, m, n)
-    lll
-  }
-  //{ ASTL.Unop(opp.asInstanceOf[Fundef1[R, SI]], this, m, repr.nomSI) }
-
-  //def concat[L <: Locus, R <: I](arg1: Seq[ASTLtrait[L, R]])(implicit m: repr[L], n: repr[R]) = Multop2[L, R, R](concatN, arg1,m,n);
-  // def orR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]) = Redop[S1, S2, R]((orI.asInstanceOf[Fundef2[R, R, R]], False[R]), arg, m, n);
-
-  /**
-   * reduction operator
-   */
-
-  /**
-   * version obsolete car il faudrait faire un match pour chaque op, ce qu'on peut eviter.
-   *
-   * @param op  reduction operator
-   * @param arg arguement being reduced
-   * @param m   : implicit used to compute the locus
-   * @param n   implicit used to compute the scalar type
-   * @tparam S1 main spatial locus
-   * @tparam S2 secondary spatial locus
-   * @tparam R  scalar type, boolean or int for example
-   *            Like redop excep it does a preliminary binop
-   *            with defVE which is true when the value is defined.
-   *            When it is not defined, the binop result shoudl take the neutral value (O for Or, 1 for and...)
-   */
-  def reduceBool[S1 <: S, S2 <: S](op: redop[B], arg: ASTLt[T[S1, S2], B]) //S1=V
-                                  (implicit m: repr[S1], m2: repr[S2], n: repr[B], d: chipBorder[S1, S2]): Redop[S1, S2, B] = {
-    val newArg: ASTLt[T[S1, S2], B] = if (d.border == null) arg //d.border null means we do not need it.
-    else op match {
-      case (orb, _) => //todo inclure to les transfer locus, pas seulement Ve
-        and[T[S1, S2], B](d.border, arg)(nomT(m, m2), nomB) //met a zero is pas border
-    }
-    Redop[S1, S2, B](op, newArg, m, n)
-  }
-
-
-
-
-  /** or Reduction which works both for boolean and integers, but does not use the border so it is obsolote */
-  def orR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): Redop[S1, S2, R] = {
-    assert(false) //we do not want to use this.
-    Redop[S1, S2, R](orRedop[R], arg, m, n)
-  }
-
-  /** or reduction processing the border, should be extended to include integers */
-  def orRB[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S1, S2]): Redop[S1, S2, B] =
-    reduceBool[S1, S2](orRedop[B], arg)(m, n, nomB, d)
-
-
-  /** version of or reduction taking into account undefined value on chip's border using an implici d:chipBorder */
-  def orRdef[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])
-                              (implicit m: repr[S1], m2: repr[S2], d: chipBorder[S1, S2]): Redop[S1, S2, B] =
-    reduceBool[S1, S2](orRedop[B], arg)
-
-  def andRdef[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])
-                               (implicit m: repr[S1], m2: repr[S2], d: chipBorder[S1, S2]): Redop[S1, S2, B] =
-    reduceBool[S1, S2](andRedop[B], arg)
-
-  def andR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): Redop[S1, S2, R] =
-    Redop[S1, S2, R](andRedop[R], arg, m, n)
-
-  def xorR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): Redop[S1, S2, R] =
-    Redop[S1, S2, R](xorRedop[R], arg, m, n)
-
-  /**
-   * reduction operator, which use the static defVe, defVf
-   */
-
-  def orRdef[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): Redop[S1, S2, R] =
-    Redop[S1, S2, R](orRedop[R], arg, m, n)
-
-
-
 
 
   /*
 
-    def subESI[S2 <: S](arg: ASTLt[T[E, S2], SI])(implicit m: repr[E]): ASTLt[E, SI] =
-      Redop[E, S2, SI]((subSI, Intof[SI](0)), arg, m, repr.nomSI).asInstanceOf[ASTLt[E, SI]]
-
-    def addESI[S2 <: S](arg: ASTLt[T[E, S2], SI])(implicit m: repr[E]): ASTLt[E, SI] = //todo remplacer par reduce
-      Redop[E, S2, SI]((addSI, Intof[SI](0)), arg, m, repr.nomSI).asInstanceOf[ASTLt[E, SI]]
+    def id[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg.ring match {
+      case B() => Unop(identityB, arg.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
+      case UI() => Unop(identityUI.asInstanceOf[Fundef1[R, R]], arg, m, n)
+      case SI() => Unop(identitySI.asInstanceOf[Fundef1[R, R]], arg, m, n)
+    }).asInstanceOf[ASTL[L, R]]
   */
 
 
-  /** minR has two implementations depending if the integers to be compared are signed or unsigned. */
-  def minR[S1 <: S, S2 <: S, R <: I](arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): ASTLt[S1, R] =
-    if (arg.ring == SI()) Redop[S1, S2, SI]((minRelSI, Intof[SI](0)), arg.asInstanceOf[ASTLt[T[S1, S2], SI]], m, repr.nomSI).asInstanceOf[ASTLt[S1, R]]
-    else Redop[S1, S2, UI]((minUI, Intof[UI](0)), arg.asInstanceOf[ASTLt[T[S1, S2], UI]], m, repr.nomUI).asInstanceOf[ASTLt[S1, R]]
 
-  /** delayedL reprograms delayed, in order to add the trait ASTLt[L, R] */
-  def delayedL[L <: Locus, R <: Ring](_arg: => ASTLt[L, R])(implicit m: repr[(L, R)]): ASTLt[L, R] = {
-    lazy val delayed = _arg;
-    new Delayed[(L, R)](() => delayed) with ASTLt[L, R]
-  }
-
-
-
-
-  /**
-   * computes an int with a single non zero bit which is the highest rank for which operand's bit is one if operand is null, output O.
-   * this is an example of boolean function with a reused value: orScanRight.
-   */
-  def mstb[L <: Locus, R <: I](arg1: ASTL[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = {
-    val y: ASTL[L, R] = orScanRight[L, R](arg1);
-    y ^ halve(y)
-  }
-
-
-  // _____________________________________________arithmetic comparison ___________________________________________________________________________
-
-
-  // _____________________________________________boolean operators ___________________________________________________________________________
-  /** Simple logical Or */
-  def or[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg1.ring match {
-    case B() =>
-      Binop(orB, arg1.asInstanceOf[ASTLt[L, B]], arg2.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
-    case _ =>
-      Binop(orUISI(arg1.ring).asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
-  }).asInstanceOf[ASTL[L, R]]
-
-
-  /** Simple logical And */
-  def and[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg1.ring match {
-    case B() => Binop(andB, arg1.asInstanceOf[ASTLt[L, B]], arg2.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
-    case _ => Binop(andUISI(arg1.ring).asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
-  }).asInstanceOf[ASTL[L, R]]
-
-  /** Simple logical Xor */
-  def xor[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] =
-    (arg1.ring match {
-    case B() => Binop(xorB, arg1.asInstanceOf[ASTLt[L, B]], arg2.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
-    case _ => Binop(xorUISI(arg1.ring).asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
-  }).asInstanceOf[ASTL[L, R]]
-
-  def neg[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg.ring match {
-    case B() => Unop(negB, arg.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
-    case _ => Unop(negSI.asInstanceOf[Fundef1[R, R]], arg, m, n)
-  }).asInstanceOf[ASTL[L, R]]
-
-  def id[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = (arg.ring match {
-    case B() => Unop(identityB, arg.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
-    case UI() => Unop(identityUI.asInstanceOf[Fundef1[R, R]], arg, m, n)
-    case SI() => Unop(identitySI.asInstanceOf[Fundef1[R, R]], arg, m, n)
-  }).asInstanceOf[ASTL[L, R]]
-
-
-  def opp[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, SI, SI] =
-    Unop[L, SI, SI](oppSI, arg.asInstanceOf[ASTLt[L, SI]], m, repr.nomSI)
-
-  def inc[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): Unop[L, R, R] = {
-    if (n.name.isInstanceOf[SI]) Unop[L, SI, SI](incSI, arg.asInstanceOf[ASTLt[L, SI]], m, repr.nomSI).asInstanceOf[Unop[L, R, R]]
-    else {
-      assert(n.name.isInstanceOf[UI]); Unop[L, UI, UI](incUI, arg.asInstanceOf[ASTLt[L, UI]], m, repr.nomUI).asInstanceOf[Unop[L, R, R]]
-    }
-  }
-
-
-  /** uses a fixed val addUISI, and let the compiler believe that this val has the appropriate expected  type R=UI or R=SI  */
-  def add[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = {
-    Binop(addUISI(n.name).asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
-  }
-
-  def min[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTL[L, R] = {
-    if (n.isInstanceOf[UI])
-      Binop(minUI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
-    else Binop(minRelSI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2, m, n)
-  }
-
-
-
-  //  def neg2[L <: Locus, R <: Ring](arg: AST2[L, R])(implicit m: repr[L], n: repr[R]) = Unop[L, R, R](negN[R], arg);
-  // implicit def fromAST2[L<:Locus,R<:Ring](x:AST2[L, R]):ASTL[L,R]=x.asInstanceOf[ASTL[L,R]
 }
 
 

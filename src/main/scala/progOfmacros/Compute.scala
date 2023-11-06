@@ -7,7 +7,7 @@ import compiler.AST._
 import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.ASTB._
-import compiler.ASTBfun.{Fundef3R, addSIRedop, p}
+import compiler.ASTBfun.{Fundef3R, addRedop, redop}
 import compiler._
 
 
@@ -15,7 +15,7 @@ import compiler._
 object Compute {
 
   val incDef: Fundef1[(V, SI), (V, SI)] = {
-    val d = p[V, SI]("dis")
+    val d = pL[V, SI]("dis")
     val newd = inc(d)
     Fundef1("integer.inc", newd, d)
   }
@@ -29,12 +29,12 @@ object Compute {
    * */
   val slopeDeltaDef: Fundef1[(V, SI), ((T[V, E], B), (V, SI))] = {
     //val x:IntV= p[V, SI]("dis")
-    val d = p[V, SI]("dis")
+    val d = pL[V, SI]("dis")
     val s: IntVe = send(List(d, d, d, -d, -d, -d))
     // val tepred = transfer(e(x))
     val tepred = transfer(s)
     //   val g: ASTLt[E, SI] = subESI(tepred)
-    val g: ASTLt[E, SI] = reduce(addSIRedop, tepred) //addESI(tepred)
+    val g: ASTLt[E, SI] = reduce(addRedop[SI].asInstanceOf[redop[SI]], tepred) //addESI(tepred)
     val grad: IntEv = send(List(g, -g))
     //val grad: IntvE = tepred - sym(tepred)
     // TODO should use opp to make only one subtraction, we need to adress selectively the two neighbors of an edge.
@@ -58,8 +58,8 @@ object Compute {
 
   /** Does only one or, which appear ridiciulously small for a macro, but that May avoid generating too many CaLoops */
   val orVdef: Fundef2[(V, B), (V, B), (V, B)] = {
-    val b0 = p[V, B]("b0")
-    val b1 = p[V, B]("b1")
+    val b0 = pL[V, B]("b0")
+    val b1 = pL[V, B]("b1")
     val r = b1 | b0
     Fundef2("orV", r, b0, b1)
   }
@@ -68,8 +68,8 @@ object Compute {
 
 
   val andVdef: Fundef2[(V, B), (V, B), (V, B)] = {
-    val b0 = p[V, B]("b0")
-    val b1 = p[V, B]("b1")
+    val b0 = pL[V, B]("b0")
+    val b1 = pL[V, B]("b1")
     val r = b1 & b0
     Fundef2("orV", r, b0, b1)
   }
@@ -77,8 +77,8 @@ object Compute {
   def andV(b0: BoolV, b1: BoolV): BoolV = new Call2(andVdef, b0, b1) with BoolV
 
   val andEdef: Fundef2[(E, B), (E, B), (E, B)] = {
-    val b0 = p[E, B]("b0")
-    val b1 = p[E, B]("b1")
+    val b0 = pL[E, B]("b0")
+    val b1 = pL[E, B]("b1")
     val r = b1 & b0
     Fundef2("orV", r, b0, b1)
   }
@@ -87,7 +87,7 @@ object Compute {
 
 
   val notEdef: Fundef1[(E, B), (E, B)] = {
-    val b0 = p[E, B]("b0")
+    val b0 = pL[E, B]("b0")
     val r = ~b0
     Fundef1("notE", r, b0)
   }

@@ -5,7 +5,6 @@ import compiler.AST._
 import compiler.ASTL._
 import compiler._
 import progOfmacros.Compute._
-import progOfmacros.SReduce.frontierEDef
 import compiler.SpatialType._
 /** macro used specifically to compute the blob predicate */
 object BlobMacro {
@@ -18,10 +17,10 @@ object BlobMacro {
 
   /** From a boolfV, computes the number of true connected components, likely to be reused for BlobE, BlobVe */
   val nbccDef: Fundef1[(T[V, F], B), (V, UI)] = {
-    val vf = p[T[V, F], B]("ringAroundV")
+    val vf = pL[T[V, F], B]("ringAroundV")
     val asInt: UintV = concatR(vf)
     asInt.setName("asInt");
-    val (n0, n1, n2, n3, n4, n5) = (elem(0, asInt), elem(1, asInt), elem(2, asInt), elem(3, asInt), elem(4, asInt), elem(5, asInt))
+    val (n0, n1, n2, n3, n4, n5) = (elt(0, asInt), elt(1, asInt), elt(2, asInt), elt(3, asInt), elt(4, asInt), elt(5, asInt))
     //   val nbChanges: UintV =sum3(n0|n1,n2|n3,n4|n5)
     val nbChanges: UintV = sum3V(n0 | n1, n2 | n3, n4 | n5)
     Fundef1("nbcc", nbChanges, vf)
@@ -33,7 +32,7 @@ object BlobMacro {
 
   /** useless wrapper to nbcc, to test a non root main. */
   val nbccBis: Fundef1[(T[V, F], B), (V, UI)] = {
-    val vB = p[T[V, F], B]("blobis")
+    val vB = pL[T[V, F], B]("blobis")
     val nbChanges: UintV = nbcc(vB) + nbcc(vB)
     nbChanges.setName("nbChange")
     Fundef1("nbccbis", nbChanges, vB)
@@ -45,10 +44,10 @@ object BlobMacro {
 
   /** From a boolfV, computes the number of true connected components */
   val nbcc2: Fundef1[(V, B), (V, UI)] = {
-    val vB = p[V, B]("blob")
+    val vB = pL[V, B]("blob")
     val asInt: UintV = concatR(Comm.apexV(f(xorR(transfer(e(vB))))))
     asInt.setName("asInt");
-    val (n0, n1, n2, n3, n4, n5) = (elem(0, asInt), elem(1, asInt), elem(2, asInt), elem(3, asInt), elem(4, asInt), elem(5, asInt))
+    val (n0, n1, n2, n3, n4, n5) = (elt(0, asInt), elt(1, asInt), elt(2, asInt), elt(3, asInt), elt(4, asInt), elt(5, asInt))
     val nbChanges: UintV = sum3V(n0 | n1, n2 | n3, n4 | n5)
     Fundef1("nbcc2", nbChanges, vB)
   }

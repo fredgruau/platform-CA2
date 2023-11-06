@@ -3,13 +3,26 @@ package compiler
 import AST._
 import ASTB._
 import ASTBfun._
-import ASTL.neg
+import ASTLfun._
 
 /** Defines boolean operations in infix notation, for Bool, Uint, Sint */
 trait MyOpIntB[+R <: Ring] {
   this: ASTBt[R] =>
-  def +[U >: R <: I](that: ASTBt[U])(implicit n: repr[U]): ASTBt[U] =
-    new Call2(addUISI(ring).asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
+
+
+  def +[U >: R <: I](that: ASTBt[U])(implicit n: repr[U]): ASTBt[U] = {
+    val res = new Call2(rightAdd.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
+    /*  ring match {case SI() => new Call2(addSI.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
+      case UI() => new Call2(addUI.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
+      case _ =>
+        assert(false) }*/
+
+    res.asInstanceOf[ASTBt[R]]
+
+  }
+
+  //  new Call2(addUISI(ring).asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
+  //new Call2(addI.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
   def unary_- : ASTBt[R] = new Call1(oppSI.asInstanceOf[Fundef1[R, SI]], this)(repr.nomSI) with ASTBt[SI].asInstanceOf[ASTBt[R]]
 
   //def -[U >: R <: SI](that: ASTBt[U])(implicit n: repr[U]): ASTBt[U] = new Call2(addUISI.asInstanceOf[Fundef2[R, U, U]], this, -that)(n) with ASTBt[U]
@@ -62,13 +75,15 @@ trait MyOpB[+R <: Ring] {
   def ^[U >: R <: Ring](that: ASTBt[U])(implicit n: repr[U]): ASTBt[U] = {
     val res = ring match {
       case B() => ASTB.addXor(this.asInstanceOf[ASTBt[B]], that.asInstanceOf[ASTBt[B]])
-      case _ => new Call2(xorUISI(ring).asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
-    };
+      case SI() => new Call2(xorSI.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
+      case UI() => new Call2(xorUI.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
+      case _ =>
+        assert(false)
+    }
     res.asInstanceOf[ASTBt[R]]
   }
 
-
-  /** we allow and between a boolean and an integer, called andLBtoRUI/SI */
+  /** we allow and between a boolean and an integer, this is also called andLBtoRUI/SI todo remove andLBtoR */
   def &[U >: R <: Ring](that: ASTBt[U])(implicit n: repr[U]): ASTBt[U] = {
     val res = ring match {
       case B() =>
@@ -77,7 +92,8 @@ trait MyOpB[+R <: Ring] {
           case SI() => new Call2(andLBtoRSI.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
           case UI() => new Call2(andLBtoRUI.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
         }
-      case _ => new Call2(andUISI(ring).asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
+      case SI() => new Call2(andSI.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
+      case UI() => new Call2(andUI.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
     };
     res.asInstanceOf[ASTBt[R]]
   }
@@ -86,7 +102,9 @@ trait MyOpB[+R <: Ring] {
      val r = ring
      val res = r match {
       case B() => ASTB.addOr(this.asInstanceOf[ASTBt[B]], that.asInstanceOf[ASTBt[B]])
-      case _ => new Call2(orUISI(ring).asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
-    }; res.asInstanceOf[ASTBt[R]]
+      case SI() => new Call2(orSI.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
+      case UI() => new Call2(orUI.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
+     };
+     res.asInstanceOf[ASTBt[R]]
   }
 } 

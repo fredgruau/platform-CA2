@@ -1,7 +1,7 @@
 package progOfmacros
 
 import compiler.AST._
-import compiler.ASTBfun.{andRedop, minRedop, minUI, orRedop, p, redop, xorRedop}
+import compiler.ASTBfun.{andRedop, minRedop, minUI, orRedop, redop, xorRedop}
 import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.Circuit.iTabSymb
@@ -64,7 +64,7 @@ object RedS {
 
   private def redSfunDef[S1 <: S, S2 <: S, R <: Ring](r: redop[R], l: S1)(implicit m: repr[S1], n: repr[S2], q: repr[R], d: chipBorder[S2, S1]): //pour defVe S1=E,S2=V
   Fundef1[(S1, R), (S2, R)] = {
-    val param = p[S1, R]("p" + l.shortName + n.name.shortName) //parameter names inform about locus
+    val param = pL[S1, R]("p" + l.shortName + n.name.shortName) //parameter names inform about locus
     val broadcasted = broadcast[S1, S2, R](param) //step 1 is broadcast
     val transfered: ASTLt[T[S2, S1], R] = transfer[S1, S2, R](broadcasted)(repr.nomT(n, m), q) //step 2 is transfer
     val res = reduce[S2, S1, R](r, transfered) //(n,m,d) yzeté implicit killerest
@@ -100,7 +100,7 @@ object RedS {
   }
 
 
-  def border[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S2, S1]): ASTLt[S2, B] = {
+  def frontier[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S2, S1]): ASTLt[S2, B] = {
     val f: Fundef1[(S1, B), (S2, B)] = getRedSFun(xorRedop[B], arg.locus)(m, n, nomB, d)
     new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
   }

@@ -1,10 +1,9 @@
 package compiler
 
 import java.lang.ArrayIndexOutOfBoundsException
-
 import dataStruc.DagNode._
 import ASTB.{ParOp, affBoolConst, _}
-import ASTBfun._
+import ASTBfun.{p, _}
 import ASTL.rewriteASTLt
 import Circuit.{TabSymb, iTabSymb, iTabSymb2}
 
@@ -12,6 +11,7 @@ import scala.collection._
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.language.implicitConversions
 import AST._
+import compiler.ASTBt.checkUISI
 import compiler.Packet.{BitLoop, BitNoLoop}
 
 /**
@@ -183,11 +183,10 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
           affBoolConst(ex.scanVar, newExp, l) //we store the sign bit
         else if (i < nbitExp)
           newExp
-        else if (exp.mym.name == UI())
-          ASTB.False()
-        else if (exp.mym.name == SI())
-          l.readWithConst(ex.scanVar) // sign bit replicates
-        else throw new Exception("extend bordel probably is UISI and we 'd need to know wether it is SI or UI")
+        else if (exp.mym.name == UI()) ASTB.False()
+        else if (exp.mym.name == SI()) l.readWithConst(ex.scanVar) // sign bit replicates for signed int.
+        else
+          throw new Exception("extend bordel probably is UISI and we 'd need to know wether it is SI or UI")
       case exp@Intof(value: Int) =>
         val t = exp.mym.name.asInstanceOf[I];
         val nbit = nbitCte(value, t) //depends on wether t is signed or unsigned
@@ -370,7 +369,6 @@ object ASTB {
   //______Elementary type
   type Uint = ASTBt[UI];
   type Sint = ASTBt[SI];
-
   type Bool = ASTBt[B];
 
 
@@ -406,6 +404,7 @@ object ASTB {
   def fromBoolB(b: Boolean): ASTBt[B] = if (b == true) True() else False()
 
   final case class Xor(arg: ASTBt[B], arg2: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Doubleton[AST[_]] //{assert(y.nbit==x.nbit)}
+
   final case class And(arg: ASTBt[B], arg2: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Doubleton[AST[_]] //{assert(y.nbit==x.nbit)}
   final case class Or(arg: ASTBt[B], arg2: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Doubleton[AST[_]] //{assert(y.nbit==x.nbit)}
   final case class Neg(arg: ASTBt[B])(implicit n: repr[B]) extends ASTB[B] with Singleton[AST[_]]
@@ -490,7 +489,9 @@ object ASTB {
   /** iterates on two ints with identical number of bits */
   case class Mapp2[R <: I](arg: ASTBt[R], arg2: ASTBt[R], op: Fundef2[B, B, B])(implicit n: repr[R])
     extends ParOp[R](Both()) with Doubleton[AST[_]] {
-    assert(arg.mym.name == arg2.mym.name, "map2's operand must be both ui or both si")
+    checkUISI(arg, arg2)
+    // totoa assert(arg.mym.name == arg2.mym.name, "map2's operand must be both ui or both si in fact not, we can map si to ui");
+    // when we define boolean fucntion such as add or eq which works for both.")
   }
 
   /** iterate on one int, uses a carry */

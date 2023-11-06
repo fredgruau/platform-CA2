@@ -46,7 +46,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
   override def tabulations = locus.tabul
 
   def extendMeDirect(n: Int): ASTLt[L, R] =
-    ASTL.extend[L, R](n, this)(new repr(locus), new repr(ring))
+    ASTLfun.extend[L, R](n, this)(new repr(locus), new repr(ring))
 
   /** first go get the unique grand child having same bit size */
   def extendMeOld(n: Int): ASTLt[L, R] = {
@@ -59,7 +59,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
     }
     while (candidateForExtend.size == 1)
 
-    ASTL.extend[L, R](n, this)(new repr(locus), new repr(ring))
+    ASTLfun.extend[L, R](n, this)(new repr(locus), new repr(ring))
   }
 
   def extendMe(n: Int): ASTLt[L, R] = extendMeDirect(n)

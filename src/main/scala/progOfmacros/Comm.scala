@@ -8,7 +8,7 @@ import compiler._
 object Comm {
   /** From a boolfE, computes the appex vertices boolfV */
   val apexVDef: Fundef1[(T[E, F], B), (T[V, F], B)] = {
-    val ef = p[T[E, F], B]("distantEdge")
+    val ef = pL[T[E, F], B]("distantEdge")
     val apexV: BoolVf = transfer(sym(transfer(ef)))
     apexV.setName("apexV");
     Fundef1("apexEtoV", apexV, ef)

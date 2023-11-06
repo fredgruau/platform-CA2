@@ -24,7 +24,7 @@ class CycleLayer2(nbit: Int)(implicit m: repr[V]) extends Layer[(V, SI)](nbit, "
     delayedL(delayedL(x))
 }
 
-class CircuitCycleLayer2 extends Circuit[V, SI](p[V, B]("input")) {
+class CircuitCycleLayer2 extends Circuit[V, SI](pL[V, B]("input")) {
 
   val cycle = new CycleLayer2(3)
 
