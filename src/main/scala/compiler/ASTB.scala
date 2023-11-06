@@ -462,10 +462,11 @@ object ASTB {
   /** Integer Constructor */
   case class Intof[R <: I](value: Int)(implicit n: repr[R]) extends ParOp[R](Both()) with EmptyBag[AST[_]]
 
+  /** used for doing concat reduction */
   case class Concat2[R1 <: Ring, R2 <: Ring, O1 <: I](arg: ASTBt[R1], arg2: ASTBt[R2])(implicit n: repr[O1])
     extends ParOp[O1](Both()) with Doubleton[AST[_]]
 
-  /** in order to use a single concat to regroup arbitrary many components */
+  /** planned to br used, in order to use a single concat to regroup arbitrary many components */
   case class ConcatN[R1 <: Ring, O1 <: I](args: List[ASTBt[R1]])(implicit n: repr[O1])
     extends ParOp[O1](Both()) with Neton[AST[_]]
 

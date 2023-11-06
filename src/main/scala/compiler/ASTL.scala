@@ -122,16 +122,15 @@ object ASTL {
                                                (implicit t: CentralSym[S2, S1, S3], m: repr[T[S1, S3]], n: repr[R]): ASTLt[T[S1, S3], R] = Sym(arg, m, t, n)
 
 
-  def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[UI]): RedopConcat[S1, S2] =
-    RedopConcat[S1, S2](arg, m, n)
-
-  /** the concat reduction has a different signature it takes a bool transfer, and produces an unsigned int. n=UI */
+  /** the concat reduction takes a bool transfer, and produces an unsigned int. n=UI */
   private[ASTL] final case class RedopConcat[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B], m: repr[S1], n: repr[UI])
     extends ASTL[S1, UI]()(repr.nomLR(m, n)) with Singleton[AST[_]] {
     /** used to compute the expression being reduced. */
     override def redExpr: List[AST[_]] = List(arg)
   }
 
+  def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[UI]): RedopConcat[S1, S2] =
+    RedopConcat[S1, S2](arg, m, n)
 
   /** Fields which have a value both  at time t, and t+1 ,todo layers should implement it */
   trait Strate[L <: Locus, R <: Ring] {

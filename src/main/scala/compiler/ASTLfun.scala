@@ -36,34 +36,17 @@ object ASTLfun {
   }
 
 
-  // _____________________________________________boolean operators ___________________________________________________________________________
+  // _____________________________________________old boolean operators ___________________________________________________________________________
 
   /** Simple logical Or */
-  def or[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = (arg1.ring match {
-    case B() => binop(orB, arg1.asInstanceOf[ASTLt[L, B]], arg2.asInstanceOf[ASTLt[L, B]])(m, repr.nomB)
-    case SI() => binop(orSI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2)
-    case UI() => binop(orUI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2)
-  }).asInstanceOf[ASTL[L, R]]
 
-  /** Simple logical And */
-  def and[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = (arg1.ring match {
-    case B() => binop(andB, arg1.asInstanceOf[ASTLt[L, B]], arg2.asInstanceOf[ASTLt[L, B]])(m, repr.nomB)
-    case SI() => binop(andSI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2)(m, n)
-    case UI() => binop(andSI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2)(m, n)
-  }).asInstanceOf[ASTL[L, R]]
+  /*
 
-  /** Simple logical Xor */
-  def xor[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] =
-    (arg1.ring match {
-      case B() => binop(xorB, arg1.asInstanceOf[ASTLt[L, B]], arg2.asInstanceOf[ASTLt[L, B]])(m, repr.nomB)
-      case SI() => binop(xorSI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2)(m, n)
-      case UI() => binop(xorUI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2)(m, n)
+    def neg[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = (arg.ring match {
+      case B() => unop(negB, arg.asInstanceOf[ASTLt[L, B]])(m, repr.nomB)
+      case _ => unop(negSI.asInstanceOf[Fundef1[R, R]], arg)(m, n)
     }).asInstanceOf[ASTL[L, R]]
-
-  def neg[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = (arg.ring match {
-    case B() => unop(negB, arg.asInstanceOf[ASTLt[L, B]])(m, repr.nomB)
-    case _ => unop(negSI.asInstanceOf[Fundef1[R, R]], arg)(m, n)
-  }).asInstanceOf[ASTL[L, R]]
+  */
 
 
   // _____________________________________________arithmetic operation ___________________________________________________________________________
@@ -82,10 +65,6 @@ object ASTLfun {
     }
   }
 
-  /** We cannot put R<:I for staying compatible with ASTBt[R<:Ring] */
-  def add[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = {
-    binop(rightAdd(n).asInstanceOf[Fundef2[R, R, R]], arg1, arg2)(m, n)
-  }
 
   def min[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = {
     if (n.isInstanceOf[UI])
@@ -156,7 +135,7 @@ object ASTLfun {
   /**
    * most significant bit, interpreted as macro
    * computes an int with a single non zero bit which is the highest rank for which operand's bit is one if operand is null, output O.
-   * this is an example of boolean function with a reused value: orScanRight.
+   * this is an example of boolean function with a reused value: orScanRight, this implies the need of dedagification after integer unfolding
    */
   def mstb[L <: Locus, R <: I](arg1: ASTL[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = {
     val y: ASTLt[L, R] = orScanRight[L, R](arg1);

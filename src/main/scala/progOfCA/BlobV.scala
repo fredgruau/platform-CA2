@@ -28,6 +28,6 @@ trait BlobV extends BoolV { //the blob is not necessarily a layer
 
 /** uses the blob to grow voronoi region stoping the growth just before merge happens */
 class GrowVor() extends Layer[(V, B)](1, "global") with ASTLt[V, B] with BlobV {
-  val next: BoolV = orR(neighbors(this)) //& (~meetV) & (~ exist[E,V](meetE))) //only radius 0 computation, because communication is handled in macro
+  val next: BoolV = orR(neighbors(this)) & (~meetV) & (~exist[E, V](meetE)) //only radius 0 computation, because communication is handled in macro
   show(this, meetE, meetV)
 }

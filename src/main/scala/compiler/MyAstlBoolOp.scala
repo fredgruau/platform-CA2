@@ -2,8 +2,9 @@ package compiler
 
 import ASTL._
 import ASTLfun._
-import compiler.ASTB.{False, Intof, True}
-import compiler.ASTBfun.ltUI2
+import compiler.AST.Fundef2
+import compiler.ASTB.{Concat2, False, Intof, True}
+import compiler.ASTBfun.{add, ltUI2}
 /**
  * Defines boolean operations to be applied on ASTLtrait, also applicable between two integer
  * Internally, within ASTB integers without consideration for Unsigned, or Signed are used,
@@ -15,25 +16,33 @@ import compiler.ASTBfun.ltUI2
 trait MyAstlBoolOp[L <: Locus, R <: Ring] {
   this: ASTLt[L, R] =>
   /*
-   * In order to obtain covariance, we would need to introduc types L,U
-   *   def &#94;[U >: R <: Ring ](that: ASTLscal[L,U])(implicit m: repr[L],n:repr[U]): ASTL[L, U] =    {      val res = ring match {
-   * case B() => Binop(xorB, this.asInstanceOf[ASTLscal[L, B]], that.asInstanceOf[ASTLscal[L, B]],m,repr.nomB)
-   * case _   => Binop(xorUISI.asInstanceOf[Fundef2[R,U,U]], this , that ,m,n)
-   * }; res.asInstanceOf[ASTL[L, U]]    }
-   */
-  def |(that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = or(this, that)
+   * In order to obtain covariance, we would need to introduc types L,U   */
 
-  def &(that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = and(this, that)
+  def |(that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = binop(ASTBfun.or(n), this, that)(m, n)
 
-  def ^(that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = xor(this, that)
+  def &(that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = binop(ASTBfun.and(n), this, that)(m, n)
 
-  def unary_~(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = neg(this)
+  def ^(that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = binop(ASTBfun.xor(n), this, that)(m, n)
+
+  def unary_~(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = unop(ASTBfun.neg, this)(m, n)
 }
 /** Integer spatial operators:  we cannot directly check the type constraint R<:I, ( clash with ASTLs, but we can impose that U<:I and U>:R,  which implies that R<:I*/
 trait MyOpInt2[L <: Locus, R <: Ring] {
   this: ASTLt[L, R] =>
   /** adds does not imposes all the operands to be equal type (SI, or UI), no message is given, but compilation fails due to lack of implicit repr[I] */
-  def +[U >: R <: I](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = add(this, that)
+
+  private def add[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = {
+    binop(ASTBfun.add(n).asInstanceOf[Fundef2[R, R, R]], arg1, arg2)(m, n)
+  }
+
+  def +[U >: R <: I](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = binop(ASTBfun.add(n), this, that)(m, n)
+
+  /** It is not possible to impose R<:I for staying compatible with ASTBt[R<:Ring] */
+  private def concat2[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = {
+    binop(ASTBfun.concat2(n).asInstanceOf[Fundef2[R, R, R]], arg1, arg2)(m, n)
+  }
+
+  def ::[U >: R <: I](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = concat2(this, that)
 
 
   /** minus  must convert UI to SI which adds an extra bit. */

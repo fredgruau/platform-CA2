@@ -125,7 +125,7 @@ class BoolifyTest extends FunSuite {
     assert(evalCode(List(("b", 5)), SI4, testInc) == 6)
   }
   test("addSI") {
-    val testAdd = Affect("a", new Call2(rightAdd[SI].asInstanceOf[Fundef2R[SI]], b, c) with ASTBt[SI])
+    val testAdd = Affect("a", new Call2(ASTBfun.add[SI].asInstanceOf[Fundef2R[SI]], b, c) with ASTBt[SI])
     assert(evalCode(List(("b", 5), ("c", 2)), SI4, testAdd) == 7)
   }
   test("minSI") {

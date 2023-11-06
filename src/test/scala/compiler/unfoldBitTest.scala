@@ -59,7 +59,7 @@ class unfoldBitTest extends FunSuite {
 
   val totop1 = (new Call1[SI, SI](incSI.asInstanceOf[Fundef1R[SI]], toto) with ASTBt[SI])
   /** to test that left and right loop can be separated */
-  val twoWays = (new Call1[SI, SI](orScanRightB.asInstanceOf[Fundef1R[SI]], totop1) with ASTBt[SI])
+  val twoWays = (new Call1[SI, SI](orScanRightUI.asInstanceOf[Fundef1R[SI]], totop1) with ASTBt[SI])
   //A present on se lance dans le affectify d'une expression simple: Mapscan
   val abs = new Call2[SI, SI, SI](minRelSI, toto, -toto) with ASTBt[SI]
   val lemin = new Call2[SI, SI, SI](minRelSI, toto, tata) with ASTBt[SI]
