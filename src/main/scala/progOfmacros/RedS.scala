@@ -43,7 +43,7 @@ object RedS {
   /** memoizes all the already used Boolean reduction */
   private var redSmem: iTabSymb[Fundef1[(S, Ring), (S, Ring)]] = HashMap()
 
-  /** how to build the name of simplicial reduction. The name informs about
+  /** how to build the name of simplicial reduction. The prefix ofthe name (until the point) informs about
    * name of the file where macro is to be stored
    * source and target simplicial locus, as well as reduction operation */
   private def redsfunName[S1 <: S, S2 <: S, R <: Ring](r: redop[R], l: S1)(implicit m: repr[S1], n: repr[S2], p: repr[R]) = {
