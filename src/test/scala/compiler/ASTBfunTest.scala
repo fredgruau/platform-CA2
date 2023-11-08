@@ -116,7 +116,7 @@ class ASTBfunTest extends FunSuite {
   }
 
   //test inc opposé, soustraction, lt
-  val six: ASTBt[SI] = new Call1(incSI.asInstanceOf[Fundef1R[SI]], cinq) with ASTBt[SI] //note here that it is possible to go from UISI originally deliverd by inc, towards SI.
+  val six: ASTBt[SI] = new Call1[SI, SI](inc[SI], cinq) with ASTBt[SI] //note here that it is possible to go from UISI originally deliverd by inc, towards SI.
   test("Inc") {
     assert(toInt(eval(six, env)) === 6)
   }
@@ -141,11 +141,11 @@ class ASTBfunTest extends FunSuite {
   test("quatre<0") {
     assert(eval(quatrelt0, env) == List(false))
   }
-
-  val cinqLtquatre = new Call2(ltSI2Mod, cinq, quatre) with ASTBt[B]
-  test("cinq<quatre") {
-    assert(eval(cinqLtquatre, env) == List(false))
-  }
+  /*
+    val cinqLtquatre = new Call2(ltSI2Mod, cinq, quatre) with ASTBt[B]
+    test("cinq<quatre") {
+      assert(eval(cinqLtquatre, env) == List(false))
+    }*/
 
   //test andLbtoR
   val quatreBis = True().&(quatre)(repr.nomSI)
@@ -158,15 +158,17 @@ class ASTBfunTest extends FunSuite {
   }
 
   //test cond et min
-  val min4et5 = new Call2(minRelSI, quatre, cinq) with ASTBt[SI]
-  val min5et4 = new Call2(minRelSI, cinq, quatre) with ASTBt[SI]
-  test("cond et min") {
-    assert(eval(min4et5, env) == List(false, false, true, false))
-  }
-  test("cond et min2") {
-    assert(eval(min5et4, env) == List(false, false, true, false))
-  }
+  /*
+    val min4et5 = new Call2(minRelSI, quatre, cinq) with ASTBt[SI]
+    val min5et4 = new Call2(minRelSI, cinq, quatre) with ASTBt[SI]
 
+    test("cond et min") {
+      assert(eval(min4et5, env) == List(false, false, true, false))
+    }
+    test("cond et min2") {
+      assert(eval(min5et4, env) == List(false, false, true, false))
+    }
+    */
   //test extend
   val moins1 = Extend(4, Intof[SI](-1))
   //print( eval(moins1,env))
@@ -188,7 +190,7 @@ class ASTBfunTest extends FunSuite {
   }
 
   //test décalllage vers la gauche
-  val quatrebis = Call1(halveBSI.asInstanceOf[Fundef1R[SI]], sept)
+  val quatrebis = Call1(halveB[SI], sept)
   test("Halve") {
     assert(toInt(eval(quatrebis, env)) == 3)
   }

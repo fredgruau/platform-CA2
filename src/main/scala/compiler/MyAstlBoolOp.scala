@@ -37,12 +37,15 @@ trait MyOpInt2[L <: Locus, R <: Ring] {
 
   def +[U >: R <: I](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = binop(ASTBfun.add(n), this, that)(m, n)
 
-  /** It is not possible to impose R<:I for staying compatible with ASTBt[R<:Ring] */
-  private def concat2[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = {
-    binop(ASTBfun.concat2(n).asInstanceOf[Fundef2[R, R, R]], arg1, arg2)(m, n)
+  /** we impose that concate generates ui, here.
+   * R <: Ring allows to take whatever argument, boolean signed or unsigned int
+   * In order to generate Signed int, this should be done at the level of the boolean function such as for sign */
+  private def concat2[L <: Locus, R <: Ring](arg1: ASTLg, arg2: ASTLg)(implicit m: repr[L], n: repr[R]): ASTLt[L, UI] = {
+    //  def UIorB(t:ASTLg)={ assert(t.ring==UI()||t.ring==B())};  UIorB(arg1);UIorB(arg2)
+    binop(ASTBfun.concat2UI, arg1.asInstanceOf[ASTLt[L, UI]], arg2.asInstanceOf[ASTLt[L, UI]])
   }
 
-  def ::[U >: R <: I](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = concat2(this, that)
+  def ::[U >: R <: Ring](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, UI] = concat2(this, that).asInstanceOf[ASTLt[L, UI]]
 
 
   /** minus  must convert UI to SI which adds an extra bit. */

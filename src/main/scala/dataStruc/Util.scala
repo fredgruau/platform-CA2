@@ -87,10 +87,30 @@ object Util {
     if (s.indexOf(p) == -1) s else s.substring(0, s.indexOf(p))
   }
 
-  /** returns the name of the spatial variable, from the name of one of its bitplane component */
+  /** is s==# , turns toto#2 into [2] */
+  def truncateAfterAndCrochetize(s: String, p: String) = {
+    if (s.indexOf(p) == -1) "" else "[" + s.substring(s.indexOf(p) + 1, s.length) + "]"
+  }
+
+  /** returns toto from toto#2 */
   def radicalOfVar(s: String): String = {
     truncateBefore(truncateBefore(s, "$"), "#")
   }
+
+  /** turns toto#2 into toto[2] */
+  def radicalOfVarIntComp(s: String): String = {
+    radicalOfVar(s) + truncateAfterAndCrochetize(s, "#")
+  }
+
+  /** replace toto#2  by toto[2] is all members contains either a diese or a dollar */
+  def radicalOfVarRefined(params: List[String]) = {
+    val allParamDieseorDollar = params.map(s => s.contains('#') || s.contains('$')).reduce(_ && _)
+    if (allParamDieseorDollar)
+      params.map(radicalOfVar(_))
+    else
+      params.map(radicalOfVarIntComp(_))
+  }
+
 
   /** returns the name of the spatial variable, from the name of one of its scalar component */
   def radicalOfVar2(s: String): String = {

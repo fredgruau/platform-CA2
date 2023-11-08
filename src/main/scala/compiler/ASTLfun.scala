@@ -36,101 +36,65 @@ object ASTLfun {
   }
 
 
-  // _____________________________________________old boolean operators ___________________________________________________________________________
-
-  /** Simple logical Or */
-
-  /*
-
-    def neg[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = (arg.ring match {
-      case B() => unop(negB, arg.asInstanceOf[ASTLt[L, B]])(m, repr.nomB)
-      case _ => unop(negSI.asInstanceOf[Fundef1[R, R]], arg)(m, n)
-    }).asInstanceOf[ASTL[L, R]]
-  */
-
-
   // _____________________________________________arithmetic operation ___________________________________________________________________________
 
   /** todo shoud work only on SI */
   def opp[L <: Locus](arg: ASTLt[L, SI])(implicit m: repr[L], n: repr[SI]): ASTLt[L, SI] = {
-    unop[L, SI, SI](oppSI, arg.asInstanceOf[ASTLt[L, SI]])(m, repr.nomSI)
+    unop[L, SI, SI](oppSI, arg)(m, repr.nomSI)
   }
 
 
-  def inc[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = {
-    if (n.name.isInstanceOf[SI]) unop[L, SI, SI](incSI, arg.asInstanceOf[ASTLt[L, SI]])(m, repr.nomSI).asInstanceOf[ASTLt[L, R]]
-    else {
-      assert(n.name.isInstanceOf[UI]);
-      unop[L, UI, UI](incUI, arg.asInstanceOf[ASTLt[L, UI]])(m, repr.nomUI).asInstanceOf[ASTLt[L, R]]
-    }
-  }
 
 
   def min[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = {
     if (n.isInstanceOf[UI])
       binop(minUI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2)(m, n)
-    else binop(minRelSI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2)(m, n)
+    else assert(false);
+    null // we cannot take the min modulo. binop(minRelSI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2)(m, n)
   }
 
   // _____________________________________________arithmetic comparison ___________________________________________________________________________
 
-  /** return true if arg1 is negative */
+  /** defined on integers, return true if arg1 is negative */
   def ltSI[L <: Locus](arg1: ASTLt[L, SI])(implicit m: repr[L]): ASTLt[L, B] = unop(ASTBfun.ltSI, arg1);
 
-  /** return true if arg1 is zero */
-  def eqSI[L <: Locus](arg1: ASTLt[L, SI])(implicit m: repr[L]): ASTLt[L, B] = unop(ASTBfun.eqSI, arg1);
-  //(implicit m: repr[L], n: repr[Ro])
+  /** return true if arg1 is zero, */
+  def eq0[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = unop(ASTBfun.eq, arg1);
 
-  /* def lt[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = {
-   if (n.isInstanceOf[SI])   binop(ASTBfun.ltSI.asInstanceOf[Fundef2[R, R, R]], arg1, arg2)(m, n)
-   else {assert(false,"comparison between unsigned int is done using directly s<");null}
- }
- */
+  def neq[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = unop(ASTBfun.neq, arg1);
+
 
   /** lt2 is  defined differently on SI, and UI, it uses an optimized algo for UI, that does not subtract
    * it could be called when doing comparison betwen unsigned int, by adding an extra bit
    * On UI, it is defined modulo2, so when comparing signed it, for distances, we must add a bit first. */
-  def lt2[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[B]): ASTLt[L, B] =
-    if (n.isInstanceOf[SI]) binop(ASTBfun.ltSI2Mod.asInstanceOf[Fundef2[R, R, B]], arg1, arg2)
-    else {
-      assert(n.isInstanceOf[SI])
+  def lt2[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[B]): ASTLt[L, B] = {
+    assert(n.isInstanceOf[UI]) //we never have to compare signed int, what we do is  take the sign.
       binop(ASTBfun.ltUI2.asInstanceOf[Fundef2[R, R, B]], arg1, arg2)
     }
 
 
-  /** gt2 is called when using the comparator sign > */
-  def gt2[L <: Locus](arg1: ASTLt[L, SI], arg2: ASTLt[L, SI])(implicit m: repr[L], n: repr[B]): ASTLt[L, B] =
-    binop(ASTBfun.gtSI2.asInstanceOf[Fundef2[SI, SI, B]], arg1, arg2)
-
+  /** gt2 is simply lt2 inverting the argument order */
+  def gt2[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[B]): ASTLt[L, B] = {
+    assert(n.isInstanceOf[UI]) //we never have to compare signed int, what we do is  take the sign.
+    binop(ASTBfun.ltUI2.asInstanceOf[Fundef2[R, R, B]], arg2, arg1)
+  }
   //------------------------------------------------------Other Binop------------------------------------------------------
 
   /** Instead of casting boolean to integer,  we define a logical and taking an int and a  bool */
-  def andLB2R[L <: Locus, R <: I](arg1: ASTLt[L, B], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] =
+  def andLB2R[L <: Locus, R <: Ring](arg1: ASTLt[L, B], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] =
     binop[L, B, R, R](andLBtoR.asInstanceOf[Fundef2[B, R, R]], arg1, arg2)
 
-
-  /*def concat2[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[I]): ASTL[L, I] =
-    Binop(concat2f.asInstanceOf[Fundef2[R1, R2, I]], arg1, arg2, m, n)
-*/
-  def concat2UI[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[UI]): ASTLt[L, UI] =
-    binop(concat2.asInstanceOf[Fundef2[R1, R2, UI]], arg1, arg2)
-
-  def concat2SI[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[SI]): ASTLt[L, SI] =
-    binop(concat2.asInstanceOf[Fundef2[R1, R2, SI]], arg1, arg2)
-
+  /** concat two bits into an unsigned int, or one bit and an unsigned int into an unsigned int, or two unsigned int into an unsigned int */
+  def concat2UI[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[UI]): ASTLt[L, UI] = {
+    assert(arg1.ring == (B) || arg1.ring == (UI))
+    binop(ASTBfun.concat2UI.asInstanceOf[Fundef2[R1, R2, UI]], arg1, arg2)
+  }
 
   //------------------------------------------------------ComputingMacro------------------------------------------------------
 
-  /** cond with internal test to decide wether it applies for signed int, unsigned int, or bool. */
+  /** we use andLb2R in order not to have to introduce "triop" but use several binop */
   def cond[L <: Locus, R <: Ring](b: ASTLt[L, B], arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] =
-    if (n.name.isInstanceOf[SI])
-      (andLB2R[L, SI](b, arg1.asInstanceOf[ASTLt[L, SI]]) | andLB2R(~b, arg2.asInstanceOf[ASTLt[L, SI]])).asInstanceOf[ASTLt[L, R]]
-    else if (n.name.isInstanceOf[UI])
-      (andLB2R[L, UI](b, arg1.asInstanceOf[ASTLt[L, UI]]) | andLB2R(~b, arg2.asInstanceOf[ASTLt[L, UI]])).asInstanceOf[ASTLt[L, R]]
-    else {
-      assert(n.name.isInstanceOf[B])
-      ((b & arg1.asInstanceOf[ASTLt[L, B]]) | (~b & arg2.asInstanceOf[ASTLt[L, B]])).asInstanceOf[ASTLt[L, R]]
-    }
+    andLB2R(b, arg1) | andLB2R(~b, arg2)
 
   /**
    * most significant bit, interpreted as macro
@@ -209,22 +173,22 @@ object ASTLfun {
   //def castB2R[L<:Locus,R<:I]( arg: AST[L,B] )(implicit m : repr[L])  = Unop[L,B,R] (castB2RN[R],arg );
 
   //todo desUISIfy
-  def halve[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = unop(halveBSI.asInstanceOf[Fundef1[R, R]], arg1)
+  def halve[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = unop(halveB, arg1)
 
   //todo desUISIfy
-  def orScanRight[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = unop(orScanRightB.asInstanceOf[Fundef1[R, R]], arg1)
+  def orScanRight[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = unop(ASTBfun.orScanRight, arg1)
   //todo desUISIfy
 
-
-  def neq[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = unop(neqSI.asInstanceOf[Fundef1[R, B]], arg1)
+  def inc[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = unop(ASTBfun.inc, arg1)
+  //todo desUISIfy
 
 
   /** @param i final number of bit that we should obtain by extending
    *           extending adds a 1 if we extend a signed integers, and integers considered is negative */
   def extend[L <: Locus, R <: Ring](i: Int, arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = unop(ASTBfun.extend[R](i), arg)
 
-  def elt[L <: Locus, R <: I](i: Int, arg: ASTLt[L, R])(implicit m: repr[L], n: repr[B]): ASTLt[L, B] =
-    unop(eltUISI(arg.ring, i).asInstanceOf[Fundef1[R, B]], arg)
+  def elt[L <: Locus, R <: I](i: Int, arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] =
+    unop(ASTBfun.elt(i), arg)
 
   /** delaying so as to obtain same radius is a special unop! */
   def increaseRadiuus[L <: Locus, R <: Ring](arg: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] =

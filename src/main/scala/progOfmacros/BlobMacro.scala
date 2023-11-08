@@ -13,7 +13,9 @@ object BlobMacro {
   def carryV(b0: BoolV, b1: BoolV, b2: BoolV): BoolV = (b0 & b1) | (b2 & (b0 | b1))
 
   /** sum3V is not written as a macro to avoid generating too many macro */
-  def sum3V(b0: BoolV, b1: BoolV, b2: BoolV): UintV = concat2UI(b0 ^ b1 ^ b2, carryV(b0, b1, b2))
+  def sum3Vold(b0: BoolV, b1: BoolV, b2: BoolV): UintV = concat2UI(b0 ^ b1 ^ b2, carryV(b0, b1, b2))
+
+  def sum3V(b0: BoolV, b1: BoolV, b2: BoolV): UintV = (b0 ^ b1 ^ b2) :: carryV(b0, b1, b2)
 
   /** From a boolfV, computes the number of true connected components, likely to be reused for BlobE, BlobVe */
   val nbccDef: Fundef1[(T[V, F], B), (V, UI)] = {

@@ -593,7 +593,8 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
             case (V(), _) | (E(), F()) => rad + 1
             case _ => rad
           }
-          assert(newRadius < 2) // we have to do  another communication between radius=1 and radius=-2
+          if (newRadius >= 2) // we have to do  another communication between radius=1 and radius=-2
+            assert(false)
           newRadius
         }
         val (rad, newArg) = arg.radiusify3(r, t)

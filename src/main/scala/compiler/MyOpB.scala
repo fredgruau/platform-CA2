@@ -17,6 +17,7 @@ trait MyOpIntB[+R <: Ring] {
   // def -[U >: R <: SI](that: ASTBt[U])(implicit n: repr[U]): ASTBt[U] = new Call2(subSI2.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]
   def -[U >: R <: SI](that: ASTBt[U])(implicit n: repr[U]): ASTBt[U] = this + (-that)
 
+  /** concat2 is used also to produce signed int, using the sign function */
   def ::[U >: R <: I](that: ASTBt[U])(implicit n: repr[U]): ASTBt[U] = Concat2(this, that)
 }
 
@@ -26,7 +27,7 @@ trait MyOpIntB[+R <: Ring] {
 trait MyOpB[+R <: Ring] {
   this: ASTBt[R] =>
 
-  //def unary_~(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = neg(this)
+
   def unary_~ = {
     def negSimplif(exp: ASTBt[B]) = exp match {
       case ASTB.False() => ASTB.True()
@@ -35,25 +36,26 @@ trait MyOpB[+R <: Ring] {
       case _ => Neg(this.asInstanceOf[ASTBt[B]])(repr.nomB).asInstanceOf[ASTBt[B]]
     }
 
+    /** we use new repr(ring) to obtain the particular type SI or UI we were looking for. */
     (ring match {
       case B() => negSimplif(this.asInstanceOf[ASTBt[B]]) // Unop(negB, arg.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
       case _ => new Call1(ASTBfun.neg(new repr(ring)), this)(new repr(ring)) with ASTBt[R] //Unop(negSI.asInstanceOf[Fundef1[R, R]], arg, m, n)
     }).asInstanceOf[ASTBt[R]]
-  }
+  } /*
   def <[U >: R <: Ring](that: ASTBt[U])(implicit n: repr[B]): ASTBt[B] = {
     ring match {
       case B() => if (this == False() && that == False()) True() else False()
-      case SI() => new Call2(ltSI2Mod.asInstanceOf[Fundef2[R, U, B]], this, that)(n) with ASTBt[B] //todo calculer le vrai ltSI2
+      case UI() => new Call2(ltUI2.asInstanceOf[Fundef2[R, U, B]], this, that)(n) with ASTBt[B] //todo calculer le vrai ltSI2
     }
   }
   def <=[U >: R <: Ring](that: ASTBt[U])(implicit n: repr[B]): ASTBt[B] = {
     ring match {
       case B() => if (this == False() && that == False()) True() else False()
-      case SI() => new Call2(leSI2.asInstanceOf[Fundef2[R, U, B]], this, that)(n) with ASTBt[B]
+      case UI() => new Call2(leSI2.asInstanceOf[Fundef2[R, U, B]], this, that)(n) with ASTBt[B]
     }
   }
 
-
+*/
   def |[U >: R <: Ring](that: ASTBt[U])(implicit n: repr[U]): ASTBt[U] = (ring match {
     case B() => ASTB.addOr(this.asInstanceOf[ASTBt[B]], that.asInstanceOf[ASTBt[B]])
     case _ => new Call2(ASTBfun.or.asInstanceOf[Fundef2[R, U, U]], this, that)(n) with ASTBt[U]

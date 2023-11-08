@@ -1,61 +1,63 @@
 package progOfCA
 
-import compiler.SpatialType._
 import compiler.AST._
-import compiler.ASTBfun.{addRedop, andRedop, eqSI, minSignRedop, orRedop, p, redop}
+import compiler.SpatialType.{BoolVe, _}
+import compiler.ASTBfun.{addRedop, andRedop, minSignRedop, orRedop, p, redop}
 import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.ASTLt._
 import compiler.Circuit.hexagon
-import compiler._
+import compiler.{B, _}
 import progOfmacros.Compute._
 import compiler.SpatialType._
+import progOfCA.Dist.slopDelta
+import progOfmacros.RedS.frontier
 
 class Seed extends ConstLayer[V, B](1, "global") with DistT {
   show(this)
 } //root classe compilable
 
+object Dist {
+  /** macro that does all the computation needing the distance  From an IntV, computes the gradient sign, and the delta to be added to make it a distance
+   * */
+  val slopeDeltaDef: Fundef1[(V, SI), ((T[V, E], B), ((V, SI), (E, B)))] = {
+    val d = pL[V, SI]("dis")
+    val dopp = -d
+    val se: IntVe = send(List(d, d, d, dopp, dopp, dopp)) //we  apply an opp on distances comming from the center.
+    val grad3: IntE = reduce(addRedop[SI].asInstanceOf[redop[SI]], transfer(se)) //the trick here is to do the expensive operation (add) only on the three edges locus, instead of the 6 Ve transfer
+    val gap: BoolE = eq0(grad3 + 4) //  gap is true iff the two neighbors cannot be compared
+    val grad6: IntEv = send(List(-grad3, grad3))
+    val slopEv: BoolEv = ltSI(grad6) //when sending back the result to EV, we have to invert again towards the center
+    val slop: BoolVe = transfer(slopEv)
+    val level: BoolE = ~reduce(orRedop[B], slopEv) //its equal if it is neither lt nor gt
+    val delta: IntV = reduce(minSignRedop, sign(extend(4, transfer(grad6)) + 2)) //we need to add 2, using one more bit, in order to add modulo 16 and not 8
+    //show(opp) //breaks a cycle
+    level.setName("level"); //vortex.setName("vortex")
+    grad3.setName("grad");
+    slop.setName("slop");
+    delta.setName("delta");
 
+    Fundef1("integer.slopDelta", Cons(slop, Cons(delta, level)), d)
+  }
+
+  /** Calls boolgrad, and separate the two results. */
+  def slopDelta(d: IntV): (BoolVe, IntV, BoolE) = {
+    val r = Call1(slopeDeltaDef, d);
+    val e1 = new Heead(r) with BoolVe
+    var t = new Taail(r)
+    val e2 = new Heead(t) with IntV
+    val e3 = new Taail(t) with BoolE
+    (e1, e2, e3)
+  }
+
+
+}
 class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[V, SI] {
-  //val level: BoolV = elem(2, this);
   val opp = -this
-  val se: IntVe = send(List(this, this, this, opp, opp, opp)) //we  apply an opp on distances comming from the center.
-  val grad3: IntE = reduce(addRedop[SI].asInstanceOf[redop[SI]], transfer(se)) //the trick here is to do the expensive operation (add) only on the three edges locus, instead of the 6 Ve transfer
-  val gap: BoolE = unop(eqSI, grad3 + 4) //the two neighbors cannot be compared if gap is true
-  val grad6: IntEv = send(List(-grad3, grad3)) //when sending back the result, we have to invert again towards the center
-  val lt: BoolVe = transfer(ltSI(grad6))
-  val eq: BoolE = ~reduce(orRedop[B], transfer(lt)) //its equal if it is neither lt nor gt
-  val delta: IntV = reduce(minSignRedop, sign(extend(4, transfer(grad6)) + 2)) //we need to add 2, using one more bit, in order to add modulo 16 and not 8
-  show(opp) //breaks the cycle
+  val (slop, delta, level) = slopDelta(this)
+  val topoligne: BoolV = (elt(2, this));
   val next: ASTLt[V, SI] = this + cond(source.asInstanceOf[BoolV], sign(opp), delta) //faudrait en faire une macro qui prends delta, source et dist et renvoie distNext
-  val vortex: BoolF = reduce(andRedop[B], transfer(clock(lt) ^ anticlock(lt))); //faudrait en faire une marco
-  //bugif(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
-  // val test= vortex |   andR(transfer(temp5)) ;  slope.bugif(test)
-  // show(tr,grad3,grad6,deltaAjust)
-  show(lt, eq, vortex, gap)
-
-  /*// val delta: IntV = minR(transfer(sign(grad + -2)))
-  val tepred = transfer(e(pred))
-  val grad: IntvE =  tepred - sym(tepred)  ; //should use opp to make only one subtraction, we need to adress selectively the two neighbors of an edge.
-  val greater: BoolvE = gt(grad); render (greater)
-//  val greaterOptimized:BoolvE=  notNull(tepred & v(mstb(xorR(tepred))))  //same as greater, but cost in gates is diminished!
-  // val next= addL(pred,extend(3,cond(source, sign(opp(pred)), minR(transfer(sign(  addL(grad,const[T[E,V],SI](c,ConstInt(-2,3)))))))))
-   val next =    pred + extend(3, cond(source, sign(- pred) , minR(transfer(sign( grad - 2 ) ))))
-//  val nextOld = delayedL(  pred | cond(source, - pred  , minR(transfer( grad   ))))
-   //a decommenter un peu plus tard pour
-   1-tester les reduction T
-   2- mettre en place bugif
-  val temp: BoolfV = clock(tslope)
-  val temp2: BoolfV = anticlock(tslope)
-     val vortex: BoolF = andR(transfer(xor(temp, temp2))); //faudrait en faire une marco
-    vortex.setName("vortex");  bugif(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
-  // val test= vortex |   andR(transfer(temp5)) ;  slope.bugif(test)
-    // ceci provoque bien l'erreur attendue java.lang.RuntimeException: Debug exp is allzero=>not usable for compute
-    //ca montre que debug ne peut etre réutilisé.
- */
-
-  //val next: ASTLt[V, SI] = this + cond(source.asInstanceOf[BoolV], sign(-this), delta) //faudrait en faire une macro qui prends delta, source et dist et renvoie distNext
-  // val temp: BoolfV = xorR2(transfer(slope)) ;  val vortex: BoolF = orR(transfer(temp));   bugif(vortex);
+  show(slop, delta, level, topoligne)
 }
 
 trait DistT {
@@ -64,8 +66,8 @@ trait DistT {
   show(dist);
 }
 
-/** we here only update the distance */
-class Dist2(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[V, SI] {
+/** a simpler version of distance */
+class DistSimpler(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[V, SI] {
   /*val level: BoolV = elem(2, this);*/
   val grad: IntVe = neighbors(this) - e(this)
   val lt: BoolVe = ltSI(grad)
@@ -76,9 +78,9 @@ class Dist2(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt
 }
 
 /** contains show(dist) otherwise, class Dist is not compiled at all, because not used from the root */
-trait Dist2T {
+trait DistSimplerT {
   self: Layer[(V, B)] => //adds a distance to a LayerV todo, it should also limit its movement
-  val dist = new Dist2(self);
+  val dist = new DistSimpler(self);
   show(dist);
 
 }

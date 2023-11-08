@@ -16,6 +16,7 @@ import dataStruc.Named
 
 
 object ASTBt {
+  type BB = ASTBt[B]
   /** stores for each function, the parameter having the same number of bits as the result */
   private var paramSameBitSizeMem: mutable.HashMap[String, Set[String]] = mutable.HashMap()
 
@@ -32,11 +33,9 @@ object ASTBt {
     paramSameBitSizeMem(f.name)
   }
 
-  def checkUISI(effectivPar: AST[_], opPar: AST[_]) = {
-    if (effectivPar.mym.name != opPar.mym.name //  && opPar.mym.name != UISI() && effectivPar.mym.name != UISI()
-    )
+  def checkUISI(effectivPar: AST[_], opPar: AST[_]) =
+    if (effectivPar.mym.name != opPar.mym.name)
       throw new Exception("Faut preserver SI ou UI")
-  }
 }
 
 /** Identifies AST corresponding to int or bool, excludes those obtained with cons */
