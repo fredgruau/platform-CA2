@@ -5,7 +5,7 @@ import compiler.ASTB.{False, True}
 import compiler.Circuit.{TabSymb, iTabSymb}
 import compiler.Instr.deployInt2
 import compiler.Locus.{all2DLocus, allLocus}
-import dataStruc.Util.{append2File, hierarchyDisplayedField, parenthesizedExp, radicalOfVar, radicalOfVar2, removeAfterChar, rootOfVar, shortenedSig, writeFile}
+import dataStruc.Util.{append2File, hierarchyDisplayedField, parenthesizedExp, radicalOfVar, radicalOfVar2, radicalOfVarIntComp, radicalOfVarRefined, removeAfterChar, rootOfVar, shortenedSig, writeFile}
 import compiler.VarKind.LayerField
 import dataStruc.Named
 import dataStruc.Named.{isLayer, noDollarNorHashtag, noHashtag}
@@ -345,13 +345,17 @@ trait ProduceJava[U <: InfoNbit[_]] {
         //we first consider specific system call show, copy, memo, debug
         case "show" => val callCodeArg = radicalOfVar(call.usedVars().toList.head) //we take the radical for diminishing the number of parameters
           theDisplayed += callCodeArg //sideeffect, update theDisplayed. display has allways a single arg which is the field to be displayed
-          callCode += callCodeArg //in fact we could supress calls to show, we leave it, so that we can check those in the compiled java.
-        case "copy" | "memo" =>
-          val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet() ++ params.map(radicalOfVar(_))
-          callCode += l.toList.mkString(",")
+          callCode += callCodeArg //in fact we could supress calls to show. We still leave them, just so that we can check those in the compiled java.
+        case "copy" => assert(paramsD.size == 1 && paramsR.size == 1) //we copy bit by bit, hence int by int.
+          val pR: String = radicalOfVar(paramsR(0))
+          val pD: String = if (tSymbVarSafe(paramsR(0)).t == (V(), B())) radicalOfVarIntComp(paramsD(0)) else radicalOfVar(paramsD(0))
+          val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet(pR, pD)
 
 
+          callCode += pD + "," + pR
         //copy and memo have the same effect
+        case "memo" => val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet() ++ params.map(radicalOfVar(_))
+          callCode += l.toList.mkString(",")
         case "bug" => val nameBug = radicalOfVar(call.exps.head.asInstanceOf[Read[_]].which) //on apelle bug avec un read, c'est obligé
           val locusBug = tSymbVar(nameBug).locus.toString.dropRight(2) //dropRight enleve les deux parenthéses
           paramCode = List(nameBug, "llbug" + locusBug, "\"" + nameBug + "\"", "bugs").reverse
@@ -361,8 +365,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
           for ((spatialType, nbit) <- localprog.spatialSig zip localprog.nbitSig) { //retrieve spatial type and  bitSize   of parameters.
             val locus: Locus = spatialType._1
             val density = nbit * locus.density
-            if (spatialType == (V(), B())) {
-              paramCode = params(i) :: paramCode;
+            if (spatialType == (V(), B())) { //we can have seedDist$2 passed to a boolV, therefore, we should transform it into seedDist[2]
+              paramCode = radicalOfVarIntComp(params(i)) :: paramCode; //this is what is done by radicalOfVarIntComp
               i += 1
             } //same processing wether it is a name or a heap variable
             else { //we prooceed differently depending wether the params are mem (isheap) or name of fields
