@@ -12,15 +12,10 @@ import compiler.ASTLfun._
 /** Simple growth from V to E to V; test of in, and border.we believe that at least for border, and neighbor, it will be reused */
 class Grow extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
   val n: BoolE = exist(this);
-  val in: BoolE = inside(this);
+  // val in: BoolE = inside(this);
   val brd: BoolE = frontier(this);
   override val next: BoolV = exist(n) //   uses  defVe implicitely, the override keyword is mandatory
-  show(this, next, n, in, brd)
-
-
-
-
-
+  show(this, next, n, brd)
   // he name of root to arg(0).lowercase
 }
 

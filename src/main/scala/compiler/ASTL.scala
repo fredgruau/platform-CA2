@@ -129,7 +129,7 @@ object ASTL {
     override def redExpr: List[AST[_]] = List(arg)
   }
 
-  def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[UI]): RedopConcat[S1, S2] =
+  def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[UI]): ASTLt[S1, UI] =
     RedopConcat[S1, S2](arg, m, n)
 
   /** Fields which have a value both  at time t, and t+1 ,todo layers should implement it */
@@ -184,7 +184,7 @@ object SpatialType {
   type BoolFv = ASTLt[T[F, V], B];
   type BoolVf = ASTLt[T[V, F], B]
   type BoolEf = ASTLt[T[E, F], B];
-  type BooleF = ASTLt[T[F, E], B]
+  type BoolFe = ASTLt[T[F, E], B]
 
 }
 /**
@@ -439,11 +439,15 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case Sym(a, _, _, _) =>
         val T(s1, src) = a.locus; //a.locus is T [E,V]
         val atr0: Array[Array[ASTBg]] = a.unfoldTransfer(m)
-        val atr = atr0.map(rotR(_));
         val res = s1 match {
-          case V() => atr.map(rotR(_)).map(rotR(_)) //throw new RuntimeException("sym not defined on V in the general case")
-          case E() => atr // la composée de deux rotation est une rotation simple qui est aussi une permutation pour E.
-          case F() => if (src < des) atr else atr.map(rotR(_)) //we follow trigonometric, the composition of tree anticlock  must add one rotation, if not(src<des).
+          case V() => atr0.map(rotR(_)).map(rotR(_)).map(rotR(_)) //throw new RuntimeException("sym not defined on V in the general case")
+          case E() => atr0.map(rotR(_)); // la composée de deux rotation est une rotation simple qui est aussi une permutation pour E.
+          case F() => src match {
+            case E() | V() => val Array(Array(db, ds1, ds2), Array(ub, us1, us2)) = atr0;
+              Array(Array(db, ds2, ds1), Array(ub, us2, us1))
+            //case V() identical to case E
+          }
+          //if (src < des) atr else atr.map(rotR(_)) //we follow trigonometric, the composition of tree anticlock  must add one rotation, if not(src<des).
         }
         res
       //read and Call treated in ASTLt.

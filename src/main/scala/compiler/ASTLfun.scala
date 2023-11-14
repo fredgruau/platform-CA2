@@ -26,7 +26,7 @@ object ASTLfun {
   def e[S1 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, E]], m2: repr[T[E, S1]], n: repr[R]): ASTLt[T[S1, E], R] = broadcast(arg) // this is done using three function e,v,f.
 
   /** broadcast towards F */
-  def f[S1 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, F]], m2: repr[T[F, S1]], n: repr[R]): ASTLt[T[S1, F], R] = broadcast(arg)
+  def f[S1 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, F]], m2: repr[T[F, S1]], n: repr[R]): ASTLt[T[S1, F], R] = broadcast[S1, F, R](arg)
 
   /** a vertex field get on its six edge, the six neighbor values, so that it can then reduce them. */
   def neighbors[R <: Ring](arg: ASTLt[V, R])(implicit n: repr[R]): ASTLt[T[V, E], R] = {
@@ -34,6 +34,19 @@ object ASTLfun {
     transfer(sym(transfer(e(arg))))
     //  transfer(symed)
   }
+
+  /** either Ef to Vf or vice versa */
+  def apex[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, F], R])
+                                       (implicit m1: repr[S1], m2: repr[S2], n: repr[R], s: CentralSym[S1, F, S2]): ASTLt[T[S2, F], R] = {
+    // val towardsFace:ASTLt[T[S1,F],R] = f(arg)
+    val onFace: ASTLt[T[F, S1], R] = transfer(arg)
+    val symmed: ASTLt[T[F, S2], R] = sym(onFace)
+    transfer(symmed)
+  }
+
+
+
+
 
 
   // _____________________________________________arithmetic operation ___________________________________________________________________________
@@ -67,8 +80,10 @@ object ASTLfun {
   /** lt2 is  defined differently on SI, and UI, it uses an optimized algo for UI, that does not subtract
    * it could be called when doing comparison betwen unsigned int, by adding an extra bit
    * On UI, it is defined modulo2, so when comparing signed it, for distances, we must add a bit first. */
-  def lt2[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[B]): ASTLt[L, B] = {
-    assert(n.isInstanceOf[UI]) //we never have to compare signed int, what we do is  take the sign.
+  def lt2[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = {
+    if (!n.name.isInstanceOf[UI]) //we never have to compare signed int, what we do is  take the sign.
+      assert(false)
+
       binop(ASTBfun.ltUI2.asInstanceOf[Fundef2[R, R, B]], arg1, arg2)
     }
 

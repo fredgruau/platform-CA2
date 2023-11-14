@@ -47,7 +47,6 @@ object ASTBfun {
       val xi = p[R]("xNegSi");
       Fundef1("negI", Mapp1(negB, List(xi)), xi)
     }
-
     (negI[SI], negI[UI])
   }
   def neg[R <: Ring](implicit n: repr[R]): Fundef1R[R] = (n.name match {
@@ -59,13 +58,13 @@ object ASTBfun {
   /** for rapid production of orB,xorB, andB */
   def fundef2Bop2(op2: Op2, s: String): Fundef2[B, B, B] = {
     val (xb, yb) = (p[B]("x" + s), p[B]("y" + s));
-    Fundef2("s", op2(xb, yb), xb, yb)
+    Fundef2(s, op2(xb, yb), xb, yb)
   }
 
   /** for rapid production of orI,xorI, andI I=SI/UI */
   def fundef2Imapp2[R <: I](op2: Fundef2R[B], s: String)(implicit m: repr[R]): Fundef2R[R] = {
     val (x, y) = (p[R]("x" + s), p[R]("y" + s));
-    Fundef2("s", Mapp2(x, y, op2), x, y)
+    Fundef2(s, Mapp2(x, y, op2), x, y)
   }
 
   private val orB: Fundef2R[B] = fundef2Bop2(Or(_, _), "orb")

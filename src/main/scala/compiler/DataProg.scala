@@ -1563,7 +1563,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       (instr: Instr) => {
         val nom = instr.names(0)
         if (reInsertion.values.toSet.contains(nom)) {
-          tobeMoved += (nom -> instr.detm1iseR); //instructions that should be moved
+          tobeMoved += (nom -> instr.detm1iseR); //detm1iseR should remove only one tm1, instead of two if there is two. instructions that should be moved
           List()
         }
         else {
@@ -1689,7 +1689,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       p.dagis.visitedL = detmANDmove(reInsertionB, p.dagis.visitedL.reverse).reverse
 
 
-      val reInsertionC = movesOfRuleC(p.dagis.visitedL)
+      val reInsertionC: Map[String, String] = movesOfRuleC(p.dagis.visitedL)
       p.dagis.visitedL = detmANDmove(reInsertionC, p.dagis.visitedL)
 
       //Rule D;  replace affect (paramR,tm1(exp) by store(paramR,-1,exp) ==> if we do that we run the risk of writing the current value before reading it
@@ -1707,7 +1707,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
       )
 
-      //for the tm1 that could not be easily supressed using optimizing tricks, we now proceed to standard detmify through creation of new registers which means new affectation.
+      //for the tm1 that could not be easily supressed using optimizing tricks, we now proceed to standard detmify through creation of new registers tmun=tminus1which means new affectation.
       val toBeRepl: List[AST[_]] = p.dagis.dagAst.visitedL.filter(_.asInstanceOf[ASTBt[_]].isTm1) //we could filter out more stuff because it consumes register
       // and registers are a precious ressourcefor(e<-toBeRepl)
 

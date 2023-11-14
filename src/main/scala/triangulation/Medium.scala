@@ -140,10 +140,13 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
     }
 
 
-  /** contains points associated to all locus, locus by locus, each point line is a plane, the number of pointlines is the locus density */
+  /** contains points associated to all locus, locus by locus, each point line is a plane,
+   * the number of pointlines is the locus density they follow a standard order
+   * the arangment is such that broadcasting is done by doubling or tripling the value
+   * which means that all the T neighbors of a given simplicial site are stacked in sequence */
   var locusPlane: HashMap[Locus, Array[pointLines]] = HashMap()
   locusPlane += V() -> Array(vertice) //adds all vertices , its a singleton array because vertice density is only 1.
-  locusPlane += E() -> {
+  locusPlane += E() -> { //order is h,d,ad
     val res = Array.ofDim[Option[Vector2D]](3, nbLineCA, nbColCA)
     for (dir <- 0 until 3) //we consider half of the neighbors first is east, second is southeast, third is southwest, ...
       for (i <- 0 until nbLineCA)
@@ -158,7 +161,7 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
     res
   }
   locusPlane +=
-    F() -> {
+    F() -> { //order is down and then up ( clock and trigo)
       val res = Array.ofDim[Option[Vector2D]](2, nbLineCA, nbColCA) //first is down, second is up
       for (dir <- 0 until 2)
         for (i <- 0 until nbLineCA)
@@ -226,9 +229,10 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
   locusPlane += T(E(), F()) -> { //bugici
     val res = Array.ofDim[Option[Vector2D]](6, nbLineCA, nbColCA) //first is down, second is up
     for (i <- 0 until nbLineCA) for (j <- 0 until nbColCA) {
+      /** d is 0 pour down, 1 pour up */
       def face(d: Int, i: Int, j: Int) = if (inside(i, j)) locusPlane(F())(d)(i)(j) else None //computes the four faces framing the three edges
 
-      val jup = if (i % 2 == 1) j + 1 else j
+      val jup = if (i % 2 == 1) j + 1 else j //ordone premier triangle
       val fourFace = Array(face(1, i - 1, jup), face(0, i, j), face(1, i, j), face(0, i, j - 1))
       for (dir <- 0 until 3) for (or <- 0 until 2) {
         res(2 * dir + or)(i)(j) = if (fourFace(dir + or).isEmpty) None else
@@ -425,8 +429,6 @@ abstract class Medium(val env: Env, val nbLineCA: Int, val nbColCA: Int, val bou
       res ++= p.flatMap((a: Array[Option[Vector2D]]) => a.toList.flatten).toSet //toList.asJava
     res
   }
-
-
 
 
 }
@@ -650,7 +652,9 @@ trait InitSelect {
       case "0" => zeroInit
       case "0" => unInit
       case "center" => centerInit
+      case "points" => pointsInit
       case "debug" => zeroInit
+      case "sparse" => sparseInit(l)
       case "def" => defInit(l) //here we must take into account the locus, we use a method instead of a lazy val in order to save space
       case "xaxis" => xaxisInit
       case "yaxis" => yaxisInit
@@ -708,7 +712,7 @@ trait InitSelect {
     }
   }
   private lazy val randomInit: InitMold = new InitMold(V(), 1) {
-    override def init(CAmemFields: Array[Array[Int]]): Unit = { // init is redefined becase instead of encode, we write into the CA
+    override def init(CAmemFields: Array[Array[Int]]): Unit = { // init is redefined becase instead of encode, we directly write into the CA
       for (lCAmem: Array[Int] <- CAmemFields) { //dot iteration, we iterate on the dot product of the two ranges
         for (i <- 0 until lCAmem.size) lCAmem(i) = env.rand.nextInt()
       }
@@ -724,7 +728,13 @@ trait InitSelect {
             setMemField(d, i, j)
   }
 
-
+  private def sparseInit(l: Locus): Init = new InitMold(l, 1) {
+    for (d <- 0 until l.density)
+      for (i <- 0 until nbLineCA)
+        for (j <- 0 until nbColCA)
+          if (random() < 0.1) //locusPlane(l)(d)(i)(j).isDefined)
+            setMemField(d, i, j)
+  }
   /** contains material used for InitMaald */
   trait BoolVField {
     val boolVField: Array[Array[Boolean]] = Array.ofDim[Boolean](nbLineCA, nbColCA)
@@ -801,5 +811,10 @@ trait InitSelect {
 
   private lazy val centerInit: InitMaald = new InitMaald(1) {
     setBoolVField(center)
+  }
+  private lazy val pointsInit: InitMaald = new InitMaald(1) {
+    setBoolVField(center)
+    setBoolVField(center.add(new Vector2D(1, 3)))
+    setBoolVField(center.add(new Vector2D(0, -4)))
   }
 }

@@ -350,8 +350,6 @@ trait ProduceJava[U <: InfoNbit[_]] {
           val pR: String = radicalOfVar(paramsR(0))
           val pD: String = if (tSymbVarSafe(paramsR(0)).t == (V(), B())) radicalOfVarIntComp(paramsD(0)) else radicalOfVar(paramsD(0))
           val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet(pR, pD)
-
-
           callCode += pD + "," + pR
         //copy and memo have the same effect
         case "memo" => val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet() ++ params.map(radicalOfVar(_))
@@ -362,15 +360,25 @@ trait ProduceJava[U <: InfoNbit[_]] {
         case _ => //we now consider a call to a real CAloop
           paramCode = List("p") //this is a method PrShift that does a preliminary shift if radius is >0yyy
           val localprog = subDataProgs(call.procName) //gets the called dataProg
+          val bitSig = localprog.nbitSig
           for ((spatialType, nbit) <- localprog.spatialSig zip localprog.nbitSig) { //retrieve spatial type and  bitSize   of parameters.
             val locus: Locus = spatialType._1
             val density = nbit * locus.density
+
             if (spatialType == (V(), B())) { //we can have seedDist$2 passed to a boolV, therefore, we should transform it into seedDist[2]
               paramCode = radicalOfVarIntComp(params(i)) :: paramCode; //this is what is done by radicalOfVarIntComp
               i += 1
-            } //same processing wether it is a name or a heap variable
-            else { //we prooceed differently depending wether the params are mem (isheap) or name of fields
-              if (isHeap(params(i))) { //its a "mem[x]
+            }
+            //until now we applied same processing wether it is a name or a heap variable
+            else {
+              val locusParamEf = tSymbVarSafe(radicalOfVar(params(i))).locus
+              if (locus.isTransfer && !locusParamEf.isTransfer) //we have done a broacast,
+              { // System.out.println("totoaaa"+ params(i))
+                paramCode = "broadcaast(" + radicalOfVar(params(i)) + ")" :: paramCode
+                i += density
+              }
+              //we prooceed differently depending wether the params are mem (isheap) or name of fields
+              else if (isHeap(params(i))) { //its a "mem[x]
                 var indexesMem: List[Int] = List()
                 for (j <- 0 until density) { //iterate over the nbit scalar parameters of the form mem[2]
                   indexesMem = adress(params(i)) :: indexesMem; i += 1
@@ -387,6 +395,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
                 paramCode = radicalOfVar(params(i)) :: paramCode
                 i += density
               }
+
             }
           }
           val loops: Iterable[String] = localprog.allLayers.filter(noDollarNorHashtag(_))

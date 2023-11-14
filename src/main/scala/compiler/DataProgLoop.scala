@@ -263,11 +263,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
       paramR, allCoalesc, loops) with ProduceJava[U]
   }
 
-  def shown = dagis.visitedL.flatMap({ case i: CallProc =>
-    if (i.procName.eq("show"))
-      i.exps.map(_.asInstanceOf[Read[_]].which) else List()
-  case _ => List()
-  })
+
   /**
    * to be executed only by the main dataProg
    *
@@ -288,6 +284,10 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
     allAdresses ++= (paramR zip (layerSpace to layerSpace + paramR.length)) //adresses of  result parameter to the mainRoot
     val nbGlobals = allAdresses.size //the number of variables allways in the heap,
     // where morover, the distincts bit planes are found in sequence in the heap
+    val shown = dagis.visitedL.flatMap({ case i: CallProc =>
+      if (i.procName.eq("show")) i.exps.map(_.asInstanceOf[Read[_]].which) else List()
+    case _ => List()
+    })
     val isshownAndNotGlobal = mutable.LinkedHashSet[String]() ++ shown diff allAdresses.keys.toSet //some shown variable are already in the globals, we do not need to show them
     val hs = new HeapStates[InstrNoLayersNorParam](noLayersInstr, Vector(null), isshownAndNotGlobal)
     //On itere sur hs. cela est complexe, on recupere pour chaque instr, l'état courant du heap pour modeliser un appel a une autre CAbranche      res = res ++ instr.codeGen(heapCur, funs, nbGlobals, emptyCoalesc)

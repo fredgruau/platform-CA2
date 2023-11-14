@@ -294,7 +294,8 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
       case e@Scan1(a, _, _, _, _) => val newe = e.copy(arg = id2(a))(e.mym); newe.dirNarrowed = e.dirNarrowed; newe
       case e@Scan2(a, b, _, _, _, _) => val newe = e.copy(arg = id2(a), arg2 = id2(b))(e.mym); newe.dirNarrowed = e.dirNarrowed; newe
       case e@Reduce(a, _, _) => val newe = e.copy(arg = id2(a))(e.mym); newe.dirNarrowed = e.dirNarrowed; newe
-      case e@Tminus1(a) => id2(a)
+      case e@Tminus1(a) =>
+        id2(a)
       case e@Shift(a, _) => e.copy(arg = id2(a))(e.mym)
     };
     newD.setName(this.name);
@@ -376,7 +377,8 @@ object ASTB {
   case class Shift[R <: Ring](arg: ASTBt[R], right: Boolean)(implicit n: repr[R]) extends ParOp[R](Both()) with Singleton[AST[_]]
 
   /** All the constructors should be declared private for clean separtion. TMInus1 illustrates how to proceeds in this direction */
-  private[ASTB] case class Tminus1[R <: Ring](arg: ASTBt[R])(implicit n: repr[R]) extends ParOp[R](Both()) with Singleton[AST[_]]
+  //private[ASTB]
+  case class Tminus1[R <: Ring](arg: ASTBt[R])(implicit n: repr[R]) extends ParOp[R](Both()) with Singleton[AST[_]]
 
 
   case class IncreaseRadius[R <: Ring](arg: ASTBt[R])(implicit n: repr[R]) extends ParOp[R](Both()) with Singleton[AST[_]]

@@ -1,7 +1,7 @@
 package progOfmacros
 
 import compiler.AST._
-import compiler.ASTBfun.{andRedop, minRedop, minUI, orRedop, redop, xorRedop}
+import compiler.ASTBfun.{andRedop, concatRedop, minRedop, minUI, orRedop, redop, xorRedop}
 import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.Circuit.iTabSymb
@@ -105,6 +105,11 @@ object RedS {
     new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
   }
 
+
+  def concatN[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S2, S1]): ASTLt[S2, B] = {
+    val f: Fundef1[(S1, B), (S2, B)] = getRedSFun(concatRedop, arg.locus)(m, n, nomB, d)
+    new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
+  }
   def leastUI[S1 <: S, S2 <: S](arg: ASTLt[S1, UI])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S2, S1]): ASTLt[S2, UI] = {
     val f: Fundef1[(S1, UI), (S2, UI)] = getRedSFun(minRedop[UI], arg.locus)(m, n, repr.nomUI, d)
     new Call1[(S1, UI), (S2, UI)](f, arg)(repr.nomLR(n, compiler.repr.nomUI)) with ASTLt[S2, UI] {}

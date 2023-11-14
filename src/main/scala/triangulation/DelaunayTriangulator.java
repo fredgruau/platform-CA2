@@ -65,7 +65,6 @@ public class DelaunayTriangulator {
 
         for (int i = 0; i < pointSet.size(); i++) {
             Triangle2D triangle = triangleSoup.findContainingTriangle(pointSet.get(i));
-
             if (triangle == null) {
                 /**
                  * If no containing triangle exists, then the vertex is not

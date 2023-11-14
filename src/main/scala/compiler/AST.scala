@@ -2,7 +2,8 @@ package compiler
 
 import dataStruc.DagNode._
 import AST.{Layer, _}
-import compiler.ASTL.delayedL
+import compiler.ASTBfun.ASTBg
+import compiler.ASTL.{ASTLg, delayedL}
 import compiler.Circuit.{TabSymb, iTabSymb}
 import compiler.VarKind.MacroField
 import dataStruc.{DagNode, Named}
@@ -287,6 +288,7 @@ object AST {
   abstract class Layer[T](val nbit: Int, val init: String)(implicit m: repr[T]) extends AST[T]() with EmptyBag[AST[_]] with Strate[T] {
     /** avoid a scala bug */
     val v2 = 1
+    assert(nbit == 1 || !this.asInstanceOf[ASTLg].ring.isInstanceOf[B], "a boolean is on one bit") //we check that if it is boolean, nbit=1
     /** the value at t, which  is represented as  the layer itself. */
     val pred: AST[T] = this
     /** system instruction for rendering,debuging,memorizing  can be associated to layers, so as to be latter retrieved during compilation */

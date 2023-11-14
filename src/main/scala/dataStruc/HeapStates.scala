@@ -24,7 +24,7 @@ class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class
     var liveVar: mutable.LinkedHashSet[String] = shown //shown variable are live at the end, because we need to access their state in order to display them
     var liveVars: List[mutable.LinkedHashSet[String]] = List(liveVar) //strings contained in buffer
     for (p <- packets.reverse) { //we compute live vars, starting from the end towards the beginning
-      liveVar = liveVar.union(p.usedVars()).diff(p.names.toSet)
+      liveVar = (liveVar.union(p.usedVars()).diff(p.names.toSet)).union(shown)
       liveVars ::= liveVar
     }
     liveVars
@@ -50,6 +50,11 @@ class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class
         nbOcc = nbOcc + heap(i)
       }
   }
+
+  /** to be called before place is called, in order to verifuing that we are not placing some already placed variables */
+  def checkNoneInHeap(value: Set[String]) = if (heap.toSet.intersect(value).nonEmpty)
+    throw new Exception("already in Heap")
+
 
   /**
    * @param valu new items to be stored in memory
@@ -89,6 +94,7 @@ class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class
   override def iterator: Iterator[(Vector[String], iTabSymb[Int])] = new Iterator[(Vector[String], iTabSymb[Int])] {
     //initialisation of iterator
     var liveVar = liveVars.head
+    //checkNoneInHeap(liveVar.toSet) todo decomment when pb
     place(liveVar) //not sure we should do that, because parameters are already placed.
     var liveVarLeft = liveVars.tail
     var packetLeft = packets
@@ -103,7 +109,9 @@ class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class
     override def next(): (Vector[String], iTabSymb[Int]) = {
       val p = packetLeft.head
       val newAllocatedAdress: List[String] = p.names
-      place(new LinkedHashSet[String] ++ newAllocatedAdress)
+      val tobeAdded = (new LinkedHashSet[String] ++ newAllocatedAdress).diff(shown.toSet) //todo declare les shown en global
+      checkNoneInHeap(tobeAdded.toSet) //decoment when problem
+      place(tobeAdded)
       val res = heap //state will evolve with the following unplace, we need to point to the heap's state before that unplace.
       val l = liveVarLeft.head
       unPlace(p.names.toSet.union(liveVar).diff(l))

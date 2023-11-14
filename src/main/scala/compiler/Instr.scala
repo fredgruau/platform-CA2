@@ -62,7 +62,17 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
 
   def detm1ise(muName: String): Instr = if (names(0) != muName) this else new Affect(muName, exps(0).asInstanceOf[ASTBt[Ring]].detm1ise)
 
-  def detm1iseR: Instr = new Affect(names(0), exps(0).asInstanceOf[ASTBt[Ring]].detm1iseR)
+
+  /** removes the first tma which we now verify is here */
+  def detm1iseR: Instr = {
+    val newExp = exps(0).asInstanceOf[ASTBg] match {
+      case e@ASTB.Tminus1(a) => a
+      case _ => throw new Exception("should begin with tm1"); null
+    }
+    //  assert(exps(0).asInstanceOf[ASTBg].isTm1, "should be tm1 that we remove")
+    //   new Affect(names(0), exps(0).asInstanceOf[ASTBt[Ring]].detm1iseR)
+    new Affect(names(0), newExp) //exps(0).asInstanceOf[ASTBt[Ring]].detm1iseR)
+  }
 
   /**
    *
@@ -782,6 +792,7 @@ object Instr {
     nameCompteuraux += 1;
     nameCompteuraux
   }
+
 
   private def newAux(): String = "_aux" + getCompteurAux
 

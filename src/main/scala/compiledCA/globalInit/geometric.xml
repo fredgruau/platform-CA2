@@ -3,7 +3,13 @@
     <init>
         center
     </init>
-    <init>
+        <init>
+            points
+        </init>
+        <init>
+            sparse
+        </init>
+        <init>
         border
     </init>
         <init>
@@ -13,5 +19,5 @@
         yaxis
     </init>
     </inits>
-    <selected rank="0"/>
+    <selected rank="1"/>
 </initMethod>

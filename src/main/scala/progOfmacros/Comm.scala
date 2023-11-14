@@ -11,11 +11,11 @@ object Comm {
     val ef = pL[T[E, F], B]("distantEdge")
     val apexV: BoolVf = transfer(sym(transfer(ef)))
     apexV.setName("apexV");
-    Fundef1("apexEtoV", apexV, ef)
+    Fundef1("comm.apexEtoV", apexV, ef)
   }
 
   /** wrapper to  Call frontierE.  */
-  def apexV(ef: BoolEf): BoolVf = new Call1(apexVDef, ef) with BoolVf
+  def apexV(ef: BoolEf): BoolVf = new Call1[(T[E, F], B), (T[V, F], B)](apexVDef, ef) with BoolVf
 
   def apexVnoMacro(ef: BoolEf): BoolVf = transfer(sym(transfer(ef))) //pour tester le calcul du rayon avec une non augmentation
 

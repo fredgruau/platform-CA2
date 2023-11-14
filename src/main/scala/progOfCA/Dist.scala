@@ -20,6 +20,19 @@ class Seed extends ConstLayer[V, B](1, "global") with DistT {
 object Dist {
   /** macro that does all the computation needing the distance  From an IntV, computes the gradient sign, and the delta to be added to make it a distance
    * */
+
+  /*val vortex: BoolF = reduce(andRedop[B], transfer(clock(lt) ^ anticlock(lt)));
+
+
+  val vortex: BoolF = andR(transfer(xor(temp, temp2))); //faudrait en faire une marco
+
+  val temp: BoolfV = clock(tslope)
+  val temp2: BoolfV = anticlock(tslope)
+  val vortex: BoolF = andR(transfer(xor(temp, temp2))); //faudrait en faire une marco
+  vortex.setName("vortex");
+  bugif(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.*/
+
+
   val slopeDeltaDef: Fundef1[(V, SI), ((T[V, E], B), ((V, SI), (E, B)))] = {
     val d = pL[V, SI]("dis")
     val dopp = -d
@@ -55,7 +68,7 @@ object Dist {
 class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[V, SI] {
   val opp = -this
   val (slop, delta, level) = slopDelta(this)
-  val topoligne: BoolV = (elt(2, this));
+  val topoligne: BoolE = frontier(elt(2, this));
   val next: ASTLt[V, SI] = this + cond(source.asInstanceOf[BoolV], sign(opp), delta) //faudrait en faire une macro qui prends delta, source et dist et renvoie distNext
   show(slop, delta, level, topoligne)
 }

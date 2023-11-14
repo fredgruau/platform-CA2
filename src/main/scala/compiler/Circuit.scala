@@ -160,9 +160,9 @@ object Circuit {
           case V() => /*vE->eV*/
             val Array(Array(h1, h2), Array(d1, d2), Array(ad1, ad2)) = t;
             Array(Array(h1, d1, ad1, shiftR(h2), tm1(d2), tm1(shiftL(ad2)))) //ici au contraire on met tm1 au début pour factoriser les tm1 dans reduce(broadcast de vE vers V
-          case F() => /*fE->eF*/
+          case F() => /*Ef->Fe*/
             val Array(Array(h1, h2), Array(d1, d2), Array(ad1, ad2)) = t; //todo consider renaming d and ad by o  and ao, 'o' for oblique
-            Array(Array(tm1(h2), tm1(shiftL(d1)), tm1(ad1)), Array(shiftR(h1), tm1((d2)), tm1(ad2)))
+            Array(Array(tm1(h2), tm1(shiftL(ad2)), tm1(d1)), Array(shiftR(h1), tm1((ad1)), tm1(d2)))
         }
       case F() => des match {
         case V() => /*Fv->Vf*/

@@ -1,6 +1,7 @@
 package simulator
 
 import compiler.{Locus, V}
+import dataStruc.Named
 import simulator.Controller.disableBinding
 import simulator.CAtype._
 import simulator.ExampleData._
@@ -42,11 +43,17 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   val globalInitNames = fromXMLasList((globalInit \\ "inits").head).toArray
   val selectedGlobalInit: Int = xInt(globalInit, "selected", "@rank") //which is the starting value for global init
 
+  /** check that global variables (layer and shown) do not share offset. */
   def invariantFieldOffset = {
+    val h = progCA.displayableLayerHierarchy()
+
+    def isGlobal(nameVar: String): Boolean = Named.isLayer(nameVar) || (h.contains(nameVar)) //true if needs to be allways accessible
     val varOfMyCell: Array[String] = new Array(progCA.CAmemWidth)
-    for ((s, l) <- memFieldsOffset) //we check no more than two variables allocated on a given cell
+    for ((s, l) <- memFieldsOffset) //we check no more than two variables allocated on a given offset
       for (offset <- l) {
-        assert(varOfMyCell(offset) == null, "two variables " + varOfMyCell(offset) + " " + s + " in cell " + offset)
+        val v = varOfMyCell(offset)
+        if (isGlobal(s))
+          assert(v == null || (!isGlobal(v)), "two variables " + varOfMyCell(offset) + " " + s + " in cell " + offset)
         varOfMyCell(offset) = s
       }
     //for (i <- 0 until varOfMyCell.length)       assert(varOfMyCell(i) != null, "unusedMemoryCell " + i) there can in fact be holes in the heap

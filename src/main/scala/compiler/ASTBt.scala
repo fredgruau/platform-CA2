@@ -113,7 +113,7 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
 
   def ring: R = mym.name
 
-
+  /** Remove the first tm1 */
   def detm1iseR: ASTBg = {
     this.asInstanceOf[AST[_]] match {
       case Read(_) => this
@@ -158,8 +158,10 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
         val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBg].deCallify(env))
         op.arg.asInstanceOf[ASTBg].deCallify(newEnv)
       case Call2(op, x, y) => //il se peut quon rajute un affect et augmente la tsymb
-        checkUISI(x, op.p1);
-        checkUISI(y, op.p2)
+        if (!op.name.equals("concat2")) {
+          checkUISI(x, op.p1); checkUISI(y, op.p2)
+        } //for concat2 param can be V or UI or UISI;
+
         // if ((x.mym.name != op.p1.mym.name && op.p1.mym.name != UISIB()) || (y.mym.name != op.p2.mym.name && op.p2.mym.name != UISIB()))
         //null//totoa throw new Exception("Faut preserver SI ou UI")
         val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBg].deCallify(env)) +

@@ -91,6 +91,20 @@ public class Util {
                 copy(src[i], dest[i * rapport + j]);
     }
 
+
+    /**
+     * when doing a braodcast from E or F we need to double , resp triple the array size
+     */
+    public static int[][] broadcaast(int[][] src) {
+        int rapport = 6 / src.length;
+        assert (rapport == 2 || rapport == 3 || rapport == 1);
+        if (rapport == 1) return src;
+        int dest[][] = new int[rapport * src.length][src[0].length];
+        for (int i = 0; i < src.length; i++)
+            for (int j = 0; j < rapport; j++)
+                copy(src[i], dest[i * rapport + j]);
+        return dest;
+    }
     /**
      * System call used to update layers, same as copy, we use demo for clarity
      *
