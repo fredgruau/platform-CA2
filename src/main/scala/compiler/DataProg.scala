@@ -9,7 +9,7 @@ import dataStruc.{Align2, Dag, DagInstr, Named, Schedule, Util, WiredInOut, toSe
 import dataStruc.WiredInOut.{defby, setInputNeighbor}
 import Instr.{a, affectizeReturn}
 import ASTB.Tminus1
-import ASTBfun.{ASTBg, Fundef2R, redop}
+import ASTBfun.{ASTBg, Fundef2R, concatRedop, redop}
 import ASTL.ASTLg
 import Named.noDollarNorHashtag
 
@@ -162,10 +162,12 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
 
   /** all registers used by insrtructions must be either contained in tSymb or in tSymb(coalesc) */
-  def invariantVariable =
-    for (v <- dagis.usedVars)
-        if (!tSymbVarExists(v) && !tSymbVarExists("p" + v) && !v.startsWith("mem["))
-          throw new Exception("variable:" + v + " not present in symbol table")
+  def invariantVariable = {
+    val used = dagis.usedVars
+    for (v <- used)
+      if (!tSymbVarExists(v) && !tSymbVarExists("p" + v) && !v.startsWith("mem["))
+        throw new Exception("variable:" + v + " not present in symbol table")
+  }
 
   invariantVariable
 
@@ -187,12 +189,13 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   private def dagisScheduleMatters = coalesc != null
 
   /** look up the symbol table if not found, take the coalesced form */
-  protected def tSymbVarSafe(str: String): U = {
+  def tSymbVarSafe(str: String): U = {
     if (coalesc == null) tSymbVar(str)
     else if (!tSymbVar.contains(str) && (!coalesc.contains(str) || !tSymbVar.contains(coalesc(str))))
       throw new Exception("on trouve pas " + str)
     else
-      tSymbVar.getOrElse(str, tSymbVar(coalesc(str)))
+      tSymbVar.getOrElse(str, tSymbVar(coalesc(str))) //renvoie la version  coalesced seulement si pas dans la table.
+
   }
 
   /** look up the symbol table if not found, take the coalesced form */
@@ -712,7 +715,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         newTsymbVar.addOne(name -> info)
       else if (stillUsed.contains(name)) //due to the fact that some operator can be processed on the main(broadcast, elem, even clock and anticlock)
       //some of the macroField are not macroified. we check which one, just by lookikng wether they are still in use in the new main instructions
-      newTsymbVar.addOne(name -> info.storedFieldise2)
+        newTsymbVar.addOne(name -> info.storedFieldise2)
     new DataProg(newDagis, newFuns ++ funs.map { case (k, v) ⇒ k -> v.macroify() }, newTsymbVar, paramD, paramR)
   }
 
@@ -732,8 +735,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
     val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
     if (!p.isLeafCaLoop || p.isRootMain) //in one extreme case the root main is also a CA loop!
-    return new DataProg(p.dagis, funs.map { case (k, v) => k -> v.addParamRtoDagis2() },
-      p.tSymbVar, paramD, paramR.map(addsAnR(_)))
+      return new DataProg(p.dagis, funs.map { case (k, v) => k -> v.addParamRtoDagis2() },
+        p.tSymbVar, paramD, paramR.map(addsAnR(_)))
     val rewrite1: Instr => List[Instr] = (i: Instr) => a(i).insertMacroFieldbeforeReduceParamR(p.tSymbVar)
     new DataProg(p.dagis.propagate(rewrite1), noSubFun, p.tSymbVar, paramD, paramR.map(addsAnR(_))) //no coalesced registers
   }
@@ -763,7 +766,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     // we first computes connected component,
 
     val (
-
       /** connected component forming zones */
       groupNodes: Iterable[List[Instr]],
 
@@ -863,7 +865,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       val names = info.locus.deploy(name)
       for (n <- names) {
         if (n != name) //we do not want to remove spatial information
-        tSymbScalar.addOne(n -> tSymbVar(name).asInstanceOf[InfoNbit[_]].scalarified) //for main function, we unfold systematically all the variables
+          tSymbScalar.addOne(n -> tSymbVar(name).asInstanceOf[InfoNbit[_]].scalarified) //for main function, we unfold systematically all the variables
       }
     }
     (d.visitedL.flatMap(_.unfoldSpace(null, p.tSymbVar)), tSymbScalar)
@@ -882,7 +884,11 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
    *         the variable used are no longer the one in the symbol table. They are the on in the values of the coalesced map
    */
 
-
+  def redopConcats = dagis.visitedL.flatMap({ //identifies which are the concat
+    case Affect(name, x) =>
+      if (x.toString.startsWith("redconcat2")) Some(name) else None //name of a reduction is red+name of operator concat2
+    case _ => None
+  })
   def unfoldSpace(m: Machine): DataProg[InfoNbit[_]] = {
     if (!isLeafCaLoop) {
       val (muI, tSymbScalar) = muInstrMain(dagis) //computes the muI associated to a callProc and direct affectation, and the modified symbolTable.
@@ -918,10 +924,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     }
 
     val p2 = alignShift() //produces tabAlign
-    // print(tabAlign.map({case (k,v)=> ""+k+v.toSeq}))
+    print(tabAlign.map({ case (k, v) => "" + k + v.toSeq }))
     val (z2, myRoot, align2root: Map[String, Array[Int]]) = p2.zones2(cycleConstraints, tabAlign)
 
-    // println(p2, z2) //displays zone
+    println(p2, z2) //displays zone
 
     val muI10: Map[String, List[Instr]] = muInstr(m, p2.dagis)
 
@@ -929,10 +935,25 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     val tZone2: Map[String, Zone] = defby(z2.visitedL)
     val defI2: Map[String, Instr] = p2.dagis.defby
 
-    val (muI12: Map[String, List[Instr]], tSymbScalar2, coalesc2) = permuteAndFixScheduledMu(muI10, p2.dagis, tZone2, defI2, myRoot, align2root) // revisit muI 's'reduce when reduced exression is folded
+    var (muI12: Map[String, List[Instr]], tSymbScalar2, coalesc2) = permuteAndFixScheduledMu(muI10, p2.dagis, tZone2, defI2, myRoot, align2root) // revisit muI 's'reduce when reduced exression is folded
     //we separate the reduction in two parts: one that can do at tm1 and the rest that is done now.
+    //concat needs to preserve the order, but it will, since whhats concatenated is already in sync whith the result of concatenation
 
-    //print(muI12)
+    // simplifConcat will replace toto_4 <- concat(toto_3,exp) par toto#4 <-exp
+
+    for (name <- redopConcats) {
+      val i = defI2(name)
+      assert(tSymbVar(name).locus == V(), "for the moment we concatenate only on vertice") //
+      if (i.inputNeighbors.nonEmpty) {
+        muI12 = muI12 + (name -> (muI12(name).map(_.simplifConcat()))) //triger in a shift in the indexes #0 is the last to be affected
+
+        for (i <- 0 to 5) //we also need to add the toto#i in tsymbVar
+          tSymbScalar2.addOne(name + "#" + i -> new InfoNbit[B](B(), tSymbVar(name).k, 1))
+        val youpi = 0
+      }
+    }
+
+
     val muI13: List[Affect[_]] = scheduleMuCode(muI12, p2.dagis, defI2, tZone2, myRoot).toList.asInstanceOf[List[Affect[_]]]
     val iT2 = DagInstr(muI13).inputTwice.filter(isNotRead) //we exploit the DAG form to find out about usedTwice exp, we did not used it yet!!!
     //if the factorized expression is just a << or >> as it is now ?? we better just recompute it
@@ -998,7 +1019,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       val i = defI(name) //instruction
       if (newMuI.contains(name)) return newMuI(name) //muInstruction's new schedule has already been computed
       val permuted: List[Instr] =
-        if (a(i).isRedop) foldRedop(a(i))
+        if (a(i).isRedop)
+          foldRedop(a(i))
         else if (i.isV) oldmuI(name) //simplest case
         else if (i.isFolded2(tZ, myRoot)) {
           if (i.isShift) foldShift(a(i))
@@ -1060,13 +1082,15 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         //sinon je sais pas faire encore faut réfléchir
         if (isFolded || tSymbVar(i.name).locus == V()) {
           val l = a(i).locus.get.asInstanceOf[S]
+          //  if(tSymbVar(i.name).locus != V()){
+
           for (scalarName <- l.deploy(i.name))
-            coalesc = coalesc + (scalarName -> i.name)
+            coalesc = coalesc + (scalarName -> i.name) //sert a rien si scalarName=i.name, si locus =V
           tSymbScalar.addOne(i.name -> tSymbVar(i.name).asInstanceOf[InfoNbit[_]]) //.regifyIf(coalescedName != names(numI)))
-          val u = 0
         }
+
         else {
-          assert(false)
+          assert(false, "je sais pas faire")
         }
         return oldmuI(i.name)
       }
@@ -1096,7 +1120,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         for (j <- 0 to 5) { //for folding of input  to work, the reduction must accumulate
           val iInputMuInst: Affect[_] = a(iInputMuInstOrdered(j)) //muInst read
           val numI = l.proj(inputShedule(j)) //numI select the target component of the simplicial vector produced by redop
-          if (tm1Sum(numI) < 2) //it is not worth doing a delayed sum
+          if (tm1Sum(numI) < 2 /*||op._1.equals("concat2")*/ ) //it is not worth doing a delayed sum,or it is risky because concat cannot be reordered
           {
             val nameOfAffectedPrevious = names(numI) + "_" + cpt(numI)
             cpt(numI) += 1;
@@ -1143,9 +1167,9 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
             //iInputMuInstOrdered(scheduleOfLastAffectedTm1).names.head+"tm1#" + nbDelayed
             val readCurrentRedVar =
               if (firstNonTm1) //we retrieve the other sum using a tm1, it introduces another Z variable, to be removed later
-              ASTB.tm1(Instr.readR(nameOfFinalAffectedTm1, r))(r)
+                ASTB.tm1(Instr.readR(nameOfFinalAffectedTm1, r))(r)
               else
-              Instr.readR(nameOfAffectedPrevious, r)
+                Instr.readR(nameOfAffectedPrevious, r)
             val newMuInstrExp =
               if (cptTm1(numI) == 1 && isTm1(j)) readNextMuVar //the first myInstruction is a simple affectation
               else Instr.reduceR(readCurrentRedVar, readNextMuVar, //the other apply the binary operator of the muInstruction
@@ -1277,7 +1301,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
             if (defI(i).isFolded2(tZone, myRoot))
               Math.max(1, densityOut / l.density) //  >1 if output neigbor has higer density
             else //i triggers only once, and sends all its token which are equal to its density
-            densityOut
+              densityOut
           token += ((i2, i) -> (token(i2, i) + nbToken)) //adds the token beween i and i2
         }
 
@@ -1439,7 +1463,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
           var cancel = false
           for (usedByl <- allUsed(l))
             if (coalesc2(usedByl) == coalesc2(v)) //we look if l uses a variable that coalesc like v
-            cancel = true //if found such variables, we cancel simplification of l
+              cancel = true //if found such variables, we cancel simplification of l
           if (cancel) {
             live -= l
             result -= l //implies not to be simplified
@@ -1493,11 +1517,17 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       WiredInOut.setInputAndOutputNeighbor(dagis.visitedL)
       val nameStillUsed = p.dagis.visitedL.flatMap(_.names).toSet.diff(idCand4Simplnotsdwich)
       val coalescedStillUsed = nameStillUsed.map((str: String) => coalesc.getOrElse(str, str))
-      for (str <- newTsymbar.keys) //we remove from the table the now useless symbols
-        if (!coalescedStillUsed.contains(str) && !(newTsymbar(str).k == ParamD()) && !(newTsymbar(str).k.isParam) && !(newTsymbar(str).k.isLayerField)) {
+      val used = dagis.usedVars
+      for (str <- newTsymbar.keys) { //we remove from the table the now useless symbols
+        if (str.equals("growvorAsint")) {
+          val u = 0
+        }
+        if (!coalescedStillUsed.contains(str) && !(newTsymbar(str).k == ParamD()) && !(newTsymbar(str).k.isParam)
+          && !(newTsymbar(str).k.isLayerField) && !used.contains(str)) {
           //  if (!coalescedStillUsed.contains(str) && !(newTsymbar(str).k == ParamD()) && !(newTsymbar(str).k == ParamD())) {
           newTsymbar.remove(str)
         }
+      }
       //dagis.visitedL.map(_.asInstanceOf[Affect[_]].correctName())
       if (dagis.visitedL.size < nInstrBeforeSimplif) simplify() //simplification can enable more simplification!
 
@@ -1563,7 +1593,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       (instr: Instr) => {
         val nom = instr.names(0)
         if (reInsertion.values.toSet.contains(nom)) {
-          tobeMoved += (nom -> instr.detm1iseR); //detm1iseR should remove only one tm1, instead of two if there is two. instructions that should be moved
+          tobeMoved += (nom -> instr.detm1iseHead); //detm1iseR should remove only one tm1, instead of two if there is two. instructions that should be moved
           List()
         }
         else {
@@ -1597,12 +1627,12 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       val theTm1s: List[AST[_]] = tm1s(instr.exps(0))
       if (theTm1s.size <= 1)
         for (e <- theTm1s.reverse)
-        e.inputNeighbors(0) match {
-          case r@Read(_) => //we returns tm1s of read, because they can be delayed.
-            // if (result.contains(instr.names(0)))     throw new Exception("there is two possible tm1(Rx) for this R1")
-            result += (instr.names(0) -> r.which)
-          case _ =>
-        }
+          e.inputNeighbors(0) match {
+            case r@Read(_) => //we returns tm1s of read, because they can be delayed.
+              // if (result.contains(instr.names(0)))     throw new Exception("there is two possible tm1(Rx) for this R1")
+              result += (instr.names(0) -> r.which) //if x= ...tm1(y) on renvoie x -> y
+            case _ =>
+          }
     }
     result
   }
@@ -1637,7 +1667,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         candB -= nom //R1 is re-defined before
       for (r1 <- beforeDef.intersect(candA))
         if (coalesc2(nom) == coalesc2(candReg(r1))) //r2 is redefined before definition of r1         }
-        candA -= r1
+          candA -= r1
       val newUsed = instr.usedVars().map(coalesc2(_))
       for (nowUsed <- newUsed.diff(live))
         if (!lastUse.contains(nowUsed))
@@ -1647,7 +1677,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         if (
           live.contains(coalesc2(r1)) && //R1 will be used
             coalesc2(nom) == coalesc2(candReg(r1))) //after R2 is redefined (now)
-        candB -= r1
+          candB -= r1
 
       if (candA.contains(nom)) { //we just pass the definition candA is still equal to its original value
         live -= coalesc2(nom)
@@ -1702,10 +1732,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
           new Affect(n, instr.exps(0).asInstanceOf[ASTBg].detm1ise)
         }
         else instr
-      }
-        //  instr.asInstanceOf[Affect[_]].toStoreDetmise()
+      })
+      // instr.asInstanceOf[Affect[_]].toStoreDetmise()
 
-      )
+
 
       //for the tm1 that could not be easily supressed using optimizing tricks, we now proceed to standard detmify through creation of new registers tmun=tminus1which means new affectation.
       val toBeRepl: List[AST[_]] = p.dagis.dagAst.visitedL.filter(_.asInstanceOf[ASTBt[_]].isTm1) //we could filter out more stuff because it consumes register
@@ -1806,7 +1836,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       }
 
       val wrap = immutable.HashMap.empty[Instr, treeDag.Wrap] ++ treeDag.visitedL.map(x => x -> treeDag.Wrap(x))
-      val loops1: Map[Instr, List[Instr]] = treeDag.indexedComponents(pipelineProximity2, wrap)
+      val loops1: Map[Instr, List[Instr]] = treeDag.indexedComponents(pipelineProximity2, true, wrap)
+      //todo construire un dag produit un topological sort gratuitement, comme on a fait pour le Dag de zone, ca serai plus élegant.
       val loops2: Seq[List[Instr]] = treeDag.topologicSort2(loops1, wrap).reverse //we sort them so as to process them in the right order
       var result: List[Packet] = List()
       for (packet: List[Instr] <- loops2) { //todo when coalescing,  care should be taken that temporary variables used in the computation of one loop can reused in the next loop
@@ -1831,7 +1862,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       paramD, paramR, coalesc, null)
 
 
-    }
+  }
 
 
 }
