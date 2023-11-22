@@ -18,21 +18,21 @@ class repr[+L](val name: L)
 /**
  * used to compute the transfer field modeling the chip's frontier
  *
- * @param border boolean false when neighbor  is not definied
+ * @param df boolean false when neighbor  is not definied
  * @tparam S1 main simplicial locus
  * @tparam S2 secondary simplicial locus
  */
-class chipBorder[S1 <: S, S2 <: S](val border: ASTLt[T[S1, S2], B])
+class chip[S1 <: S, S2 <: S](val df: ASTLt[T[S1, S2], B])
 
-object chipBorder {
+object chip {
   /** trahsfer field near the  chip's border, can be undefined, the contant def layers indicates where it is defined,
    * so as to neutralize artefacts, when doing reductions. */
-  implicit val borderVe = new chipBorder[V, E](new ConstLayer[T[V, E], B](1, "def"))
-  implicit val borderEv = new chipBorder[E, V](null)
-  implicit val borderVf = new chipBorder[V, F](new ConstLayer[T[V, F], B](1, "def"))
-  implicit val borderFv = new chipBorder[F, V](null)
-  implicit val borderFe = new chipBorder[F, E](new ConstLayer[T[F, E], B](1, "def"))
-  implicit val borderEf = new chipBorder[E, F](null)
+  implicit val borderVe = new chip[V, E](new ConstLayer[T[V, E], B](1, "def"))
+  implicit val borderEv = new chip[E, V](null)
+  implicit val borderVf = new chip[V, F](new ConstLayer[T[V, F], B](1, "def"))
+  implicit val borderFv = new chip[F, V](null)
+  implicit val borderFe = new chip[F, E](new ConstLayer[T[F, E], B](1, "def"))
+  implicit val borderEf = new chip[E, F](null)
   //todo inclure tout les transfer locus, pas seulement Ve
 
 }

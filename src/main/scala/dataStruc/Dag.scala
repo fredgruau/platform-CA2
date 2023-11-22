@@ -5,7 +5,10 @@ import compiler.ASTBfun.ASTBg
 import compiler.Circuit.iTabSymb
 import compiler.{AST, ASTB, Affect, Instr}
 
-import scala.collection.{mutable, _}
+import java.lang
+import java.lang.System
+import scala.Console.out
+import scala.collection.{Map, mutable, _}
 import scala.collection.immutable.{HashMap, HashSet}
 
 
@@ -129,18 +132,57 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
   /**
    * we apply the unionFind algorithme to compute connected components .
    *
+   * @param testCycle true if we want to avoid cycles
    * @param p   predicate which defines adjacence beetween DagNodes
-   * @param all mapping associating an element to its wrapping. itcan be provided by the calling environment, it it needs it
+   * @param myWrap    mapping associating an element to its wrapping. itcan be provided by the calling environment, it it needs it
    * @result map associating a root to its component
    *         TODO redefinir a partir de indexed paquet
    */
-  def indexedComponents(p: (T, T) => Boolean, all: Map[T, Wrap] = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))): Map[T, List[T]] = {
 
-    for (src <- visitedL)
+
+  def indexedComponents(p: (T, T) => Boolean, testCycle: Boolean, myWrap: Map[T, Wrap] = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))): Map[T, List[T]] = {
+    /** at the beginning, all the elements are roots. */
+
+    var intputNeighborRoots: Map[T, Set[T]] = null;
+    if (testCycle)
+      intputNeighborRoots = immutable.HashMap.empty ++ visitedL.map(x => x -> x.inputNeighbors.toSet)
+
+    def inputNeihborRootsClosure(t: T): Set[T] = {
+      var result: Set[T] = intputNeighborRoots(t)
+      for (input <- intputNeighborRoots(t))
+        result = result.union(inputNeihborRootsClosure(input))
+      result
+    }
+
+    def inputNeihborRootsClosures(ts: Set[T]): Set[T] = if (ts.isEmpty) HashSet.empty else
+      ts.map(inputNeihborRootsClosure(_)).reduce((x, y) => x.union(y))
+
+    /** a cycle is created if src contains trueInputNeighborsClosure from neighbors other than target, which contains target */
+    def cycleCreation(src: T, target: T) = {
+      val r = inputNeihborRootsClosures(src.inputNeighbors.toSet - target).contains(target)
+      if (r) System.out.println("" + src + "annnnd" + target + "create a cycle")
+      r
+    }
+
+
+    for (src: T <- visitedL)
       for (target <- src.inputNeighbors)
-        if (p(src, target))
-          all(src).union(all(target)) //computes a common root for elements of one component
-    visitedL.groupBy(all(_).root.elt)
+        if (p(src, target) && (!testCycle || !cycleCreation(src, target))) { //either we accept cycle, or we do not but there is none
+
+          val rootoRemove = myWrap(src).union(myWrap(target)) //in case of a true union, we need to know which root is removed
+          val newCommonRoot: T = myWrap(src).root.elt //computes a common root for elements of one component
+          if (testCycle)
+            rootoRemove match {
+              case None => //the two merged nodes already add the same root, so nothing needs to be done.
+              case Some(r) => //root r, is removed
+
+                intputNeighborRoots = intputNeighborRoots + (newCommonRoot ->
+                  (intputNeighborRoots(newCommonRoot) - r.elt).union(intputNeighborRoots(r.elt)))
+                intputNeighborRoots = intputNeighborRoots - r.elt
+                val u = 0
+            }
+        }
+    visitedL.groupBy(myWrap(_).root.elt)
   }
 
 
@@ -152,7 +194,7 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
    * @result List of dagNodes of each component, as an iterable of iterable
    */
   def components2(p: (T, T) => Boolean, all: Map[T, Wrap] = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))): Iterable[List[T]] = {
-    indexedComponents(p, all).values
+    indexedComponents(p, false, all).values
   }
 
 }

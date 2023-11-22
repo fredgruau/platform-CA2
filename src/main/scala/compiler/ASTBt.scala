@@ -152,8 +152,8 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
       case u@Param(_) => env(u.nameP) //soit un read soit un readscalar soit un affectscalar suivant la nature du parametre
       case Call1(op, x) => //il se peut quon rajoute un affect et augmente la tsymb au lieu d' augmenter l'environnement
         //we check that x 's type is a subtype of the paramater
-        // we dlike to write something like that op.p1.mym=x.mym
-        if (x.mym.name != op.p1.mym.name)
+        // we dlike to write something like that op.p1.mym=x.mym if op is element we do not check because concat produces boolean instead of uint
+        if (x.mym.name != op.p1.mym.name && !op.name.startsWith("elt"))
           throw new Exception("Faut preserver SI ou UI")
         val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBg].deCallify(env))
         op.arg.asInstanceOf[ASTBg].deCallify(newEnv)

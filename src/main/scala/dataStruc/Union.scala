@@ -45,20 +45,26 @@ trait Union[T <: Union[T]] {
   /** There will be some check to do on align two instruction already sharing roots are merged */
   def checkIsSameRoot(x: T, y: T): Unit = {}
 
-  def union(y: T, doAlign: Boolean = true): Unit = {
+  /** returns the root that is no longer a root if there is one. */
+  def union(y: T, doAlign: Boolean = true): Option[T] = {
     val xroot = root;
     val yroot = y.root
     if (xroot != yroot) { //dans le cas de align, si xroot = yroot faut quand meme vérifier que les alignement coincide.
       if (xroot.rank < yroot.rank) {
         if (doAlign) transitiveClosure(xroot, this, y); //x was aligned to x root, now it must be aligne to y's root
         xroot.parent = yroot; //the parent of x directly points to the new root
+        return Some(xroot)
       }
       else {
         yroot.parent = xroot;
         if (doAlign) transitiveClosure(yroot, y, this)
         if (xroot.rank == yroot.rank) xroot.rank += 1
+        return Some(yroot)
       }
     }
-    else (checkIsSameRoot(this, y)) //x and y are already in the same component. we must check if alignement coincide
+    else {
+      checkIsSameRoot(this, y)
+      return None //x and y are already in the same component. we must check if alignement coincide
+    }
   }
 }

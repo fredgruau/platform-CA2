@@ -225,7 +225,8 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
       for (leave <- leaveLeft.values)
         if (isFree2(leave))
           return leave
-      throw new Exception("on trouve pas de prochaine leave")
+      throw new Exception("on trouve pas de prochaine leave, les composante connexes pour le predicat (appelé paquet)" +
+        " forme un cycle, on ne peut pas les organiser en DAG ")
     }
 
 

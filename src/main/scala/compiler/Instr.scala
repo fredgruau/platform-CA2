@@ -1,21 +1,24 @@
 package compiler
 
 import AST._
-import ASTB.AffBool
-import ASTBfun.{ASTBg, redop}
+import ASTB.{AffBool, Uint}
+import ASTBfun.{ASTBg, concat2UI, redop}
 import Instr._
 import VarKind._
 import dataStruc.{Align2, Dag, DagInstr, DagNode, HeapStates, WiredInOut}
 import Circuit._
-import compiler.SpatialType.ASTLtG
+import compiler.SpatialType.{ASTLtG, IntV, UintV}
 import compiler.Packet.BitLoop
 import dataStruc.Align2.{compose, invert}
+
 import scala.language.postfixOps
 import scala.collection.{mutable, _}
 import scala.collection.immutable.{HashMap, HashSet}
 
 /** Instruction used within the compiler, call, affect. Dag and Union allows to defined ConnectedComp  */
 abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
+  def simplifConcat(): Instr = null
+
   /** substitute x in names and x in read(x) by coalesc(x) */
   def coalesc(allCoalesc: iTabSymb[String]): Instr = null
 
@@ -60,18 +63,23 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
 
   def boolExprForIndexI(i: Int, gen: BitLoop, env: HashMap[String, ASTBt[B]]): ASTBt[B] = null //only defined for affect!
 
-  def detm1ise(muName: String): Instr = if (names(0) != muName) this else new Affect(muName, exps(0).asInstanceOf[ASTBt[Ring]].detm1ise)
+  def detm1ise(muName: String): Instr = if (names(0) != muName) this
+  else new Affect(muName, exps(0).asInstanceOf[ASTBt[Ring]].detm1ise)
 
 
-  /** removes the first tma which we now verify is here */
-  def detm1iseR: Instr = {
+  /** removes the first tm1 which we now verify is here */
+  def detm1iseHead: Instr = {
     val newExp = exps(0).asInstanceOf[ASTBg] match {
-      case e@ASTB.Tminus1(a) => a
-      case _ => throw new Exception("should begin with tm1"); null
+      case e@ASTB.Tminus1(a) => a.name = e.name; a
+      case _ =>
+        throw new Exception("should begin with tm1"); null
     }
-    //  assert(exps(0).asInstanceOf[ASTBg].isTm1, "should be tm1 that we remove")
-    //   new Affect(names(0), exps(0).asInstanceOf[ASTBt[Ring]].detm1iseR)
-    new Affect(names(0), newExp) //exps(0).asInstanceOf[ASTBt[Ring]].detm1iseR)
+    new Affect(names(0), newExp)
+  }
+
+  /** recursive removes the first tm1 */
+  def detm1iseR: Instr = {
+    new Affect(names(0), exps(0).asInstanceOf[ASTBt[Ring]].detm1iseR)
   }
 
   /**
@@ -512,6 +520,28 @@ case class Loop(names: List[String], exps: List[AffBool]) extends Instr {
 
 //todo on aurait pas du prendre de case class pour affect ou callProc.
 case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
+
+  /* def encpasulatedConcats(s:String, e:ASTBt[UI]):ASTBt[UI]={
+     var res=e
+     for(i<- (1 to 5).reverse){
+       val ecur: Uint = new Read[UI](s + "#" + i) with ASTBt[UI]
+        res = ecur :: res
+     }
+      res
+   }*/
+  override def simplifConcat(): Instr = {
+    def diesify(s: String) = if (s.contains('_')) s.replace('_', '#') else s + "#0" //quand c'est 0 y a pas de tiret
+
+    exp match {
+      case Call2(_, _, arg2) =>
+        val res = Affect(diesify(name), arg2)
+        res
+      case _ => //on fait 5 calls encapsulé concat(exp,
+        val res = Affect(diesify(name), exp)
+        // val radName=name.dropRight(2);   val res= Affect(radName,encpasulatedConcats(radName,exp.asInstanceOf[ASTBt[UI]]))
+        res
+    }
+  }
 
   def correctName(): Unit = {
     val nameE = exp.name

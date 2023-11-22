@@ -181,7 +181,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
     super.toString +
       // (if(coalescTMP!= null&&coalescTMP.size>0) "tmp registers:" + toStringCoalesc(coalescTMP) else "" ) +
       (if (loops != null) "Total code of macro: " +
-        totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ") else "")
+        //totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ") else "")
+        totalCode.map(_.toStringTreeInfix(this.asInstanceOf[DataProg[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ") else "")
 
   }
   /**

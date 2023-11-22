@@ -272,7 +272,7 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
     newD.asInstanceOf[ASTB[R]]
   }
 
-
+  /** recursive remove of all tm1, seem to be very odd to do that! */
   override def detm1iseR: ASTBt[R] = {
     def id2[R3 <: Ring]: rewriteASTBt[R3] = d => d.asInstanceOf[ASTBt[R]].detm1iseR.asInstanceOf[ASTBt[R3]] //introduit des variables libres
     val newD = this.asInstanceOf[ASTBg] match {
@@ -305,7 +305,7 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
   /** remove the head tm1 */
   override def detm1ise: ASTBt[R] = this match {
     case ASTB.Tminus1(e) =>
-      e.name = name; //propagates the name's change
+      e.name = name; //propagates the name's change should we allways do that
       e
     case _ => this
   }
@@ -466,7 +466,7 @@ object ASTB {
 
   /** used for doing concat reduction */
   case class Concat2[R1 <: Ring, R2 <: Ring, O1 <: I](arg: ASTBt[R1], arg2: ASTBt[R2])(implicit n: repr[O1])
-    extends ParOp[O1](Both()) with Doubleton[AST[_]]
+    extends ParOp[O1](Left()) with Doubleton[AST[_]] //on pourrait mettre both, mais faudrait bien ruser, alors
 
   /** planned to br used, in order to use a single concat to regroup arbitrary many components */
   case class ConcatN[R1 <: Ring, O1 <: I](args: List[ASTBt[R1]])(implicit n: repr[O1])

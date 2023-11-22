@@ -2,7 +2,7 @@ package dataStruc
 
 import compiler.AST.Read
 import compiler.ASTB.{AffBool, False}
-import compiler.{AST, ASTB, Affect, InfoType}
+import compiler.{AST, ASTB, Affect, DataProg, InfoType}
 import compiler.Circuit.TabSymb
 import dataStruc.Util.{radicalOfVar, radicalOfVar2}
 import dataStruc.DagNode.Neton
@@ -44,14 +44,16 @@ trait DagNode[+T <: DagNode[T]] {
    *         them without parenthesis, and therefore much less parenthesis, and much more readable expression
    */
 
-  def toStringTreeInfix(t: TabSymb[InfoType[_]], PARL: String = "", PARR: String = ""): String = { //default value for PARL and PARE is no parenthesis
+  // def toStringTreeInfix(t: TabSymb[InfoType[_]], PARL: String = "", PARR: String = ""): String = { //default value for PARL and PARE is no parenthesis
+  def toStringTreeInfix(t: DataProg[InfoType[_]], PARL: String = "", PARR: String = ""): String = { //default value for PARL and PARE is no parenthesis
     def isShift(s: String) = s.equals("<<") || s.equals(">>>")
 
-    def toStringInputOperand(t: TabSymb[InfoType[_]]): String = {
+    def toStringInputOperand(t: DataProg[InfoType[_]]): String = {
       assert(t != null && isInstanceOf[AST[_]])
       this.asInstanceOf[AST[_]] match {
         case Read(name) => val rad = radicalOfVar2(name)
-          if (t(rad).k.isParamD || t(rad).k.isLayerField) name + "[i]" //no delays for the moment being, when we read
+          val s = t.tSymbVarSafe(rad)
+          if (s.k.isParamD || s.k.isLayerField) name + "[i]" //no delays for the moment being, when we read
           else name //operand is a loop register.
         case False() =>
           "/* False*/" //by simplification a whole expression may reduce to false after simplification.
@@ -65,12 +67,12 @@ trait DagNode[+T <: DagNode[T]] {
      *         as a quick and dirty way to remove the tm1 in an affectation paramR<-tm1(exp)
      */
 
-    def toStringOutputOperand(t: TabSymb[InfoType[_]]): String = {
+    def toStringOutputOperand(t: DataProg[InfoType[_]]): String = {
       assert(isInstanceOf[AST[_]])
       this.asInstanceOf[AST[_]] match {
         case ASTB.AffBool(name, _) =>
           val nameRad = radicalOfVar2(name);
-          val k = t(nameRad).k
+          val k = t.tSymbVarSafe(nameRad).k
           if (!k.isParam) toString //affectation is done to a register local in the loop.
           else if (k.isRadius1) name + "[i-1]=" //Radius can be either 0 or 1 here we should also take into account the store.
           else if (k.isRadiusm1) name + "[i+1]=" //Radius can be either 0 or 1 here we should also take into account the store.
@@ -95,7 +97,7 @@ trait DagNode[+T <: DagNode[T]] {
     }
   }
 
-  def toStringTreeInfixPar(t: TabSymb[InfoType[_]]): String = toStringTreeInfix(t, "(", ")")
+  def toStringTreeInfixPar(t: DataProg[InfoType[_]]): String = toStringTreeInfix(t, "(", ")")
   /**
    * Tries to find a cycle
    *

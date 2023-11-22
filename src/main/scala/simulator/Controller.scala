@@ -10,6 +10,7 @@ import simulator.XMLutilities._
 import simulator.colors.mainColors
 
 import java.awt.Color
+import java.awt.Color.cyan
 import java.io.FileNotFoundException
 import java.util
 import javax.swing.{InputMap, JComponent, KeyStroke}
@@ -84,7 +85,11 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   /** part of the xml param which cannot be (yet) changed during a simulation */
   private val fixed: NodeSeq = simulParam \\ "fixed"
   /** Colors of displayed layers */
-  private val colorCode: Map[String, String] = fromXMLasHashMap(displayParam, "colorOfField", "@color")
+  private var colorCode: Map[String, String] = fromXMLasHashMap(displayParam, "colorOfField", "@color")
+  val shown = progCA.displayableLayerHierarchy()
+  colorCode = colorCode.filter((t) => shown.contains(t._1))
+  //((s:(String,String)=>shown.contains(s._1))
+
   /** associate a color to each displayed field , fiedls names are the keys, colors are the values which need ot be decoded from hexadecimal */
   var colorDisplayedField: Map[String, Color] = colorCode.mapValues((s: String) => new Color(Integer.decode(s))).toMap
   /** We 'll have to generate the voronoi in space. We consider that V() is allways displayed */
@@ -98,6 +103,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   var isPlaying: Boolean = xBool(simulParam, "simul", "@isPlaying")
   /** the layers which are already expanded are saved, so that we do  not need to expand them again from one run to the next */
   var expandedLayers: Set[String] = fromXMLasList((displayParam \\ "expandedLayer").head).toSet
+  expandedLayers = expandedLayers.filter(progCA.displayableLayerHierarchy().contains(_)) //we remove layers no longer existing
 
   /** updates the xml containing all the Param of the CAs, for the moment we only save expanded layers, and displayed fields, with their colors
    * we drop the two hexa digit of the alpha component of colors, it is not used */

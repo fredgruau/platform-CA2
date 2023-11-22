@@ -5,7 +5,7 @@ import compiler.ASTB.{False, True}
 import compiler.Circuit.{TabSymb, iTabSymb}
 import compiler.Instr.deployInt2
 import compiler.Locus.{all2DLocus, allLocus}
-import dataStruc.Util.{append2File, hierarchyDisplayedField, parenthesizedExp, radicalOfVar, radicalOfVar2, radicalOfVarIntComp, radicalOfVarRefined, removeAfterChar, rootOfVar, shortenedSig, writeFile}
+import dataStruc.Util.{append2File, hierarchyDisplayedField, parenthesizedExp, radicalOfVar, radicalOfVar2, radicalOfVarIntComp, radicalOfVarRefined, removeAfterChar, rootOfVar, sameRoot, shortenedSig, writeFile}
 import compiler.VarKind.LayerField
 import dataStruc.Named
 import dataStruc.Named.{isLayer, noDollarNorHashtag, noHashtag}
@@ -153,8 +153,9 @@ trait ProduceJava[U <: InfoNbit[_]] {
         /* val t = totalCode
          val removeFalse = t.filter(e=> e != False()&&e != True()) */
         //certaine expression se simplifie sur false ou true
-        totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]]))
-          .grouped(4).map(_.mkString(";")).mkString(";\n ")
+
+        // totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ")
+        totalCode.map(_.toStringTreeInfix(this.asInstanceOf[DataProg[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ")
       }
     ))
   }
@@ -305,6 +306,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
       },
       "DISPLAYABLE" -> //theDisplayed contains two kinds of name:aux and segmented, first step should separate the segmented
         {
+          assert(sameRoot(theDisplayed), "some fields do not encode a path")
           val s = parenthesizedExp(rootOfVar(theDisplayed.head), hierarchyDisplayedField(theDisplayed)); s + "."
         },
       "INITLAYER" -> {

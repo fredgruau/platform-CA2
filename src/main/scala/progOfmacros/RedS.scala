@@ -6,7 +6,7 @@ import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.Circuit.iTabSymb
 import compiler.repr.{nomB, nomCons, nomV}
-import compiler.{AST, ASTLt, B, E, F, Ring, S, SI, T, UI, V, chipBorder, repr}
+import compiler.{AST, ASTLt, B, E, F, Ring, S, SI, T, UI, V, chip, repr}
 import progOfmacros.RedS.getRedSFun
 
 import scala.collection.immutable.HashMap
@@ -62,7 +62,7 @@ object RedS {
    * @tparam S2 target simplicial type
    * @return computes the scala code of a whole  simplicial reduction, is done here because Broadcast Transfer and Redop are private to ASTL. */
 
-  private def redSfunDef[S1 <: S, S2 <: S, R <: Ring](r: redop[R], l: S1)(implicit m: repr[S1], n: repr[S2], q: repr[R], d: chipBorder[S2, S1]): //pour defVe S1=E,S2=V
+  private def redSfunDef[S1 <: S, S2 <: S, R <: Ring](r: redop[R], l: S1)(implicit m: repr[S1], n: repr[S2], q: repr[R], d: chip[S2, S1]): //pour defVe S1=E,S2=V
   Fundef1[(S1, R), (S2, R)] = {
     val param = pL[S1, R]("p" + l.shortName + n.name.shortName) //parameter names inform about locus
     val broadcasted = broadcast[S1, S2, R](param) //step 1 is broadcast
@@ -79,7 +79,7 @@ object RedS {
    * @param r  reduction applied
    * @return function in scala which does the corresponding simplicial reduction,  memoised in redSmem
    */
-  def getRedSFun[S1 <: S, S2 <: S, R <: Ring](r: redop[R], l: S1)(implicit m: repr[S1], n: repr[S2], q: repr[R], d: chipBorder[S2, S1]): Fundef1[(S1, R), (S2, R)] = {
+  def getRedSFun[S1 <: S, S2 <: S, R <: Ring](r: redop[R], l: S1)(implicit m: repr[S1], n: repr[S2], q: repr[R], d: chip[S2, S1]): Fundef1[(S1, R), (S2, R)] = {
     val funName = redsfunName(r, l)(m, n, q)
     if (!redSmem.contains(funName))
       redSmem = redSmem + (funName -> redSfunDef(r, l)(m, n, q, d))
@@ -89,28 +89,29 @@ object RedS {
    *
    * @return a call to an or reduction, exist is a more explicit name
    *         pour defEv S1=E S2=V, the type of chipBorder is Ve therefore [S2, S1] */
-  def exist[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S2, S1]): ASTLt[S2, B] = {
+  def exist[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chip[S2, S1]): ASTLt[S2, B] = {
     val f: Fundef1[(S1, B), (S2, B)] = getRedSFun(orRedop[B], arg.locus)(m, n, nomB, d)
     new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
   }
 
-  def inside[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S2, S1]): ASTLt[S2, B] = {
+  def inside[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chip[S2, S1]): ASTLt[S2, B] = {
     val f: Fundef1[(S1, B), (S2, B)] = getRedSFun(andRedop[B], arg.locus)(m, n, nomB, d)
     new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
   }
 
 
-  def frontier[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S2, S1]): ASTLt[S2, B] = {
+  def frontier[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chip[S2, S1]): ASTLt[S2, B] = {
     val f: Fundef1[(S1, B), (S2, B)] = getRedSFun(xorRedop[B], arg.locus)(m, n, nomB, d)
     new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
   }
 
 
-  def concatN[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S2, S1]): ASTLt[S2, B] = {
+  def concatN[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chip[S2, S1]): ASTLt[S2, B] = {
     val f: Fundef1[(S1, B), (S2, B)] = getRedSFun(concatRedop, arg.locus)(m, n, nomB, d)
     new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
   }
-  def leastUI[S1 <: S, S2 <: S](arg: ASTLt[S1, UI])(implicit m: repr[S1], n: repr[S2], d: chipBorder[S2, S1]): ASTLt[S2, UI] = {
+
+  def leastUI[S1 <: S, S2 <: S](arg: ASTLt[S1, UI])(implicit m: repr[S1], n: repr[S2], d: chip[S2, S1]): ASTLt[S2, UI] = {
     val f: Fundef1[(S1, UI), (S2, UI)] = getRedSFun(minRedop[UI], arg.locus)(m, n, repr.nomUI, d)
     new Call1[(S1, UI), (S2, UI)](f, arg)(repr.nomLR(n, compiler.repr.nomUI)) with ASTLt[S2, UI] {}
   }

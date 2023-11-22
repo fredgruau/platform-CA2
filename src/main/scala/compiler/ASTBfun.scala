@@ -1,7 +1,7 @@
 package compiler
 import AST.{Call1, _}
 import ASTB.{Elt, _}
-import compiler.ASTBfun.{Fundef2R, Fundef3R, negB, p}
+import compiler.ASTBfun.{Fundef2R, Fundef3R, fundef2Bop2, negB, p}
 import compiler.ASTLfun.halve
 import compiler.SpatialType.BoolV
 import ASTLfun._
@@ -61,6 +61,12 @@ object ASTBfun {
     Fundef2(s, op2(xb, yb), xb, yb)
   }
 
+  /** used with cac */
+  val delta: Fundef2R[B] = {
+    val (xb, yb) = (p[B]("deltax"), p[B]("deltay"));
+    Fundef2("delta", xb & ~yb, xb, yb)
+  }
+
   /** for rapid production of orI,xorI, andI I=SI/UI */
   def fundef2Imapp2[R <: I](op2: Fundef2R[B], s: String)(implicit m: repr[R]): Fundef2R[R] = {
     val (x, y) = (p[R]("x" + s), p[R]("y" + s));
@@ -71,6 +77,19 @@ object ASTBfun {
   private val (orSI, orUI) = {
     def orI[R <: I](implicit m: repr[R]) = fundef2Imapp2(orB, "orI"); (orI[SI], orI[UI])
   }
+
+
+  val concatB: Fundef2[B, UI, UI] = {
+    val (xb, yui) = (p[B]("xb"), p[UI]("yui"))
+    Fundef2("concat2", Concat2(xb, yui), xb, yui)
+  }
+
+
+  /*
+    val concat2BUI: Fundef2R[UI]= fundef2Bop2(
+      (Concat2(_:ASTBt[_], _:ASTBt[_])(repr.nomUI))
+      .asInstanceOf[Op2], "concat2")
+      .asInstanceOf[Fundef2R[UI]]*/
   def or[R <: Ring](implicit n: repr[R]): Fundef2R[R] = (n.name match {
     case B() => orB
     case SI() => orSI
@@ -81,6 +100,7 @@ object ASTBfun {
   private val (xorSI, xorUI) = {
     def xorI[R <: I](implicit m: repr[R]) = fundef2Imapp2(xorB, "xorI"); (xorI[SI], xorI[UI])
   }
+
 
   def xor[R <: Ring](implicit n: repr[R]): Fundef2R[R] = (n.name match {
     case B() => xorB
@@ -239,7 +259,7 @@ object ASTBfun {
     (eqI[SI], eqI[UI])
   }
   /** return true if integer is  zero */
-  def eq[R <: I](implicit n: repr[R]) = (n.name match {
+  def eq[R <: Ring](implicit n: repr[R]) = (n.name match {
     case SI() => eqSI
     case UI() => eqUI
   }).asInstanceOf[Fundef1[R, B]]
@@ -349,12 +369,12 @@ object ASTBfun {
 
   /** optimal implementation of comparison between two unsigned integers, using orscanright like operators, */
   val ltUI2: Fundef2[UI, UI, B] = {
-    val (xui, yui) = (p[UI]("xminUI"), p[UI]("yminUI"));
+    val (xui, yui) = (p[UI]("xminUI"), p[UI]("yminUI")); //a t-on x < y
     val difference = xui ^ yui //true for bits which differs betwen xui and yui
     val segmentOf1: Uint = Scan1(difference, orB, False(), Right(), initUsed = false) //fills with one, starting from the rightmost 1 to the first leftmost least significant bit
     //we have to affect segmentof1 because it is read simultaneously at two indexes, for first1.
     val first1: Uint = ~(new Call1[UI, UI](halveBUI, segmentOf1) with ASTBt[UI]) & segmentOf1 //only the rightmost msb bits remains. halveBui must comes first otherwise it bugs
-    // true if yui was the one with most significant bit of difference set to 1, that is a strict lower than
+    // true if yui is true for i being the index of the  with most significant bit of difference, that is a strict lower than
     Fundef2("ltUI", new Call1[UI, B](neqUI, first1 & yui) with ASTBt[B], xui, yui) //todo ecrire des xor et des and pour les ui
   } //TODO a faire correct en utilisant ltUI.
 
@@ -383,9 +403,7 @@ object ASTBfun {
    * @return
    */
   def concatRedop[R <: Ring](implicit n: repr[R]): redop[R] = {
-    if (n.name.isInstanceOf[SI]) (orSI.asInstanceOf[Fundef2[R, R, R]], Intof[SI](-1).asInstanceOf[ASTB[R]])
-    if (n.name.isInstanceOf[UI]) (orUI.asInstanceOf[Fundef2[R, R, R]], Intof[SI](-1).asInstanceOf[ASTB[R]])
-    else (orB.asInstanceOf[Fundef2[R, R, R]], False().asInstanceOf[ASTB[R]])
+    (concatB.asInstanceOf[Fundef2R[R]], Intof[UI](-1).asInstanceOf[ASTB[R]]) //neutral is wrong
   }
 
   def orRedop[R <: Ring](implicit n: repr[R]): redop[R] = {
@@ -405,6 +423,7 @@ object ASTBfun {
     if (n.name.isInstanceOf[UI]) (xorUI.asInstanceOf[Fundef2[R, R, R]], Intof[UI](0).asInstanceOf[ASTB[R]])
     else (xorB.asInstanceOf[Fundef2[R, R, R]], False().asInstanceOf[ASTB[R]])
   }
+
 
   /** min on signed integers is relative, min on unsigned integer is absolute */
   def minRedop[R <: Ring](implicit n: repr[R]): redop[R] = {

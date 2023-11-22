@@ -45,13 +45,15 @@ trait MyOpInt2[L <: Locus, R <: Ring] {
     binop(ASTBfun.concat2UI, arg1.asInstanceOf[ASTLt[L, UI]], arg2.asInstanceOf[ASTLt[L, UI]])
   }
 
-  def ::[U >: R <: Ring](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, UI] = concat2(this, that).asInstanceOf[ASTLt[L, UI]]
+  /** concatenatin, this=lsb, that =msb */
+  def ::[U >: R <: Ring](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, UI] =
+    concat2(that, this).asInstanceOf[ASTLt[L, UI]] //si on fait x::y  xor3::carry, this c'est la carry, c'est y
 
 
   /** minus  must convert UI to SI which adds an extra bit. */
   def -[U >: R <: I](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, SI] = ring match {
     case SI() => add[L, SI](this.asInstanceOf[ASTLt[L, SI]], -that)
-    case UI() => add[L, SI](uI2SIL(this.asInstanceOf[ASTL[L, UI]]), -uI2SIL(that.asInstanceOf[ASTL[L, UI]]))
+    case UI() => add[L, SI](uI2SIL(this.asInstanceOf[ASTL[L, UI]]), -uI2SIL(that.asInstanceOf[ASTL[L, UI]])) //add 1 bit so as to convert to unsined
   }
 
 
@@ -60,6 +62,11 @@ trait MyOpInt2[L <: Locus, R <: Ring] {
 
   /** If arguments are  unsigned, we must first convert it to signed */
   def <[U >: R <: I](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = lt2(this, that)
+
+  def ==[U >: R <: I](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = unop(ASTBfun.eq(n), this ^ that)
+  //eq0((this ^ that))
+
+
   /*
    ring match {
    case SI() => lt2[L](this.asInstanceOf[ASTLt[L, SI]], that.asInstanceOf[ASTLt[L, SI]])

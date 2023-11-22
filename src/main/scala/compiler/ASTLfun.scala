@@ -5,7 +5,9 @@ import ASTL._
 import compiler.AST.{Fundef1, Fundef2}
 import compiler.ASTB._
 import compiler.ASTBfun._
-import compiler.SpatialType.IntEv
+import compiler.SpatialType._
+import compiler.ASTLfun.carryV
+import progOfmacros.RedS.frontier
 
 /** contains generic primitive manipulating ASTLs, without direct access to the constructors */
 object ASTLfun {
@@ -38,14 +40,35 @@ object ASTLfun {
   /** either Ef to Vf or vice versa */
   def apex[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, F], R])
                                        (implicit m1: repr[S1], m2: repr[S2], n: repr[R], s: CentralSym[S1, F, S2]): ASTLt[T[S2, F], R] = {
-    // val towardsFace:ASTLt[T[S1,F],R] = f(arg)
-    val onFace: ASTLt[T[F, S1], R] = transfer(arg)
-    val symmed: ASTLt[T[F, S2], R] = sym(onFace)
-    transfer(symmed)
+    transfer(sym(transfer(arg)))
   }
 
+  /**
+   *
+   * @param is represent blobs
+   * @return a BoolVf where each neigbor blob component will be represented by a single bit out of the six
+   *         this is a version minimizing the number of gates (only 18) but more difficult to figure out on the border,
+   *         and not reusable when the frontier is encoded as a boolE
+   */
+  def oneToOneOptimized(is: BoolV): BoolVf = {
+    val brd: BoolE = frontier(is)
+    val brdIn: BoolVe = transfer(v(brd)) & e(is) //builds a Ve true if on the border, and also on the filled side. this transfer needs an implicit
+    val cbrdin: BoolFv = transfer(clock(brdIn)) //opposite the edge
+    val ccbrdin: BoolVf = transfer(clock(clock(cbrdin))) //we are there
+    ccbrdin
+  }
 
-
+  /** cac=clock+anticlock
+   * Does a binop  operation between the two Transfer locus around a given simplicial locus S1,
+   * by doing a Clockwise, and an AntiClockwise rotation, and applying the bionop
+   * This is not really a reduction, just a binop, so it does not need to define neutral elements, because
+   * either an S1 site is defined and so are it transfer around,
+   * or S1 is not and also so are its transfer around it.
+   */
+  def cac[S1 <: S, S2 <: S, S3 <: S, R <: Ring](r: Fundef2R[R], arg: ASTLt[T[S1, S2], R])
+                                               (implicit m1: repr[S2], m2: repr[S1], m3: repr[S3], n: repr[R], a: AntiClock[S1, S2, S3]): ASTLt[T[S1, S3], R] = {
+    binop(r, clock(arg), anticlock(arg))
+  }
 
 
 
@@ -74,6 +97,7 @@ object ASTLfun {
   /** return true if arg1 is zero, */
   def eq0[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = unop(ASTBfun.eq, arg1);
 
+
   def neq[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = unop(ASTBfun.neq, arg1);
 
 
@@ -83,7 +107,6 @@ object ASTLfun {
   def lt2[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = {
     if (!n.name.isInstanceOf[UI]) //we never have to compare signed int, what we do is  take the sign.
       assert(false)
-
       binop(ASTBfun.ltUI2.asInstanceOf[Fundef2[R, R, B]], arg1, arg2)
     }
 
@@ -107,10 +130,15 @@ object ASTLfun {
 
   //------------------------------------------------------ComputingMacro------------------------------------------------------
 
-  /** we use andLb2R in order not to have to introduce "triop" but use several binop */
+  /** we use macro for computation on three arguments, in order not to have to introduce "triop" but use several binop */
   def cond[L <: Locus, R <: Ring](b: ASTLt[L, B], arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] =
     andLB2R(b, arg1) | andLB2R(~b, arg2)
 
+  /** carryV is not written as a macro to avoid generating too many macro */
+  def carryV(b0: BoolV, b1: BoolV, b2: BoolV): BoolV = (b0 & b1) | (b2 & (b0 | b1))
+
+  /** does on two bits, the same of max 3 non zero bits, non adjacents, distributed over 6 bits */
+  def sum3V(b0: BoolV, b1: BoolV, b2: BoolV): UintV = (b0 ^ b1 ^ b2) :: carryV(b0, b1, b2)
   /**
    * most significant bit, interpreted as macro
    * computes an int with a single non zero bit which is the highest rank for which operand's bit is one if operand is null, output O.
@@ -129,35 +157,52 @@ object ASTLfun {
   /** redop is used through reduce, which will set undefined at the border, to the  neutral element of the reduction.
    * the border is introduced using implicit */
   def reduce[S1 <: S, S2 <: S, R <: Ring](op: redop[R], arg: ASTLt[T[S1, S2], R])
-                                         (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chipBorder[S1, S2]): ASTLt[S1, R] = {
+                                         (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chip[S1, S2]): ASTLt[S1, R] = {
     val neutralElt: ASTLt[T[S1, S2], R] = const[T[S1, S2], R](op._2)
-    val newArg: ASTLt[T[S1, S2], R] = if (d.border == null) arg else
-      cond[T[S1, S2], R](d.border, arg, neutralElt)
+    val newArg: ASTLt[T[S1, S2], R] = if (d.df == null) arg else
+      cond[T[S1, S2], R](d.df, arg, neutralElt)
     redop[S1, S2, R](op, newArg)
   }
 
+
   def orR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])
-                                      (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chipBorder[S1, S2]): ASTLt[S1, R] = {
+                                      (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chip[S1, S2]): ASTLt[S1, R] = {
     reduce(orRedop[R], arg)
   }
 
+  /* def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[UI]): ASTLt[S1, UI] =
+     RedopConcat[S1, S2](arg, m, n)
+ */
+
+  /** We had to use a reduction, bool,bool->boole which forces us to retrieve a bool, but we need a UI so we do a cast */
+  def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])
+                               (implicit m: repr[S1], m2: repr[S2]): ASTLt[S1, UI] = {
+    val res = redop[S1, S2, UI](concatRedop, arg.asInstanceOf[ASTLt[T[S1, S2], UI]])
+    res.asInstanceOf[ASTLt[S1, UI]]
+  }
+
+  /*  def castUI[L<:Locus](arg: ASTLt[L, B]):ASTLt[L, UI]=
+      {val res=arg.asInstanceOf[ASTLt[L, UI] ]
+        res.mym=repr(arg.locus,UI()).asInstanceOf[repr[(L,UI)]]
+        res
+      }*/
   def andR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])
-                                       (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chipBorder[S1, S2]): ASTLt[S1, R] = {
+                                       (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chip[S1, S2]): ASTLt[S1, R] = {
     reduce(andRedop[R], arg)
   }
 
   def xorR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])
-                                       (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chipBorder[S1, S2]): ASTLt[S1, R] = {
+                                       (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chip[S1, S2]): ASTLt[S1, R] = {
     reduce(xorRedop[R], arg)
   }
 
   def minR[S1 <: S, S2 <: S, R <: I](arg: ASTLt[T[S1, S2], R])
-                                    (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chipBorder[S1, S2]): ASTLt[S1, R] = {
+                                    (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chip[S1, S2]): ASTLt[S1, R] = {
     reduce(minRedop[R], arg)
   }
 
   def minSignR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], SI])
-                                (implicit m: repr[S1], m2: repr[S2], n: repr[SI], d: chipBorder[S1, S2]): ASTLt[S1, SI] = {
+                                (implicit m: repr[S1], m2: repr[S2], n: repr[SI], d: chip[S1, S2]): ASTLt[S1, SI] = {
     reduce(minSignRedop, arg)
   }
 

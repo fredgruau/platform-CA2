@@ -95,6 +95,7 @@ object ASTL {
     override def redExpr: List[AST[_]] = List(arg)
   }
 
+
   def redop[S1 <: S, S2 <: S, R <: Ring](op: redop[R], arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): ASTLt[S1, R]
   = Redop[S1, S2, R](op, arg, m, n)
 
@@ -129,8 +130,6 @@ object ASTL {
     override def redExpr: List[AST[_]] = List(arg)
   }
 
-  def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[UI]): ASTLt[S1, UI] =
-    RedopConcat[S1, S2](arg, m, n)
 
   /** Fields which have a value both  at time t, and t+1 ,todo layers should implement it */
   trait Strate[L <: Locus, R <: Ring] {
@@ -287,7 +286,12 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
           // case l:Layer[_,_] =>  l.nbit
           case Coonst(cte, _, _) => ASTB.nbitExpAndParam(emptyAstMapInt, cte, paramBitIncrease)
           case Unop(op, _, _, _) => ASTB.nbitExpAndParam(emptyAstMapInt + (op.p1 -> argBitSize()), op.arg, paramBitIncrease)
-          case Redop(_, _, _, _) | Clock(_, _, _, _, _) | Transfer(_, _, _) | Broadcast(_, _, _) | Sym(_, _, _, _) => argBitSize() //bit size equals bit size of arg
+          case Clock(_, _, _, _, _) | Transfer(_, _, _) | Broadcast(_, _, _) | Sym(_, _, _, _) => argBitSize() //bit size equals bit size of arg
+          case Redop(op, _, _, _) =>
+            if (op._1 == concatB)
+              this.locus.fanout
+            else
+              argBitSize()
           case Send(_) => ASTbitSize(newthis.asInstanceOf[Neton[AST[_]]].args.head)
           case RedopConcat(exp, _, _) => this.locus.fanout //for the concat redop, the number of bit must take into account the arity (2,3, or 6)
 
@@ -532,7 +536,12 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case e@Sym(arg, _, _, _) => val newArg = arg.align(r, tt)
         val T(_, des) = this.locus;
         val T(s1, src) = arg.locus;
-        val atr = rotPerm(s1 match { case E() => 1 case F() => if (src < des) 1 else 2 case V() => 3 });
+        val atr: Array[Int] = s1 match {
+          case E() => rotPerm(1)
+          case V() => rotPerm(3)
+          case F() => Array(0, 2, 1, 3, 5, 4)
+        } //we permute 1 and 2, as well as 4 and 5
+
         r.c = permute(r.c, atr, e.locus);
         r.algn = composeAll2(atr, r.algn)
         e.copy(arg = newArg)

@@ -75,6 +75,9 @@ object Util {
     root + "(" + sons.map(parenthesizedExp(_, father2son)).mkString(")(") + ")" // + "." //the point is necessaru when the tree is reduced to a single root
   }
 
+  /** If we directly set the name of a variable, the danger is that its name will not encode a path in layer, and therefore, will not be displayed */
+  def sameRoot(displayed: Set[String]): Boolean =
+    displayed.map(rootOfVar(_)).size == 1
   /**
    *
    * @param s string to be processed
