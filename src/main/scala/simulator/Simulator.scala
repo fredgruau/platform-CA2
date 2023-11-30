@@ -172,7 +172,7 @@ object SimulatorUtil {
         var initRoot: HashMap[String, String] = HashMap.empty
         /** coded as a method because when iterating through the CAsizes, nbColCA is modified */
         val arch: String = x(simulParam, "machine", "@arch")
-        var randomRoot = 0
+
 
         /** @return `true` if there is a next element, `false` otherwise */
         override def hasNext: Boolean = nbIter < totalIter
@@ -182,11 +182,11 @@ object SimulatorUtil {
           iter match {
             case "CAsize" => nbLineCA = gridSizes(nbIter)._1; nbColCA = gridSizes(nbIter)._2
             case "multiInit" => initRoot = HashMap(rootLayer -> multiInits(nbIter))
-            case "random" => randomRoot = nbIter
+            case "random" => controller.randomRoot = nbIter
             case _ =>
           } //inital value of nbLineCA
           nbIter = nbIter + 1
-          new Env(arch, nbLineCA, nbColCA, controller, initRoot, randomRoot)
+          new Env(arch, nbLineCA, nbColCA, controller, initRoot)
         }
       }
     }

@@ -925,9 +925,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
     val p2 = alignShift() //produces tabAlign
     print(tabAlign.map({ case (k, v) => "" + k + v.toSeq }))
+    println("dag produced by alignShift\n" + p2) //display result of  alignShift.
     val (z2, myRoot, align2root: Map[String, Array[Int]]) = p2.zones2(cycleConstraints, tabAlign)
 
-    println(p2, z2) //displays zone
+    println(z2) //displays zone,
 
     val muI10: Map[String, List[Instr]] = muInstr(m, p2.dagis)
 
@@ -1120,7 +1121,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         for (j <- 0 to 5) { //for folding of input  to work, the reduction must accumulate
           val iInputMuInst: Affect[_] = a(iInputMuInstOrdered(j)) //muInst read
           val numI = l.proj(inputShedule(j)) //numI select the target component of the simplicial vector produced by redop
-          if (tm1Sum(numI) < 2 /*||op._1.equals("concat2")*/ ) //it is not worth doing a delayed sum,or it is risky because concat cannot be reordered
+          if (tm1Sum(numI) < 2 || op._1.name.equals("concat2")) //it is not worth/not possible to be doing a delayed sum,or it is risky because concat cannot be reordered
           {
             val nameOfAffectedPrevious = names(numI) + "_" + cpt(numI)
             cpt(numI) += 1;

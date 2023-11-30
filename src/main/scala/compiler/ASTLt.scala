@@ -25,6 +25,7 @@ import scala.collection.immutable.HashSet
  */
 
 /**
+ * Class use to collect information computed by the align "visitor"
  *
  * @param c    a possible cycle constraint
  * @param si   new affect instructions for shift
@@ -108,7 +109,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
     val newD: ASTLt[L, R] = this match {
       case a: ASTL[L, R] => a.propagateASTL(rewrite)
       case _ => this.asInstanceOf[AST[_]] match {
-        case Read(src) => new Read[(L, R)](target)(mym) with ASTLt[L, R]
+        case Read(s) => if (s.equals(src)) new Read[(L, R)](target)(mym) with ASTLt[L, R] else this
         case _ => this //.propagate((d: AST[(L, R)]) => d.replaceBy(src,target))
       }
     }

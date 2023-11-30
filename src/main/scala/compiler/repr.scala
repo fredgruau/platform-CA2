@@ -31,8 +31,8 @@ object chip {
   implicit val borderEv = new chip[E, V](null)
   implicit val borderVf = new chip[V, F](new ConstLayer[T[V, F], B](1, "def"))
   implicit val borderFv = new chip[F, V](null)
-  implicit val borderFe = new chip[F, E](new ConstLayer[T[F, E], B](1, "def"))
-  implicit val borderEf = new chip[E, F](null)
+  implicit val borderFe = new chip[F, E](null)
+  implicit val borderEf = new chip[E, F](new ConstLayer[T[E, F], B](1, "def"))
   //todo inclure tout les transfer locus, pas seulement Ve
 
 }

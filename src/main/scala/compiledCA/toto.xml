@@ -1,9 +1,0 @@
-<Layer>layers
-    <Layer>def
-        <Field>Ve</Field>
-        <Field>E</Field>
-        <Field>F</Field>
-    </Layer>
-    <Layer>seed <Field>llseed</Field>
-    </Layer>
-</Layer>

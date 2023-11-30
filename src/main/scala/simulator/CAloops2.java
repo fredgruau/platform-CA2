@@ -15,7 +15,7 @@ import java.util.HashMap;
  */
 public interface CAloops2 {
 
-    void copyLayer(int[][] m);
+
     /**
      *
      * @param p prepare for a loop of radius one by doing the necessary shift

@@ -732,7 +732,7 @@ trait InitSelect {
     for (d <- 0 until l.density)
       for (i <- 0 until nbLineCA)
         for (j <- 0 until nbColCA)
-          if (random() < 0.1) //locusPlane(l)(d)(i)(j).isDefined)
+          if (env.rand.nextFloat() < 0.1) //locusPlane(l)(d)(i)(j).isDefined)
             setMemField(d, i, j)
   }
   /** contains material used for InitMaald */

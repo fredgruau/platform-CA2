@@ -22,12 +22,11 @@ import scala.util.Random
  * @param initName   init method for root layer, which can vary
  * @param randomRoot so that we can reproduce same list of random numbers
  */
-class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Controller, initName: HashMap[String, String],
-          val randomRoot: Integer) {
+class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Controller, initName: HashMap[String, String]) {
   /** current time */
   var t = 0
-  /** Random number generator */
-  var rand: Random = new Random(randomRoot)
+  /** Random number generator each environement has its copy */
+  var rand: Random = new Random(controller.randomRoot)
   /** contains a thread which iterates the CA, while not asked to pause */
 
   val medium: Medium = arch match {
@@ -66,11 +65,12 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
   }
 
   def init(): Unit = {
-    rand = new Random(randomRoot) //we reinitialize the random number in order to reproduce exactly the same random sequence
+    rand = new Random(controller.randomRoot) //we reinitialize the random number in order to reproduce exactly the same random sequence
     initMemCA() //invariant stipulates that memory should be filled so we fill it already right when we create it
-    controller.progCA.copyLayer(mem)
+    //controller.progCA.copyLayer(mem) plus besoin pisque je fais un forward
     if (medium.voronoi.isEmpty)
       medium.initVoronoi(controller.displayedLocus) //we have to compute the voronoi upon medium's creation
+    forward() //we do one forward, so as to be able to show the fields.
     for (_ <- 0 until controller.t0) //forward till to
       forward()
     computeVoronoirColors() // for the initial painting

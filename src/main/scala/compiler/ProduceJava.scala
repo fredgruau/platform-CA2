@@ -49,9 +49,9 @@ trait ProduceJava[U <: InfoNbit[_]] {
     for (k4 <- grouped.keys) { //for loops, the code is distributed in several file, for clarity
       val fileName = k4 + ".java"
       //if macro file does not exists, creates it (preambule + k4 + "{\n" + notYetDefined.values.mkString("\n") + postambule).replace('#', '$'); //'#' is not a valid char for id
-      val ard = if (!new File(nameDirCompilLoops + fileName).exists()) {
+      val ard: Set[String] = if (!new File(nameDirCompilLoops + fileName).exists()) {
         val preambule = "package compiledMacro;\n import simulator.PrShift;\n public class "
-        writeFile(nameDirCompilLoops + fileName, preambule + k4 + "{\n }")
+        writeFile(nameDirCompilLoops + fileName, preambule + k4 + "{\n }") //new compiled java macro will be inserted just before last acolades.
         new HashSet[String]() //there is no macro yet defined, since the class was not even existing
       }
       else
@@ -256,14 +256,14 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
         anchorNotNamed(decompositionLocus)
       },
-      "COPYLAYER" -> { //iL contains only the variable totoll not toto
-        val iL = initLayer(layerSubProg2).keys.filter(isLayer(_)).filter(x => !x.startsWith("lldef") && tSymbVar.contains(x.drop(2))) //we check that the layer without ll exists
-        //anchoring both lltoto and toto in memory.
-        //todo faut virer def
-        val llandNotll = spatialOfffsetsInt.filter(x => iL.contains(x._1) || iL.contains("ll" + x._1))
-        "" + anchorNamed(llandNotll) +
-          iL.toList.map(s => "copy(" + s + "," + s.drop(2) + ");").mkString("")
-      },
+      /*  "COPYLAYER" -> { //iL contains only the variable totoll not toto
+          val iL = initLayer(layerSubProg2).keys.filter(isLayer(_)).filter(x => !x.startsWith("lldef") && tSymbVar.contains(x.drop(2))) //we check that the layer without ll exists
+          //anchoring both lltoto and toto in memory.
+          //todo faut virer def
+          val llandNotll = spatialOfffsetsInt.filter(x => iL.contains(x._1) || iL.contains("ll" + x._1))
+          "" + anchorNamed(llandNotll) +
+            iL.toList.map(s => "copy(" + s + "," + s.drop(2) + ");").mkString("")
+        },*/
       "FIELDOFFSET" -> {
         def fieldOffset(offset: Map[String, List[Int]]): String = {
           def offsetOneVar(oneVar: (String, List[Int])) = {
@@ -306,7 +306,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
       },
       "DISPLAYABLE" -> //theDisplayed contains two kinds of name:aux and segmented, first step should separate the segmented
         {
-          assert(sameRoot(theDisplayed), "some fields do not encode a path")
+          if (!sameRoot(theDisplayed))
+            throw (new Exception("some fields do not encode a path"))
           val s = parenthesizedExp(rootOfVar(theDisplayed.head), hierarchyDisplayedField(theDisplayed)); s + "."
         },
       "INITLAYER" -> {
@@ -348,6 +349,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
         case "show" => val callCodeArg = radicalOfVar(call.usedVars().toList.head) //we take the radical for diminishing the number of parameters
           theDisplayed += callCodeArg //sideeffect, update theDisplayed. display has allways a single arg which is the field to be displayed
           callCode += callCodeArg //in fact we could supress calls to show. We still leave them, just so that we can check those in the compiled java.
+
         case "copy" => assert(paramsD.size == 1 && paramsR.size == 1) //we copy bit by bit, hence int by int.
           val pR: String = radicalOfVar(paramsR(0))
           val pD: String = if (tSymbVarSafe(paramsR(0)).t == (V(), B())) radicalOfVarIntComp(paramsD(0)) else radicalOfVar(paramsD(0))
@@ -405,7 +407,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
             paramCode = loops.toList ++ paramCode
       }
       callCode += paramCode.reverse.mkString(",") + ");"
-      if (!callCode.equals(lastCallCode))
+      if (!callCode.equals(lastCallCode) && !call.locus.equals("show"))
         theCallCode = callCode :: theCallCode //in case of copy or memo of integer, several times the same call code will be generated
       lastCallCode = callCode //in which  case we keep only the first one by ignoring the following
     }

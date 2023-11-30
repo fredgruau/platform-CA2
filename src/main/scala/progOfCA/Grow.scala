@@ -6,14 +6,22 @@ import compiler.SpatialType._
 import compiler.ASTL._
 import compiler.Circuit.hexagon
 import compiler.{AST, ASTBfun, ASTLt, B, Circuit, E, F, T, V}
-import progOfmacros.RedS.{exist, frontier, inside}
+import progOfmacros.RedSwrapper.{exist, border, inside}
 import compiler.ASTLfun._
+import progOfmacros.Topo.brdin
 
+
+/** uses the blob computation to grow seed into Voronoi region, just by stoping the growth just before merge happens */
+
+class GrowVor() extends Layer[(V, B)](1, "global") with BoolV with Blobify {
+  show(this, b.meet) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
+  override val next: AST[(V, B)] = this | (brdV & ~b.meet) //we extend the blob around the border brdV, except for meeting meeting points
+}
 /** Simple growth from V to E to V; test of in, and border.we believe that at least for border, and neighbor, it will be reused */
 class Grow extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
   val n: BoolE = exist(this);
   // val in: BoolE = inside(this);
-  val brd: BoolE = frontier(this);
+  val brd: BoolE = border(this);
   override val next: BoolV = exist(n) //   uses  defVe implicitely, the override keyword is mandatory
   show(this, next, n, brd)
   // he name of root to arg(0).lowercase

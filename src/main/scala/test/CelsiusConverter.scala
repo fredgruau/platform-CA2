@@ -33,13 +33,14 @@ object CelsiusConverter extends SimpleSwingApplication {
         case ButtonClicked(_) | EditDone(_) => convert()
       }
     }
-    contents = tempCelsius /*new FlowPanel {
+    contents = tempCelsius
+    new FlowPanel {
       contents += tempCelsius
       contents +=celsiusLabel
       contents +=convertButton
       contents +=fahrenheitLabel
       border = Swing.EmptyBorder(10, 10, 10, 10)
-    }*/
-    //defaultButton = Some(convertButton)
+    }
+    defaultButton = Some(convertButton)
   }
 }

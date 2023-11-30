@@ -16,7 +16,7 @@ import java.util
 import javax.swing.{InputMap, JComponent, KeyStroke}
 import scala.collection.JavaConverters._
 import scala.swing._
-import scala.swing.event.{ButtonClicked, Key, KeyReleased, SelectionChanged}
+import scala.swing.event.{ButtonClicked, EditDone, Key, KeyReleased, SelectionChanged}
 import scala.xml.{Node, NodeSeq, XML}
 
 /**
@@ -30,6 +30,8 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
                  var simulParam: Node, var displayParam: Node,
                  val progCA: CAloops2, val chosenDir: String, val mf: MainFrame)
   extends ToolBar() { //the controller inherits the toolBar, so that it can easily identifies which button was ckicqued, using the button's variable  name
+
+  var randomRoot: Int = xInt(simulParam, "simul", "@randomRoot")
   /** we need to know the locus of fields which are either displayed or initialized */
   val locusOfDisplayedOrDirectInitField: Map[String, Locus] = progCA.fieldLocus.asScala.toMap
   /** we need to know the number of ints of fields which are either displayed or initialized */
@@ -143,6 +145,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
     Controller.this.listenTo(this) //Controller.this refer to the enclsing controller
   }
 
+
   private val ForwardButton = new SimpleButton(forwardIcon) //myButton(forwardIcon, this)
   private val InitButton = new SimpleButton(initIcon)
   private val PlayPauseButton = new SimpleButton(if (isPlaying) pauseNormalIcon
@@ -155,8 +158,11 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   val globalInitList = new ComboBox[String](globalInitNames) {
     selection.item = globalInitNames(selectedGlobalInit)
   }
-  contents += globalInitList
-  listenTo(globalInitList.selection)
+  val randomRootField = new TextField("" + randomRoot, 2)
+  contents += (globalInitList, randomRootField)
+  listenTo(globalInitList.selection, randomRootField)
+
+
 
 
   //todo add a jcombo to select a number between 0 and 9
@@ -174,6 +180,9 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   listenTo(this.keys)
   //listenTo(mouse.clicks)
   reactions += {
+    case EditDone(_) =>
+      randomRoot = Integer.parseInt(randomRootField.text)
+      InitButton.doClick() //we assume that we want a new random setting
     case ExpandLayer(s) =>
       expandedLayers += s
       updateAndSaveXMLparamCA()
@@ -233,9 +242,14 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
       repaintEnv()
       requestFocus()
     case ButtonClicked(InitButton) | KeyReleased(_, Key.A, _, _) =>
+      val wasPlaying = isPlaying
+      if (isPlaying) {
+        PlayPauseButton.doClick()
+      } //we need a temporary pause of the computing thread, so as to avoid having two threads run simultaneously
       initEnv()
       repaintEnv()
       requestFocus() //necessary to enable listening to the keys again.
+      if (wasPlaying) PlayPauseButton.doClick()
     case SelectionChanged(`globalInitList`) =>
       InitButton.doClick()
       updateAndSaveXMLGlobalInit()

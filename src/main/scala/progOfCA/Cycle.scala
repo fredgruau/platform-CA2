@@ -5,7 +5,7 @@ import compiler.AST.{Layer, _}
 import compiler.ASTLfun.inc
 import compiler.SpatialType._
 import compiler.{AST, ASTLt, B, SI, UI, V, repr}
-import progOfmacros.RedS.leastUI
+import progOfmacros.RedSwrapper.leastUI
 import simulator.Util.show
 
 /** produce a global uniform field cycling through the 2^nbit values, that can be used for testing */

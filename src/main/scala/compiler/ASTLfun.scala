@@ -7,9 +7,11 @@ import compiler.ASTB._
 import compiler.ASTBfun._
 import compiler.SpatialType._
 import compiler.ASTLfun.carryV
-import progOfmacros.RedS.frontier
+import progOfmacros.RedSwrapper._
 
-/** contains generic primitive manipulating ASTLs, without direct access to the constructors */
+/** contains generic building block manipulating ASTLs, without direct access to the constructors
+ * they are not implemented in macro, because they are used by macro.
+ * we  have communication, and computation as presented in the spatial type papers, and others */
 object ASTLfun {
 
   /** Allows to consider false and true as occurence of ASTLs */
@@ -51,7 +53,7 @@ object ASTLfun {
    *         and not reusable when the frontier is encoded as a boolE
    */
   def oneToOneOptimized(is: BoolV): BoolVf = {
-    val brd: BoolE = frontier(is)
+    val brd: BoolE = border(is)
     val brdIn: BoolVe = transfer(v(brd)) & e(is) //builds a Ve true if on the border, and also on the filled side. this transfer needs an implicit
     val cbrdin: BoolFv = transfer(clock(brdIn)) //opposite the edge
     val ccbrdin: BoolVf = transfer(clock(clock(cbrdin))) //we are there
@@ -70,7 +72,24 @@ object ASTLfun {
     binop(r, clock(arg), anticlock(arg))
   }
 
+  def clock2(arg: BoolVe): BoolVe = clock(clock(arg)) //on peut etendre aux transfer type T[V,F], T[F,x]
 
+  def enlarge(arg: BoolVe): BoolVe = arg | clock2(arg)
+
+  def shrink(arg: BoolVe): BoolVe = arg & clock2(arg)
+
+
+  /**
+   * Does two consecutive exists,
+   *
+   * @param brd
+   * @return boolE x true  iff among the five edges withing the rhombus centered on x , one is true for brd,
+   */
+  def rhombusExist(brd: BoolE): BoolE = {
+    val brdF: BoolF = exist[E, F](brd)
+    exist[F, E](brdF) //second use of brdE, check that there is a totally empty rhombus between two blobs
+
+  }
 
   // _____________________________________________arithmetic operation ___________________________________________________________________________
 

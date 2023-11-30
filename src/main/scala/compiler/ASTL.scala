@@ -493,29 +493,26 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         var newArg = arg.align(r, tt)
         val algn: Map[String, Array[Int]] = r.algn
         var newArg2 = arg2.align(r, tt)
-        val k = algn.keys.toSet.intersect(r.algn.keys.toSet);
-        assert(k.size <= 1, " more than one to aligne !")
-        if (k.nonEmpty && !(algn(k.head) sameElements r.algn(k.head))) {
+        val alignedTwice: Predef.Set[String] = algn.keys.toSet.intersect(r.algn.keys.toSet);
+        val alignedTwiceDistinctly = alignedTwice.filter(s => r.algn(s) != algn(s)) //variables with two distinct alignement due to clock/sym operation
+        if (alignedTwiceDistinctly.size > 1) // we process only the case with a single such variable
+          throw new Exception(" more than one to aligne !")
+        if (alignedTwiceDistinctly.nonEmpty && !(algn(alignedTwiceDistinctly.head) sameElements r.algn(alignedTwice.head))) {
           //k is the aux defined by an instr which will have to use two registers.
-          val nome: String = k.head //here we assume that there is a single input variable
+          val nome: String = alignedTwiceDistinctly.head //here we assume that there is a single input variable
           val perm = compose(invert(algn(nome)), r.algn(nome))
           val shiftedE = "shift" + nome
           r.c = intersect(r.c, Some(Cycle(perm, locus.asInstanceOf[TT])))
-
-          //  val shiftInstr = ShiftInstr(shiftedE, e, perm)
-          //val repr = arg.mym.asInstanceOf[repr[(L, R)]]
           val repr = new repr(tt(nome).t) // asInstanceOf[repr[(L, R)]]
           val read = new Read(nome)(repr) with ASTLt[L, R] //not used at the end!
-
-          //  val shiftInstr = Affect(shiftedE, arg) //we shift the clock in order to obtain the right correspondance
           val shiftInstr = Affect(shiftedE, read) //we shift the clock in order to obtain the right correspondance
           // between shif and shifted
           //TODO le alignperm de shiftInstr on le fait ensuite!
           //    shiftInstr.alignPerm=perm
           r.si += nome -> shiftInstr
           r.algn += shiftedE -> algn(nome)
-          //newArg = newArg.replaceBy(nome, shiftedE)
-          newArg2 = newArg2.replaceBy(nome, shiftedE)
+          //newArg = newArg.replaceBy(nome, shiftedE) //the first sub expression is left as is
+          newArg2 = newArg2.replaceBy(nome, shiftedE) //in the second espression, we will use the shifted variable.
         }
         else //we combined the alignement from each operand of the binop
           for ((k, v) <- algn)

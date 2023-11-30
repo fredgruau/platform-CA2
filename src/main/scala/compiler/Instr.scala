@@ -660,17 +660,17 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
    * @return aligned instruction, together with shift affect
    */
   def align2(cs: TabSymb[Constraint], t: TabSymb[InfoNbit[_]], alignnPerm: mutable.Map[(String, String), Array[Int]]): List[Instr] = {
-    val r = Result()
+    val r = Result() //collect results, r.alg contains k,v iff name is using k, and is aligned on k using v
     val newExp = exp.asInstanceOf[ASTLt[_, _]].align(r, t)
     val newAffect = Affect(name, newExp)
     newAffect.alignPerm = r.algn //to be removed
-    r.algn.map({ case (k, v) => alignnPerm.addOne((name, k), v) })
+    r.algn.map({ case (k, v) => alignnPerm.addOne((name, k), v) }) //name is using k, and is aligned on k using v
     var result: List[Instr] = List()
     if (r.c != None) {
       cs.addOne(name -> r.c.get)
       result = r.si.values.toList
     }
-    newAffect :: result //We return  also the shift-affect instruction
+    newAffect :: result // the shift-affect instruction is added as a new instruction
   }
 
 
