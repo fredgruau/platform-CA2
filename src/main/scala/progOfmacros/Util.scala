@@ -7,6 +7,7 @@ import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.Circuit.hexagon
 import compiler.{V, _}
+import progOfmacros.RedSwrapper.border
 import progOfmacros.Topo.nbccDef
 
 object Util {
@@ -125,4 +126,13 @@ object Util {
 
   def randN12(b: BoolV): BoolVe = new Call1[(V, B), (T[V, E], B)](randN12def, b) with BoolVe
 
+  private val randE2def: Fundef1[(V, B), (T[E, V], B)] = { //yavait un bug, on a suivi la méthode de deboggage
+    // conssitant a nommer les variables contenant les résultats intermediiares, afin de dechifrer le code compilé.
+    val b = pL[V, B]("rand")
+    val bE: BoolE = border[V, E](b)
+    val res2: BoolEv = send[E, V, B](List(bE, ~bE))
+    Fundef1("util.randE2", res2, b)
+  }
+
+  def randE2(b: BoolV): BoolEv = new Call1[(V, B), (T[E, V], B)](randE2def, b) with BoolEv
 }

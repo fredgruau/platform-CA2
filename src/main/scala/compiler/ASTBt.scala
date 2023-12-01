@@ -1,7 +1,7 @@
 package compiler
 
 import AST.{AstPred, Call1, Call2, Call3, Delayed, Fundef, Fundef1, Fundef2, Fundef3, Layer, Param, Read}
-import ASTB.{And, Dir, Extend, False, Intof, Mapp2, Or, ParOp, Scan1, Scan2, Tminus1, True, Xor, nbitCte, rewriteASTBt}
+import ASTB.{And, Dir, Extend, False, Intof, Mapp2, Or, ParOp, Scan1, Scan2, Tminus1, True, Xor, nbitCte, rewriteASTBt, _}
 import ASTBfun.{ASTBg, Fundef2R}
 import ASTL.rewriteASTLt
 import Circuit.{TabSymb, iTabSymb, iTabSymb2}
@@ -9,7 +9,6 @@ import Circuit.{TabSymb, iTabSymb, iTabSymb2}
 import scala.collection.{Map, Set, immutable, mutable}
 import scala.collection.immutable.{HashMap, HashSet}
 import Array._
-import ASTB._
 import compiler.ASTBt.checkUISI
 import compiler.Packet.{BitLoop, BitNoLoop}
 import dataStruc.Named
@@ -264,9 +263,39 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
   /** returns the set of tree whose father  iterates the list of bits forming the integer,
    * in the inverse direction i.e. dirNarrowed goes
    * from leftward to rightward or from rightward to leftward
-   * also narrows the direction if needed otherwise leave direction as Both */
-
+   * also narrows the direction if needed otherwise leave direction as Both
+   * it is possible that the expression starts with non parop.
+   * we should then return the set of trees whose father is nonparop */
   def SetDirAndReturnChangedDir(): Set[ASTBg] = {
+    var r: HashSet[ASTBg] = HashSet.empty
+    var dirs: HashSet[Dir] = HashSet.empty
+    if (isInstanceOf[ParOp[_]]) {
+      val me = asInstanceOf[ParOp[_]]
+      val myDir = me.dirNarrowed
+      dirs = HashSet(myDir)
+    }
+
+    for (s <- inputNeighbors) {
+      r = r.union(s.asInstanceOf[ASTBg].SetDirAndReturnChangedDir()) //retrieves already found inverted directions
+      if (s.isInstanceOf[ParOp[_]])
+        dirs = dirs + s.asInstanceOf[ParOp[_]].dirNarrowed //dirs contains the narrowed dir of the children
+    }
+    if (isInstanceOf[ParOp[_]]) {
+      val me = asInstanceOf[ParOp[_]]
+      val myDir = me.dirNarrowed //c'est lourds, je répéte
+      if (dirs.contains(ASTB.Left()) && dirs.contains(ASTB.Right())) { // I added the filtering very recently
+        r = r ++ inputNeighbors.filter(_.isInstanceOf[ParOp[_]]).filter(_.asInstanceOf[ParOp[_]].dirNarrowed == myDir.narrowed.opposite).asInstanceOf[List[ASTBg]]
+        me.dirNarrowed = myDir.narrowed
+      }
+      else if (dirs.contains(ASTB.Left()))
+        me.dirNarrowed = ASTB.Left()
+      else if (dirs.contains(ASTB.Right()))
+        me.dirNarrowed = ASTB.Right()
+    }
+    r
+  }
+
+  def SetDirAndReturnChangedDirOld(): Set[ASTBg] = {
     var r: HashSet[ASTBg] = HashSet.empty
     if (!isInstanceOf[ParOp[_]]) return r
     val me = asInstanceOf[ParOp[_]]

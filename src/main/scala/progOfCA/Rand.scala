@@ -7,12 +7,13 @@ import compiler.ASTLfun._
 import compiler.Circuit.hexagon
 import compiler._
 import compiler.SpatialType._
-import progOfmacros.Util.{randN12, randN6, randNext}
+import progOfmacros.Util.{randE2, randN12, randN6, randNext}
 /** Layer implementing a random bit */
 class Rand() extends Layer[(V, B)](1, "random") with ASTLt[V, B] {
   val next: BoolV = randNext(this) //randDef is used only here, no need for a wrapper!
-  val randEdge: BoolVe = randN12(this)
-  show(this, randEdge)
+  val randDir: BoolVe = randN12(this)
+  val randSide: BoolEv = randE2(this)
+  show(this, randDir)
 }
 
 object Rand extends App {
