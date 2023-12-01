@@ -105,6 +105,11 @@ public class Util {
                 copy(src[i], dest[i * rapport + j]);
         return dest;
     }
+
+    public static void broadcaast(int[] src, int[][] dest) {
+        for (int j = 0; j < dest.length; j++)
+            copy(src, dest[j]);
+    }
     /**
      * System call used to update layers, same as copy, we use demo for clarity
      *

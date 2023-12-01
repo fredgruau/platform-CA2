@@ -13,6 +13,11 @@ import progOfmacros.Compute._
 import progOfmacros.RedSwrapper.{border, exist, inside}
 import progOfmacros.Topo.{brdin, nbcc}
 
+/* *
+Contains code use to compute fields for maintaining topological invariant such as blobs, and quasipoints
+ */
+
+
 /** endows a V-body with the blob meeting points. */
 trait Blobify {
   self: BoolV =>
@@ -43,13 +48,12 @@ class Blob(brd: BoolE, brdIn: BoolVe, brdV: BoolV) extends Named { //the blob is
 trait QuasiPtify {
   self: BoolV with Blobify => //quasiPoints are blobs.
   val doubleton: BoolE = inside[V, E](this)
-  val singleton: BoolV = inside[E, V](doubleton)
+  val singleton: BoolV = andR(neighbors(~this)) & this
   val tripleton: BoolF = inside[V, F](this)
-
+  val q = new QuasiPoint(this)
 }
 
-class Quasipoint(is: BoolV) extends Named {
-  val doubleton: BoolE = inside(is)
+class QuasiPoint(is: BoolV) extends Named {
 
 }
 

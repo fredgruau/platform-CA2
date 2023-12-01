@@ -177,6 +177,9 @@ trait ProduceJava[U <: InfoNbit[_]] {
         //   if (v.t == (V(), B()) /*|| v.t == B()*/)   List(adress(coalesc(k))) else
         {
           val offsetstring = v.locus.deploy2(k, tSymbVarSafe(k))
+          for (of <- offsetstring)
+            if (!coalesc.contains(of))
+              throw new Exception("trouve pas " + of + " dans coalesc")
           offsetstring.map((s: String) => adress(coalesc(s))).toList
         })
       }
@@ -352,8 +355,15 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
         case "copy" => assert(paramsD.size == 1 && paramsR.size == 1) //we copy bit by bit, hence int by int.
           val pR: String = radicalOfVar(paramsR(0))
-          val pD: String = if (tSymbVarSafe(paramsR(0)).t == (V(), B())) radicalOfVarIntComp(paramsD(0)) else radicalOfVar(paramsD(0))
-          val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet(pR, pD)
+          val pD: String = if (tSymbVarSafe(paramsR(0)).t == (V(), B()))
+            radicalOfVarIntComp(paramsD(0))
+          else radicalOfVar(paramsD(0))
+          val locuspR = tSymbVarSafe(pR).locus
+          val locuspD = tSymbVarSafe(pD).locus
+
+          if (locuspR.isTransfer && !locuspD.isTransfer)
+            callCode = "broadcaast(" //6 copy from 1D array to 1Darray are turned into a call to broaadcast from 1D arrau to 2D array
+          //val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet(pR, pD)
           callCode += pD + "," + pR
         //copy and memo have the same effect
         case "memo" => val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet() ++ params.map(radicalOfVar(_))

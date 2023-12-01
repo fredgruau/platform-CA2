@@ -292,7 +292,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
     val isshownAndNotGlobal = mutable.LinkedHashSet[String]() ++ shown diff allAdresses.keys.toSet //some shown variable are already in the globals, we do not need to show them
     val hs = new HeapStates[InstrNoLayersNorParam](noLayersInstr, Vector(null), isshownAndNotGlobal)
     //On itere sur hs. cela est complexe, on recupere pour chaque instr, l'état courant du heap pour modeliser un appel a une autre CAbranche      res = res ++ instr.codeGen(heapCur, funs, nbGlobals, emptyCoalesc)
-    for ((instr, (heapCur, adresses)) <- dagis.visitedL.reverse zip hs) {
+    for ((instr, (heapCur, adresses: iTabSymb[Int])) <- dagis.visitedL.reverse zip hs) {
       res = res ++ instr.codeGenInstr(heapCur, funs, nbGlobals, emptyCoalesc)
       allAdresses ++= adresses.toList.map((e: (String, Int)) => (e._1, nbGlobals + (e._2)))
     }

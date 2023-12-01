@@ -50,7 +50,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //print(prog1)
 
     val prog2 = prog1.treeIfy();
-    print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
+    //print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
 
     val prog3 = prog2.procedurIfy();
     //print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
@@ -65,16 +65,16 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //    print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
 
     val prog5ter = prog5bis.radiusify3
-    print("radiusify555555555555555555555555555555\n" + prog5ter)
+    //print("radiusify555555555555555555555555555555\n" + prog5ter)
 
     val prog6 = prog5ter.unfoldSpace(m); //ajouter les tm1s!!
-    print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
+    // print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
 
     val prog7 = prog6.treeIfy(); //spatiall unfolding generates reused expression that need to be affected again
-    print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
+    //  print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
     val prog7bis = prog7.simplify(); //this will remove id which are read only once.
-    print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
+    // print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
 
     val prog8: DataProg[InfoNbit[_]] = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
     print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")

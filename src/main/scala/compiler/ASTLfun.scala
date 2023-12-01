@@ -39,6 +39,9 @@ object ASTLfun {
     //  transfer(symed)
   }
 
+  /** go through the edge to the other neighbor */
+  def toNeighb(msg: BoolVe): BoolVe = transfer(sym(transfer(msg)))
+
   /** either Ef to Vf or vice versa */
   def apex[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, F], R])
                                        (implicit m1: repr[S1], m2: repr[S2], n: repr[R], s: CentralSym[S1, F, S2]): ASTLt[T[S2, F], R] = {

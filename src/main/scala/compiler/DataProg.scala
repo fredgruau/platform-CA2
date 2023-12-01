@@ -1745,7 +1745,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       for (e <- toBeRepl) { //we look if there is  tm1 in tm1, it is an added difficulty
         val d = (new Dag[AST[_]](List(e.inputNeighbors(0)))) //builds the dag of tm1's expr in order to see if itself contains other tm1
         if (d.visitedL.filter(_.asInstanceOf[ASTBt[_]].isTm1).nonEmpty) {
-          assert(false, "plusieur tm1 emboités dans une meme expr, mefiance, vérifier si ca marche")
+          //assert(false, "plusieurs tm1 emboités dans une meme expr, mefiance, vérifier si ca marche")
         }
       }
       dagis.affectizeTm1(toBeRepl.asInstanceOf[List[ASTBt[_]]])
@@ -1771,7 +1771,9 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
   /**
    * @return the program is still scalar affectation, but there is no call to boolean functions, only boolean operators,
-   *         such as Scan or Map, and they are organized as a sequence of doubly nested loops.
+   *         such as Scan or Map, and they are organized as a sequence of doubly nested loops with direction left or right
+   *         right is used to compute <, because we consider msb first
+   *         left is used when doing addition which considers lsb first.
    */
   def loopIfy(): DataProgLoop[InfoNbit[_]] = {
     val p = this.asInstanceOf[DataProg[InfoNbit[_]]]

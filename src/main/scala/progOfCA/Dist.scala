@@ -26,7 +26,7 @@ class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[
   // we can decide to set it to true only if there is a blob, or allways, in which case there will be a center all around the chip, which may
   // be approriate if we want ports all around the chip. If we want this last behavoir we need to use OR2 instead of OR, where neutral will
   // true instead of false.
-  show(b.meetE, b.meetV, b.brd, b.brdV)
+  show(b.meetE, b.meetV)
   val topoligne: BoolE = border(elt(2, this)); //allows to visualize the field by coloring edges instead of  vertices
   val vortex: BoolF = andR(transfer(cac(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
 

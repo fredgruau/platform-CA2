@@ -21,7 +21,7 @@ class mainTest extends FunSuite with BeforeAndAfter {
 }
 
 /** test concatR with elem */
-class DisguisedIdentity() extends Layer[(V, B)](1, "global") with Blob {
+class DisguisedIdentity() extends Layer[(V, B)](1, "global") with Topo {
   val next: BoolV = elt(0, concatR(e(this)).asInstanceOf[UintV]) //this is in fact the identity
   show(this)
 }
