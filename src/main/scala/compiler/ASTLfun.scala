@@ -42,7 +42,7 @@ object ASTLfun {
   /** go through the edge to the other neighbor */
   def toNeighb(msg: BoolVe): BoolVe = transfer(sym(transfer(msg)))
 
-  /** either Ef to Vf or vice versa */
+  /** either Ef to Vf or vice versa, depending on arg */
   def apex[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, F], R])
                                        (implicit m1: repr[S1], m2: repr[S2], n: repr[R], s: CentralSym[S1, F, S2]): ASTLt[T[S2, F], R] = {
     transfer(sym(transfer(arg)))
@@ -150,7 +150,7 @@ object ASTLfun {
     binop(ASTBfun.concat2UI.asInstanceOf[Fundef2[R1, R2, UI]], arg1, arg2)
   }
 
-  //------------------------------------------------------ComputingMacro------------------------------------------------------
+  //------------------------------------------------------ComputingMacro with more that two inputs or outputs------------------------------------------------------
 
   /** we use macro for computation on three arguments, in order not to have to introduce "triop" but use several binop */
   def cond[L <: Locus, R <: Ring](b: ASTLt[L, B], arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] =
@@ -161,6 +161,7 @@ object ASTLfun {
 
   /** does on two bits, the same of max 3 non zero bits, non adjacents, distributed over 6 bits */
   def sum3V(b0: BoolV, b1: BoolV, b2: BoolV): UintV = (b0 ^ b1 ^ b2) :: carryV(b0, b1, b2)
+
   /**
    * most significant bit, interpreted as macro
    * computes an int with a single non zero bit which is the highest rank for which operand's bit is one if operand is null, output O.
@@ -168,9 +169,10 @@ object ASTLfun {
    */
   def mstb[L <: Locus, R <: I](arg1: ASTL[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = {
     val y: ASTLt[L, R] = orScanRight[L, R](arg1);
-    y ^ halve(y)
+    ~halve(y) ^ y //it may bug because embrouille avec deux scan.
   }
 
+  def unary(b0: BoolV, b1: BoolV): List[BoolV] = List(b0 & b1, ~b0 & b1, b0 & ~b1, ~b0 & ~b1)
 
 
   //------------------------------------------------------Reduction------------------------------------------------------

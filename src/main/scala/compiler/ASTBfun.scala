@@ -1,11 +1,13 @@
 package compiler
-import AST.{Call1, _}
-import ASTB.{Elt, _}
+
+import AST.{Call1, Fundef2, _}
+import ASTB.{Elt, Scan1, _}
 import compiler.ASTBfun.{Fundef2R, Fundef3R, fundef2Bop2, negB, p}
 import compiler.ASTLfun.halve
 import compiler.SpatialType.BoolV
 import ASTLfun._
 import compiler.ASTBt.BB
+import compiler.MyOpB
 
 /** Contains the code of logical function defined as val, to avoid reproducting the code several times, when they are used in BINOP or UNOP
  * todo function which use bool Constructors should be moved to ASTB, so that we can declare those constructors, private.
@@ -334,17 +336,18 @@ object ASTBfun {
 
 
   private val (halveBSI, halveBUI) = {
-  val other: Fundef2R[B] = {
-    val (xb, yb) = (p[B]("xb"), p[B]("yb"));
-    Fundef2("other", yb, xb, yb)
-  }
+    val other: Fundef2R[B] = {
+      val (xb, yb) = (p[B]("xb"), p[B]("yb"));
+      Fundef2("other", yb, xb, yb)
+    }
 
     def halveBI[R <: I](implicit n: repr[R]): Fundef1R[R] = {
       val x = p[R]("xhalveB");
-    Fundef1("halve", Scan1(x, other, False(), Right(), initUsed = true), x)
+      Fundef1("halve", Scan1(x, other, False(), Right(), initUsed = true), x)
     };
     (halveBI[SI], halveBI[UI])
   }
+
 
   /** result in shifting bits towards the tail, entering a zero at the end of the list,
    * it would divide by two an unsigned integers */
@@ -352,6 +355,16 @@ object ASTBfun {
     case SI() => halveBSI
     case UI() => halveBUI
   }).asInstanceOf[Fundef1[R, R]]
+
+
+  /** the call to halve remove the LSB elt(0) which reappers as the first bit after the concatenation, thus rotating the bits to the right */
+  val rotUI = {
+    val x = p[UI]("xrot");
+    Fundef1[UI, UI]("rot", (new Call1[UI, UI](halveBUI, x)(repr.nomUI)
+      with ASTBt[UI]) ::
+      (new Call1[UI, B](elt(0), x)(repr.nomB)
+        with ASTBt[B]).asInstanceOf[ASTBt[UI]], x)
+  }
 
 
   private val (orScanRightSI, orScanRightUI) = {

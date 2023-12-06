@@ -7,8 +7,14 @@ import compiler.{B, V}
 import dataStruc.Named
 import progOfmacros.Util.randN12
 
+/** a force is exerted on a support and generates a movement */
 abstract class Force {
-
+  /**
+   *
+   * @param is support on which to apply the force
+   * @param r  random BoolV
+   * @return
+   */
   def action(is: BoolV, r: Rand): CenteredMove
 }
 
@@ -28,7 +34,7 @@ object Force {
       val isqp = is.asInstanceOf[BoolV with QuasiPtify] //this force works only on quasiPoint
       val extend12dir = e(isqp.singleton) & ra.randDir //isolated point move toward one of the 12 possible directions
       val extend2side = clock2(transfer(sym(v(isqp.doubleton) & ra.randSide)))
-      new CenteredMove(fromBool[V](false), extend2side)
+      new CenteredMove(fromBool[V](false), extend2side | extend12dir)
     }
   }
 }

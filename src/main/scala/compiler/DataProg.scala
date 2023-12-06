@@ -146,7 +146,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
                                  val paramD: List[String], val paramR: List[String],
                                  val coalesc: iTabSymb[String] = null) {
   /** all the coalesced register must be defined in the symbol table */
-
   def allLayers: Iterable[String] = {
     def isLayer(name: String) = tSymbVar(name).k.isLayerField
 
@@ -157,8 +156,15 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       for (c <- coalesc.values)
         if (!tSymbVar.contains(c) && !c.startsWith("mem[")) //!(Try(c.toInt).isSuccess))
           throw new Exception("colesced register:" + c + " not present in symbol table")
-
   invariantCoalesc
+
+  /** verifies that a main loop does not call other main loop, we would need a stack and that has no been implemented */
+
+  def invariantSingleMain =
+    if (!isLeafCaLoop && !isRootMain)
+      throw new Exception("there is only the mainRoot which is not a leaf Ca loop ")
+
+  invariantSingleMain
 
 
   /** all registers used by insrtructions must be either contained in tSymb or in tSymb(coalesc) */
@@ -171,14 +177,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
   invariantVariable
 
-  /** we want to ensure that a main loop does not call other main loop, that's a good practice, it makes things simpler */
-  def invariantSingleMain =
-    if (!isLeafCaLoop)
-      for (fun <- funs.values)
-        if (!fun.isLeafCaLoop)
-          throw new Exception("there are mains in the main")
 
-  //invariantSingleMain
 
   /** the main root is characterized by the fact that it has a bug layer. */
   def isRootMain: Boolean = tSymbVar.contains("llbugV")

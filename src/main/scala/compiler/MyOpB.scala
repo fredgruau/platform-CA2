@@ -18,7 +18,7 @@ trait MyOpIntB[+R <: Ring] {
   def -[U >: R <: SI](that: ASTBt[U])(implicit n: repr[U]): ASTBt[U] = this + (-that)
 
   /** concat2 is used also to produce signed int, using the sign function */
-  def ::[U >: R <: I](that: ASTBt[U])(implicit n: repr[U]): ASTBt[U] = Concat2(this, that)
+  def ::[U >: R <: Ring](that: ASTBt[U])(implicit n: repr[U]): ASTBt[UI] = Concat2(that, this) //(implicit m: repr[L], n: repr[R])
 }
 
 /**The need for covariance prevents us for verifying that U=R using the scala type system. 
@@ -41,7 +41,9 @@ trait MyOpB[+R <: Ring] {
       case B() => negSimplif(this.asInstanceOf[ASTBt[B]]) // Unop(negB, arg.asInstanceOf[ASTLt[L, B]], m, repr.nomB)
       case _ => new Call1(ASTBfun.neg(new repr(ring)), this)(new repr(ring)) with ASTBt[R] //Unop(negSI.asInstanceOf[Fundef1[R, R]], arg, m, n)
     }).asInstanceOf[ASTBt[R]]
-  } /*
+  }
+
+  /*
   def <[U >: R <: Ring](that: ASTBt[U])(implicit n: repr[B]): ASTBt[B] = {
     ring match {
       case B() => if (this == False() && that == False()) True() else False()

@@ -8,7 +8,7 @@ import compiler.ASTLfun._
 import compiler.Circuit.iTabSymb
 import compiler.repr.{nomB, nomCons, nomV}
 import compiler.{AST, ASTLt, B, E, F, Ring, S, SI, T, UI, V, chip, repr}
-import progOfmacros.RedS.getRedSFun
+import progOfmacros.RedS.{getRedSFun, redsDirect}
 
 object RedSwrapper {
   /** wrapper to a function built on the fly
@@ -30,6 +30,9 @@ object RedSwrapper {
     val f: Fundef1[(S1, B), (S2, B)] = getRedSFun(xorRedop[B], arg.locus)(m, n, nomB, d)
     new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
   }
+
+  def borderDirect[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chip[S2, S1]): ASTLt[S2, B] =
+    redsDirect(xorRedop[B], arg)
 
   def concatN[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chip[S2, S1]): ASTLt[S2, B] = {
     val f: Fundef1[(S1, B), (S2, B)] = getRedSFun(concatRedop, arg.locus)(m, n, nomB, d)

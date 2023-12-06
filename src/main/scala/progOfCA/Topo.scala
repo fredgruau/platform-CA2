@@ -1,7 +1,7 @@
 package progOfCA
 
 import compiler.AST.{Call1, Call2, Fundef1, Fundef2, Layer, pL}
-import compiler.ASTLfun._
+import compiler.ASTLfun.{orR, _}
 import compiler.ASTL._
 import compiler.SpatialType._
 import compiler.Circuit.hexagon
@@ -47,8 +47,13 @@ class Blob(brd: BoolE, brdIn: BoolVe, brdV: BoolV) extends Named { //the blob is
 
 trait QuasiPtify {
   self: BoolV with Blobify => //quasiPoints are blobs.
-  val doubleton: BoolE = inside[V, E](this)
+  /** true for the vertices of a qpt consiting exactly of one vertices */
   val singleton: BoolV = andR(neighbors(~this)) & this
+  /** true if both apex vertices of the edge are empty */
+  val bothApexEmpty: BoolE = ~orR(apex[V, E, B](f(this)))
+  /** true for the edge inside qpt consiting exactly of two vertices */
+  val doubleton: BoolE = inside[V, E](this) & bothApexEmpty
+  /** true for the face inside a qpt consiting exactly of three adjacent  vertices */
   val tripleton: BoolF = inside[V, F](this)
   val q = new QuasiPoint(this)
 }

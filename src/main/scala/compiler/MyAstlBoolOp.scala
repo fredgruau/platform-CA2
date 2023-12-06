@@ -47,8 +47,8 @@ trait MyOpInt2[L <: Locus, R <: Ring] {
 
   /** concatenatin, this=lsb, that =msb */
   def ::[U >: R <: Ring](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, UI] =
-    concat2(that, this).asInstanceOf[ASTLt[L, UI]] //si on fait x::y  xor3::carry, this c'est la carry, c'est y
-
+    concat2(that, this).asInstanceOf[ASTLt[L, UI]] //si on fait x::y  xor3::carry, a droite c'est le bit de poids fort
+  //first arg is a bool, second arg is an UINT
 
   /** minus  must convert UI to SI which adds an extra bit. */
   def -[U >: R <: I](that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, SI] = ring match {

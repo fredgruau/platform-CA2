@@ -34,14 +34,22 @@ object RedS {
    * @tparam S2 target simplicial type
    * @return computes the scala code of a whole  simplicial reduction, is done here because Broadcast Transfer and Redop are private to ASTL. */
 
+
+  def redsDirect[S1 <: S, S2 <: S, R <: Ring](r: redop[R], arg: ASTLt[S1, R])
+                                             (implicit m: repr[S1], n: repr[S2], q: repr[R], d: chip[S2, S1]): ASTLt[S2, R] = {
+    val broadcasted = broadcast[S1, S2, R](arg) //step 1 is broadcast
+    val transfered: ASTLt[T[S2, S1], R] = transfer[S1, S2, R](broadcasted)(repr.nomT(n, m), q) //step 2 is transfer
+    val res = reduce[S2, S1, R](r, transfered) //(n,m,d) yzeté implicit killerest
+    res
+  }
   private def redSfunDef[S1 <: S, S2 <: S, R <: Ring](r: redop[R], l: S1)(implicit m: repr[S1], n: repr[S2], q: repr[R], d: chip[S2, S1]): //pour defVe S1=E,S2=V
   Fundef1[(S1, R), (S2, R)] = {
     val param = pL[S1, R]("p" + l.shortName + n.name.shortName) //parameter names inform about locus
-    val broadcasted = broadcast[S1, S2, R](param) //step 1 is broadcast
-    val transfered: ASTLt[T[S2, S1], R] = transfer[S1, S2, R](broadcasted)(repr.nomT(n, m), q) //step 2 is transfer
-    val res = reduce[S2, S1, R](r, transfered) //(n,m,d) yzeté implicit killerest
-    //val res = Redop[S2, S1, B](r, transfered, n, nomB) // orRdef(transfer(v(param))) //step 3 is reduce
-    Fundef1(redsfunName(r, l)(m, n, q), res, param) // we compute a function of one argument. res is the body, param are the single parameter
+    /*   val broadcasted = broadcast[S1, S2, R](param) //step 1 is broadcast
+       val transfered: ASTLt[T[S2, S1], R] = transfer[S1, S2, R](broadcasted)(repr.nomT(n, m), q) //step 2 is transfer
+       val res = reduce[S2, S1, R](r, transfered) //(n,m,d) yzeté implicit killerest
+    */
+    Fundef1(redsfunName(r, l)(m, n, q), redsDirect[S1, S2, R](r, param), param) // we compute a function of one argument. res is the body, param are the single parameter
   }
 
   /**

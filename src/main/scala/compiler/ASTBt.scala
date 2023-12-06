@@ -295,27 +295,6 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
     r
   }
 
-  def SetDirAndReturnChangedDirOld(): Set[ASTBg] = {
-    var r: HashSet[ASTBg] = HashSet.empty
-    if (!isInstanceOf[ParOp[_]]) return r
-    val me = asInstanceOf[ParOp[_]]
-    val myDir = me.dirNarrowed
-    var dirs: HashSet[Dir] = HashSet(myDir)
-    for (s <- inputNeighbors) {
-      r = r.union(s.asInstanceOf[ASTBg].SetDirAndReturnChangedDir()) //retrieves already found inverted directions
-      if (s.isInstanceOf[ParOp[_]])
-        dirs = dirs + s.asInstanceOf[ParOp[_]].dirNarrowed //dirs contains the narrowed dir of the children
-    }
-    if (dirs.contains(ASTB.Left()) && dirs.contains(ASTB.Right())) { // I added the filtering very recently
-      r = r ++ inputNeighbors.filter(_.isInstanceOf[ParOp[_]]).filter(_.asInstanceOf[ParOp[_]].dirNarrowed == myDir.narrowed.opposite).asInstanceOf[List[ASTBg]]
-      me.dirNarrowed = myDir.narrowed
-    }
-    else if (dirs.contains(ASTB.Left()))
-      me.dirNarrowed = ASTB.Left()
-    else if (dirs.contains(ASTB.Right()))
-      me.dirNarrowed = ASTB.Right()
-    r
-  }
 
 
   /**
