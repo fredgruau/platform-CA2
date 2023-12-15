@@ -63,24 +63,6 @@ object ASTLfun {
     ccbrdin
   }
 
-  /** cac=clock+anticlock
-   * Does a binop  operation between the two Transfer locus around a given simplicial locus S1,
-   * by doing a Clockwise, and an AntiClockwise rotation, and applying the bionop
-   * This is not really a reduction, just a binop, so it does not need to define neutral elements, because
-   * either an S1 site is defined and so are it transfer around,
-   * or S1 is not and also so are its transfer around it.
-   */
-  def cac[S1 <: S, S2 <: S, S3 <: S, R <: Ring](r: Fundef2R[R], arg: ASTLt[T[S1, S2], R])
-                                               (implicit m1: repr[S2], m2: repr[S1], m3: repr[S3], n: repr[R], a: AntiClock[S1, S2, S3]): ASTLt[T[S1, S3], R] = {
-    binop(r, clock(arg), anticlock(arg))
-  }
-
-  def clock2(arg: BoolVe): BoolVe = clock(clock(arg)) //on peut etendre aux transfer type T[V,F], T[F,x]
-
-  def enlarge(arg: BoolVe): BoolVe = arg | clock2(arg)
-
-  def shrink(arg: BoolVe): BoolVe = arg & clock2(arg)
-
 
   /**
    * Does two consecutive exists,
@@ -193,6 +175,12 @@ object ASTLfun {
                                       (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chip[S1, S2]): ASTLt[S1, R] = {
     reduce(orRedop[R], arg)
   }
+
+  def orR2[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])
+                                       (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chip[S1, S2]): ASTLt[S1, R] = {
+    reduce(or2Redop[R], arg)
+  }
+
 
   /* def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])(implicit m: repr[S1], n: repr[UI]): ASTLt[S1, UI] =
      RedopConcat[S1, S2](arg, m, n)

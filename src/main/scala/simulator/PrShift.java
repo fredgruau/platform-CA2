@@ -6,10 +6,13 @@ public interface PrShift {
 
     /**
      * bit level communication within the CA memory, so that << and >>> need only a shift instead of a rotation
+     *
      * @param h int32 CA memory
      */
     public void propagate4shift(int[] h);
-};
+
+    public void mirror(int[] h);
+}
 
 
 

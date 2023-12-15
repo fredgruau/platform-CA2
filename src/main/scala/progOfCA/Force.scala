@@ -5,6 +5,7 @@ import compiler.ASTLfun._
 import compiler.SpatialType._
 import compiler.{B, V}
 import dataStruc.Named
+import progOfmacros.RedT.clock2
 import progOfmacros.Util.randN12
 
 /** a force is exerted on a support and generates a movement */

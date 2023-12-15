@@ -127,7 +127,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
     if (loops != null) //we have a leaf CA
       loops.flatMap(_.loops.map(_.totalOp)).reduce(_ + _)
     else //we sum the gate count of leaf ca. TODO not sure about that, since a leafCA could be used more than once we should sum over the called macro
-      funs.values.map(_.asInstanceOf[DataProgLoop[_]].totalOp).reduce(_ + _)
+      if (funs.nonEmpty) funs.values.map(_.asInstanceOf[DataProgLoop[_]].totalOp).reduce(_ + _)
+      else 0
 
 
   /** @param s name of a variable

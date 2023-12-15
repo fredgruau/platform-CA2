@@ -61,8 +61,10 @@ object InfoNbit {
  */
 class InfoNbit[+T](override val t: T, override val k: VarKind, val nb: Int) extends InfoType(t, k) {
   def density = locus.density * nb
+  /*
 
-  def radiusify2(r: Int): InfoNbit[_] = new InfoNbit(t, ParamRR(r), nb)
+    def radiusify2(r: Int): InfoNbit[_] = new InfoNbit(t, ParamRR(r), nb)
+  */
 
   def radiusify3(r: Int): InfoNbit[_] = new InfoNbit(t, ParamRR(r), nb)
 

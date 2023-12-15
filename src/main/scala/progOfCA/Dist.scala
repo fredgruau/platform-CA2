@@ -12,6 +12,7 @@ import progOfmacros.Compute._
 import compiler.SpatialType._
 import progOfmacros.Grad
 import progOfmacros.RedSwrapper.border
+import progOfmacros.RedT.cac
 
 class Seed extends ConstLayer[V, B](1, "global") with DistT {
   show(this)
@@ -22,9 +23,10 @@ class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[
   val opp = -this
   val (sloplt: BoolVe, delta, level, gap) = Grad.slopDelta(this) //faudrait que je récupére la date du fichier ou se trouve slopeDelta
   //gabriel centers can be directly obtain simply by taking meeting point of the blob, using sloplt
-  val b = new Blob(orR(transfer(sloplt)), sloplt, orR(sloplt)) //when computing brdE, we need it to be either true or false on the border
-  // we can decide to set it to true only if there is a blob, or allways, in which case there will be a center all around the chip, which may
-  // be approriate if we want ports all around the chip. If we want this last behavoir we need to use OR2 instead of OR, where neutral will
+  val b = new Blob(orR(transfer(sloplt)), sloplt, orR2(sloplt)) //when computing brdE, we need it to be either true or false on the border
+  // we can decide to set it to true only if there is a blob, or allways, in which case there will be a center all around the chip,
+  // which may be approriate if we want ports all around the chip. If we want this last behavoir
+  // we need to use OR2 instead of OR, where neutral will
   // true instead of false.
   show(b.meetE, b.meetV)
   val topoligne: BoolE = border(elt(2, this)); //allows to visualize the field by coloring edges instead of  vertices

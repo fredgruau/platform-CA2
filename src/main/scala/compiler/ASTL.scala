@@ -555,6 +555,59 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
    * @param t symbol table to be updated for paramR() to paramRR(Int) where int indicate the radius of result param
    * @return radius and modifier of expression
    */
+
+  override def radiusify3(r: TabSymb[Int], t: TabSymb[InfoNbit[_]]): (Int, ASTLt[L, R]) = {
+
+
+    this.asInstanceOf[ASTLg] match {
+      case trans@Transfer(arg, m, n) => {
+        def increaseRadius(rad: Int, src: Locus, target: Locus): Int = {
+          val newRadius = (src, target) match {
+            case (V(), _) | (E(), F()) => rad + 1
+            case _ => rad
+          }
+          if (newRadius >= 2) // we have to do  another communication between radius=1 and radius=-2
+            assert(false)
+          newRadius
+        }
+
+        val (rad, newArg) = arg.radiusify3(r, t)
+        val T(src, target) = arg.locus //we get the source and target locus knowing that arg is a transfer locus
+        (increaseRadius(rad, src, target), trans.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
+      }
+      case binop@Binop(_, arg, arg2, _, _) =>
+        var (r1, newArg) = arg.radiusify3(r, t)
+        var (r2, newArg2) = arg2.radiusify3(r, t)
+        assert(r1 == r2 || r1 < 0 || r2 < 0 || Math.abs(r1 - r2) == 1, "binop should processe variables of near identical index i") //todo introduce delays)
+        if (r1 < r2 && r1 >= 0) //negative radius means constant
+          newArg = increaseRadiuus(newArg)(new repr(newArg.locus), new repr(newArg.ring)) //we augment radius of arg by delaying it
+        else if (r2 < r1 && r2 >= 0) //negative radius means constant
+          newArg2 = increaseRadiuus(newArg2)(new repr(newArg2.locus), new repr(newArg2.ring)) //we augment radius of arg2 by delaying it
+        // if (r1 < r2) for (i <- 0 until r2 - r1) //arg=tm1(arg)
+        (math.max(r1, r2), binop.copy(arg = newArg, arg2 = newArg2).asInstanceOf[ASTL[L, R]])
+      case Coonst(_, _, _) => (-1000, this) //negative radius means arbitrary radius,
+      case u@Unop(op, arg, _, _) =>
+        var (rad, newArg) = arg.radiusify3(r, t)
+        rad = rad + (if (op.name == "increaseRadius2") 1 else 0)
+        (rad, u.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
+      //for other cases we do nothing
+      case b@Broadcast(arg, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
+      case b@Redop(_, arg, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
+      case b@RedopConcat(arg, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
+      // case b@Clock(arg, _) =>  val (rad,newArg) = arg.radiusify3(r, t);(rad,b.copy(arg=newArg).asInstanceOf[ASTL[L,R]])
+      case b@Sym(arg, _, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
+
+      case b@Clock(arg, _, _, _, _) => val (rad, newArg) = arg.radiusify3(r, t); //the radius needs to be augmented
+        (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]]) //the radius remains the same, just like sym.
+      case b@Send(args) => val radNewArgs = args.map(_.radiusify3(r, t));
+        val newRad = radNewArgs.map(_._1).reduce(Math.max(_, _))
+        val newb = b.copy(args = radNewArgs.map(_._2))(lpart(b.mym), rpart(b.mym))
+        (newRad, newb.asInstanceOf[ASTL[L, R]])
+
+    }
+
+  }
+  /*
   override def radiusify2(r: TabSymb[Int], t: TabSymb[InfoNbit[_]]): Int = {
     def increaseRadius(rad: Int, src: Locus, target: Locus): Int = {
       val newRadius = (src, target) match {
@@ -593,56 +646,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
 
   }
 
-  override def radiusify3(r: TabSymb[Int], t: TabSymb[InfoNbit[_]]): (Int, ASTLt[L, R]) = {
 
-
-    this.asInstanceOf[ASTLg] match {
-      case trans@Transfer(arg, m, n) => {
-        def increaseRadius(rad: Int, src: Locus, target: Locus): Int = {
-          val newRadius = (src, target) match {
-            case (V(), _) | (E(), F()) => rad + 1
-            case _ => rad
-          }
-          if (newRadius >= 2) // we have to do  another communication between radius=1 and radius=-2
-            assert(false)
-          newRadius
-        }
-        val (rad, newArg) = arg.radiusify3(r, t)
-        val T(src, target) = arg.locus //we get the source and target locus knowing that arg is a transfer locus
-        (increaseRadius(rad, src, target), trans.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
-      }
-      case binop@Binop(_, arg, arg2, _, _) =>
-        var (r1, newArg) = arg.radiusify3(r, t)
-        var (r2, newArg2) = arg2.radiusify3(r, t)
-        assert(r1 == r2 || r1 < 0 || r2 < 0 || Math.abs(r1 - r2) == 1, "binop should processe variables of near identical index i") //todo introduce delays)
-        if (r1 < r2 && r1 >= 0) //negative radius means constant
-          newArg = increaseRadiuus(newArg)(new repr(newArg.locus), new repr(newArg.ring)) //we augment radius of arg by delaying it
-        else if (r2 < r1 && r2 >= 0) //negative radius means constant
-          newArg2 = increaseRadiuus(newArg2)(new repr(newArg2.locus), new repr(newArg2.ring)) //we augment radius of arg2 by delaying it
-        // if (r1 < r2) for (i <- 0 until r2 - r1) //arg=tm1(arg)
-        (math.max(r1, r2), binop.copy(arg = newArg, arg2 = newArg2).asInstanceOf[ASTL[L, R]])
-      case Coonst(_, _, _) => (-1000, this) //negative radius means arbitrary radius,
-      case u@Unop(op, arg, _, _) =>
-        var (rad, newArg) = arg.radiusify3(r, t)
-        rad = rad + (if (op.name == "increaseRadius2") 1 else 0)
-        (rad, u.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
-      //for other cases we do nothing
-      case b@Broadcast(arg, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
-      case b@Redop(_, arg, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
-      case b@RedopConcat(arg, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
-      // case b@Clock(arg, _) =>  val (rad,newArg) = arg.radiusify3(r, t);(rad,b.copy(arg=newArg).asInstanceOf[ASTL[L,R]])
-      case b@Sym(arg, _, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
-
-      case b@Clock(arg, _, _, _, _) => val (rad, newArg) = arg.radiusify3(r, t); //the radius needs to be augmented
-        (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]]) //the radius remains the same, just like sym.
-      case b@Send(args) => val radNewArgs = args.map(_.radiusify3(r, t));
-        val newRad = radNewArgs.map(_._1).reduce(Math.max(_, _))
-        val newb = b.copy(args = radNewArgs.map(_._2))(lpart(b.mym), rpart(b.mym))
-        (newRad, newb.asInstanceOf[ASTL[L, R]])
-
-    }
-
-  }
 
   override def radiusify(r: TabSymb[(Int, Option[Modifier])], t: TabSymb[InfoNbit[_]]): (Int, Option[Modifier]) = {
 
@@ -694,6 +698,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case Sym(arg, _, _, _) => arg.radiusify(r, t) //ca ne change pas
     }
   }
+*/
 
   override def cost(): Cost = {
     this.asInstanceOf[ASTLg] match { //read and Call treated in ASTLt.

@@ -11,6 +11,7 @@ import dataStruc.Named
 import progOfmacros.Topo
 import progOfmacros.Compute._
 import progOfmacros.RedSwrapper.{border, exist, inside}
+import progOfmacros.RedT.{enlarge, enlargeEF, enlargeFE}
 import progOfmacros.Topo.{brdin, nbcc}
 
 /* *
@@ -37,9 +38,12 @@ trait Blobify {
 class Blob(brd: BoolE, brdIn: BoolVe, brdV: BoolV) extends Named { //the blob is not necessarily a layer
   val nbCc: UintV = nbcc(brdIn) //first use of brdE
   val meetV: BoolV = nbCc > 1 //makes an implicit conversion of nbCh from unsigned int to signed int. shoudl take into acount only nbch$1
-  val nonEmptyRhomb: BoolE = rhombusExist(brd) // true if center of a totally empty rhombus
   val twoAdjBlob: BoolE = inside[V, E](brdV) //third use of brdE, check that there is two adjacent blobs next to the empty rhombus
-  val meetE: BoolE = ~nonEmptyRhomb & twoAdjBlob //we've got to be able to not have to write calls to andE!!
+  val nonEmptyRhomb: BoolE = rhombusExist(brd) // true if center of a NON-totally empty rhombus
+  val nonEmptyRhomb2: BoolE = orR(transfer(enlargeFE(enlargeEF(brdIn)))) //more precise computation that works for detecting edge gabriel centers
+  val meetE: BoolE = {
+    ~nonEmptyRhomb2 & twoAdjBlob
+  } //we've got to be able to not have to write calls to andE!!
   val meetEside = exist[E, V](meetE)
   val meet = meetV | meetEside
 

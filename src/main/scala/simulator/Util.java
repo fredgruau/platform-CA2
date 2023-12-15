@@ -110,6 +110,16 @@ public class Util {
         for (int j = 0; j < dest.length; j++)
             copy(src, dest[j]);
     }
+
+    /**
+     * used to broadcast an Int field, such as a distance
+     */
+    public static void broadcaast(int[][] src, int[][] dest) {
+        int arity = dest.length / src.length;
+        for (int j = 0; j < arity; j++)
+            for (int i = 0; i < src.length; i++)
+                copy(src[i], dest[j * src.length + i]);
+    }
     /**
      * System call used to update layers, same as copy, we use demo for clarity
      *

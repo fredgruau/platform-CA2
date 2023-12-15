@@ -35,7 +35,7 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
   /** Memory of the CA, it is being rewritten by the running thread, not touched if being displayed
    * we add 1 to the column size  medium.nbInt32CAmem +1 so as to avoid catching ArrayIndexOutOfBoundsException
    * when  we write at i+1 instead of i, (we do that in order to avoid memorizing register introudced for tm1s, and save local memory */
-  val mem: Array[Array[Int]] = Array.ofDim[Int](controller.progCA.CAmemWidth(), medium.nbInt32CAmem + 1)
+  val mem: Array[Array[Int]] = Array.ofDim[Int](controller.progCA.CAmemWidth(), medium.nbInt32CAmem)
 
   /** associated pannel */
   var pannel: CApannel = null //to be set latter due to mutual recursive definition
@@ -59,7 +59,8 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
       /** fields layerName's components */
       val memFields2Init: Seq[Array[Int]] = memFields(layerName) //gets the memory plane
       val initNameFinal = initName.getOrElse(layerName, controller.initName(layerName)) //either it is the root layer or we find it in env
-      val initMethod: Init = medium.initSelect(initNameFinal, controller.locusOfDisplayedOrDirectInitField(layerName))
+      val initMethod: Init = medium.initSelect(initNameFinal,
+        controller.locusOfDisplayedOrDirectInitField(layerName), controller.bitSizeDisplayedOrDirectInitField.getOrElse(layerName, 1))
       initMethod.init(memFields2Init.toArray) //we pass the locus here, several init are reused with different locus, such as def/center/yaxis
     }
   }

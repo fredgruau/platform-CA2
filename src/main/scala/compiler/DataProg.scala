@@ -817,22 +817,24 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     //dagis.visitedL=dagis.visitedL.reverse.map(_)
     new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.radiusify3 }, p.tSymbVar, paramD, paramR, coalesc)
   }
+  /*
 
-  def radiusify2: DataProg[InfoNbit[_]] = {
-    val radius: TabSymb[Int] = mutable.HashMap.empty //stores all the radius of the id in that symbol tables.
-    val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
-    if (isLeafCaLoop)
-      dagis.visitedL = dagis.visitedL.reverse.map(_.radiusify3(radius, p.tSymbVar))
-    new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.radiusify2 }, p.tSymbVar, paramD, paramR, coalesc)
-  }
+    def radiusify2: DataProg[InfoNbit[_]] = {
+      val radius: TabSymb[Int] = mutable.HashMap.empty //stores all the radius of the id in that symbol tables.
+      val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
+      if (isLeafCaLoop)
+        dagis.visitedL = dagis.visitedL.reverse.map(_.radiusify3(radius, p.tSymbVar))
+      new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.radiusify2 }, p.tSymbVar, paramD, paramR, coalesc)
+    }
 
-  def radiusify: DataProg[InfoNbit[_]] = {
-    val radius: TabSymb[(Int, Option[Modifier])] = mutable.HashMap.empty //stores all the radius of the id in that symbol tables.
-    val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
-    if (isLeafCaLoop)
-      dagis.visitedL.reverse.map(_.radiusify(radius, p.tSymbVar))
-    new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.radiusify }, p.tSymbVar, paramD, paramR, coalesc)
-  }
+    def radiusify: DataProg[InfoNbit[_]] = {
+      val radius: TabSymb[(Int, Option[Modifier])] = mutable.HashMap.empty //stores all the radius of the id in that symbol tables.
+      val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
+      if (isLeafCaLoop)
+        dagis.visitedL.reverse.map(_.radiusify(radius, p.tSymbVar))
+      new DataProg(dagis, funs.map { case (k, v) ⇒ k -> v.radiusify }, p.tSymbVar, paramD, paramR, coalesc)
+    }
+  */
 
   /**
    * @param m models the "machine"'s communications
@@ -922,7 +924,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       new DataProg(dagisWithShift, noSubFun, p.tSymbVar, paramD, paramR)
     }
 
-    val p2 = alignShift() //produces tabAlign
+    val p2 = alignShift() //produces tabAlign, introduit deux shifts.
     print(tabAlign.map({ case (k, v) => "" + k + v.toSeq }))
     println("dag produced by alignShift\n" + p2) //display result of  alignShift.
     val (z2, myRoot, align2root: Map[String, Array[Int]]) = p2.zones2(cycleConstraints, tabAlign)

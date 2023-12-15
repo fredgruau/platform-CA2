@@ -1,8 +1,9 @@
 package triangulation
 
 import java.awt.{Color, Polygon}
-
+import java.lang.Integer.decode
 import math.min
+import scala.collection.immutable.HashMap
 import scala.swing.Dimension
 
 /** contains all the simple static functions needed for simulation */
@@ -43,6 +44,14 @@ object Utility {
     return time
   }
 
+  /** allume le nombre de bits correponsdants en début d'entier. faut faire +2 par exemple pour 8 ca allume 10 bits.
+   * used to move entire lines */
+  val maskCompact: Map[Int, Int] = HashMap(6 -> 0xFF000000, 8 -> 0xFFC00000, 14 -> 0xFFFF0000, 30 -> 0xFFFFFFFF)
+  /** used to move bits within each line. */
+  val maskSparse: Map[Int, Int] = HashMap(6 -> 0x01010101, 8 -> (1 | 1 << 10 | 1 << 20), 14 -> 0x00010001, 30 -> 0x00000001)
+
+  def writeInt32(dest: Int, src: Int, mask: Int): Int =
+    (dest & ~mask) | (src & mask)
   /**
    *
    * @param input Int storing a stack of bits
@@ -118,7 +127,7 @@ object Utility {
    * @param bits       the number of bits you want to have/emulate, ...
    * @return
    */
-  def rol(x: Int, firstshift: Int, bits: Int): Int = {
+  def rol(x: Int, firstshift: Int, bits: Int = 32): Int = {
     if (firstshift < 0) return ror(x, -firstshift, bits)
     val shift = firstshift % bits
     // masks                           |       bits        |
@@ -130,7 +139,7 @@ object Utility {
   }
 
   //---------------------------------------------------------------------------
-  def ror(x: Int, firstshift: Int, bits: Int): Int = {
+  def ror(x: Int, firstshift: Int, bits: Int = 32): Int = {
     if (firstshift < 0) return rol(x, -firstshift, bits)
     val shift = firstshift % bits
     val m0 = (1 << (bits - shift)) - 1
@@ -170,6 +179,7 @@ object Utility {
     for (j <- (0 until blockSize))
       t(i + j) = t(i1 + j)
 
+  /** in a second step, we create  space between block so has to be able to shift only with << or >> */
   def interleaveSpace(memCAint32: Array[Int], nbBlock: Int, blockSize: Int) =
     for (i <- (0 until nbBlock).reverse)
       move(memCAint32, i * blockSize, 2 + i * (blockSize + 1), blockSize)

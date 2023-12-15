@@ -1,20 +1,20 @@
 package simulator;
 
-import java.util.HashMap;
-
 /**
  * static functions used for bit manipulation
  */
 public class UtilBitJava {
     /** mask(i) is true for the index of the bits that should be set through propagation from the right */
-    public final static HashMap<Integer, Integer> mask = new HashMap<>();
+ /*   public final static HashMap<Integer, Integer> mask = new HashMap<>();
 
-    static {
+
+    static { //the right most binary digit, i.e. the lsb, is one.
         mask.put(new Integer(6), new Integer(0x01010101));
-        mask.put(new Integer(8), new Integer(1 | 1 << 10 | 1 << 20));  //0x00100801)  0b00000000000100000000010000000001
+        mask.put(new Integer(8), new Integer(1 | 1 << 10 | 1 << 20));  //construit "par la droite"  0b00000000000100000000010000000001
         mask.put(new Integer(14), new Integer(0x00010001));
         mask.put(new Integer(32), new Integer(0x00000001));
-    }
+
+    }*/
 
     final static int maskRight = (1 << 31) - 1;  // 0|1111111111111111111111111111111
     final static int maskLeft = maskRight << 1;    // 1111111111111111111111111111111|0
@@ -66,6 +66,24 @@ public class UtilBitJava {
         v = v & ~(bitMaskx << nbCol + 1) | bitRight << nbCol;
         return v;
     }
+
+    public static int propagateBitxand1Old(int v, int nbCol, int maskSpars) {
+        v = moveBitxtoy(v, nbCol, 0, maskSpars);
+        v = moveBitxtoy(v, 1, nbCol + 1, maskSpars);
+        return v;
+    }
+
+    //x=1 y=nbcol
+
+    /**
+     * in V, moves bits at position x, to position y
+     */
+    public static int moveBitxtoy(int v, int x, int y, int bitMaskx) {
+        int bitLu = v & (bitMaskx << x);
+        v = v & ~(bitMaskx << y) | (x < y ? (bitLu << (y - x)) : (bitLu >>> (x - y)));
+        return v;
+    }
+
 
     final static int bitMask16 = 0x00010001;
     final static int maskRight16 = ~bitMask16;

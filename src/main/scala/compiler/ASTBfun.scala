@@ -75,7 +75,7 @@ object ASTBfun {
     Fundef2(s, Mapp2(x, y, op2), x, y)
   }
 
-  private val orB: Fundef2R[B] = fundef2Bop2(Or(_, _), "orb")
+  val orB: Fundef2R[B] = fundef2Bop2(Or(_, _), "orb")
   private val (orSI, orUI) = {
     def orI[R <: I](implicit m: repr[R]) = fundef2Imapp2(orB, "orI"); (orI[SI], orI[UI])
   }
@@ -425,6 +425,12 @@ object ASTBfun {
     else (orB.asInstanceOf[Fundef2[R, R, R]], False().asInstanceOf[ASTB[R]])
   }
 
+  /** OrR2 will be allways true on the border */
+  def or2Redop[R <: Ring](implicit n: repr[R]): redop[R] = {
+    if (n.name.isInstanceOf[SI]) (orSI.asInstanceOf[Fundef2[R, R, R]], Intof[SI](-1).asInstanceOf[ASTB[R]])
+    else if (n.name.isInstanceOf[UI]) (orUI.asInstanceOf[Fundef2[R, R, R]], Intof[UI](-1).asInstanceOf[ASTB[R]])
+    else (orB.asInstanceOf[Fundef2[R, R, R]], True().asInstanceOf[ASTB[R]])
+  }
   def andRedop[R <: Ring](implicit n: repr[R]): redop[R] = {
     if (n.name.isInstanceOf[SI]) (andSI.asInstanceOf[Fundef2[R, R, R]], Intof[SI](0).asInstanceOf[ASTB[R]])
     if (n.name.isInstanceOf[UI]) (andUI.asInstanceOf[Fundef2[R, R, R]], Intof[SI](0).asInstanceOf[ASTB[R]])

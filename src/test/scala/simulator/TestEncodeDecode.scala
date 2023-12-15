@@ -78,6 +78,38 @@ class TestEncodeDecode extends FunSuite with BeforeAndAfter {
     m.decode(lCAmem, lCAoutput)
     assert(list(lCAinput) == list(lCAoutput))
   }
+
+  def setLineTrue(T: Array[Boolean]) =
+    for (i <- 0 until T.length)
+      T(i) = true
+
+
+  def mirror(mem: Array[Int], nbLineCA: Int, nbColCA: Int): Unit = {
+    mem(2) = writeInt32(mem(2), ror(mem(4), 1), maskCompact(nbColCA)) //copy line 2, to line 0
+    val nbLinePerInt = 32 / (nbColCA + 2)
+    val nbIntUsed = nbLineCA / nbLinePerInt
+    val last = nbIntUsed + 2 - 1
+    //1= 2 - 1
+    mem(last) = writeInt32(mem(last), rol(mem(last - 2), 1), maskCompact(nbColCA) >>> (32 - 2 - nbColCA)) //copy line last-2, to last line
+
+    val u = 0
+  }
+
+  test("miror<=32") {
+    val lCAinput = Array.ofDim[Boolean](16, 6)
+    lCAinput(2)(2) = true //we but something into the next next  firstligne
+    lCAinput(13)(2) = true //we but something into the avant avant dernier ligne
+    val lCAoutput = Array.ofDim[Boolean](16, 6)
+    val lCAmem = Array.ofDim[Int](10)
+    val m = Medium(16, 6, 30, null)
+    m.encode(lCAinput, lCAmem)
+    mirror(lCAmem, 16, 6)
+    //lCAmem(2)=writeInt32(lCAmem(2),lCAmem(4) >>> 1, maskSmall(6) ) //copy line 2 into line 0
+    m.decode(lCAmem, lCAoutput)
+    assert(lCAinput(2).toList == lCAoutput(0).toList)
+    assert(lCAinput(13).toList == lCAoutput(15).toList) //line number 9 should have copied to line 11
+  }
+
   test("encodeDecode<=32 camem plus grand") {
     val lCAinput = Array.ofDim[Boolean](12, 14)
     randomFill(lCAinput)

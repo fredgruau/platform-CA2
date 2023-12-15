@@ -211,14 +211,6 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
    *          know where to store it.
    * @return radius and modifier of expression
    */
-  def radiusify2(r: TabSymb[Int], t: TabSymb[InfoNbit[_]]): Int =
-    this.asInstanceOf[AST[_]] match {
-      case Read(s) => t(s).k match {
-        case ParamD() | LayerField(_, _) => 0
-        case MacroField() => r(s) //we must have computed it before, and stored it in r
-      }
-    }
-
   def radiusify3(r: TabSymb[Int], t: TabSymb[InfoNbit[_]]): (Int, ASTLt[L, R]) =
     (this.asInstanceOf[AST[_]] match {
       case Read(s) => t(s).k match {
@@ -229,13 +221,24 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
 
     }, this)
 
-  def radiusify(r: TabSymb[(Int, Option[Modifier])], t: TabSymb[InfoNbit[_]]): (Int, Option[Modifier]) =
-    this.asInstanceOf[AST[_]] match {
-      case Read(s) => t(s).k match {
-        case ParamD() => startRadius(locus)
-        case MacroField() => r(s) //we should have computed it before, and stored it in r
+  /*
+
+    def radiusify2(r: TabSymb[Int], t: TabSymb[InfoNbit[_]]): Int =
+      this.asInstanceOf[AST[_]] match {
+        case Read(s) => t(s).k match {
+          case ParamD() | LayerField(_, _) => 0
+          case MacroField() => r(s) //we must have computed it before, and stored it in r
+        }
       }
-    }
+
+    def radiusify(r: TabSymb[(Int, Option[Modifier])], t: TabSymb[InfoNbit[_]]): (Int, Option[Modifier]) =
+      this.asInstanceOf[AST[_]] match {
+        case Read(s) => t(s).k match {
+          case ParamD() => startRadius(locus)
+          case MacroField() => r(s) //we should have computed it before, and stored it in r
+        }
+      }
+  */
 
 
   /** Only read node are non ASTL nodes and are treated in ASTLt. */

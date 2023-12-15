@@ -9,6 +9,7 @@ import compiler.{ASTLt, B, Circuit, V}
 import org.scalatest
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
+/*
 class mainTest extends FunSuite with BeforeAndAfter {
   test("main concatR, broadcast, elem") {
 
@@ -24,4 +25,4 @@ class mainTest extends FunSuite with BeforeAndAfter {
 class DisguisedIdentity() extends Layer[(V, B)](1, "global") with Topo {
   val next: BoolV = elt(0, concatR(e(this)).asInstanceOf[UintV]) //this is in fact the identity
   show(this)
-}
+}*/

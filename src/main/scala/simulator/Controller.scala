@@ -43,8 +43,9 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   /** this is for the display, this is not the number of lines and columns. */
   val CAwidth: Int = xInt(simulParam, "display", "@CAwidth")
 
-  val globalInitNames = fromXMLasList((globalInit \\ "inits").head).toArray
+  val globalInitNames: Array[String] = fromXMLasList((globalInit \\ "inits").head).toArray
   val selectedGlobalInit: Int = xInt(globalInit, "selected", "@rank") //which is the starting value for global init
+  val randomInitNames: Array[Int] = (0 to 9).toArray
 
   /** check that global variables (layer and shown) do not share offset. */
   def invariantFieldOffset = {
@@ -158,9 +159,12 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   val globalInitList = new ComboBox[String](globalInitNames) {
     selection.item = globalInitNames(selectedGlobalInit)
   }
-  val randomRootField = new TextField("" + randomRoot, 2)
-  contents += (globalInitList, randomRootField)
-  listenTo(globalInitList.selection, randomRootField)
+  val randomInitList = new ComboBox[Int](randomInitNames) {
+    selection.item = 0
+  }
+  //val randomRootField = new TextField("" + randomRoot, 2)
+  contents += (globalInitList, randomInitList) //, randomRootField)
+  listenTo(globalInitList.selection, randomInitList.selection)
 
 
 
@@ -180,9 +184,9 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   listenTo(this.keys)
   //listenTo(mouse.clicks)
   reactions += {
-    case EditDone(_) =>
+    /*case EditDone(_) =>
       randomRoot = Integer.parseInt(randomRootField.text)
-      InitButton.doClick() //we assume that we want a new random setting
+      InitButton.doClick() //we assume that we want a new random setting*/
     case ExpandLayer(s) =>
       expandedLayers += s
       updateAndSaveXMLparamCA()
@@ -253,6 +257,10 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
     case SelectionChanged(`globalInitList`) =>
       InitButton.doClick()
       updateAndSaveXMLGlobalInit()
+    case SelectionChanged(`randomInitList`) =>
+      randomRoot = randomInitList.selection.item
+      InitButton.doClick()
+
   }
   focusable = true
   requestFocus

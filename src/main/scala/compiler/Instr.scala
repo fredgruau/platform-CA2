@@ -42,13 +42,15 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
   def unfoldInt(t: TabSymb[InfoNbit[_]]): List[Instr]
 
 
-  def radiusify2(radius: TabSymb[Int], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {}
-
   def radiusify3(radius: TabSymb[Int], tSymbVar: TabSymb[InfoNbit[_]]): Instr = {
     null
   } //implemented only in  Affect
 
-  def radiusify(radius: TabSymb[(Int, Option[Modifier])], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {}
+  /*
+    def radiusify(radius: TabSymb[(Int, Option[Modifier])], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {}
+
+    def radiusify2(radius: TabSymb[Int], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {}
+  */
 
   protected def show(x: Option[Locus]) = x match {
     case Some(s) => "" + s
@@ -691,13 +693,6 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
    * @param radius contains the already computer radius
    * @param tSymbVar
    */
-  override def radiusify2(radius: TabSymb[Int], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {
-    val r: Int = exp.asInstanceOf[ASTLt[_ <: Locus, _ <: Ring]].radiusify2(radius, tSymbVar)
-    radius.addOne(name -> r) //we store radius of identifier for future use.
-    if (tSymbVar(name).k.isParamR)
-      tSymbVar.addOne(name -> tSymbVar(name).radiusify2(r)) //for paramR, we modify the symbol table
-  }
-
   override def radiusify3(radius: TabSymb[Int], tSymbVar: TabSymb[InfoNbit[_]]): Instr = {
     val (r, newExp) = exp.asInstanceOf[ASTLt[_ <: Locus, _ <: Ring]].radiusify3(radius, tSymbVar)
     radius.addOne(name -> r) //we store radius of identifier for future use.
@@ -706,12 +701,22 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
     new Affect(name, newExp)
   }
 
-  override def radiusify(radius: TabSymb[(Int, Option[Modifier])], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {
-    val (r, modifier): (Int, Option[Modifier]) = exp.asInstanceOf[ASTLt[_ <: Locus, _ <: Ring]].radiusify(radius, tSymbVar)
-    radius.addOne(name -> (r, modifier)) //we store radius of identifier for future use.
-    if (tSymbVar(name).k.isParamR)
-      tSymbVar.addOne(name -> tSymbVar(name).radiusify2(r)) //for paramR, we modify the symbol table
-  }
+  /*
+    override def radiusify2(radius: TabSymb[Int], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {
+      val r: Int = exp.asInstanceOf[ASTLt[_ <: Locus, _ <: Ring]].radiusify2(radius, tSymbVar)
+      radius.addOne(name -> r) //we store radius of identifier for future use.
+      if (tSymbVar(name).k.isParamR)
+        tSymbVar.addOne(name -> tSymbVar(name).radiusify2(r)) //for paramR, we modify the symbol table
+    }
+
+
+    override def radiusify(radius: TabSymb[(Int, Option[Modifier])], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {
+      val (r, modifier): (Int, Option[Modifier]) = exp.asInstanceOf[ASTLt[_ <: Locus, _ <: Ring]].radiusify(radius, tSymbVar)
+      radius.addOne(name -> (r, modifier)) //we store radius of identifier for future use.
+      if (tSymbVar(name).k.isParamR)
+        tSymbVar.addOne(name -> tSymbVar(name).radiusify2(r)) //for paramR, we modify the symbol table
+    }
+  */
 
   /**
    *

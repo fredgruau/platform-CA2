@@ -1,8 +1,8 @@
-package triangulation
+package triangulation //toto
 
 import compiler.{T, _}
 import simulator.CAtype.pointLines
-import simulator.UtilBitJava.{propagateBit14and1, propagateBit6and1, propagateBitxand1}
+import simulator.UtilBitJava.{moveBitxtoy, propagateBit14and1, propagateBit6and1, propagateBitxand1}
 import simulator.{Controller, Env, PrShift, UtilBitJava}
 import triangulation.Medium._
 import triangulation.Utility._
@@ -477,18 +477,62 @@ object Medium {
         assert(nbColCA % 30 == 0, "nbCol is a multiple of 30")
         /** number of ints needed storing the booleans of one bit plane of the CA memory */
         override val nbInt32: Int = (nbLineCA * nbColCA) / 30
-        /** the number of "macro columns, two if nbColumn=60" */
+        /** the number of "macro columns, two if nbColumn=60, a line is mapped to two columns, in a toroidal way." */
         val nbBlock: Int = nbColCA / 30
         /** we need to insert one integer as a buffer between each macro columns, plus two before and one after */
-        override val nbInt32CAmem: Int = (nbLineCA + 1) * nbBlock + 2
-        override val propagate4Shift: PrShift = (h: Array[Int]) => {
-          val blockSizeInterleaved = nbLineCA + 1
-          val nbInt32total: Int = nbBlock * blockSizeInterleaved //we have to take the interleaved space into account
-          val nbInnerLoop: Int = nbBlock
-          for (i <- 0 until nbInnerLoop)
-            for (j <- i * blockSizeInterleaved until (i + 1) * blockSizeInterleaved) {
-              UtilBitJava.propagateBit1and30(h, 1 + j, 1 + (j + blockSizeInterleaved) % nbInt32total)
-            }
+        override val nbInt32CAmem: Int = (nbLineCA + 1) * nbBlock + 3
+        val blockSizeInterleaved = nbLineCA + 1 //number of int32 in a column
+
+        /**
+         *
+         * @param mem  copies an entire line   of mem into another entire line
+         * @param src  source line
+         * @param dest destination line
+         */
+        def copyEntireLine(mem: Array[Int], src: Int, dest: Int) = {
+          // for (i <-  0 until nbLineCA+1)) { //i parcours les lignes
+          for (j <- 0 until nbBlock)
+            mem(1 + dest + j * blockSizeInterleaved) = mem(1 + src + j * blockSizeInterleaved)
+        }
+
+        def rotateEntireLineRigt(mem: Array[Int], line: Int) = {
+          //  val line2rotated=( line2Trunc >>>1  | (line2Trunc <<(nbColCA-1) )) & maskFirst
+
+          val lastIndex = 1 + line + (nbBlock - 1) * blockSizeInterleaved - 1
+          var previousFirstBit = mem(lastIndex) & 2
+          for (j <- 0 until nbBlock) {
+            val indexCur = 1 + line + j * blockSizeInterleaved
+            val nextFirstbit = mem(indexCur) & 2 //save for the next iteration before mem(indexCur) is written
+            mem(indexCur) = mem(indexCur) >>> 1 | previousFirstBit << 29
+            previousFirstBit = nextFirstbit
+          }
+
+        }
+
+        override val propagate4Shift: PrShift = new PrShift() {
+          def propagate4shift(mem: Array[Int]): Unit = {
+            mirror(mem)
+            val nbInt32total: Int = nbBlock * blockSizeInterleaved //we have to take the interleaved space into account
+            val nbInnerLoop: Int = nbBlock
+            for (i <- 0 until nbInnerLoop) //i index of a macro columns
+              for (j <- i * blockSizeInterleaved until (i + 1) * blockSizeInterleaved) { //j traverse macro coloni
+                UtilBitJava.propagateBit1and30(mem, 1 + j, 1 + (j + blockSizeInterleaved) % nbInt32total)
+              }
+          }
+
+          override def mirror(mem: Array[Int]): Unit = {
+            def copyLine(src: Int, dest: Int) = copyEntireLine(mem, src + 1, dest + 1)
+
+            def rotateLineRight(i: Int) = rotateEntireLineRigt(mem, i + 1)
+
+            //process top line
+            copyLine(2, 0)
+            rotateLineRight(0)
+            //process Bottom line
+            // copyLine(nbLineCA-2,nbLineCA)            rotateLineLeft(2,1)
+
+
+          }
         }
 
         /**
@@ -530,21 +574,104 @@ object Medium {
       assert((nbColCA == 6 || nbColCA == 8 || nbColCA == 14) && (nbLineCA % nbLignePerInt32) == 0, "nbCol must be  6, 8 or 14, all the int32 are used completely")
       /** number of ints needed storing the booleans of one bit plane of the CA memory */
       override val nbInt32: Int = nbLineCA / nbLignePerInt32 //for each lines, we need two separating bits
-
+      assert(nbInt32 % 2 == 0) //we need an event number of integers, so that each int will regroupe line with identical parity
+      // which will result in a simpler scheme for implementing  the axial symmetry of vertical axis.
       /** number of Int32 needed for one bit plan of the CA memory * */
-      override def nbInt32CAmem: Int = 3 + nbInt32 //we need two extra int32 before and one int32 after.
+      override def nbInt32CAmem: Int = 4 + nbInt32 //we need two extra int32 before and two int32 after.
 
       override val propagate4Shift: PrShift = new PrShift() {
-        def propagate4shift(t: Array[Int]): Unit = {
-          val tlength = t.length - 1
-          val last = t(tlength - 2) //last integer
-          val first = t(2) //first integer. normal bits start at t[2]
-          t(1) = last >>> (nbColCA + 2) //we start by computing  the very first integer t[1]
-          t(tlength - 1) = first << (nbColCA + 2) //and then the very last integer t[tlength - 2]
-          val masks: Map[Integer, Integer] = UtilBitJava.mask.asScala.toMap
-          val m: Integer = masks(new Integer(nbColCA)).toInt
-          for (i <- 1 until tlength)
-            t(i) = propagateBitxand1(t(i), nbColCA, m)
+        def addMod(i: Int, j: Int) = (i + j + nbColCA) % nbColCA
+
+        val first = 2;
+        val last = 1 + nbInt32
+        val maskS: Integer = maskSparse(nbColCA)
+        val bout = 32 % (nbColCA + 2)
+        /** we build the move computed for the first line* */
+        val (movesEven, movesOdd) = {
+          var even: Map[Int, Int] = HashMap.empty
+          var odd: Map[Int, Int] = HashMap.empty
+          var leftMost = 32 - bout - (nbColCA + 2) + 1
+          var destLeft = nbColCA - 1 //index modulo nbCol of leftmost and right most value of line, place where we will copy
+          while (leftMost > 0) //last value is 1
+          {
+            val destRight = addMod(destLeft, -nbColCA + 1)
+            even = even + (leftMost + addMod(destLeft, -2) -> (leftMost + destLeft))
+            odd = odd + (leftMost + addMod(destLeft, -1) -> (leftMost + destLeft))
+            even = even + (leftMost + addMod(destRight, +1) -> (leftMost + destRight))
+            odd = odd + (leftMost + addMod(destRight, +2) -> (leftMost + destRight))
+            leftMost -= nbColCA + 2
+            destLeft = addMod(destLeft, nbInt32 / 2) //le decalage augmente en rapport avec le nombre d'entier
+
+            if (destLeft >= nbColCA)
+              throw new Exception("pb addmod")
+          }
+          (even, odd)
+        }
+
+        /** due to rotation, we must add a supplementary shift, to even and odd */
+        def shift(i: Int, shiftRange: Int): Int = {
+          val offset = i - i % (nbColCA + 2)
+          val iroot = i - offset - 1
+          val ishifted = addMod(iroot, shiftRange)
+          val res = ishifted + offset + 1
+          if (shiftRange == 0 && res != i) throw new Exception("shift Error")
+          res
+        }
+
+        def shift(h: Map[Int, Int], shiftRange: Int): Map[Int, Int] = h.map({ case (k, v) => (shift(k, shiftRange), shift(v, shiftRange)) })
+
+
+        def propagate4shift(mem: Array[Int]): Unit = {
+          mirror(mem)
+          mem(first - 1) = mem(last) >>> (nbColCA + 2) //we start by computing  the very first integer t[first-1]
+          mem(last + 1) = mem(first) << (nbColCA + 2) //and then the very last integer t[last+1]
+
+          for (i <- 1 until last + 1)
+            mem(i) = propagateBitxand1(mem(i), nbColCA, maskS)
+        }
+
+        def print(m: Array[Int]) =
+          for (n <- first to last)
+            System.out.println((m(n) | 0x80000000).toBinaryString)
+
+
+        /** applies a precomputed list of move, (distinct for even or odd int32. */
+        def applyMove(v: Int, moves: Map[Int, Int], mask: Int): Int = {
+          var res = v
+          for (move <- moves)
+            res = moveBitxtoy(res, move._1, move._2, mask)
+          res
+        }
+
+        def mirror(mem: Array[Int]): Unit = {
+          //process top line
+          val bout = 32 % (nbColCA + 2)
+          val maskFirst = maskCompact(nbColCA) >> bout //cover the first line. we pass over the first two bits, for nbCol+2=10
+          val line2 = if (nbInt32 > 2) mem(4) else mem(first) << nbColCA + 2 //faut aussi rotationner les bits eux meme
+          val line2Trunc = line2 & maskFirst
+          val line2rotated = (line2Trunc >>> 1 | (line2Trunc << (nbColCA - 1))) & maskFirst
+          mem(first) = writeInt32(mem(first), line2rotated, maskFirst) //copy line 2, to line 0
+          //process bottom line
+          val maskOffset = (nbLignePerInt32 - 1) * (nbColCA + 2)
+          val maskLast = maskFirst >>> maskOffset
+          val linem2 = if (nbInt32 > 2) mem(last - 2) else mem(last) >>> (nbColCA + 2)
+          val linem2Trunc = linem2 & maskLast //faut aussi rotationner les bits eux meme
+          val linem2Rotated = (linem2Trunc << 1 | (linem2Trunc >>> (nbColCA - 1))) & maskLast //& 0x00000002
+          mem(last) = writeInt32(mem(last), linem2Rotated, maskLast) //copy line last-2, to last line
+          //process right and left column using precomputed  movesEven and movesOdd
+          print(mem)
+          val maskSlim = 1 //we will now have to move bit by bit, because the moves are not uniform across a given integers
+          for (i <- first - 1 until last + 1) {
+            val mv = shift(if (i % 2 == 0) movesEven else movesOdd, i / 2 - 1) //adds a shift i/2-1 to the move computed for the first line
+            mem(i) = applyMove(mem(i), mv, maskSlim)
+          }
+          print(mem)
+          val u = 0
+          //process left columne
+
+          /*         for(n<-List(maskFirst,maskLast,linem2,linem2Rotated,mem(last),mem(2)))
+                       System.out.println((n|0x80000000).toBinaryString)
+                    val u=0*/
         }
       }
       //PrepareShift.prepareShiftGte30
@@ -554,12 +681,14 @@ object Medium {
        *
        * @param memCAbool  boolean bit plane isomorph to the Cellular AUtomaton structure
        * @param memCAint32 compressed form into a 1D array of 32 bits Integers, on which iteration will proceeds
+       *                   if nbColCA = 8 memCAint32(k) contains 4  block of 8 bits, the first one starting at position k, with a space of
+       *                   nbLine/4 in between
        */
       override def encode(memCAbool: Array[Array[Boolean]], memCAint32: Array[Int]): Unit = {
         for (i <- 0 until nbLineCA) { //we iterate on the CA lines,
           /** how much do we need to rotate */
           val shift = (i / 2) % nbColCA
-          val rotated = rotateLeft(memCAbool(i), shift)
+          val rotated = rotateLeft(memCAbool(i), shift) // takes into account the fact that lines get shifted
           /** index of target Int32, which implements interleaving */
           val index = i % nbInt32
           memCAint32(index) = memCAint32(index) << 1 //separating bit
@@ -645,16 +774,16 @@ trait InitSelect {
    * @return an  "Init" which can initialize a layer, because of lazy, this init is created once and then reused
    *         this is the only public method provided by the initSelect trait,
    */
-  def initSelect(initMethodName: String, l: Locus): Init = {
+  def initSelect(initMethodName: String, l: Locus, nbit: Int): Init = {
     val finalInitMethodName = if (initMethodName == "global") env.controller.globalInitList.selection.item //currently selected init method
     else initMethodName
     finalInitMethodName match {
       case "0" => zeroInit
-      case "0" => unInit
+      case "true" => unInit
       case "center" => centerInit
       case "points" => pointsInit
       case "debug" => zeroInit
-      case "sparse" => sparseInit(l)
+      case "sparse" => sparseInit(l, nbit)
       case "def" => defInit(l) //here we must take into account the locus, we use a method instead of a lazy val in order to save space
       case "xaxis" => xaxisInit
       case "yaxis" => yaxisInit
@@ -690,8 +819,13 @@ trait InitSelect {
   }
   private lazy val zeroInit: InitMaald = new InitMaald(1) {} //nothing to do, the boolV field would be zero by default.
   private lazy val unInit: InitMaald = new InitMaald(1) {
+    for (i <- 2 until nbLineCA - 2) {
+      val (j0, j1) = if (i % 2 == 0) (2, nbColCA - 1) else (1, nbColCA - 2)
+      for (j <- j0 until j1) {
+        boolVField(i)(j) = true
 
-
+      }
+    }
   } //n
   private lazy val dottedBorderInit: InitMold = new InitMold(V(), 1) {
     for (i <- 0 until nbLineCA) if (i % 2 == 0) {
@@ -728,12 +862,16 @@ trait InitSelect {
             setMemField(d, i, j)
   }
 
-  private def sparseInit(l: Locus): Init = new InitMold(l, 1) {
-    for (d <- 0 until l.density)
-      for (i <- 0 until nbLineCA)
-        for (j <- 0 until nbColCA)
-          if (env.rand.nextFloat() < 0.05) //locusPlane(l)(d)(i)(j).isDefined)
-            setMemField(d, i, j)
+  private def sparseInit(l: Locus, nbit: Int): Init = new InitMold(l, nbit) {
+    for (f <- memFields)
+      for (i <- 2 until nbLineCA - 2) {
+        val (j0, j1) = if (i % 2 == 0) (2, nbColCA - 1) else (1, nbColCA - 2)
+        for (j <- j0 until j1) {
+          if (env.rand.nextFloat() < 0.5) //locusPlane(l)(d)(i)(j).isDefined)
+            f(i)(j) = true
+        }
+        //setMemField(f, i, j)
+      }
   }
   /** contains material used for InitMaald */
   trait BoolVField {
@@ -765,7 +903,7 @@ trait InitSelect {
   }
 
   private class InitMold(val locus: Locus, val nbit: Int) extends Init {
-    assert(nbit == 1, "we assume that we do not initalize int fields, only boolean fields")
+    //    assert(nbit == 1, "we assume that we do not initalize int fields, only boolean fields")
     /** use as a tmp list of arrays of booleans, to more  easily computes the initial values */
     val memFields: Array[Array[Array[Boolean]]] = Array.ofDim[Boolean](locus.density * nbit, nbLineCA, nbColCA)
     /** simplification for the common case which is a boolV field */
