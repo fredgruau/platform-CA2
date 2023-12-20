@@ -484,27 +484,22 @@ object Medium {
         /** we need to insert one integer as a buffer between each macro columns, plus two before and one after */
         override val nbInt32CAmem: Int = nbLineCAp1 * nbIntPerLine + 3
         val first = 2; //index of first integer of first line really used
-        val last = nbLineCA - 1 //index of first integer of  last line really used
+        val last = nbLineCA + 1 //index of first integer of  last line really used
 
         override val propagate4Shift: PrShift = new PrShift() {
           def prepareBit(mem: Array[Int]): Unit = {
             mirror(mem)
             propage4Shift(mem)
           }
-
           def propage4Shift(mem: Array[Int]): Unit =
             for (i <- 0 until nbIntPerLine) //i index of a macro columns
               for (j <- i * nbLineCAp1 until (i + 1) * nbLineCAp1) //j traverse macro coloni
                 UtilBitJava.propagateBit1and30(mem, 1 + j, 1 + (j + nbLineCAp1) % nbIntPerLine * nbLineCAp1)
 
 
-
-
           override def mirror(mem: Array[Int]): Unit = {
             def copyLine(src: Int, dest: Int) = copyEntireLine(mem, src + 1, dest + 1, nbIntPerLine, nbLineCAp1)
-
             def rotateLineRight(i: Int) = rotateEntireLineRigt(mem, i + 1, nbIntPerLine, nbLineCAp1)
-
             def rotateLineLeft(i: Int) = rotateEntireLineLeft(mem, i + 1, nbIntPerLine, nbLineCAp1)
 
             //process top line
@@ -514,17 +509,15 @@ object Medium {
             copyLine(nbLineCA - 3, nbLineCA - 1)
             rotateLineLeft(nbLineCA - 1) //a rotation of range 1, because the index diff is 2
 
-            //process right and left column using precomputed  moves in movesEven and movesOdd
-
-            val maskSlim = 1 //we will now have to move bit by bit, because the moves are not uniform across a given integers
-            var movesEven = HashMap[Int, Int](1 -> 0, (nbColCA - 3) -> (nbColCA - 1)) //here moves are between 0 and nbCOl-1
-            var movesOdd = HashMap[Int, Int](2 -> 0, (nbColCA - 2) -> (nbColCA - 1))
-
-            def shift(bitPos: Int, shiftRange: Int): Int = (bitPos + shiftRange + nbColCA) % nbColCA
-
+            //wenow process right and left column
+            // we  precomputed  moves movesEven and movesOdd, which differ depending on the parity of the line index
+            //we  have to move individual bits, because the moves are not uniform across considered integers
+            val movesEven = HashMap[Int, Int](1 -> 0, (nbColCA - 3) -> (nbColCA - 1)) //here moves are between 0 and nbCOl-1
+            val movesOdd = HashMap[Int, Int](2 -> 0, (nbColCA - 2) -> (nbColCA - 1))
             /** due to rotation, we must add a supplementary shift to even and odd,
              * shifted  moves are still  between 0 and nbCOl-1 */
             def shiftMv(h: Map[Int, Int], shiftRange: Int): Map[Int, Int] = {
+              def shift(bitPos: Int, shiftRange: Int): Int = (bitPos + shiftRange + nbColCA) % nbColCA
               h.map({ case (k, v) => (shift(k, shiftRange), shift(v, shiftRange)) })
             }
 
@@ -541,7 +534,6 @@ object Medium {
               (startCol + line, bitPos % 30 + 1) //, +1 because first bit is reserved for propagation from neighbor
             }
 
-
             /**
              *
              * @param mv   spefies src and target destination for a single bit, within a CA line of nbColCA cells
@@ -554,22 +546,17 @@ object Medium {
               val bitRead = getBitx(mem(iIntSrc), ibitSrc)
               mem(iIntDest) = putBitx(mem(iIntDest), ibitDest, bitRead)
               //for debug printMem(mem(iIntDest))
-              val u = 0
             }
 
-            for (i <- 2 until nbLineCA + 2) {
+            for (i <- first to last) {
               val moves = shiftMv(if (i % 2 == 0) movesEven else movesOdd, i / 2 - 1) //adds a shift i/2-1 to the move computed for the first line
-              for (mv <- moves) {
-                applyMove(mv, (i - 2), mem)
-              }
+              //the -1 comes for the fact that we start at 2
+              for (mv <- moves) applyMove(mv, (i - 2), mem)
             }
-
-
           }
         }
         /**
          * encode from boolean to ints 32 bits
-         *
          * @param memCAbool  boolean bit plane isomorph to the Cellular AUtomaton structure
          * @param memCAint32 compressed form into a 1D array of 32 bits Integers, on which iteration will proceeds
          */
@@ -613,7 +600,6 @@ object Medium {
 
       override val propagate4Shift: PrShift = new PrShift() {
         def addMod(i: Int, j: Int) = (i + j + nbColCA) % nbColCA
-
         val first = 2;
         val last = 1 + nbInt32
         val maskS: Integer = maskSparse(nbColCA)
@@ -624,7 +610,7 @@ object Medium {
           var odd: Map[Int, Int] = HashMap.empty
           var leftMost = 32 - bout - (nbColCA + 2) + 1
           var destLeft = nbColCA - 1 //index modulo nbCol of leftmost and right most value of line, place where we will copy
-          while (leftMost > 0) //last value is 1
+          while (leftMost > 0) //last considered value is 1
           {
             val destRight = addMod(destLeft, -nbColCA + 1)
             even = even + (leftMost + addMod(destLeft, -2) -> (leftMost + destLeft))
@@ -640,40 +626,45 @@ object Medium {
           (even, odd)
         }
 
-        /** due to rotation, we must add a supplementary shift to the moves even and odd */
-        def shift(i: Int, shiftRange: Int): Int = {
-          val offset = i - i % (nbColCA + 2)
-          val iroot = i - offset - 1 //iroot is in the right interval 0..nbCol-1 so as to do a modulo addition
-          val ishifted = addMod(iroot, shiftRange)
-          val res = ishifted + offset + 1
-          if (shiftRange == 0 && res != i) throw new Exception("shift Error")
-          res
-        }
-
-        def shift(h: Map[Int, Int], shiftRange: Int): Map[Int, Int] = {
-          h.map({ case (k, v) => (shift(k, shiftRange), shift(v, shiftRange)) })
-        }
 
 
         def prepareBit(mem: Array[Int]): Unit = {
           mirror(mem)
+          propagate4Shift(mem)
+        }
+
+
+        def propagate4Shift(mem: Array[Int]): Unit = {
           mem(first - 1) = mem(last) >>> (nbColCA + 2) //we start by computing  the very first integer t[first-1]
           mem(last + 1) = mem(first) << (nbColCA + 2) //and then the very last integer t[last+1]
-          for (i <- 1 until last + 1) {
+          for (i <- 1 until last + 1)
             mem(i) = propagateBitxand1(mem(i), nbColCA, maskS)
-          }
         }
 
-
-        /** applies a precomputed list of move, (distinct for even or odd int32. */
-        def applyMove(v: Int, moves: Map[Int, Int], mask: Int): Int = {
-          var res = v
-          for (move <- moves)
-            res = moveBitxtoy(res, move._1, move._2, mask)
-          res
-        }
 
         def mirror(mem: Array[Int]): Unit = {
+
+          def shift(h: Map[Int, Int], shiftRange: Int): Map[Int, Int] = {
+            /** due to rotation, we must add a supplementary shift to the moves even and odd */
+            def shift(i: Int, shiftRange: Int): Int = {
+              val offset = i - i % (nbColCA + 2)
+              val iroot = i - offset - 1 //iroot is in the right interval 0..nbCol-1 so as to do a modulo addition
+              val ishifted = addMod(iroot, shiftRange)
+              val res = ishifted + offset + 1
+              if (shiftRange == 0 && res != i) throw new Exception("shift Error")
+              res
+            }
+
+            h.map({ case (k, v) => (shift(k, shiftRange), shift(v, shiftRange)) })
+          }
+
+          /** applies a precomputed list of move, (distinct for even or odd int32. */
+          def applyMove(v: Int, moves: Map[Int, Int], mask: Int): Int = {
+            var res = v
+            for (move <- moves)
+              res = moveBitxtoy(res, move._1, move._2, mask)
+            res
+          }
           //process top line
           val bout = 32 % (nbColCA + 2)
           val maskFirst = maskCompact(nbColCA) >> bout //cover the first line. we pass over the first two bits, for nbCol+2=10
@@ -694,13 +685,6 @@ object Medium {
             val mv = shift(if (i % 2 == 0) movesEven else movesOdd, i / 2 - 1) //adds a shift i/2-1 to the move computed for the first line
             mem(i) = applyMove(mem(i), mv, maskSlim)
           }
-
-
-          //process left columne
-
-          /*         for(n<-List(maskFirst,maskLast,linem2,linem2Rotated,mem(last),mem(2)))
-                       System.out.println((n|0x80000000).toBinaryString)
-                    val u=0*/
         }
       }
       //PrepareShift.prepareShiftGte30
