@@ -126,7 +126,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
         val anchor = (anchorParam(shortSigIn, paramD) ::: anchorParam(shortSigOut, paramR) ::: anchorParam(layerNames, layerNames.flatMap(s => tSymbVar(s).locus.deploy(s)))).reverse.mkString(",")
         if (anchor.size > 0) "int[] " + anchor + ";" else "" //we may not need to anchor anything.
       },
-      "PROPAGATEFIRSTBIT" -> paramD.map((s: String) => "p.propagate4shift(" + s + ")").mkString(";"), //for the moment we do the propagation on all data parameters
+      "PROPAGATEFIRSTBIT" -> paramD.map((s: String) => "p.prepareBit(" + s + ")").mkString(";"), //for the moment we do the propagation on all data parameters
       "CALINENUMBER" -> (paramD ::: paramR)(0), //There must be at least one param,we need to read it so as to know the length which is the number of CA lines.
       "DECLINITPARAM" -> {
         /** declares all the variables local to the loops, and initializes them to zero if needed */

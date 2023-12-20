@@ -16,7 +16,6 @@ import compiler.E
 
 /**
  * pannel for drawing one CA , together with relevant information
- *
  * @param env contains all what's needed to draw
  */
 class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Panel {

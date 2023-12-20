@@ -9,7 +9,7 @@ public interface PrShift {
      *
      * @param h int32 CA memory
      */
-    public void propagate4shift(int[] h);
+    public void prepareBit(int[] h);
 
     public void mirror(int[] h);
 }

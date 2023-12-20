@@ -11,6 +11,7 @@ import java.util.ArrayList;
  * also static variablle such as defVE which are allways used, and allways the same
  */
 public class Util {
+
     /**
      * @param shouldBeZero should allways be false
      * @param bugV         accumulates vertic bug

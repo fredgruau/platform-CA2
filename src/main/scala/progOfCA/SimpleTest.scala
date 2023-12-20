@@ -10,7 +10,7 @@ import progOfmacros.RedSwrapper.exist
 import progOfmacros.RedT.{enlarge, enlargeEF, enlargeFE}
 
 /** sert a tester les fonction utilisant les type T[X,Y] via les operations transfer et sym */
-class SimpleTest extends ConstLayer[V, B](1, "global") with BoolV {
+class SimpleTest extends ConstLayer[V, UI](3, "global") with UintV {
   val test0 = transfer(e(this))
   //val test1:BoolVe=enlargeFE(test0)
   // val test2=orR(transfer(test1))
