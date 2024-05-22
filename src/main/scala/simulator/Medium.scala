@@ -1,8 +1,6 @@
 package simulator //toto
 
 import compiler.{T, _}
-import de.alsclo.voronoi.Voronoi
-import de.alsclo.voronoi.graph.Point
 import triangulation.{DelaunayTriangulator, NotEnoughPointsException, Triangle2D, Vector2D, Voroonoi}
 
 import java.util
@@ -398,27 +396,7 @@ abstract class Medium(val env: Env, val nbLine: Int, val nbCol: Int, val boundin
     assert(setset.size == displayedPoint.size)
   }
 
-  /** computes the voronoi using a faster algorithm, not conclusive */
-  private def voronoiseFast() = {
-    //translate diplayed points using the right class
-    val p1 = new Point(0.5, 1.5)
-    val p2 = new Point(1.5, 1.5)
-    //val p3 = new Point(1.5, 0.5)
-    val p3 = new Point(0.0, 0.0)
-    // val p4 = new Point(0.5, 0.5)
-    val p4 = new Point(512.00, 221.70)
-    val c = new Point(1, 1)
 
-    def toArrayList[T](input: List[T]): java.util.ArrayList[T] = new java.util.ArrayList[T](input.asJava)
-
-    val points = util.Arrays.asList(c, p1, p2, p3, p4)
-    val points2 = toArrayList(List(c, p1, p2, p3, p4))
-    val displayedPoint1 = displayedPoint.toList.map(v => new Point(v.x, v.y)).drop(26)
-    for (p <- displayedPoint1) System.out.print("new Point(" + p.x + "," + p.y + "),");
-    val displayedPoint2 = toArrayList(displayedPoint1)
-    val g = new Voronoi(displayedPoint2)
-    val u = 0
-  }
   /** when displayed points are modified by either adding or removing locus,
    * recompute the triangles, and then the voronoi hashtable */
   private def voronoise(): Unit = {
