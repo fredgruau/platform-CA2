@@ -1,0 +1,34 @@
+package compiledCA;
+
+import compiledMacro.*;
+import compiler.Locus;
+import scala.collection.immutable.List;
+import simulator.CAloops;
+import simulator.CAloops2;
+import simulator.PrShift;
+import java.util.ArrayList;
+import java.util.HashMap;
+import static simulator.Util.*;
+
+public final class {{NAMECA}}CA implements CAloops2 {
+{{ANONYMOUSLOOP}}
+public int CAmemWidth() {return {{MEMWIDTH}};}
+
+@Override public ArrayList<String> theLoops(PrShift p,int[][] m) {ArrayList<String> bugs=new ArrayList<>();
+{{ANCHORNAMED}}{{ANCHORNOTNAMED}}
+{{LISTCALL}} return bugs;}
+
+
+
+@Override public HashMap<String, List<Integer>> fieldOffset() {HashMap<String, List<Integer>> map = new HashMap<>(); //for layer's initialization and update, as well as displayed fields.
+{{FIELDOFFSET}} return (map);}
+@Override public HashMap<String, Locus> fieldLocus() {HashMap<String, Locus> map = new HashMap<>();
+{{FIELDLOCUS}}; return (map);}
+@Override public HashMap<String, Integer> fieldBitSize() { HashMap<String, Integer> map = new HashMap<>();
+{{BITSIZE}} return (map); }
+@Override  public String displayableLayerHierarchy() { return "{{DISPLAYABLE}}";}
+@Override public HashMap<String, String> init() {HashMap<String, String> map = new HashMap<>();
+ {{INITLAYER}} return (map);}
+@Override public int gateCount(){return ({{GATECOUNT}} );}
+
+}

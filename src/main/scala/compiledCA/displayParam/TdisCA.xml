@@ -1,0 +1,24 @@
+<displayParam>
+    <expandedLayer>
+        <Layer>
+            tdistdisDist
+        </Layer>
+        <Layer>
+            tdisDiiist
+        </Layer>
+        <Layer>
+            tdis
+        </Layer>
+    </expandedLayer>
+    <colorOfField>
+        <layer color="0xFF00FF">
+            tdis
+        </layer>
+        <layer color="0x00FF00">
+            tdisDiiist
+        </layer>
+        <layer color="0x80FF00">
+            tdisDiiistTslope
+        </layer>
+    </colorOfField>
+</displayParam>

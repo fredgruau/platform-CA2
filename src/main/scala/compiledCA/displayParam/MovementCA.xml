@@ -1,0 +1,21 @@
+<displayParam>
+    <expandedLayer>
+        <Layer>
+            movementB
+        </Layer>
+        <Layer>
+            movementMv
+        </Layer>
+    </expandedLayer>
+    <colorOfField>
+        <layer color="0x0000FF">
+            movementSingleton
+        </layer>
+        <layer color="0xFF00FF">
+            movementInvade
+        </layer>
+        <layer color="0x8000FF">
+            movement
+        </layer>
+    </colorOfField>
+</displayParam>

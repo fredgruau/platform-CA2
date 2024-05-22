@@ -1,0 +1,21 @@
+<displayParam>
+    <expandedLayer>
+        <Layer>
+            growvor
+        </Layer>
+        <Layer>
+            growvorB
+        </Layer>
+    </expandedLayer>
+    <colorOfField>
+        <layer color="0xFF00FF">
+            growvorBMeete
+        </layer>
+        <layer color="0x00FFFF">
+            growvor
+        </layer>
+        <layer color="0x00FF80">
+            growvorBMeetv
+        </layer>
+    </colorOfField>
+</displayParam>

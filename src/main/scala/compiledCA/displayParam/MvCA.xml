@@ -1,0 +1,30 @@
+<displayParam>
+    <expandedLayer>
+        <Layer>
+            mv
+        </Layer>
+        <Layer>
+            mvM
+        </Layer>
+        <Layer>
+            mvB
+        </Layer>
+        <Layer>
+            mvRa
+        </Layer>
+    </expandedLayer>
+    <colorOfField>
+        <layer color="0x00FFFF">
+            mvBNbcc
+        </layer>
+        <layer color="0x8000FF">
+            mvDoubleton
+        </layer>
+        <layer color="0xFF0080">
+            mvInvade
+        </layer>
+        <layer color="0x00FF80">
+            mv
+        </layer>
+    </colorOfField>
+</displayParam>

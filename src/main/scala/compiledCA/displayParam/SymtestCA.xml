@@ -1,0 +1,15 @@
+<displayParam>
+    <expandedLayer>
+        <Layer>
+            symtest
+        </Layer>
+    </expandedLayer>
+    <colorOfField>
+        <layer color="0x80FF00">
+            symtest
+        </layer>
+        <layer color="0x00FF80">
+            symtestEmptyrhomb1
+        </layer>
+    </colorOfField>
+</displayParam>

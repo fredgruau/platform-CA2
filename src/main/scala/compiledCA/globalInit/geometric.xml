@@ -1,0 +1,29 @@
+<initMethod>
+    <inits>
+        <init>
+            center
+        </init>
+        <init>
+            points
+        </init>
+        <init>
+            randinside
+        </init>
+        <init>
+            sparse
+        </init>
+        <init>
+            border
+        </init>
+        <init>
+            xaxis
+        </init>
+        <init>
+            yaxis
+        </init>
+        <init>
+            true
+        </init>
+    </inits>
+    <selected rank="3"/>
+</initMethod>
