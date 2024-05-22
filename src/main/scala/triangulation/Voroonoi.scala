@@ -3,31 +3,35 @@ package triangulation
 import java.awt.{Color, Polygon}
 
 import OrientedLine._
-import Voronoi._
+import Voroonoi._
 import triangulation.Utility._
 
 import scala.collection.{Set, immutable}
 import scala.collection.immutable.Set
 import scala.swing.Dimension
 
-/** contains the code for computing the voronoi Cell, as a polygon */
-class Voronoi(val center: Vector2D) {
-
-
+/** contains the code for computing the voronoi Cell, as a polygon,
+ *
+ * @param center points in the center of the cell.
+ */
+class Voroonoi(val center: Vector2D) {
   def addColor(c: Color) = color = Utility.addColor(color, c)
-
-
   var color: Color = Color.black;
-
   def resetColor() = color = Color.black;
 
 
   var discontinuousTriangle = false
+  /** list of triangles incident to the center of the voronoi.
+   * Its a var, because it is computed later by visiting the triangle's summits*/
   var triangles: List[Triangle2D] = List()
-
   def addTriangle(t: Triangle2D) =
     triangles ::= t
 
+  /**
+   * permutes the summits a,b and c of the triangle until a is the center of the voronoi
+   *
+   * @param t
+   */
   def permute2(t: Triangle2D) = {
     var count = 0
     while (t.a != center) {
@@ -38,7 +42,7 @@ class Voronoi(val center: Vector2D) {
     }
   }
 
-  /** put the triangles in trigonometric wise , starting after the border until the border */
+  /** put the triangles in trigonometric wise order, starting after the border until the border */
 
   def orderTriangles() = {
     triangles.map(permute2(_)) //this permutation should be called again, because it will be undone by neighbors also ordering.
@@ -78,38 +82,53 @@ class Voronoi(val center: Vector2D) {
     if (first.b != last.c) //the triangles around the voronoi's center do not form a ring,
       discontinuousTriangle = true // the center of the polygon is onconvex hull of all the point
     triangles = res ::: res2.reverse
-
   }
 
   val epsilon = 0.000000000000000001
   import scala.collection.immutable.Set
-  /** records one or two sides if corner */
+
+  /** If voronoi intersect a side of the bounding box, sides stores  the index or the corresponding side.
+   * There can be two such indexes, if polygon contains a  corner */
   var sides: Set[Int] = Set()
+  /** will contain the resulting polygon */
   var polygon = new Polygon()
 
-  def corner: Option[Int] =
+  /** @return if there is a corner, returns its index */
+  def corner: Option[Int] = {
     if (sides.size < 2) None
     else {
       val firstSide = sides.reduce(Math.max)
       Some(if (firstSide == 3 && sides.contains(0)) 0 else firstSide) //express a toroidal metric not immediate to grasp
     }
+  }
 
   /**
-   * sets the polygons, take into account if it cuts the bounding box.
+   * adjust  the polygon' sequence of segments if  it cuts the bounding box.
+   * adds points intersectng the bbox, supress points outside the bbox
+   *
    * @param bb bounding box
+   *           Uses the delaunays triangle to determine whether voronoi intersects the bbox
    */
-  def setPolygon(bb: Dimension) = {
+  def intersectPolygonWithBB(bb: Dimension) = {
     val bbP = toPolygon(bb)
-    def cornerPoint: List[Vector2D] = {
-      val c = corner
-      if (c == None) List()
-      else List(new Vector2D(bbP.xpoints(c.get), bbP.ypoints(c.get)))
-    }
-    /** computes intersection  between the bisectrice of [u,v] and the bounding box */
+
+    /**
+     *
+     * @param p polygon
+     * @param i index of a point defining the polygon's border
+     * @return the point of index i
+     */
+    def summit(p: Polygon, i: Int) = new Vector2D(p.xpoints(i), p.ypoints(i))
+
+    def cornerPoint: Option[Vector2D] = corner.map((f: Int) => summit(bbP, f))
+
+    /** @param u points on polygon
+     * @param v  points on polygon comming after u, in trigonometric order
+     * @return intersection  between the bisectrice of [u,v] (here order matters) and the bounding box */
     def pointOnBB(u: Vector2D, v: Vector2D): Vector2D = {
       val bissec = bissector(u, v)
-      val (l, side) = bissec.selectSide(bbP)
-      sides += side //we stores which sides we are a border of.
+      val (l, side: Int) = bissec.selectSide(bbP)
+      sides += side //we need to remember which sides we are a border of.
       bissec.intersect(l)
     }
     /**
@@ -135,7 +154,7 @@ class Voronoi(val center: Vector2D) {
      *
      */
     def truncatedPoly(first: Triangle2D, others: List[Triangle2D], last: Triangle2D): List[Vector2D] =
-      hitTheWall(first, true) ::: others.map(_.computeCenter()) ::: hitTheWall(last, false) ::: cornerPoint
+      hitTheWall(first, true) ::: others.map(_.computeCenter()) ::: hitTheWall(last, false) ::: (cornerPoint.toList)
 
     /** true if the center of triangle lies ouside of the bounding box */
     def outside(t: Triangle2D): Boolean = {
@@ -160,7 +179,6 @@ class Voronoi(val center: Vector2D) {
       }
       else {
         //we select the adjacent delaunay triangle whose circumCenter falls outside the bounding box.
-
         val indexTruncated: Int = triangles.indexWhere(outside(_))
         val indexTruncated2: Int = triangles.indexWhere(inside(_))
         if (indexTruncated == -1 || indexTruncated2 == -1) //all inside or all outside
@@ -189,7 +207,7 @@ class Voronoi(val center: Vector2D) {
   }
 }
 
-object Voronoi {
+object Voroonoi {
   /**
    *
    * @param l list

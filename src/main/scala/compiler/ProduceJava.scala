@@ -126,7 +126,17 @@ trait ProduceJava[U <: InfoNbit[_]] {
         val anchor = (anchorParam(shortSigIn, paramD) ::: anchorParam(shortSigOut, paramR) ::: anchorParam(layerNames, layerNames.flatMap(s => tSymbVar(s).locus.deploy(s)))).reverse.mkString(",")
         if (anchor.size > 0) "int[] " + anchor + ";" else "" //we may not need to anchor anything.
       },
-      "PROPAGATEFIRSTBIT" -> paramD.map((s: String) => "p.prepareBit(" + s + ")").mkString(";"), //for the moment we do the propagation on all data parameters
+      "PROPAGATEFIRSTBIT" -> {
+        val callsToPropagate: Seq[String] = paramD.map((s: String) => "p.prepareBit(" + s + ")") //for the moment we do the propagation on all data parameters
+        val callsToPropagate2 = shortSigIn.map((s: String) => "p.prepareBit(" + s + ")")
+
+        val callsToMirror = shortSigIn.map((s: String) => {
+          val l = tSymbVar(s).t.asInstanceOf[(Locus, Ring)]._1
+          "p.mirror(" + s + ",compiler.Locus." + l.javaName + ")"
+        })
+        callsToMirror.mkString(";") + ";\n" + callsToPropagate2.mkString(";") + "\n"
+      },
+
       "CALINENUMBER" -> (paramD ::: paramR)(0), //There must be at least one param,we need to read it so as to know the length which is the number of CA lines.
       "DECLINITPARAM" -> {
         /** declares all the variables local to the loops, and initializes them to zero if needed */
@@ -295,7 +305,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
           HashMap[String, Locus]() ++ names.map((s: String) => s -> tSymbVar(s).t.asInstanceOf[(Locus, Ring)]._1) ++ l
         }
         fieldLocus(spatialOfffsetsInt.keys, layerSubProgStrict).map((kv: (String, Locus)) => //we need to know the locus, as soon as  we need to know the bit planes
-          " map.put(\"" + kv._1 + "\"," + "Locus." + kv._2.javaName + ")").mkString(";\n")
+          " map.put(\"" + kv._1 + "\"," + "compiler.Locus." + kv._2.javaName + ")").mkString(";\n")
       },
       "BITSIZE" -> {
         /** number of bits for non boolean variables. */

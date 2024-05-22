@@ -271,9 +271,12 @@ object AST {
   //on se sert de DELAYED que dans ASTL, donc on va directement l'y mettre.
   //def delayed3[L<:Locus,R<:Ring](_arg: => AST[Tuple2[L,R]])(implicit m: repr[Tuple2[L,R]])   = { lazy val delayed4 = _arg with AST2[L,R];new Delayed(() => delayed4) }
 
+  /** Strate are field defined at t and t+1 */
   trait Strate[T] {
-    val pred: AST[T];
-    val next: AST[T]
+    self: AST[T] => //a strate is an AST
+    val pred: AST[T] = this;
+    /** the value at t, is the strate itself. */
+    val next: AST[T] //next must be defined.
   }
 
   /**
@@ -289,8 +292,8 @@ object AST {
     /** avoid a scala bug */
     val v2 = 1
     assert(nbit == 1 || !this.asInstanceOf[ASTLg].ring.isInstanceOf[B], "a boolean is on one bit") //we check that if it is boolean, nbit=1
-    /** the value at t, which  is represented as  the layer itself. */
-    val pred: AST[T] = this
+
+
     /** system instruction for rendering,debuging,memorizing  can be associated to layers, so as to be latter retrieved during compilation */
     private var sysInstr: List[CallProc] = List.empty;
 

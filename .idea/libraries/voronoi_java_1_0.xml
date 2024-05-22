@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="voronoi-java-1.0">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../voronoi-java/target/voronoi-java-1.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

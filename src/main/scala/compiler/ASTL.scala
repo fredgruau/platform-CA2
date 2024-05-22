@@ -42,8 +42,9 @@ object ASTL {
   final case class Broadcast[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[S1, R], m: repr[T[S1, S2]], n: repr[R])
     extends ASTL[T[S1, S2], R]()(repr.nomLR(m, n)) with Singleton[AST[_]]
 
+  trait Toto {}
   def broadcast[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, S2]], n: repr[R]): ASTLt[T[S1, S2], R] =
-    Broadcast[S1, S2, R](arg, m, n) //step 1 is broadcast
+    new Broadcast[S1, S2, R](arg, m, n) //step 1 is broadcast
 
   /** a bit more subtle than broadcast, sends a distinct component to each of T[S1,S2] */
   private[ASTL] final case class Send[S1 <: S, S2 <: S, R <: Ring](args: List[ASTLt[S1, R]])

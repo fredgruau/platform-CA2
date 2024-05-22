@@ -1,7 +1,6 @@
 package simulator
 
 import org.scalatest.{BeforeAndAfter, FunSuite}
-import triangulation.Medium
 import triangulation.Utility._
 
 import scala.util.Random
@@ -73,7 +72,7 @@ class TestEncodeDecode extends FunSuite with BeforeAndAfter {
     randomFill(lCAinput)
     val lCAoutput = Array.ofDim[Boolean](12, 14)
     val lCAmem = Array.ofDim[Int](9)
-    val m = Medium(12, 14, 30, null)
+    val m = simulator.Medium.christal(12, 14, 30, null)
     m.encode(lCAinput, lCAmem)
     m.decode(lCAmem, lCAoutput)
     assert(list(lCAinput) == list(lCAoutput))
@@ -101,7 +100,7 @@ class TestEncodeDecode extends FunSuite with BeforeAndAfter {
     lCAinput(13)(2) = true //we but something into the avant avant dernier ligne
     val lCAoutput = Array.ofDim[Boolean](16, 6)
     val lCAmem = Array.ofDim[Int](10)
-    val m = Medium(16, 6, 30, null)
+    val m = Medium.christal(16, 6, 30, null)
     m.encode(lCAinput, lCAmem)
     mirror(lCAmem, 16, 6)
     //lCAmem(2)=writeInt32(lCAmem(2),lCAmem(4) >>> 1, maskSmall(6) ) //copy line 2 into line 0
@@ -115,7 +114,7 @@ class TestEncodeDecode extends FunSuite with BeforeAndAfter {
     randomFill(lCAinput)
     val lCAoutput = Array.ofDim[Boolean](12, 14)
     val lCAmem = Array.ofDim[Int](10)
-    val m = Medium(12, 14, 30, null)
+    val m = Medium.christal(12, 14, 30, null)
     m.encode(lCAinput, lCAmem)
     m.decode(lCAmem, lCAoutput)
     assert(list(lCAinput) == list(lCAoutput))
@@ -125,7 +124,7 @@ class TestEncodeDecode extends FunSuite with BeforeAndAfter {
     randomFill(lCAinput)
     val lCAoutput = Array.ofDim[Boolean](4, 6)
     val lCAmem = Array.ofDim[Int](4)
-    val m = Medium(4, 6, 30, null)
+    val m = Medium.christal(4, 6, 30, null)
     m.encode(lCAinput, lCAmem)
     m.decode(lCAmem, lCAoutput)
     assert(list(lCAinput) == list(lCAoutput))
@@ -136,7 +135,7 @@ class TestEncodeDecode extends FunSuite with BeforeAndAfter {
     randomFill(lCAinput)
     val lCAoutput = Array.ofDim[Boolean](6, 8)
     val lCAmem = Array.ofDim[Int](5)
-    val m = Medium(6, 8, 30, null)
+    val m = Medium.christal(6, 8, 30, null)
     m.encode(lCAinput, lCAmem)
     m.decode(lCAmem, lCAoutput)
     assert(list(lCAinput) == list(lCAoutput))

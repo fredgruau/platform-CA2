@@ -103,6 +103,18 @@ abstract class S extends Locus with Ordered[S] {
   def the6sufx = sufx
 
 }
+
+class Tata {}
+
+trait Toto {}
+
+case class Tata1() extends Tata {}
+
+case class Tata2() extends Tata {}
+
+object Tata {
+  val tata = new Tata1() with Toto
+}
 final case class V() extends S {
   val sufx  = Array("")
 
@@ -191,6 +203,7 @@ final case class T[+S1 <: S, +S2 <: S](from: S1, to: S2) extends TT {
 
 }
 object Locus {
+  trait Tata {}
 
   /**
    *

@@ -1,6 +1,9 @@
 package simulator;
+
+import compiler.Locus;
+
 /**
- * ann object implementing PrShift can do the computation needed for horizontal communication
+ * an object implementing PrShift can do the prior computation needed for horizontal communication
  */
 public interface PrShift {
 
@@ -11,7 +14,13 @@ public interface PrShift {
      */
     public void prepareBit(int[] h);
 
-    public void mirror(int[] h);
+    public void prepareBit(int[][] h);
+
+    public void mirror(int[][] h, Locus l);
+
+    public void mirror(int[] h, Locus l);
+
+
 }
 
 

@@ -6,7 +6,7 @@ import simulator.CAtype._
 import scala.swing.Swing._
 import scala.swing.event._
 import scala.swing.{Dimension, Frame, MainFrame, Panel, SimpleSwingApplication}
-import triangulation.{DelaunayTriangulator, NotEnoughPointsException, Triangle2D, Vector2D, Voronoi}
+import triangulation.{DelaunayTriangulator, NotEnoughPointsException, Triangle2D, Vector2D, Voroonoi}
 
 import scala.collection.JavaConverters._
 import triangulation.Utility._
@@ -113,7 +113,7 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
 
     def drawCAcolorVoronoi() = {
       //env.computeVoronoirColors() //painting allways need to recompute the colors, it would seem
-      for (v: Voronoi <- env.medium.voronoi.values)
+      for (v: Voroonoi <- env.medium.voronoi.values)
         if (v.color != Color.black || v.corner.isDefined //we print the corners even it they are black, because they can overlap
         ) {
           g.setColor(v.color)

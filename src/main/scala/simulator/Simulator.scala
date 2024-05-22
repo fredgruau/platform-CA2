@@ -10,7 +10,7 @@ import java.net.URL
 import javax.swing.{ImageIcon, JTree}
 import scala.swing.Swing.Icon
 import scala.swing._
-import scala.xml.Node
+import scala.xml.{Elem, Node}
 import BorderPanel.Position._
 import scala.collection.immutable.HashMap
 
@@ -72,7 +72,7 @@ object Simulator extends SimpleSwingApplication {
     /** process the signal we create controller first in order to instanciate state variable used by layerTree */
     val controller = new Controller(nameCA, globalInit, nameGlobalInit, simulParam, displayParam, progCA, chosenDir, this)
     /** Tree for browsing the hierarchy of layers and which field to display */
-    val xmlLayerTree = readXmlTree(progCA.displayableLayerHierarchy())
+    val xmlLayerTree: Elem = readXmlTree(progCA.displayableLayerHierarchy())
     System.out.println("the displayable layers are\n" + xmlLayerTree)
     //creation of layerTree needs controller, in order to be able to send signal of expansion and coloring/uncoloring
     val layerTree: LayerTree = new LayerTree(xmlLayerTree, controller)
@@ -97,10 +97,10 @@ object Simulator extends SimpleSwingApplication {
       var numCell = 0
       //how many columns
       val nbColPannel: Int = xInt(simulParam, "display", "@nbCol")
-      for (env: Env <- iterEnvs) { //effectivement, lorsque on crée les envs, il n'ont as encore leur panner
+      for (env: Env <- iterEnvs) { //effectivement, lorsque on crée les envs, il n'ont as encore leur pannel
         controller.envList = controller.envList :+ env //we will need to acess the list of env, from the controler
         env.pannel = new CApannel(controller.CAwidth, controller.CAheight, env, progCA) // the number of CAlines is 1/ sqrt(2) the number of CA colomns.
-        if (env.nbColCA >= 30) { // if the CA has too many columns, it get displayed on multiple columns
+        if (env.medium.nbCol >= 30) { // if the CA has too many columns, it get displayed on multiple columns
           assert(numCell % nbColPannel == 0, "you must garantee that CA whose number of columns is >=30 are displayed on multiple of nbColPannel")
           add(env.pannel, constraints(numCell % nbColPannel, numCell / nbColPannel, nbColPannel, GridBagPanel.Fill.Horizontal)) //adds the pannel using the Grid layout (GridBagPnnel)
           numCell += nbColPannel
@@ -224,7 +224,8 @@ object SimulatorUtil {
     /** stores all the memory fields of a CA */
     type CAMem = Array[Array[Int]]
     /** coordinate for all vertices, or for one subfield of all edges, face or transfer locus
-     * may be undefined, if point lies out of the bounding box */
+     * points is undefined, if it lies out of the bounding box
+     * coordinates of the 2D arrays range between nbLine and nbCol */
     type pointLines = Array[Array[Option[Vector2D]]]
 
     /** allows to reuse the same code for displaying or for generating svg */

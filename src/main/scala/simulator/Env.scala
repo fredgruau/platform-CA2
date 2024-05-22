@@ -2,8 +2,8 @@ package simulator
 
 import compiler.ASTB.False
 import compiler.Locus
+import simulator.Medium.christal
 import triangulation.Utility.halve
-import triangulation.{Init, Medium}
 
 import scala.collection.JavaConverters._
 import java.awt.Color
@@ -16,13 +16,13 @@ import scala.util.Random
 /**
  * contains all the information needed to run a given CA.
  *
- * @param nbColCA    number of column in the CA grid
- * @param nbLineCA   number of lines in the CA grid
+ * @param nbCol  number of column in the CA grid
+ * @param nbLine number of lines in the CA grid
  * @param controller the controller contians information valid for all the environment
  * @param initName   init method for root layer, which can vary
  * @param randomRoot so that we can reproduce same list of random numbers
  */
-class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Controller, initName: HashMap[String, String]) {
+class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, initName: HashMap[String, String]) {
   /** current time */
   var t = 0
   /** Random number generator each environement has its copy */
@@ -30,12 +30,12 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
   /** contains a thread which iterates the CA, while not asked to pause */
 
   val medium: Medium = arch match {
-    case "christal" => Medium(nbLineCA, nbColCA, controller.CAwidth, this) //default medium is christal
+    case "christal" => christal(nbLine, nbCol, controller.CAwidth, this) //default medium is christal
   }
   /** Memory of the CA, it is being rewritten by the running thread, not touched if being displayed
    * we add 1 to the column size  medium.nbInt32CAmem +1 so as to avoid catching ArrayIndexOutOfBoundsException
-   * when  we write at i+1 instead of i, (we do that in order to avoid memorizing register introudced for tm1s, and save local memory */
-  val mem: Array[Array[Int]] = Array.ofDim[Int](controller.progCA.CAmemWidth(), medium.nbInt32CAmem)
+   * when  we write at i+1 instead of i, (we do that in order to avoid memorizing register introduced for tm1s, and save local memory */
+  val mem: Array[Array[Int]] = Array.ofDim[Int](controller.progCA.CAmemWidth(), medium.nbInt32total)
 
   /** associated pannel */
   var pannel: CApannel = null //to be set latter due to mutual recursive definition
@@ -60,8 +60,9 @@ class Env(arch: String, nbLineCA: Int, val nbColCA: Int, val controller: Control
       val memFields2Init: Seq[Array[Int]] = memFields(layerName) //gets the memory plane
       val initNameFinal = initName.getOrElse(layerName, controller.initName(layerName)) //either it is the root layer or we find it in env
       val initMethod: Init = medium.initSelect(initNameFinal,
-        controller.locusOfDisplayedOrDirectInitField(layerName), controller.bitSizeDisplayedOrDirectInitField.getOrElse(layerName, 1))
-      initMethod.init(memFields2Init.toArray) //we pass the locus here, several init are reused with different locus, such as def/center/yaxis
+        controller.locusOfDisplayedOrDirectInitField(layerName), // locus is passed. It is used in def/center/yaxis
+        controller.bitSizeDisplayedOrDirectInitField.getOrElse(layerName, 1))
+      initMethod.init(memFields2Init.toArray)
     }
   }
 

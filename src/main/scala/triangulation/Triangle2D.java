@@ -153,6 +153,9 @@ public class Triangle2D {
         return ((hasa && hasb) || (hasa && hasc) || (hasc && hasb));
     }
 
+    /**
+     * permutes the summits of the triangle
+     */
     public void permute() {
         Vector2D tmp = a;
         a = b;
