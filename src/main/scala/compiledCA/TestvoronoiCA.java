@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import static simulator.Util.*;
 
-public final class   TestvoronoiCA implements CAloops2 {
+public final class     TestvoronoiCA implements CAloops2 {
  public static void _fun2(PrShift p,int [][] testvoronoiEv,int [][] testvoronoiER){
  int[] testvoronoiER$h=testvoronoiER[0],testvoronoiER$d=testvoronoiER[1],testvoronoiER$ad=testvoronoiER[2],testvoronoiEv$h1=testvoronoiEv[0],testvoronoiEv$h2=testvoronoiEv[1],testvoronoiEv$d1=testvoronoiEv[2],testvoronoiEv$d2=testvoronoiEv[3],testvoronoiEv$ad1=testvoronoiEv[4],testvoronoiEv$ad2=testvoronoiEv[5];
 p.mirror(testvoronoiEv,compiler.Locus.locusEv());
