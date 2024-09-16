@@ -15,6 +15,7 @@ import scala.swing.Dimension
  * @param center points in the center of the cell.
  */
 class Voroonoi(val center: Vector2D) {
+  var trianglesOK=true
   def addColor(c: Color) = color = Utility.addColor(color, c)
   var color: Color = Color.black;
   def resetColor() = color = Color.black;
@@ -34,7 +35,7 @@ class Voroonoi(val center: Vector2D) {
    */
   def permute2(t: Triangle2D) = {
     var count = 0
-    while (t.a != center) {
+    while (!t.a.isEqual(center) ) {
       count += 1
       if (count > 1000)
         throw new Exception("ca boucle dans permute")
@@ -43,9 +44,15 @@ class Voroonoi(val center: Vector2D) {
   }
 
   /** put the triangles in trigonometric wise order, starting after the border until the border */
-
   def orderTriangles() = {
+    if (triangles.isEmpty) {
+      System.out.print("y en a pas des triangles!")
+      trianglesOK=false
+    }
+    else{
+
     triangles.map(permute2(_)) //this permutation should be called again, because it will be undone by neighbors also ordering.
+
     var first = triangles.head //there is allways at least one triangle
     var res: List[Triangle2D] = List(first)
     var res2: List[Triangle2D] = List()
@@ -57,31 +64,35 @@ class Voroonoi(val center: Vector2D) {
       count += 1
       if (count > 1000)
         throw new Exception("ca boucle dans ordertriangle")
-      val (t1s, t2s) = triangleLeft.partition(_.c == first.b)
+      val (t1s, t2s) = triangleLeft.partition(_.c.isEqual2( first.b))
       triangleLeft = t2s;
       withCommonSideBefore = t1s
-      if (withCommonSideBefore.nonEmpty) {
+      if (withCommonSideBefore.nonEmpty) { //we found the triangle before, and insert it.
         first = withCommonSideBefore.head
         res = first :: res
       }
     } while (withCommonSideBefore.nonEmpty)
-    if (triangleLeft.nonEmpty) //first has no triangle neighbor before, we must be on the points convex hull
+    if (triangleLeft.nonEmpty) //first has no triangle neighbor before, we must be on the outerborder
       do {
         count += 1
         if (count > 1000)
           throw new Exception("ca boucle dans ordertriangle")
-      val (lt1, t2s) = triangleLeft.partition(_.b == last.c) //we know there should be exactly one element matching
-      // val (lt1, t2s) = triangleLeft.partition( (t: Triangle2D)=>quasiEqual2(t.b ,last.c) )//we know there should be exactly one element matching
-      if (lt1.size != 1)
-        System.out.print("problem Order triangle")
-      val newLast = lt1.head
+        val (lt1, t2s) = triangleLeft.partition(_.b.isEqual2( last.c)) //we look for the triangles on the other end. we know there should be exactly one element matching
+        //val (lt1, t2s) = triangleLeft.partition( (t: Triangle2D)=>quasiEqual2(t.b ,last.c) )//we know there should be exactly one element matching
+      if (lt1.isEmpty) {
+        System.out.print("problem Order triangle, the triangles do not form a segment, they cannot be put in continuity")
+        trianglesOK=false  //triangleOK is true if no triangle
+      } else
+      {val newLast = lt1.head
       res2 = newLast :: res2;
       triangleLeft = t2s;
-      last = newLast
-    } while (triangleLeft.nonEmpty)
-    if (first.b != last.c) //the triangles around the voronoi's center do not form a ring,
+      last = newLast}
+    } while (triangleLeft.nonEmpty && trianglesOK)
+    if (!first.b.isEqual(last.c) )//the triangles around the voronoi's center do not form a ring,
       discontinuousTriangle = true // the center of the polygon is onconvex hull of all the point
     triangles = res ::: res2.reverse
+
+    }
   }
 
   val epsilon = 0.000000000000000001
@@ -90,6 +101,7 @@ class Voroonoi(val center: Vector2D) {
   /** If voronoi intersect a side of the bounding box, sides stores  the index or the corresponding side.
    * There can be two such indexes, if polygon contains a  corner */
   var sides: Set[Int] = Set()
+  def isBorder:Boolean=sides.nonEmpty
   /** will contain the resulting polygon */
   var polygon = new Polygon()
 
@@ -104,14 +116,14 @@ class Voroonoi(val center: Vector2D) {
 
   /**
    * adjust  the polygon' sequence of segments if  it cuts the bounding box.
-   * adds points intersectng the bbox, supress points outside the bbox
+   * truncate the polygon so that it fits the bounding box
+   * by adding points intersectng the bbox, and supressing points outside the bbox
    *
    * @param bb bounding box
    *           Uses the delaunays triangle to determine whether voronoi intersects the bbox
    */
   def intersectPolygonWithBB(bb: Dimension) = {
     val bbP = toPolygon(bb)
-
     /**
      *
      * @param p polygon
@@ -153,8 +165,22 @@ class Voroonoi(val center: Vector2D) {
      * @return
      *
      */
-    def truncatedPoly(first: Triangle2D, others: List[Triangle2D], last: Triangle2D): List[Vector2D] =
-      hitTheWall(first, true) ::: others.map(_.computeCenter()) ::: hitTheWall(last, false) ::: (cornerPoint.toList)
+    def truncatedPoly(first: Triangle2D, others: List[Triangle2D], last: Triangle2D): List[Vector2D] = {
+      val h1 =hitTheWall(first, true)
+      val h2= hitTheWall(last, false)
+/*    tentative d'identifier les "creux"
+  val crossBeforeBB=h1.nonEmpty && h2.nonEmpty &&
+        (h1(0).sub(h2(0)).dot(first.c.sub(last.b))<0)
+      if (crossBeforeBB) {
+        val l1=bissector(first.c, first.a).asInstanceOf[Line]
+        val l2=bissector(last.a,last.b).asInstanceOf[Line]
+          val meet=l1.intersect(l2)
+           last.computeCenter()::meet:: first.computeCenter() ::others.map(_.computeCenter())
+          //System.out.println("rrrere")
+      }
+      else*/
+        hitTheWall(first, true) ::: others.map(_.computeCenter()) ::: hitTheWall(last, false) ::: (cornerPoint.toList)
+    }
 
     /** true if the center of triangle lies ouside of the bounding box */
     def outside(t: Triangle2D): Boolean = {
@@ -184,8 +210,6 @@ class Voroonoi(val center: Vector2D) {
         if (indexTruncated == -1 || indexTruncated2 == -1) //all inside or all outside
           triangles.map(_.computeCenter()) //on recalcule plusieurs fois le centre
         else { //one of the triangle has its center outside and another has its center inside
-
-
           val lastIndexTruncated: Int = triangles.lastIndexWhere(outside(_))
           val insid = triangles.map(inside(_))
           //assert(indexTruncated == lastIndexTruncated, "we make the hypothese that here should be at most one circumcenter outside the bounding box")

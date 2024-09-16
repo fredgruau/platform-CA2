@@ -12,6 +12,8 @@ import java.util.ArrayList;
  */
 public class Util {
 
+
+
     /**
      * @param shouldBeZero should allways be false
      * @param bugV         accumulates vertic bug

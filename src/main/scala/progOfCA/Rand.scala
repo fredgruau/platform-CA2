@@ -13,6 +13,7 @@ class Rand() extends Layer[(V, B)](1, "random") with ASTLt[V, B] {
   val next: BoolV = randNext(this) //randDef is used only here, no need for a wrapper!
   lazy val randDir: BoolVe = randN12(this) //only qpointRand uses this
   lazy val randSide: BoolEv = randE2(this) //only qpointRand uses this
+  show(randSide)
   //show(this, randDir)
 }
 

@@ -30,6 +30,12 @@ public class Vector2D implements Cloneable {
         this.y = y;
     }
 
+    public boolean isEqual(Vector2D v) {return x == v.x && y == v.y;
+    }
+    public boolean isEqual2(Vector2D v) {return almostEqualS(x,v.x) && almostEqualS(y,v.y);
+    }
+    public static boolean almostEqualS(double x, double y){return(Math.abs(x-y)  < 0.000001);}
+    public double distance(Vector2D other){ return (sub(other).mag());}
     public boolean almostEqual(Vector2D v) {
         return (sub(v).mag() < 0.000001);
     }
@@ -52,6 +58,11 @@ public class Vector2D implements Cloneable {
      */
     public Vector2D add(Vector2D vector) {
         return new Vector2D(this.x + vector.x, this.y + vector.y);
+    }
+
+    public Vector2D barycenter(Vector2D v,double coeff) {
+        Vector2D res=mult(coeff).add(v.mult(1-coeff));
+        return (res);
     }
 
     public Vector2D middle(Vector2D v) {
@@ -232,7 +243,7 @@ public class Vector2D implements Cloneable {
         }
     }
 
-    private static Vector2D intersection(Line l1, Line l2) {
+   public static Vector2D intersection(Line l1, Line l2) {
         double a1 = l1.e.y - l1.s.y, b1 = l1.s.x - l1.e.x, c1 = a1 * l1.s.x + b1 * l1.s.y;
         double a2 = l2.e.y - l2.s.y, b2 = l2.s.x - l2.e.x, c2 = a2 * l2.s.x + b2 * l2.s.y;
         double delta = a1 * b2 - a2 * b1;

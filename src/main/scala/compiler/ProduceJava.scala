@@ -320,7 +320,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
       "DISPLAYABLE" -> //theDisplayed contains two kinds of name:aux and segmented, first step should separate the segmented
         {
           if (!sameRoot(theDisplayed))
-            throw (new Exception("some fields do not encode a path"))
+            throw (new Exception("some fields do not encode a path"+theDisplayed))
           val s = parenthesizedExp(rootOfVar(theDisplayed.head), hierarchyDisplayedField(theDisplayed)); s + "."
         },
       "INITLAYER" -> {

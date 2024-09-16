@@ -3,6 +3,8 @@ package simulator
 import compiler.{Locus, V}
 import triangulation.Vector2D
 
+import scala.util.Random
+
 
 trait Init {
   /**
@@ -11,11 +13,12 @@ trait Init {
    * @param CAmemFields memory fields to fill
    */
   def init(CAmemFields: Array[Array[Int]]): Unit
+
 }
 
 /** for a medium, adds  the possibity of choosing an init */
 trait InitSelect {
-  self: Medium =>
+  self: Medium with encodeByInt=>   // Some inits are using encode
 
   /**
    *
@@ -25,9 +28,7 @@ trait InitSelect {
    *         this is the only public method provided by the initSelect trait,
    */
   def initSelect(initMethodName: String, l: Locus, nbit: Int): Init = {
-    val finalInitMethodName = if (initMethodName == "global") env.controller.globalInitList.selection.item //currently selected init method
-    else initMethodName
-    finalInitMethodName match {
+    initMethodName match {
       case "0" => zeroInit
       case "true" => unInit
       case "center" => centerInit
@@ -44,7 +45,9 @@ trait InitSelect {
       case "false" => zeroInit
     }
   }
-
+  /** Random number generator each medium has its copy */
+  private var  rand:Random =null
+  def initRandom(r:Int):Unit=rand=new Random(r)
   //geometric primitive fields used to construct initial configurations
   private val origin = new Vector2D(0, 0)
   private val center = new Vector2D(nbLine / 2, nbCol / 2)
@@ -99,7 +102,7 @@ trait InitSelect {
   private lazy val randomInit: InitMold = new InitMold(V(), 1) {
     override def init(CAmemFields: Array[Array[Int]]): Unit = { // init is redefined becase instead of encode, we directly write into the CA
       for (lCAmem: Array[Int] <- CAmemFields) { //dot iteration, we iterate on the dot product of the two ranges
-        for (i <- 0 until lCAmem.size) lCAmem(i) = env.rand.nextInt()
+        for (i <- 0 until lCAmem.size) lCAmem(i) = rand.nextInt()
       }
     }
   }
@@ -119,7 +122,7 @@ trait InitSelect {
       for (i <- 2 until nbLine - 2) {
         val (j0, j1) = if (i % 2 == 0) (2, nbCol - 1) else (1, nbCol - 2)
         for (j <- j0 until j1) {
-          if (env.rand.nextFloat() < 0.6) //locusPlane(l)(d)(i)(j).isDefined)
+          if (rand.nextFloat() < 0.6) //locusPlane(l)(d)(i)(j).isDefined)
             f(i)(j) = true
         }
         //setMemField(f, i, j)
@@ -132,7 +135,7 @@ trait InitSelect {
       for (i <- 2 until nbLine - 2) {
         val (j0, j1) = if (i % 2 == 0) (2, nbCol - 1) else (1, nbCol - 2)
         for (j <- j0 until j1) {
-          if (env.rand.nextFloat() < 0.15) //locusPlane(l)(d)(i)(j).isDefined)
+          if (rand.nextFloat() < 0.15) //locusPlane(l)(d)(i)(j).isDefined)
             f(i)(j) = true
         }
         //setMemField(f, i, j)

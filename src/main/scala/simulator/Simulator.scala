@@ -136,6 +136,7 @@ object ExampleData {
   val forwardIcon: ImageIcon = Icon("src/ressources/skip_forward_black.gif")
   val backwarddIcon: ImageIcon = Icon("src/ressources/skip_backward_black.gif")
   val initIcon: ImageIcon = Icon("src/ressources/rewind_black.gif")
+  val closeBoxIcon: ImageIcon = Icon("src/ressources/closebox.jpg")
 }
 
 object SimulatorUtil {
@@ -232,7 +233,8 @@ object SimulatorUtil {
     trait myGraphics2D {
       def setColor(c: Color): Unit
 
-      def drawPoint(x: Int, y: Int): Unit
+      def drawPoint(x: Int, y: Int,size:Int): Unit
+      def drawLine(x: Int, y: Int,x2: Int, y2: Int): Unit
 
       def fillPolygon(p: Polygon): Unit
 

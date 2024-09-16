@@ -1,13 +1,16 @@
 package simulator
 
+import compiler.Locus.allLocus
 import compiler.{Locus, V}
-import dataStruc.Named
+import dataStruc.{Coord2D, Named, PlanarGraph}
 import simulator.Controller.disableBinding
 import simulator.CAtype._
 import simulator.ExampleData._
+import simulator.Medium.christal
 import simulator.Simulator.{displayParam, nameGlobalInit, simulParam}
 import simulator.XMLutilities._
 import simulator.colors.mainColors
+import triangulation.Vector2D
 
 import java.awt.Color
 import java.awt.Color.cyan
@@ -15,6 +18,8 @@ import java.io.FileNotFoundException
 import java.util
 import javax.swing.{InputMap, JComponent, KeyStroke}
 import scala.collection.JavaConverters._
+import scala.collection.immutable
+import scala.collection.immutable.{HashMap, HashSet}
 import scala.swing._
 import scala.swing.event.{ButtonClicked, EditDone, Key, KeyReleased, SelectionChanged}
 import scala.xml.{Node, NodeSeq, XML}
@@ -99,11 +104,25 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   colorDisplayedField = colorDisplayedField.filter(x => locusOfDisplayedOrDirectInitField.contains(x._1)) //if a field is nolonger defined and used to be colored, it has to be removed from the displayed
   var displayedLocus: Set[Locus] =
     colorDisplayedField.keys.map(locusOfDisplayedOrDirectInitField(_)).toSet + V()
+  var currentProximityLocus=   proximityLocus(displayedLocus)
+  private def updateProximity=     currentProximityLocus=   proximityLocus(displayedLocus)
+  /**
+   *
+   * @param loci     locus which are displayed
+   * @return    graph of adjacency between $loci
+   * removes adjacency which compromise planarity,
+   * hypothesis is that those are only punctual adjacency
+   * this will create plannar graph with face of degree 4, which thereafter should be correctly split.
+   */
 
-  /** we'll applies t0 iterations upon initialization to speed up going directly to the interesting cases */
+  private def proximityLocus(loci:Set[Locus]): Map[Locus, Set[Locus]] =  christal(6, 8, 200).proximityLocus(loci)
+
+    /** we'll applies t0 iterations upon initialization to speed up going directly to the interesting cases */
   val t0: Int = xInt(simulParam, "simul", "@t0")
   /** true if we start to play immediately */
   var isPlaying: Boolean = xBool(simulParam, "simul", "@isPlaying")
+  var showMore:Boolean=true
+
   /** the layers which are already expanded are saved, so that we do  not need to expand them again from one run to the next */
   var expandedLayers: Set[String] = fromXMLasList((displayParam \\ "expandedLayer").head).toSet
   expandedLayers = expandedLayers.filter(progCA.displayableLayerHierarchy().contains(_)) //we remove layers no longer existing
@@ -151,6 +170,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   private val InitButton = new SimpleButton(initIcon)
   private val PlayPauseButton = new SimpleButton(if (isPlaying) pauseNormalIcon
   else playNormalIcon)
+  private val showCrossButton = new SimpleButton(closeBoxIcon)
 
   //val globalInit: Array[String] = Array("center", "border", "yaxis","random")  //"onCircle", "random", "poisson", "blakHole"
 
@@ -165,13 +185,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   //val randomRootField = new TextField("" + randomRoot, 2)
   contents += (globalInitList, randomInitList) //, randomRootField)
   listenTo(globalInitList.selection, randomInitList.selection)
-
-
-
-
   //todo add a jcombo to select a number between 0 and 9
-
-
   /** When we switch mode between pause and play, the icon of the PlayPause button toggles */
   private def togglePlayPauseIcon(): Unit = {
     PlayPauseButton.icon =
@@ -209,17 +223,19 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
         {
           colorDisplayedField -= s
           displayedLocus = colorDisplayedField.keys.map(locusOfDisplayedOrDirectInitField(_)).toSet + V()
-          if (!displayedLocus.contains(l))
+          if (!displayedLocus.contains(l)) {  //there is one locus minus
+            updateProximity
             for (env <- envList)
-              env.medium.removeLocus(l)
+              env.medium.voronoise(displayedLocus,currentProximityLocus)
+          }
           colorDisplayedField - s
         }
         else { //we add a color
           if (!displayedLocus.contains(l)) //we have a new locus to display
-          {
+          {displayedLocus += l
+            updateProximity
             for (env <- envList)
-              env.medium.addNewLocus(l)
-            displayedLocus += l
+              env.medium.voronoise(displayedLocus,currentProximityLocus)
           }
           val mainColorLeft = mainColors.toSet.diff(colorDisplayedField.values.toSet)
           if (mainColorLeft.nonEmpty) {
@@ -235,7 +251,9 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
       layerTree.repaint()
 
       repaintEnv()
-
+    case ButtonClicked(showCrossButton) =>
+      showMore= !showMore
+      repaintEnv()
     case ButtonClicked(PlayPauseButton) | KeyReleased(_, Key.Space, _, _) =>
       isPlaying = !isPlaying
       togglePlayPauseIcon()
@@ -255,12 +273,25 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
       requestFocus() //necessary to enable listening to the keys again.
       if (wasPlaying) PlayPauseButton.doClick()
     case SelectionChanged(`globalInitList`) =>
-      InitButton.doClick()
+      initButtonClick()//InitButton.doClick()
       updateAndSaveXMLGlobalInit()
     case SelectionChanged(`randomInitList`) =>
       randomRoot = randomInitList.selection.item
-      InitButton.doClick()
+      initButtonClick()//InitButton.doClick()
 
+  }
+  /** ca bug si je fait initButton.doClick(), je ne sais pas pourquoi peut etre parceque
+   * j'ai bricolé des changement de sdk et de version de
+   * donc j'ai ecrit le code séparément, la ca a l'ai d'aller*/
+  def initButtonClick(): Unit = {
+    val wasPlaying = isPlaying
+    if (isPlaying) {
+      PlayPauseButton.doClick()
+    } //we need a temporary pause of the computing thread, so as to avoid having two threads run simultaneously
+    initEnv()
+    repaintEnv()
+    requestFocus() //necessary to enable listening to the keys again.
+    if (wasPlaying) PlayPauseButton.doClick()
   }
   focusable = true
   requestFocus

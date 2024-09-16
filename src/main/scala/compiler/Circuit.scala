@@ -47,7 +47,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     body = computeRoot //we pretend that the circuit is a function which returns compute Root
 
     val prog1: DataProg[InfoType[_]] = DataProg(this);
-    //print(prog1)
+    print(prog1)
 
     val prog2 = prog1.treeIfy();
     //print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);

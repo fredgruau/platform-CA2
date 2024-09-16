@@ -1,5 +1,7 @@
 package simulator
 
+import compiler.Locus.{allLocus, locusEv, locusV}
+
 import java.awt.{BasicStroke, Color, Dimension, Graphics2D, Image, Point, Polygon, geom}
 import simulator.CAtype._
 
@@ -12,7 +14,12 @@ import scala.collection.JavaConverters._
 import triangulation.Utility._
 
 import Color._
-import compiler.E
+import compiler.{E, Locus}
+import dataStruc.Coord2D
+
+import scala.collection.immutable
+import scala.collection.immutable.HashSet
+import scala.util.Random
 
 /**
  * pannel for drawing one CA , together with relevant information
@@ -41,9 +48,14 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
       override def drawPolygon(p: Polygon): Unit = g.drawPolygon(p)
 
       override def drawText(s: String, i: Int, j: Int) = g.drawString(s, i, j)
-      override def drawPoint(x: Int, y: Int): Unit = {
-        g.setStroke(new BasicStroke(2))
+      override def drawPoint(x: Int, y: Int, size:Int): Unit = {
+        g.setStroke(new BasicStroke(size))
         g.drawLine(x, y, x, y)
+      }
+
+      override def drawLine(x: Int, y: Int, x2: Int, y2: Int): Unit = {
+        g.setStroke(new BasicStroke(1))
+        g.drawLine(x, y, x2, y2)
       }
     }
     drawCA(gscreen, env)
@@ -55,79 +67,159 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
    * @param env
    */
   def drawCA(g: myGraphics2D, env: Env) = {
-    def drawPoints(c: Color) = {
-      g.setColor(c);
-      for (p <- env.medium.displayedPoint)
-        g.drawPoint(p.x.toInt, p.y.toInt)
-    }
+
+    val rand = new Random()
+    def randColor=new Color(rand.nextFloat, rand.nextFloat, rand.nextFloat)
+
 
     def drawText(c: Color) = {
       g.setColor(c);
       g.drawText(env.bugs.mkString(","), 0, height - 10)
     }
-
-    def drawTriangles(c: Color) = {
+    def drawTriangles(c: Color,triangleSoup:List[Triangle2D]) = {
       g.setColor(c);
-      for (t <- env.medium.triangleSoup) {
+      for (t <- triangleSoup)
+        g.drawPolygon(toPolygon(t))
+    }
+
+    def fillTriangles(c: Color,triangleSoup:List[Triangle2D]) = {
+      g.setColor(c);
+      for (t <- triangleSoup)
+        g.fillPolygon(toPolygon(t))
+    }
+
+    def drawTrianglesVEv(c: Color,triangleSoup:List[Triangle2D]) = {
+      g.setColor(c);
+      val targetLoci: Set[Locus]=HashSet(locusV,locusEv)
+      val locusOfPoint:immutable.HashMap[Vector2D,Locus]=immutable.HashMap.empty++allLocus.map((l:Locus) => env.medium.pointSet(l).toList.map((v:Vector2D)=>(v->l))).flatten
+
+
+      for (t <- triangleSoup) {
+        val lociSummit: Set[Locus] =HashSet(t.a,t.b,t.c).map (locusOfPoint(_))
+        if(  targetLoci.subsetOf(lociSummit))
+        //g.setColor(randColor);
         g.drawPolygon(toPolygon(t))
       }
     }
 
+    def drawdebug(c:Color)={
+      g.setColor(c)
+      for ((p1,p2)<-env.medium.bug) {
+        g.drawLine(p1.x.toInt,p1.y.toInt,p2.x.toInt,p2.y.toInt)
+        g.drawPoint(p1.x.toInt, p1.y.toInt,6)
+        g.drawPoint(p2.x.toInt, p2.y.toInt,6)
+      }
+    }
+
+    def drawEdges(c: Color) = {
+      g.setColor(c);
+     // env.medium.resetLocusNeigbors
+     // for (p <- env.medium.displayedPoint)
+      //  for (p2<- env.medium.locusNeighbors(p))
+      //  g.drawLine(p.x.toInt,p.y.toInt,p2.x.toInt,p2.y.toInt)
+      for(e<-env.medium.planarGraph.edges)
+        g.drawLine(e.src.x.toInt,e.src.y.toInt,e.target.x.toInt,e.target.y.toInt)
+    }
+    /** used for debug */
+    def drawFaces(): Unit = {
+      for(f<-env.medium.planarGraph.faces)
+        if(f.border.size<=31 && f.border.size>6 && rand.nextBoolean()&& rand.nextBoolean()  )//
+        {
+          g.setColor(WHITE)
+          g.fillPolygon(f.toPolygon)
+          g.setColor(black)
+
+          g.drawPolygon(f.toPolygon)
+          for(p<-f.border)
+            g.drawPoint(p.src.x.toInt,p.src.y.toInt,6)
+        }
+    }
+
+    def drawCrossedFaces(): Unit = {
+      g.setColor(gray)
+      for(f<-env.medium.planarGraph.faces)
+        if(f.isCrossing && f.border.size<31 && rand.nextBoolean()&& rand.nextBoolean() )  //we do not fill the outer border which is allowed to have crossing, due to two pending edges
+          g.fillPolygon(f.toPolygon)
+    }
+
+
     def drawCAinsideContour(c: Color) = {
       g.setColor(c);
-      for ((_, v) <- env.medium.voronoi)
+      for ((_, v) <- env.medium.theVoronois)
         if (v.sides.isEmpty)
           g.drawPolygon(v.polygon)
     }
 
     def drawCA1DborderContour(c: Color) = {
       g.setColor(c);
-      for ((_, v) <- env.medium.voronoi)
-        if (v.sides.nonEmpty)
+      for ((_, v) <- env.medium.theVoronois)
+        if (v.isBorder)
           g.drawPolygon(v.polygon)
     }
-    /*
+    def drawOutsideFace()={
+      env.medium.planarGraph.setOuterBorder()
+      val outBorder=env.medium.planarGraph.outerBorder.border
+      for(e<-outBorder) {
+        if(outBorder.contains(e.miror))g.setColor(pink)  //we use a distinct color for crossed edge
+        else g.setColor(orange)
+        g.drawLine(e.src.x.toInt,e.src.y.toInt,e.target.x.toInt,e.target.y.toInt)
+      }
+    }
 
-        def drawCAtestInitBoolV(initMethod: env.medium.InitMold, c: Color) = {
-          g.setColor(c)
-          for (i <- 0 until initMethod.boolVField.size)
-            for (j <- 0 until initMethod.boolVField(0).size)
-              if (initMethod.boolVField(i)(j)) {
-                val v: Vector2D = env.medium.vertice(i)(j).get
-                g.fillPolygon(env.medium.voronoi(v).polygon)
-              }
+
+    def drawPoints() = {
+
+      for (p <- env.medium.displayedPoint) {
+        val v2=env.medium.theVoronois(Coord2D(p.x,p.y))
+        if(v2.trianglesOK) {
+          g.setColor(gray)
+          g.drawPoint(p.x.toInt, p.y.toInt,2)
+        }
+        else  {
+          g.setColor(white)
+          g.drawPoint(p.x.toInt, p.y.toInt,4)
         }
 
-        def drawCAtestInit(initMethod: env.medium.InitMold, c: Color) = {
-          g.setColor(c)
-          for (d <- 0 until initMethod.locus.density)
-            for (i <- 0 until env.medium.nbLineCA)
-              for (j <- 0 until env.medium.nbColCA)
-                if (initMethod.memFields(d)(i)(j)) {
-                  assert(env.medium.locusPlane(initMethod.locus)(d)(i)(j).isDefined, "defined is defined exactly when the point exists")
-                  val v: Vector2D = env.medium.locusPlane(initMethod.locus)(d)(i)(j).get
-                  g.fillPolygon(env.medium.voronoi(v).polygon)
-                }
-        }
-    */
-
+      }
+    }
     def drawCAcolorVoronoi() = {
       //env.computeVoronoirColors() //painting allways need to recompute the colors, it would seem
-      for (v: Voroonoi <- env.medium.voronoi.values)
-        if (v.color != Color.black || v.corner.isDefined //we print the corners even it they are black, because they can overlap
+      //for (v: Voroonoi <- env.medium.voronoi.values) {
+        for(p<-env.medium.displayedPoint){
+          val v2=env.medium.theVoronois(Coord2D(p.x,p.y))
+        if (v2.polygon.npoints==0){ //we could not build the voronoi, we just draw a point.
+          g.setColor(v2.color)
+          g.drawPoint(p.x.toInt, p.y.toInt,10)
+          g.drawPoint(p.x.toInt, p.y.toInt,1)} //on veut que le stroke revient a 1.
+        else if
+          (v2.color != Color.black || v2.corner.isDefined //we print the corners even it they are black, because they can overlap
         ) {
-          g.setColor(v.color)
-          g.fillPolygon(v.polygon)
+          g.setColor(v2.color)
+          g.fillPolygon(v2.polygon)
+        }
         }
     }
 
     //drawCAtestInit(env.medium.defInit(E()),red)
     drawCAcolorVoronoi()
-    drawCAinsideContour(gray)
-    drawCA1DborderContour(white)
-    //drawTriangles(gray)
-    drawPoints(white)
+   // drawCAinsideContour(gray)
+   // drawCA1DborderContour(white)
+
+    //
+
+//     drawTriangles(blue,env.medium.triangleSoupDelaunay)
+   // drawTriangles(green,env.medium.triangleSoupGraph)
+   // drawEdges(red)
+    drawPoints()
     drawText(white)
+
+
+    //drawdebug(green)
+     if(env.controller.showMore)
+        {drawCrossedFaces();drawFaces()}
+   // drawTriangles(blue,env.medium.triangleSoupDelaunay)
+  //   drawTrianglesVEv(blue,env.medium.triangleSoupDelaunay)
+    // drawOutsideFace() plante si y ajuste V()
   }
 
 }

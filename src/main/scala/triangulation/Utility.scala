@@ -1,5 +1,7 @@
 package triangulation
 
+import dataStruc.Coord2D
+
 import java.awt.{Color, Polygon}
 import java.lang.Integer.decode
 import math.min
@@ -8,6 +10,12 @@ import scala.swing.Dimension
 
 /** contains all the simple static functions needed for simulation */
 object Utility {
+  //compute an angle defined by three points, using the scalar product, and arcosinus, at the level of B
+  def angle(A:Coord2D,B:Coord2D,C:Coord2D):Double={
+    val BA=A.sub(B)
+    val BC=C.sub(B)
+    Math.acos(BA.prodScal(BC)/(BA.norme * BC.norme))
+  }
   def addPoint(p: Polygon, a: Vector2D) =
     p.addPoint(a.x.toInt, a.y.toInt)
 

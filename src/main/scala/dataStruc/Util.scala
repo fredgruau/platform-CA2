@@ -2,6 +2,9 @@ package dataStruc
 
 import compiler.Circuit.{iTabSymb, iTabSymb2}
 import dataStruc.Align2.compose
+import simulator.CAtype.pointLines
+import triangulation.Vector2D
+import triangulation.Vector2D.almostEqualS
 
 import java.io.{BufferedWriter, File, FileWriter}
 import java.util.regex.Pattern
@@ -11,6 +14,91 @@ import scala.reflect.ClassTag
 
 
 object Util {
+
+
+  import compiler.Locus.allLocus
+  import compiler.{T, _}
+  import dataStruc.Util.sameElements
+  import triangulation.{DelaunayTriangulator, NotEnoughPointsException, Triangle2D, Vector2D, Voroonoi}
+
+  import java.util
+  import scala.::
+  import scala.math.cos
+  //import de.alsclo.voronoi.graph.Voronoi
+  import simulator.CAtype.pointLines
+  import simulator.UtilBitJava.{moveBitxtoy, propagateBit14and1, propagateBit6and1, propagateBitxand1}
+  import simulator.{Controller, Env, PrShift, UtilBitJava}
+  import triangulation.Utility._
+
+  import java.awt.Color
+  import scala.collection.IterableOnce.iterableOnceExtensionMethods
+  import scala.collection.JavaConverters._
+  import scala.collection.immutable.{HashMap, HashSet}
+  import scala.math.{min, random, round}
+  import scala.swing.Dimension
+  import scala.swing.Swing.pair2Dimension
+
+  trait border{
+    def boundingBox: Dimension
+    def right(v:Vector2D):Boolean=almostEqualS(v.x,boundingBox.width);
+    def left(v:Vector2D):Boolean=almostEqualS(v.x,0);
+    def up(v:Vector2D):Boolean=almostEqualS(v.y,boundingBox.height);
+    def down(v:Vector2D):Boolean=almostEqualS(v.y,0)
+    def onBorder(v:Vector2D):Boolean={up(v)||down(v)||left(v)||right(v)}
+    def onBorder(v:Vertex2):Boolean=onBorder(new Vector2D(v.coord.x,v.coord.y ))
+    def onBorder(v:Coord2D):Boolean=onBorder(new Vector2D(v.x,v.y ))
+    def onSameBorder(v1:Vector2D, v2:Vector2D)= {
+      up(v1)&&up(v2)||
+        down(v1)&&down(v2)||
+        left(v1)&&left(v2)||
+        right(v1)&&right(v2)
+    }
+  }
+
+  trait Rectangle{
+    def nbLine: Int
+    def nbCol: Int
+    /**
+     *
+     * @param ni input to test
+     * @param n  maximum allowed
+     * @return true if 0<=ni<=n
+     */
+    private def insideInterval(ni: Int, n: Int) = 0 <= ni && ni < n
+    /**
+     *
+     * @param ni input x coordinate
+     * @param nj input y coordinate
+     * @return true if the coordinates indicate a point within the cellular automaton
+     */
+    def inside(ni: Int, nj: Int) = insideInterval(ni, nbLine) && insideInterval(nj, nbCol)
+  }
+
+  def copyArray(t: Array[Int]): Array[Int] = {
+    val tmp = Array.ofDim[Int](t.length) //we use tmp when decoding in order to to avoid modify the CA memory
+    t.copyToArray(tmp)
+    tmp
+  }
+  /** Removes an elements for a set and returns it
+   * @return element removed */
+  def pop[A] (s:mutable.HashSet[A]):A={
+    val elem=s.head
+    s.remove(elem)
+    elem
+  }
+
+
+  def sameElements[T](t1:Array[pointLines],t2:Array[pointLines]): Boolean = {
+    for (i <- 0 until t1.length)
+      for (j <- 0 until t1(0).length)
+        for (k <- 0 until t1(0)(0).length)
+        { val tt1=t1(i)(j)
+          val tt2=t2(i)(j)
+          if (tt1(k).isDefined && (!tt1(k).get.almostEqual(tt2(k).get)))
+            return false
+        }
+    return true
+  }
 
   def writeFile(filename: String, s: String): Unit = {
     val file = new File(filename)

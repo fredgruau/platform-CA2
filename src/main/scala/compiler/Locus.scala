@@ -2,8 +2,12 @@ package compiler
 
 import scala.collection.{Iterator, Seq}
 
+
 /** The 9 locus. Three simplicial locus: V for vertex, E for edge, F for face, */
-sealed abstract class Locus {
+sealed abstract class Locus extends Ordered[Locus ]{
+  def compare(that: Locus): Int = {
+    toString.compareTo(that.toString)
+  }
   /** @return where to print the variable of affect instructions, so that we can distinguish between S,E,F,T
    */
   def tabul: Int = this match {
@@ -70,7 +74,7 @@ object Modifier {
 }
 
 
-abstract class S extends Locus with Ordered[S] {
+abstract class S extends Locus /*with Ordered[S] */{
   def javaName: String = "locus" + toString
 
   def shortName: String = toString.dropRight(2)

@@ -1,5 +1,5 @@
 <initMethod>
-    <inits>
+        <inits>
         <init>
             center
         </init>
@@ -24,6 +24,5 @@
         <init>
             true
         </init>
-    </inits>
-    <selected rank="3"/>
-</initMethod>
+    </inits><selected rank="3"/>
+      </initMethod>

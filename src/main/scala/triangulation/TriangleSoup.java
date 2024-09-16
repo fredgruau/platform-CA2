@@ -60,8 +60,6 @@ class TriangleSoup {
     }
 
     /**
-     * Returns the triangles from this triangle soup.
-     *
      * @return The triangles from this triangle soup
      */
     public List<Triangle2D> getTriangles() {
@@ -108,7 +106,7 @@ class TriangleSoup {
      * Returns one of the possible triangles sharing the specified edge. Based
      * on the ordering of the triangles in this triangle soup the returned
      * triangle may differ. To find the other triangle that shares this edge use
-     * the {@link findNeighbour(Triangle2D triangle, Edge2D edge)} method.
+     * the  findNeighbour(Triangle2D triangle, Edge2D edge) method.
      *
      * @param edge The edge
      * @return Returns one triangle that shares the specified edge
@@ -159,5 +157,4 @@ class TriangleSoup {
 
         triangleSoup.removeAll(trianglesToBeRemoved);
     }
-
 }

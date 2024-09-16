@@ -76,6 +76,9 @@ object DataProg {
     while (!instrsCur.isEmpty)
     // we now descend starting from the main circuit, to explore all the field, and then fields of fields.....
     dataStruc.Name.setName(f, ""); //for ''grad'' to appear as a name, it should be a field of an object extending the fundef.
+    //we check that each layers is reached by the naming algo
+    for(l<-layers)
+      assert(l.name!=null,"one of the layers has not been reached by the naming algorithm")
     val funs: iTabSymb[Fundef[_]] = immutable.HashMap.empty ++ dag.visitedL.collect {
       case l: Call[_] =>
         (l.f.name, l.f)

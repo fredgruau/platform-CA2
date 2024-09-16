@@ -32,6 +32,24 @@ public class Triangle2D {
         this.c = c;
     }
 
+
+    /**
+     *
+     * @param aa firs side
+     * @param bb second side
+     * @param cc third side
+     * @return true if one side is equals to the sum of the two others;
+     */
+    static boolean degenerated(double aa, double bb, double cc){
+        return (Vector2D.almostEqualS( 2*Math.max(aa,Math.max(bb,cc)), aa+bb+cc));
+    }
+    /**
+     *
+     * @return true if the triangle is flat
+     */
+   public boolean isDegenerate(){
+       return degenerated(a.distance(b),b.distance(c),c.distance(a));
+   }
     public Vector2D barycenter() {
         return new Vector2D((a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3);
     }
@@ -165,7 +183,7 @@ public class Triangle2D {
 
     /**
      * @param t potential neighbors.
-     *          t is a neighbor if it has two summits in common, in which case we will link it to the third summit
+     *          t is a neighbor if it has two summits a and b in common with this, in which case we will refer to it through the third summit tc
      */
     public void computeNeighbour(Triangle2D t) {
         if (t != this) {
@@ -271,6 +289,21 @@ public class Triangle2D {
 
     static final double TOL = 0.0000001;
 
+
+    public static double det(final Vector2D p1, final Vector2D p2, final Vector2D p3){
+        final double offset = Math.pow(p2.x, 2) + Math.pow(p2.y, 2);
+        final double bc = (Math.pow(p1.x, 2) + Math.pow(p1.y, 2) - offset) / 2.0;
+        final double cd = (offset - Math.pow(p3.x, 2) - Math.pow(p3.y, 2)) / 2.0;
+        final double det = (p1.x - p2.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p2.y);
+        return det;
+    }
+    public  boolean flat(){
+        return flat(a,b,c) ;
+    }
+    public static boolean flat(Vector2D p1, Vector2D p2, Vector2D p3){
+        double d=det(p1, p2, p3);
+        return Math.abs(det(p1, p2, p3) )< TOL;
+    }
     /**
      * retourne le centre du cercle dans lequel le triangle est inscrit
      **/

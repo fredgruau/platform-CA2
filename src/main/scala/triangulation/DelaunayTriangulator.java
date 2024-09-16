@@ -30,7 +30,7 @@ public class DelaunayTriangulator {
      *
      * @throws NotEnoughPointsException Thrown when the point set contains less than three points
      */
-    public void computeNeighbor() {
+    public void computeN_eighbor() {
         triangleSoup.computeNeighbor();
     }
 

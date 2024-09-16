@@ -85,7 +85,8 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
       case Taail(_) => "tail"
       case Cons(_, _) => "cons"
       case Delayed(arg) => "Delayed"
-      case l: Layer[_] => "Layer2 " + this.name + ":" + mym.name
+      case l: Layer[_] =>
+        "Layer2 " + this.name + ":" + mym.name
       case _ => throw new RuntimeException("merdouille")
     }
 

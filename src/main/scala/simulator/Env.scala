@@ -1,7 +1,7 @@
 package simulator
 
 import compiler.ASTB.False
-import compiler.Locus
+import compiler.{Locus, V}
 import simulator.Medium.christal
 import triangulation.Utility.halve
 
@@ -25,13 +25,14 @@ import scala.util.Random
 class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, initName: HashMap[String, String]) {
   /** current time */
   var t = 0
-  /** Random number generator each environement has its copy */
-  var rand: Random = new Random(controller.randomRoot)
-  /** contains a thread which iterates the CA, while not asked to pause */
 
-  val medium: Medium = arch match {
-    case "christal" => christal(nbLine, nbCol, controller.CAwidth, this) //default medium is christal
+
+
+  val medium: Medium with encodeByInt with InitSelect = arch match {
+    case "christal" => christal(nbLine, nbCol, controller.CAwidth) //default medium is christal
   }
+  /** Random number generator each medium has its copy */
+  medium.initRandom(controller.randomRoot)
   /** Memory of the CA, it is being rewritten by the running thread, not touched if being displayed
    * we add 1 to the column size  medium.nbInt32CAmem +1 so as to avoid catching ArrayIndexOutOfBoundsException
    * when  we write at i+1 instead of i, (we do that in order to avoid memorizing register introduced for tm1s, and save local memory */
@@ -59,19 +60,23 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
       /** fields layerName's components */
       val memFields2Init: Seq[Array[Int]] = memFields(layerName) //gets the memory plane
       val initNameFinal = initName.getOrElse(layerName, controller.initName(layerName)) //either it is the root layer or we find it in env
-      val initMethod: Init = medium.initSelect(initNameFinal,
+      val finalInitMethodName: String = if (initNameFinal== "global") controller.globalInitList.selection.item //currently selected init method
+      else initNameFinal
+      val initMethod: Init = medium.initSelect(finalInitMethodName,
         controller.locusOfDisplayedOrDirectInitField(layerName), // locus is passed. It is used in def/center/yaxis
-        controller.bitSizeDisplayedOrDirectInitField.getOrElse(layerName, 1))
+        controller.bitSizeDisplayedOrDirectInitField.getOrElse(layerName, 1)) // bitsize  is passed.
       initMethod.init(memFields2Init.toArray)
     }
   }
 
   def init(): Unit = {
-    rand = new Random(controller.randomRoot) //we reinitialize the random number in order to reproduce exactly the same random sequence
+    medium.initRandom(controller.randomRoot) //we reinitialize the random number in order to reproduce exactly the same random sequence
+   // medium.middleClosure(controller.currentProximityLocus)  //alternative way of building quickly voronoi.
+     //controller.progCA.copyLayer(mem) plus besoin pisque je fais un forward
+    if (medium.theVoronois.isEmpty)
+      medium.voronoise(controller.displayedLocus, controller.currentProximityLocus) //we have to compute the voronoi upon medium's creation
     initMemCA() //invariant stipulates that memory should be filled so we fill it already right when we create it
-    //controller.progCA.copyLayer(mem) plus besoin pisque je fais un forward
-    if (medium.voronoi.isEmpty)
-      medium.initVoronoi(controller.displayedLocus) //we have to compute the voronoi upon medium's creation
+// System.out.println( medium.pointSet(V()).size)
     forward() //we do one forward, so as to be able to show the fields.
     for (_ <- 0 until controller.t0) //forward till to
       forward()
@@ -89,6 +94,28 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
   def memFields(fieldName: String): List[Array[Int]] =
     controller.memFieldsOffset(fieldName).map(mem(_))
 
+
+  /** we create that array once and forall to decode memory bit planes */
+  private val bitPlaneBuffer: Array[Array[Boolean]] = Array.ofDim[Boolean](nbLine, nbCol)
+
+
+  /**
+   * sum to the colors of locus l, the contribution of bitplanes
+   * which can represent a boolean field
+   *
+   * @param locus     locus where new colors are to be summed
+   * @param color     color to be summed
+   * @param bitPlanes whether it should be summed
+   */
+  private def sumColorVoronoi(locus: Locus, color: Color, bitPlanes: List[Array[Int]]): Unit = {
+    assert (bitPlanes.size == medium.locusPlane(locus).length, "number of bit planes should be locus density")
+    for ((plane, points) <- bitPlanes zip medium.locusPlane(locus)) { //we do a dot iteration simultaneously on pointsPlane, and bitPlane
+      //   decodeInterleavRot(nbLineCA, nbColCA, plane, sandBox) //we convert the compact encoding on Int32, into simple booleans
+      medium.decode(plane, bitPlaneBuffer) //we convert the compact encoding on Int32, into simple booleans
+      medium.sumColorVoronoi(color,bitPlaneBuffer, points)
+    }
+  }
+
   /** iterate through all the layers to be displayed */
   private def computeVoronoirColors(): Unit = {
     medium.resetColorVoronoi(controller.displayedLocus)
@@ -102,12 +129,12 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
       for (i <- (0 until bitSize).reverse) { //reverse so that bit 0 gets smallest color
         //we decompose an int into its bits, first bit are strongest bit
         val bitiOfLocus = (0 until locus.density).map(j => bitPlane(i + j * bitSize)).toList
-        medium.sumColorVoronoi(locus, colorAjusted, bitiOfLocus) // bitPlane.slice(i * locus.density, (i + 1) * locus.density))
+        sumColorVoronoi(locus, colorAjusted, bitiOfLocus) // bitPlane.slice(i * locus.density, (i + 1) * locus.density))
         colorAjusted = halve(colorAjusted)
       }
     }
   }
-
+  /** contains a thread which iterates the CA, while not asked to pause */
   def play(): Unit = {
     val thread = new Thread {
       override def run(): Unit = {

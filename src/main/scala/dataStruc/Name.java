@@ -36,12 +36,14 @@ public class Name {
               } catch (IllegalAccessException e) {
                   e.printStackTrace();
               }
-              if (o2 instanceof Named) //we found a class worth of consideration, because carrying a name, may be we should restrict ourself to layere here
+              if (o2 instanceof Named) //we found a class worth of consideration, because carrying a name, may be we should restrict ourself to layers here
                   setNameField(conteneur, conteneurName, (Named) o2, fieldName); //so we try to name o2
 	    else if (o2 instanceof HashMap ) { 
 		   HashMap<?,?>  m = (HashMap<?, ?>) o2;	for ( Object  a :m.entrySet())  {Object key = ((Map.Entry<?,?>) a).getKey(); Object value =  ((Map.Entry<?,?>) a).getValue();
-	        if(value instanceof Named && key  instanceof Named  )  setNameField(  conteneur,  conteneurName+fieldName+"yyy" , (Named)value  , ((Named)key).name());
-	        else if(value instanceof Named && key  instanceof Integer  )  setNameField(  conteneur,  conteneurName+fieldName+"yyy" , (Named)value  , ""+(key) );
+	        if(value instanceof Named && key  instanceof Named  )
+                setNameField(  conteneur,  conteneurName+fieldName+"yyy" , (Named)value  , ((Named)key).name());
+	        else if(value instanceof Named && key  instanceof Integer  )
+                setNameField(  conteneur, conteneurName+ capitalizeFirst(fieldName+"yyy" ), (Named)value  , ""+(key) );
                   }
               }
           }
@@ -50,7 +52,9 @@ public class Name {
 	}
 
 	static int compteurToto = 0;
-
+     public static String capitalizeFirst(String s){
+         return ((""+s.charAt(0)).toUpperCase() + s.substring(1).toLowerCase());
+     }
     /**
      * When a field is accessed through different path, we will try to name it through different container
      * each path give a possible name, we want to minimise the path length, wich is the number of uppercap

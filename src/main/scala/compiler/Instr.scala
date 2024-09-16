@@ -349,7 +349,10 @@ case class CallProc(var procName: String, names: List[String], exps: List[AST[_]
   def preciseName(motherLayer: String) = procName += motherLayer
 
 
-  override def toString: String = pad(names.mkString(","), 25) + "<-" + procName + "(" + exps.map(_.toStringTree).mkString(" ") + ")"
+  override def toString: String = {
+    val y=0
+    pad(names.mkString(","), 25) + "<-" + procName + "(" + exps.map(_.toStringTree).mkString(" ") + ")"
+  }
 
 
   //override def toString: String = pad(names.foldLeft(" ")(_ + "," + _).substring(2), 25) + "<-" + p + "(" + exps.map(_.toStringTree).foldLeft(" ")(_ + " " + _) + ")\n"
@@ -532,6 +535,7 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
       res
    }*/
   override def simplifConcat(): Instr = {
+    val u=0
     def diesify(s: String) = if (s.contains('_')) s.replace('_', '#') else s + "#0" //quand c'est 0 y a pas de tiret
 
     exp match {
