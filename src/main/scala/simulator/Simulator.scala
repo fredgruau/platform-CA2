@@ -1,5 +1,7 @@
 package simulator
 
+import compiler.Circuit
+import compiler.Circuit.compiledCA
 import simulator.SimulatorUtil._
 import simulator.XMLutilities._
 import triangulation.Vector2D
@@ -7,14 +9,24 @@ import triangulation.Vector2D
 import java.awt.{Color, Polygon}
 import java.io.{FileNotFoundException, IOException}
 import java.net.URL
-import javax.swing.{ImageIcon, JTree}
+import javax.swing.{ImageIcon, JFrame, JTree}
 import scala.swing.Swing.Icon
 import scala.swing._
 import scala.xml.{Elem, Node}
 import BorderPanel.Position._
 import scala.collection.immutable.HashMap
-
+/*object mySim extends Simulator
+class AppletLauncher extends JFrame {
+  //super.("Eno");
+  val mySim2 = new Simulator();
+  mySim2.startup(Array("toto","tata"))
+  //getContentPane().add(mySim2.top;
+  }*/
 object Simulator extends SimpleSwingApplication {
+
+
+
+
   /** name of Cellular automaton being simulated, to be set by method startUp, and then used by method top */
   var nameCA: String = " "
   /** parameters defining sizes, t0, isPlaying, common to all simulations */
@@ -24,6 +36,7 @@ object Simulator extends SimpleSwingApplication {
   var globalInit: Node = null
   var selectedGlobalInit: Int = -1 //it will bug if we forget to read it.
   var nameGlobalInit: String = null
+  var options:String=""  //-c pour compile
   /**
    * @param args command line argument, contains the name of CA being simulated
    *             startup is called before top is launched,so that
@@ -42,8 +55,7 @@ object Simulator extends SimpleSwingApplication {
     catch {
       case _: FileNotFoundException => readXML("src/main/scala/compiledCA/displayParam/default.xml")
     }
-
-
+ if(args.length>3) options=args(3)
     super.startup(args)
   }
 
@@ -59,13 +71,21 @@ object Simulator extends SimpleSwingApplication {
     /** possible directories where CA can be found */
     val directories = List("compiledCA") //, "compHandCA")
     //find  the right directory
-    val possibleDir = directories.filter((s: String) => loadClass(s + "." + nameCA) != null)
-    assert(possibleDir.size > 0, nameCA + "could not be found in any of the directories " + directories)
+    val nameCACA=nameCA+"CA"
+    val possibleDir = directories //.filter((s: String) => loadClass(s + "." + nameCACA) != null)
+    assert(possibleDir.size > 0, nameCA + " could not be found in any of the directories " + directories)
     assert(possibleDir.size < 2, nameCA + "could  be found two times in the directories " + directories)
     val chosenDir: String = possibleDir.head //we take the first found directory
-    val classCA: Class[CAloops2] = loadClass(chosenDir + "." + nameCA)
+
     /** contains the loops but also many other parameters */
-    val progCA: CAloops2 = getProg(classCA) //will be used to create the controller, but also the browsable treeLayers.
+    val progCA: CAloops2 =
+      if (options.contains("-c"))
+        Circuit.compiledCA(nameCA)  //force la compilation
+      else{
+          val classCA: Class[CAloops2] = loadClass(chosenDir + "." + nameCACA)
+          getProg(classCA)  //récupére le CA déja compilé et rangé
+        }
+       //will be used to create the controller, but also the browsable treeLayers.
     title = "spatial computation " + nameCA + " gateCount=" + progCA.gateCount() + " memory Width=" + progCA.CAmemWidth()
 
 

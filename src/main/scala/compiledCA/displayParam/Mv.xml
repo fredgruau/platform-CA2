@@ -1,0 +1,22 @@
+<displayParam>
+        <expandedLayer>
+        <Layer>
+          mvForcesyyy0
+        </Layer><Layer>
+          mvForcesyyy0R
+        </Layer><Layer>
+          mv
+        </Layer><Layer>
+          mvB
+        </Layer><Layer>
+          mvM
+        </Layer>
+      </expandedLayer>
+        <colorOfField>
+          <layer color="0x00FF80">
+            mv
+          </layer><layer color="0xFF00FF">
+            mvMPush
+          </layer>
+        </colorOfField>
+      </displayParam>

@@ -284,8 +284,8 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
           newFuns += (newname -> cur.funs(f).bitIfy(nbitarg))
         // re-creates the code of f, taking into account nbitarg.
         val fprog = newFuns(newname)
-        val nbitResult = fprog.paramR.map(s => fprog.tSymbVar(s).nb) //we get the number of bits of results
-        (names zip nbitResult).foreach { sn => newTSymb += sn._1 -> new InfoNbit(cur.tSymbVar(sn._1).t, cur.tSymbVar(sn._1).k, sn._2) }
+        val nbitResult: Seq[Int] = fprog.paramR.map(s => fprog.tSymbVar(s).nb) //we get the number of bits of results
+        (names zip nbitResult).foreach { sn => newTSymb += sn._1 -> new InfoNbit(cur.tSymbVar(sn._1).t, cur.tSymbVar(sn._1).k, sn._2) } //updates the symbol rtable
         CallProc(newname, names, newexps).asInstanceOf[Instr]
       }
   }

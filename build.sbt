@@ -1,8 +1,8 @@
 name := "platform-CA2"
 
 version := "0.1"
-scalaVersion := "2.13.12"
-//scalaVersion := "2.13.1"
+//scalaVersion := "2.13.12"
+scalaVersion := "2.13.1"   //ce que j'avais originellement avant tortue sandwich
 
 //scalaVersion := "2.13.10"
 githubTokenSource := TokenSource.GitConfig("github.token")
@@ -21,5 +21,5 @@ libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "1.3.0"
 
 libraryDependencies += "blob" % "quadedgetriangulation_2.13" % "1.+"
 
-
+//libraryDependencies +=  "quadedgetriangulation_2.13" % "1.2"
 

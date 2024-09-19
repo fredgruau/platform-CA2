@@ -2,13 +2,14 @@ package compiler
 
 import compiler.AST.Read
 import compiler.ASTB.{False, True}
-import compiler.Circuit.{TabSymb, iTabSymb}
+import compiler.Circuit.{TabSymb, compiledCA, iTabSymb}
 import compiler.Instr.deployInt2
 import compiler.Locus.{all2DLocus, allLocus}
 import dataStruc.Util.{append2File, hierarchyDisplayedField, parenthesizedExp, radicalOfVar, radicalOfVar2, radicalOfVarIntComp, radicalOfVarRefined, removeAfterChar, rootOfVar, sameRoot, shortenedSig, writeFile}
 import compiler.VarKind.LayerField
 import dataStruc.Named
 import dataStruc.Named.{isLayer, noDollarNorHashtag, noHashtag}
+import javaxtools.compiler.{CharSequenceCompiler, UseCompiler}
 import simulator.CAloops2
 import simulator.SimulatorUtil.getProg
 import simulator.XMLutilities.readXML
@@ -20,13 +21,14 @@ import scala.collection.convert.ImplicitConversions.`collection asJava`
 import scala.collection.{Map, mutable}
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.jdk.CollectionConverters._
+import scala.util.Random
 import scala.xml.{Elem, Node, NodeSeq, XML}
 
 /** provide method in order to  produce the final java code */
 trait ProduceJava[U <: InfoNbit[_]] {
   self: DataProgLoop[U] =>
   /** returns  a big string  storing the code for CAloops, and the code for main calling those CAloops on arrays */
-  def produceAllJavaCode: String = { //we need to generate spatial signature for macros before we can adress the main.
+  def produceAllJavaCode: CAloops2 = { //we need to generate spatial signature for macros before we can adress the main.
     val leafLoops = subDataProgs.filter(p => p._2.isLeafCaLoop)
     val codeLoops: iTabSymb[String] = leafLoops.map({ case (k, v) => (k -> v.asInstanceOf[ProduceJava[U]].javaCodeCAloop(k)) }) //retrieves all the CA loops
     val (codeLoopsMacro, codeLoopsAnonymous) = codeLoops.partition({ case (k, v) => !k.startsWith("_fun") }) //anonymous functions start with _fun
@@ -35,21 +37,37 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
     val nameDirCompilCA = "src/main/scala/compiledCA/"
     val nameCAjava = nameCA.capitalize + ".java"
+
+
+    val PACKAGE_NAME = "compiledCA"
+    //val PACKAGE_SRC = "prog"
+    //val CLASS_NAME = "Output"
+    val r = new Random()
+    val randClassName = "" + Math.abs(r.nextInt % 1000)
+    val qName = PACKAGE_NAME + '.' + nameCA.capitalize //+ randClassName
+
+
+
     writeFile(nameDirCompilCA + nameCAjava, codeMain + "\n") //stores the code of the main plujs anonmymous loop
+   val compiledCA= UseCompiler.newCA(codeMain, qName) //We store the program in a global variable which can then be read by the simulator. This is very dirty but it work
+
+
     //we now process non anonymous macro loop
     val nameDirCompilLoops = "src/main/scala/compiledMacro/" //where thew will be stored
-    val grouped = codeLoopsMacro.groupBy({ case (k, v) => k.substring(0, k.indexOf(".")) }) //  what comes before the dot is the name of the class where to regroup macros
+    val grouped: Predef.Map[String, Map[String, String]] = codeLoopsMacro.groupBy({ case (k, v) => k.substring(0, k.indexOf(".")) }) //  what comes before the dot is the name of the class where to regroup macros
 
 
     /** returns name of already defined macro of type macrosType */
-    def alreadyDefined(macrosTypeFile: String): Array[String] = Class.forName(macrosTypeFile).getDeclaredMethods.map(_.getName())
+    def alreadyDefined(macrosTypeFile: String): Array[String] =
+      Class.forName(macrosTypeFile).getDeclaredMethods.map(_.getName())
 
     /** contains the loops but also many other parameters */
     var codeAllLoops = ""
     for (k4 <- grouped.keys) { //for loops, the code is distributed in several file, for clarity
       val fileName = k4 + ".java"
       //if macro file does not exists, creates it (preambule + k4 + "{\n" + notYetDefined.values.mkString("\n") + postambule).replace('#', '$'); //'#' is not a valid char for id
-      val ard: Set[String] = if (!new File(nameDirCompilLoops + fileName).exists()) {
+      val ard: Set[String] =   //contient "rand_1"
+        if (!new File(nameDirCompilLoops + fileName).exists()) {
         val preambule = "package compiledMacro;\n import simulator.PrShift;\n public class "
         writeFile(nameDirCompilLoops + fileName, preambule + k4 + "{\n }") //new compiled java macro will be inserted just before last acolades.
         new HashSet[String]() //there is no macro yet defined, since the class was not even existing
@@ -66,7 +84,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
       }
 
     }
-    "" + codeMain + codeAllLoops //returns for direct printing
+    compiledCA
+    //"" + codeMain + codeAllLoops //returns for direct printing
   }
 
   /**

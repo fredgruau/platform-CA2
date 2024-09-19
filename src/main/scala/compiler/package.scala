@@ -1,4 +1,7 @@
+import simulator.CAloops2
+
 package object compiler {
+
   def rotateLeft[A](seq: Seq[A]): Seq[A] = {
     rotateLeft(seq, 1)
   }

@@ -1,6 +1,7 @@
 package dataStruc
 
 import dataStruc.Coord2D.triangle
+import dataStruc.PlanarGraph.NbFaceMinContour
 import triangulation.Utility.angle
 import triangulation.{Triangle2D, Utility, Vector2D}
 
@@ -73,9 +74,10 @@ class PlanarGraph() {
 
 
   }
+
   def setOuterBorder()={
     for(f<-faces)
-      if (f.border.size > 30) {
+      if (f.border.size > NbFaceMinContour) {
         f.outerBorder = true
         outerBorder = f
       }
@@ -278,4 +280,7 @@ class Face2(val border:List[Edge2]){
     return res
   }
 
+}
+object PlanarGraph{
+  val NbFaceMinContour=17 //face will be contour if bordersize bigger than 17
 }

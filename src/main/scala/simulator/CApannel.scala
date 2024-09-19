@@ -123,7 +123,7 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
     /** used for debug */
     def drawFaces(): Unit = {
       for(f<-env.medium.planarGraph.faces)
-        if(f.border.size<=31 && f.border.size>6 && rand.nextBoolean()&& rand.nextBoolean()  )//
+        if( f.border.size>6 && !f.outerBorder && rand.nextBoolean()&& rand.nextBoolean()  )//
         {
           g.setColor(WHITE)
           g.fillPolygon(f.toPolygon)

@@ -6,7 +6,8 @@ import ASTBfun.ASTBg
 import Circuit._
 import compiler.ASTLt.ConstLayer
 import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp}
-import progOfCA.{Grow}
+import progOfCA.Grow
+import simulator.{ CAloops2}
 
 import scala.collection._
 import scala.collection.immutable.HashMap
@@ -43,7 +44,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
    *
    */
 
-  def compile(m: Machine): Unit = {
+  def compile(m: Machine): CAloops2 = {
     body = computeRoot //we pretend that the circuit is a function which returns compute Root
 
     val prog1: DataProg[InfoType[_]] = DataProg(this);
@@ -52,7 +53,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     val prog2 = prog1.treeIfy();
     //print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
 
-    val prog3 = prog2.procedurIfy();
+    val prog3: DataProg[InfoType[_]] = prog2.procedurIfy();
     //print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
     val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
@@ -64,7 +65,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
     //    print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
 
-    val prog5ter = prog5bis.radiusify3
+    val prog5ter: DataProg[InfoNbit[_]] = prog5bis.radiusify3
     //print("radiusify555555555555555555555555555555\n" + prog5ter)
 
     val prog6 = prog5ter.unfoldSpace(m); //ajouter les tm1s!!
@@ -87,8 +88,13 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     val prog12 = prog11.coaalesc() //allocates memory
     // System.out.println(prog12.allLayers)
     //  print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
-    ("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaCode)
+   // ("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaCode)
+    //as a result of compiling, compiledCA is available and will be read by the simulator, so we just launch it.
+   // val s=new simulator.Simulator()   s.AppletLauncher()
+    prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaCode
   }
+
+
 }
 
 
@@ -101,6 +107,25 @@ object Circuit {
       def computeRoot = root
     }.compile(hexagon)
   }
+
+
+  /**
+   *
+   * @param nameCA name of the CA program
+   *               returns an instance of CAloops2 that does the convolution, ready for simulation
+   */
+  def compiledCA(nameCA:String):CAloops2={
+    val nameClass=("progOfCA." + nameCA)
+    new Circuit[V, B](){
+      val root = Class.forName(nameClass).newInstance.asInstanceOf[ASTLt[V, B]] //asInstanceOf[{ def hello(name: String): String }]
+      root.setName(nameCA.toLowerCase) //so that the name of the variables start with the name of the CA
+      def computeRoot = root
+    }.compile(hexagon)
+  }
+
+
+
+
 
 
   type TabSymb[T] = mutable.HashMap[String, T]

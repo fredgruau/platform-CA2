@@ -14,10 +14,6 @@ import progOfmacros.Grad
 import progOfmacros.RedSwrapper.border
 import progOfmacros.RedT.cac
 
-class Seed extends ConstLayer[V, B](1, "global") with DistT {
-  show(this)
-} //root classe compilable
-
 
 class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[V, SI] {
   val opp = -this

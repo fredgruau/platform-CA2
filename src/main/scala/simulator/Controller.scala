@@ -159,18 +159,17 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   }
 
 
-  private class SimpleButton(ic: javax.swing.Icon) extends Button() {
+  class SimpleButton(ic: javax.swing.Icon) extends Button() {
     icon = ic
     contents += this
     Controller.this.listenTo(this) //Controller.this refer to the enclsing controller
   }
 
 
-  private val ForwardButton = new SimpleButton(forwardIcon) //myButton(forwardIcon, this)
-  private val InitButton = new SimpleButton(initIcon)
-  private val PlayPauseButton = new SimpleButton(if (isPlaying) pauseNormalIcon
-  else playNormalIcon)
-  private val showCrossButton = new SimpleButton(closeBoxIcon)
+  val ForwardButton = new SimpleButton(forwardIcon) //myButton(forwardIcon, this)
+   val InitButton = new SimpleButton(initIcon)
+   val PlayPauseButton = new SimpleButton(if (isPlaying) pauseNormalIcon  else playNormalIcon)
+  val ShowCrossButton = new SimpleButton(closeBoxIcon)
 
   //val globalInit: Array[String] = Array("center", "border", "yaxis","random")  //"onCircle", "random", "poisson", "blakHole"
 
@@ -249,11 +248,8 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
       updateAndSaveXMLparamCA()
       layerTree.hideRoot
       layerTree.repaint()
+      repaintEnv()
 
-      repaintEnv()
-    case ButtonClicked(showCrossButton) =>
-      showMore= !showMore
-      repaintEnv()
     case ButtonClicked(PlayPauseButton) | KeyReleased(_, Key.Space, _, _) =>
       isPlaying = !isPlaying
       togglePlayPauseIcon()
@@ -263,6 +259,9 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
       forwardEnv()
       repaintEnv()
       requestFocus()
+    case ButtonClicked(ShowCrossButton) =>
+      showMore= !showMore
+      repaintEnv()
     case ButtonClicked(InitButton) | KeyReleased(_, Key.A, _, _) =>
       val wasPlaying = isPlaying
       if (isPlaying) {

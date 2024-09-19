@@ -1,4 +1,6 @@
 package simulator
+import DelaunayLogic.{Delaunay, QuadEdge}
+import GeometricPrimitives.FinitePoint
 import Medium.add2
 import dataStruc.Util.{Rectangle, border, copyArray, sameElements}
 import simulator.CAtype.pointLines
@@ -459,7 +461,7 @@ abstract class Medium(val nbLine: Int, val nbCol: Int, val boundingBox: Dimensio
   /** points  being displayed (whose voronoi are colored) */
   var displayedPoint: Set[Vector2D] = Set()
    var triangleSoupDelaunay:List[Triangle2D] = null
-  var triangleSoupGraph:List[Triangle2D] = null
+  var triangleSoup:List[Triangle2D] = null
 
   /**
    *
@@ -531,11 +533,16 @@ abstract class Medium(val nbLine: Int, val nbCol: Int, val boundingBox: Dimensio
     triangleSoup
   }
 
-   private def triangleSoupFromQuadTree()=
-    { val f=FinitePoint(2.0,2.0)
-      //val seeds=displayedPoint.map((v: Vector2D) => FinitePoint(v.x,v.y))
-      Delaunay.TriangulateDelaunay()
+ private def triangleSoupFromQuadTree(points:Set[Vector2D])=
+    {  def toFp(v:Vector2D)=FinitePoint(v.x,v.y)
+      def toV2D(f:FinitePoint)=new Vector2D(f.x,f.y)
+      def toTriangle2D(ppp:(FinitePoint, FinitePoint, FinitePoint))=new Triangle2D(toV2D(ppp._1),toV2D(ppp._2),toV2D(ppp._3))
 
+      val seeds=displayedPoint.map(toFp)
+      val qe: QuadEdge = Delaunay.TriangulateDelaunay(seeds,true)
+      val ts: Set[(FinitePoint, FinitePoint, FinitePoint)] =qe.getTriangle()
+      val triangleSoup: List[Triangle2D] =ts.map(toTriangle2D(_)).toList
+      triangleSoup
       //Delaunay.TriangulateDelaunay()
 
 
@@ -563,14 +570,16 @@ abstract class Medium(val nbLine: Int, val nbCol: Int, val boundingBox: Dimensio
     displayedPoint=HashSet.empty
     for (l <- loci)  displayedPoint ++= pointSet(l)
     // triangleSoupDelaunay=triangleSoupFromDelaunay(loci)
-     triangleSoupGraph=triangleSoupFromGraph(lociGraph)
+   triangleSoup=triangleSoupFromGraph(lociGraph)
+     // triangleSoup=triangleSoupFromQuadTree(displayedPoint)
+
 
 
      val crossedEdge=planarGraph.crossingEdge() //should be empty
     // assert(crossedEdge.isEmpty,"somme edge are crossing"+crossedEdge)
     theVoronois = immutable.HashMap() ++ displayedPoint.map((v: Vector2D) => Coord2D(v.x,v.y) -> new Voroonoi(v))
     var voronoisOk=true
-    for (t <- triangleSoupGraph) {
+    for (t <- triangleSoup) {
       t.orientCCW() //triangles are oriented counter clockWise
       for (p: Vector2D <- List(t.a, t.b, t.c)) { //we collect all the triangle incident to each PE p
         val v=theVoronois(Coord2D(p.x,p.y))
@@ -610,7 +619,8 @@ abstract class Medium(val nbLine: Int, val nbCol: Int, val boundingBox: Dimensio
   def proximityLocus(loci:Set[Locus]):Map[Locus,Set[Locus]]={
     displayedPoint=HashSet.empty
     for (l <- loci)  displayedPoint ++= pointSet(l)
-    val triangleSoup=triangleSoupFromDelaunay(loci)  //we use delaunay in order to find out proximity between loci
+    val triangleSoup=triangleSoupFromQuadTree(displayedPoint)
+    //val triangleSoup=triangleSoupFromDelaunay(loci)  //we use delaunay in order to find out proximity between loci
     //we build the voronoi, so as to be able to test if a triangle is on the border
     theVoronois = immutable.HashMap() ++ displayedPoint.map((v: Vector2D) => Coord2D(v.x,v.y) -> new Voroonoi(v))
     for (t <- triangleSoup) {
