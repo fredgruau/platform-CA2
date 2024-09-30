@@ -9,10 +9,10 @@
             testvoronoiE
           </layer><layer color="0xFFFF00">
             testvoronoiV
-          </layer><layer color="0xFFC800">
-            testvoronoiFv
           </layer><layer color="0x0000FF">
             testvoronoi
+          </layer><layer color="0x00FFFF">
+            testvoronoiF
           </layer>
         </colorOfField>
       </displayParam>

@@ -5,11 +5,13 @@ import ASTB.{Tminus1, shiftL, shiftR}
 import ASTBfun.ASTBg
 import Circuit._
 import compiler.ASTLt.ConstLayer
-import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp}
+import compiler.DataProg.nameDirCompilLoops
+import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp, radicalRad}
 import progOfCA.Grow
-import simulator.{ CAloops2}
+import simulator.CAloops2
 
-import scala.collection._
+import java.io.File
+import scala.collection.{mutable, _}
 import scala.collection.immutable.HashMap
 
 /**
@@ -32,6 +34,11 @@ import scala.collection.immutable.HashMap
  * In turns, the 1D CA takes input output fields produced by the host, on a single cell (or on four corners)
  */
 abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(L, R)]("main", null, p: _*) {
+  /**
+   * contains name of macro which needs being recompiled, because allthough they were already compiled, they are now needed for a distinct number of bits
+   * Emblematic example is the distance which is used for 3 bits, but also 5bits integers.
+   */
+
   /** to be defined in the circuit for collecting all the nodes participating in usefull computation,   "abstract def" because known latter */
   def computeRoot: ASTLt[L, R]
 
@@ -48,7 +55,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     body = computeRoot //we pretend that the circuit is a function which returns compute Root
 
     val prog1: DataProg[InfoType[_]] = DataProg(this);
-    print(prog1)
+    //print(prog1)
 
     val prog2 = prog1.treeIfy();
     //print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
@@ -60,7 +67,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     // print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
     val prog5: DataProg[InfoNbit[_]] = prog4.macroify();
-    // print("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
+    println("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
     //    print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
@@ -99,6 +106,10 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
 
 
 object Circuit {
+  final case class NbOfBitIntoAccountException(private val message: String = "",
+       private val cause: Throwable = None.orNull)
+    extends Exception(message, cause)
+  var takeNbOfBitIntoAccount:Set[String]=immutable.HashSet()
   /** we restrict ourself to circuit returning a boolV, for the moment */
   def main(args: Array[String]) {
     new Circuit[V, B]() {
@@ -106,6 +117,33 @@ object Circuit {
       root.setName(args(0).toLowerCase) //so that the name of the variables start with the name of the CA
       def computeRoot = root
     }.compile(hexagon)
+  }
+  def hasBeenReprogrammed(macroName: String, nameDirProg:String, nameDirCompil :String):Boolean={
+    val fileProg=new File (nameDirProg + macroName.capitalize  + ".scala")  //faut capitaliser parcque ce fut minusculisé!
+    val fileCompiled=new File (nameDirCompil + macroName + ".java")
+    val e=fileProg.exists()
+    val dp=fileProg.lastModified()
+    val dc=fileCompiled.lastModified()
+    val res= fileCompiled.exists() && fileProg.lastModified()>fileCompiled.lastModified()
+    res
+  }
+  /** returns name of already defined macro of type macrosType.
+   *  for example, methods of rand, if macroTypeFile=compiledMacro/rand*/
+  def alreadyCompiled(macrosTypeFile: String): Array[String] = {
+    var result: Array[String] = Array()
+    try {
+      val c = Class.forName(macrosTypeFile)
+     c.getDeclaredMethods.map(_.getName())
+  }
+    catch{
+      case e: ClassNotFoundException =>  Array()
+    }
+  }
+  /** returns name of already defined macro of type macrosType.
+   *  for example, methods of rand, if macroTypeFile=compiledMacro/rand
+   *  removes the bit size*/
+  def alreadyCompiledRough(macrosTypeFile: String): Array[String] = {
+    alreadyCompiled(macrosTypeFile).map(radicalRad(_)) //we get the declared metho, but then supress the int size
   }
 
 

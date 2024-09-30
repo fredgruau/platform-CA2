@@ -1,4 +1,3 @@
-public static int {{NAMEMACRO}}GateCount={{GATECOUNT}};
  public static void {{NAMEMACRO}}(PrShift p,{{PARAMETERS}}){
  {{ANCHORPARAM}}
 {{PROPAGATEFIRSTBIT}} ;

@@ -1,6 +1,6 @@
 package simulator
-import DelaunayLogic.{Delaunay, QuadEdge}
-import GeometricPrimitives.FinitePoint
+//import DelaunayLogic.{Delaunay, QuadEdge}
+//import GeometricPrimitives.FinitePoint
 import Medium.add2
 import dataStruc.Util.{Rectangle, border, copyArray, sameElements}
 import simulator.CAtype.pointLines
@@ -532,7 +532,7 @@ abstract class Medium(val nbLine: Int, val nbCol: Int, val boundingBox: Dimensio
     }
     triangleSoup
   }
-
+/**
  private def triangleSoupFromQuadTree(points:Set[Vector2D])=
     {  def toFp(v:Vector2D)=FinitePoint(v.x,v.y)
       def toV2D(f:FinitePoint)=new Vector2D(f.x,f.y)
@@ -546,7 +546,7 @@ abstract class Medium(val nbLine: Int, val nbCol: Int, val boundingBox: Dimensio
       //Delaunay.TriangulateDelaunay()
 
 
-    }
+    }*/
   private def triangleSoupFromDelaunay(loci: Set[Locus]) :List[Triangle2D] =  {
     var triangleSoup:List[Triangle2D]=null
     try {
@@ -619,8 +619,8 @@ abstract class Medium(val nbLine: Int, val nbCol: Int, val boundingBox: Dimensio
   def proximityLocus(loci:Set[Locus]):Map[Locus,Set[Locus]]={
     displayedPoint=HashSet.empty
     for (l <- loci)  displayedPoint ++= pointSet(l)
-    val triangleSoup=triangleSoupFromQuadTree(displayedPoint)
-    //val triangleSoup=triangleSoupFromDelaunay(loci)  //we use delaunay in order to find out proximity between loci
+    //val triangleSoup=triangleSoupFromQuadTree(displayedPoint)
+    val triangleSoup=triangleSoupFromDelaunay(loci)  //we use delaunay in order to find out proximity between loci
     //we build the voronoi, so as to be able to test if a triangle is on the border
     theVoronois = immutable.HashMap() ++ displayedPoint.map((v: Vector2D) => Coord2D(v.x,v.y) -> new Voroonoi(v))
     for (t <- triangleSoup) {

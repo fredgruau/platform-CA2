@@ -9,7 +9,7 @@ import java.lang
 import java.lang.System
 import scala.Console.out
 import scala.collection.{Map, mutable, _}
-import scala.collection.immutable.{HashMap, HashSet}
+import scala.collection.immutable.{HashMap, HashSet, ListSet}
 
 
 object Dag {
@@ -57,7 +57,7 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
   /** newly visited node */
   private var newVisitedL: List[T] = List()
   /** the set version of visitedL */
-  private var visitedS: HashSet[T] = HashSet()
+  private var visitedS: Set[T] = ListSet()
   addGreaterOf(generators) //visits all the Dag's nodes
   def toStringOld = allGenerators.map(_.toStringTree).mkString("\n")
 
@@ -193,7 +193,8 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
    * @param all mapping associating an element to its wrapping. itcan be provided by the calling environment, it it needs it
    * @result List of dagNodes of each component, as an iterable of iterable
    */
-  def components2(p: (T, T) => Boolean, all: Map[T, Wrap] = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))): Iterable[List[T]] = {
+  def components2(p: (T, T) => Boolean, all: Map[T, Wrap] = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))): Iterable[List[T]] =
+  {
     indexedComponents(p, false, all).values
   }
 

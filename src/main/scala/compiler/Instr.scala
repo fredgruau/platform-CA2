@@ -10,6 +10,7 @@ import Circuit._
 import compiler.SpatialType.{ASTLtG, IntV, UintV}
 import compiler.Packet.BitLoop
 import dataStruc.Align2.{compose, invert}
+import dataStruc.Util.{intBetweenDash, methodName, radical}
 
 import scala.language.postfixOps
 import scala.collection.{mutable, _}
@@ -46,11 +47,6 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
     null
   } //implemented only in  Affect
 
-  /*
-    def radiusify(radius: TabSymb[(Int, Option[Modifier])], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {}
-
-    def radiusify2(radius: TabSymb[Int], tSymbVar: TabSymb[InfoNbit[_]]): Unit = {}
-  */
 
   protected def show(x: Option[Locus]) = x match {
     case Some(s) => "" + s
@@ -219,44 +215,6 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
     }
   }
 
-  def procedurIfyOld(hd: TabSymb[String], tl: TabSymb[String], t: TabSymb[InfoType[_]]): List[Instr] = {
-    /**
-     * @param s
-     * @return names of ASTL variables, associated to variable of type cons(cons...))
-     */
-    def subNames(s: String): List[String] = if (hd.contains(s)) hd(s) :: subNames(tl(s)) else List(s)
-
-    /**
-     *
-     * @param arg one of the argument of call
-     *            if the name of arg is null, it sets it to auxL and adds it to the symbol table with apropriate type
-     *            and with store as kind
-     */
-    def setNameIfNullandAddtoT(arg: AST[_]) = {
-      if (arg.name == null) {
-        arg.setNameIfNull("auxl")
-        t += arg.name -> new InfoType(arg.mym, StoredField())
-      }
-    }
-
-    this match {
-      case Affect(s, exp) => exp match {
-        case c: Call[_] =>
-          val res = subNames(s)
-          // we must set names of effective parameters and add them to the symbol table if needed
-          c.args.toList.map(setNameIfNullandAddtoT(_))
-          //value which are sent through call and retrieved from the procedure, have to be stored
-          for (r <- res ::: c.args.toList.map(_.name))
-            if (t.contains(r) && t(r).k == MacroField()) t += r -> new InfoType(t(r).t, StoredField()); // register the fact that results must be stored.
-          List(CallProc(c.f.name, res, c.args.toList))
-        case Taail(_) | Heead(_) => List() //we do not need those any more.
-        case _ => List(this)
-      }
-
-      case _ => if (this.isReturn) List() else List(this)
-    }
-  }
-
   /**
    *
    * @param cur        The current programm
@@ -273,20 +231,56 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
     case CallProc(f, names, exps) =>
       val newexps = exps.map(_.asInstanceOf[ASTLt[_, _]].bitIfyAndExtend(cur, expBitSize, newTSymb))
       val nbitarg = newexps.map(a => expBitSize(a)) //.toList.flatten
-      val newname = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _) //we make precise in the function name, the number of bits of arguments
+      val namePlusInputsize = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _) //we make precise in the function name, the number of bits of arguments
 
       //  if (f.size>2 && sysInstr.contains(f.substring(0,3)))
       if (isSysInstr(f))
       //there is not code to be generated for system calls
       CallProc(f, names, newexps).asInstanceOf[Instr]
-      else {
-        if (!newFuns.contains(newname))
-          newFuns += (newname -> cur.funs(f).bitIfy(nbitarg))
+      else {//now we have four cases:
+        var namePlusOutputsize=""
+        var nbitResult2:List[Int]=List() //number of bits of returned result, from the macro. will be computed in distinct ways
+        val freshlyCompiled=cur.funs.contains(f)
+        val nameOfBitified=newFuns.keys.filter(_.startsWith(namePlusInputsize))
+        val freshlyCompiledAndBitified=nameOfBitified.nonEmpty
+        val s="compiledMacro."+radical(f)
+        val namePreviouslyCompiledCrude: Array[String] =alreadyCompiled(s)
+        val namePreviouslyCompiled= namePreviouslyCompiledCrude.filter(_.startsWith(methodName(namePlusInputsize)))
+        val previouslyCompiled=namePreviouslyCompiled.nonEmpty //the compiled java contains one method with corresponiding number of bits for inputs.
+        if(previouslyCompiled){
+          assert(namePreviouslyCompiled.length==1) //there cannot be two possible outputs for a given input.
+          namePlusOutputsize=namePreviouslyCompiled(0)
+          val nameWithoutInput=namePlusOutputsize.drop(methodName(namePlusInputsize).length)
+          namePlusOutputsize=radical(f)+"."+ namePlusOutputsize
+          nbitResult2=intBetweenDash(nameWithoutInput) //retrieve the int between the dashes
+        }
+        else if(freshlyCompiledAndBitified)
+          {   //on cherche le nouveau prog dans les nouvelle fun, voir si il a était bitifié
+            namePlusOutputsize=nameOfBitified.head
+            if(newFuns.contains(namePlusOutputsize)){}
+            val newProg=newFuns(namePlusOutputsize) //on va chercher les nombre de bit dans la fonction déja bitifié
+            nbitResult2 = newProg.paramR.map(s => newProg.tSymbVar(s).nb) //use the previously bitified macro to retrieve the number of bits of results
+          }
+        else if (freshlyCompiled){ //not yet bitified,
+          val prog: DataProg[InfoType[_]] = cur.funs(f) //the dataprog of this macro is avialbe in the  funs!!!
+          val newProg = prog.bitIfy(nbitarg) //newProg the macro is "bitified". (we compute the bit cardinality
+          nbitResult2 = newProg.paramR.map(s => newProg.tSymbVar(s).nb) //use the just bitified macro to retrieve the number of bits of result
+          namePlusOutputsize = namePlusInputsize + nbitResult2.map(_.toString).foldLeft("")(_ + "_" + _)
+          newFuns += (namePlusOutputsize -> newProg)
+        }
+        else { //not freshly compiled,  because that macro was available for another bit size, we will need to do all the compilation again
+                    takeNbOfBitIntoAccount=takeNbOfBitIntoAccount+namePlusInputsize
+                    throw new NbOfBitIntoAccountException()
+        }
+
+        // newFuns += (namePlusInputsize -> cur.funs(f).bitIfy(nbitarg))
         // re-creates the code of f, taking into account nbitarg.
-        val fprog = newFuns(newname)
-        val nbitResult: Seq[Int] = fprog.paramR.map(s => fprog.tSymbVar(s).nb) //we get the number of bits of results
-        (names zip nbitResult).foreach { sn => newTSymb += sn._1 -> new InfoNbit(cur.tSymbVar(sn._1).t, cur.tSymbVar(sn._1).k, sn._2) } //updates the symbol rtable
-        CallProc(newname, names, newexps).asInstanceOf[Instr]
+
+       // val fprog = newFuns(namePlusInputsize)
+        //val nbitResult: Seq[Int] = fprog.paramR.map(s => fprog.tSymbVar(s).nb) //we get the number of bits of results
+       // System.out.println("toto"+namePlusOutputsize)
+        (names zip nbitResult2).foreach { sn => newTSymb += sn._1 -> new InfoNbit(cur.tSymbVar(sn._1).t, cur.tSymbVar(sn._1).k, sn._2) } //updates the symbol rtable
+        CallProc(namePlusOutputsize, names, newexps).asInstanceOf[Instr] //returns the modified call
       }
   }
 
@@ -415,8 +409,12 @@ case class CallProc(var procName: String, names: List[String], exps: List[AST[_]
       case "memo" | "bug" | "show" | "copy" =>
         val l = List(this.coalesc(allCoalesc).asInstanceOf[CallProc])
         l
-      case _ => val fun: DataProgLoop[_] = funs(procName) //we get the dataProgLoop
-        if (fun.isLeafCaLoop) {
+      case _ =>
+        if(!funs.contains(procName)) //procname was a marco, which had been already compiled
+          List(this.coalesc(allCoalesc).asInstanceOf[CallProc])
+        else{
+        val fun: DataProgLoop[_] = funs(procName) //we get the dataProgLoop
+        if (fun.isLeafCaLoop) { //it could still be a freshly compiled macro
           //we just need to coalesc this by replacing names used either using param or using adress
           List(this.coalesc(allCoalesc).asInstanceOf[CallProc])
         }
@@ -432,7 +430,7 @@ case class CallProc(var procName: String, names: List[String], exps: List[AST[_]
           }
           fun.codeGen(heap, occupied, params) //here there are many elements in the  List.
         }
-
+        }
     }
 
   def codeGenInstrOld(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int, allCoalesc: iTabSymb[String]):
@@ -621,18 +619,18 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
 
   /** @return if instruction is ASTLt, returns the locus */
   override def locus: Option[Locus] = exp match {
-    case a: ASTLt[_, _] => Some(a.locus)
+    case a: ASTLt[_, _] => Some(a.locus.asInstanceOf[Locus])
     case _ => None
   }
 
   /** @return if instruction is ASTLt, returns the locus */
   override def ring: Option[Ring] = exp match {
-    case a: ASTLt[_, _] => Some(a.ring)
+    case a: ASTLt[_, _] => Some(a.ring.asInstanceOf[Ring])
     case _ => None
   }
 
   override def locus2: Option[Ring] = exp match {
-    case a: ASTBt[_] => Some(a.ring)
+    case a: ASTBt[_] => Some(a.ring.asInstanceOf[Ring])
     case _ => None
   }
 
@@ -823,7 +821,7 @@ object Instr {
    * @return add one (resp. two) suffixes to the variable names, for simplicial (resp. tranfer) variable
    */
   private def deploy(n: String, tSymb: TabSymb[InfoNbit[_]]): List[String] =
-    Locus.deploy(n, tSymb(n).t.asInstanceOf[(_ <: Locus, _)] _1)
+    Locus.deploy(n, tSymb(n).t.asInstanceOf[(_ <: Locus, _)]._1)
 
   private var nameCompteuraux = 0
 

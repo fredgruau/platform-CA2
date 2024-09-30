@@ -3,7 +3,7 @@ package compiler
 import java.util.stream.Collectors
 import ASTB._
 import AST.{AstPred, Call, Fundef, Layer, Read, isCons, isNotRead}
-import Circuit.{AstMap, Machine, TabSymb, iTabSymb, iTabSymb2}
+import Circuit.{AstMap, Machine, TabSymb, alreadyCompiled, alreadyCompiledRough, hasBeenReprogrammed, iTabSymb, iTabSymb2}
 import VarKind.{LayerField, MacroField, ParamD, ParamR, ParamRR, StoredField}
 import dataStruc.{Align2, Dag, DagInstr, Named, Schedule, Util, WiredInOut, toSet}
 import dataStruc.WiredInOut.{defby, setInputNeighbor}
@@ -12,7 +12,9 @@ import ASTB.Tminus1
 import ASTBfun.{ASTBg, Fundef2R, concatRedop, redop}
 import ASTL.ASTLg
 import Named.noDollarNorHashtag
+import dataStruc.Util.{methodName, radical}
 
+import java.io.File
 import java.util
 import scala.collection.IterableOnce.iterableOnceExtensionMethods
 import scala.collection.{Iterable, IterableOnce, Map, MapView, Set, immutable, mutable}
@@ -21,8 +23,11 @@ import scala.language.postfixOps
 import scala.util.Try
 
 object DataProg {
+  val nameDirCompilLoops = "src/main/scala/compiledMacro/" //where the compiled loops will be stored
+  val nameDirProgLoops = "src/main/scala/progOfmacros/" //where the source of macro will be stored
   /** set to false after first construct, identifies the mainRoot */
   var isRootMain = true
+
 
   /** print a map on several small lines, instead of one big line */
   private def string[T](t: TabSymb[T], s: String): String = t.toList.grouped(4).map(_.mkString(s)).mkString("\n") + "\n"
@@ -83,10 +88,36 @@ object DataProg {
       case l: Call[_] =>
         (l.f.name, l.f)
     }
+
+   //compute the name of the java classes containing the code of macros
+    var javaClassName: Set[String] =funs.keys.map(radical(_)).toSet
+    //removes  previously compiled class of loops, which needs to be compiled again, because source has been updated.
+    for(namejava<-javaClassName)
+      if (hasBeenReprogrammed(namejava,nameDirProgLoops,nameDirCompilLoops)) //there has been a reprogramming
+      {val f=new File(nameDirCompilLoops + namejava)
+        f.delete()
+        javaClassName=javaClassName-namejava
+      }
+    /**
+     * builds the map of already compiled macro, for each java file of macro
+     */
+    val allAlreadayCompiled:HashMap[String,Array[String]]=
+         HashMap()++javaClassName.map((s:String)=>(s->alreadyCompiledRough("compiledMacro." +s)))
+
+    /**
+     *
+     * @param macroNobitSize name of loopmacro not including bit size
+     * @return true if one loop $macroNobitSize$ has been compiled for at least one bit size
+     */
+    def isCompiled(macroNobitSize:String):Boolean=allAlreadayCompiled(radical( macroNobitSize)).contains(methodName(macroNobitSize))
+
+    /**
+     * select which of the fun has already been compiled once for some bit size
+     */
+    val notYetCompiledFun=funs.filter((x)=> !isCompiled(x._1))
+    // System.out.println(notYetCompiledFun)
     /** second  gathering of SysInstr which can now access  the layer's name, because  setName has been called   */
     val instrs: List[CallProc] = main :: getSysInstr(dag.visitedL)
-
-
     /** adding bug layers */
     if (isRootMain) {
       isRootMain = false //the next dataProg will therefore not execute the comming code
@@ -97,8 +128,13 @@ object DataProg {
     val tsb: TabSymb[InfoType[_]] = mutable.HashMap.empty
     tsb ++= f.p.toList.map(a => ("p" + a.name, InfoType(a, ParamD()))) // stores parameters  in the symbol table.
     tsb ++= layers.map(a => (Named.lify(a.name), InfoType(a, LayerField(a.nbit, a.init)))) // stores layers with bit size, in the symbol table.
-    new DataProg[InfoType[_]](new DagInstr(instrs, dag), funs.map { case (k, v) ⇒ k -> DataProg(v) },
+    val newProg=new DataProg[InfoType[_]](new DagInstr(instrs, dag),
+      notYetCompiledFun.map //compiles only the recently modified or not yet compiled macro
+      //funs.map //compiles all the macro
+    { case (k, v) ⇒ k -> DataProg(v) },
       tsb, f.p.toList.map("p" + _.name), List())
+    newProg.checkInvariant
+    newProg
   }
 
   def bugLayers(lesInstr: List[CallProc]) = {
@@ -148,39 +184,33 @@ object DataProg {
 class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataProg[U]], val tSymbVar: TabSymb[U],
                                  val paramD: List[String], val paramR: List[String],
                                  val coalesc: iTabSymb[String] = null) {
+
   /** all the coalesced register must be defined in the symbol table */
-  def allLayers: Iterable[String] = {
+  def allLayers: List[String] = {
     def isLayer(name: String) = tSymbVar(name).k.isLayerField
-
-    tSymbVar.keys.filter(isLayer(_))
+    tSymbVar.keys.filter(isLayer(_)).toList
   }
-  def invariantCoalesc =
-    if (coalesc != null)
-      for (c <- coalesc.values)
-        if (!tSymbVar.contains(c) && !c.startsWith("mem[")) //!(Try(c.toInt).isSuccess))
-          throw new Exception("colesced register:" + c + " not present in symbol table")
-  invariantCoalesc
-
-  /** verifies that a main loop does not call other main loop, we would need a stack and that has no been implemented */
-
-  def invariantSingleMain =
-    if (!isLeafCaLoop && !isRootMain)
-      throw new Exception("there is only the mainRoot which is not a leaf Ca loop ")
-
-  invariantSingleMain
-
-
-  /** all registers used by insrtructions must be either contained in tSymb or in tSymb(coalesc) */
-  def invariantVariable = {
-    val used = dagis.usedVars
-    for (v <- used)
-      if (!tSymbVarExists(v) && !tSymbVarExists("p" + v) && !v.startsWith("mem["))
-        throw new Exception("variable:" + v + " not present in symbol table")
-  }
-
-  invariantVariable
-
-
+  def checkInvariant={
+    def invariantLayers={ //only the main can have layers, oups, not true because we pass the defVe layers
+      assert(allLayers.isEmpty||isRootMain, "we have a macro" +"with layers, let us look at produce java, what happens in the suppressed segment")
+    }
+    def invariantCoalesc =
+      if (coalesc != null)
+        for (c <- coalesc.values)
+          if (!tSymbVar.contains(c) && !c.startsWith("mem[")) //!(Try(c.toInt).isSuccess))
+            throw new Exception("colesced register:" + c + " not present in symbol table")
+    /** verifies that a main loop does not call other main loop, we would need a stack and that has no been implemented */
+    def invariantSingleMain =
+      if (!isLeafCaLoop && !isRootMain)
+        throw new Exception("there is only the mainRoot which is not a leaf Ca loop ")
+    /** all registers used by insrtructions must be either contained in tSymb or in tSymb(coalesc) */
+    def invariantVariable = {
+      val used = dagis.usedVars
+      for (v <- used)
+        if (!tSymbVarExists(v) && !tSymbVarExists("p" + v) && !v.startsWith("mem["))
+          throw new Exception("variable:" + v + " not present in symbol table")
+    }
+ invariantCoalesc;invariantSingleMain;invariantVariable}//;invariantLayers  }
 
   /** the main root is characterized by the fact that it has a bug layer. */
   def isRootMain: Boolean = tSymbVar.contains("llbugV")
@@ -197,7 +227,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       throw new Exception("on trouve pas " + str)
     else
       tSymbVar.getOrElse(str, tSymbVar(coalesc(str))) //renvoie la version  coalesced seulement si pas dans la table.
-
   }
 
   /** look up the symbol table if not found, take the coalesced form */
@@ -206,43 +235,13 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     else tSymbVar.contains(str) || (coalesc.contains(str) && tSymbVar.contains(coalesc(str)))
   }
 
-  def toStringFuns: String = {
-    var branch: Int = 0;
-    var leave: Int = 0
 
-    def countCAloops(f: DataProg[U]): Unit =
-      if (f.isLeafCaLoop) leave += 1
-      else {
-        branch += 1
-        f.funs.values.map(countCAloops(_))
-      }
-
-    def totalComplexity: String = {
-      if (!isInstanceOf[DataProgLoop[_]]) return ""
-      var res = 0
-      for (f <- funs.values)
-        res += f.asInstanceOf[DataProgLoop[_]].totalOp
-      " total complexity is: " + res + "gates "
-    }
-
-    if (!isLeafCaLoop //paramD.size==1&&paramD.head=="pinput"
-    ) //verifie que c'est la racine
-    {
-      countCAloops(this);
-      "************************************************\n there is " + branch + " main branch fun and " + leave + " leaf ca loop\n" + totalComplexity
-    }
-    else ""
-  }
 
   /** @return instructions in textual form */
 
   def toStringHeader =
     (if (isLeafCaLoop) "************************************************\nleaf CA loop " else "non-leaf main ") +
       " of signature: " + paramD.mkString(" ") + "=>" + paramR.mkString(" ") /*+ " name of CA " + paramR(0) */ + "\n"
-
-  /** @return instructions in textual form */
-  def toStringInstr = "there is " + dagis.visitedL.length + " instructions\n" +
-    dagis.visitedL.reverse.map((i: Instr) => i.toString() + "\n").mkString("")
 
   lazy val keys: List[String] = tSymbVar.keys.toList
   /** regroup  identifier having a common varkind */
@@ -274,21 +273,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   def sortedindexedByKindThenByType(p: String => Boolean) = ListMap(indexedByKindThenByType(p).toSeq.sortBy(_._1): _*)
 
 
-  /** @return the whole symbol table  in textual form */
-  def toStringTabSymb = {
-    tSymbVar.size + " variables sorted by kind and then by spatial or scalar type:\nSpatial types: \n " +
-      sortedindexedByKindThenByType(isSpatial).mkString("\n") +
-      "\nScalar type: \n" +
-      // sortedIdScalar.values.map(_.mkString("\n")) +
-      sortedindexedByKindThenByType(isScalar).filter((x: (VarKind, Map[_, List[String]])) => x._2.nonEmpty).mkString("\n") +
-      "\nnon boolean varaiable are : " + intKeys.map((id: String) => id + ":" + tSymbVar(id).asInstanceOf[InfoNbit[_]].nb + " bit") + "\n"
-  }
-
   /** keys of coalescInverted are register list towards which variables are coalesced, we must add standalone variables */
   lazy val coalesced: Map[String, Iterable[String]] =
     if (coalesc == null || coalesc.isEmpty) HashMap()
     else coalesc.keys groupBy (coalesc(_))
-
   /** names of variables which are used before being affected */
   lazy val delayed = {
     var res: Set[String] = HashSet()
@@ -307,28 +295,69 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   lazy val standaloneRegister: Iterable[String] =
     tSymbVar.keys.filter((s: String) => (!coalesc.contains(s) && !tSymbVar(s).k.isParam && !tSymbVar(s).k.isLayerField && !coalesced.contains(s) && !(s(0) == '_')))
 
-  /** @return coalesced registers in textual form with alphabetic ordering on the keys
-   *          so that the register r1,r2... stand out together */
-  def toStringCoalesc: String = if (coalesc == null) "" else {
-    val sortCoalesced = ListMap(coalesced.toSeq.sortBy(_._1): _*)
-    "standalone (also need registers): " + standaloneRegister.mkString(",") + "\n" +
-      "delayed: (need initialize) " + delayed.mkString(",") + "\n" +
-      coalesced.size + " classes of coalesced Ids\n" +
-      coalesced.keys.toList.sorted.mkString(", ") + "\n" +
-      sortCoalesced.grouped(2).map(_.mkString("---")).mkString("\n") + "\n"
-  }
-
   /**
-   * @param t declared function, and macro
-   * @tparam T
-   * @return automatically defined macro are moved to last position for clarity.
+   * we distinguish between the various segment to print.
+   * @return
    */
-  def listOf[T](t: Map[String, T]): List[(String, T)] = {
-    val (automatic, definedMacros) = t.partition((x: (String, T)) => x._1.startsWith("_fun"));
-    automatic.toList ::: definedMacros.toList
-  }
-
   override def toString: String = {
+
+    def toStringFuns: String = {
+      var branch: Int = 0; var leave: Int = 0
+      def countCAloops(f: DataProg[U]): Unit =
+        if (f.isLeafCaLoop) leave += 1
+        else {
+          branch += 1
+          f.funs.values.map(countCAloops(_))
+        }
+      def totalComplexity: String = {
+        if (!isInstanceOf[DataProgLoop[_]]) return ""
+        var res = 0
+        for (f <- funs.values)
+          res += f.asInstanceOf[DataProgLoop[_]].totalOp
+        " total complexity is: " + res + "gates "
+      }
+      if (!isLeafCaLoop )//verifie que c'est la racine
+      {  countCAloops(this);
+        "************************************************\n there is " + branch + " main branch fun and " + leave + " leaf ca loop\n" + totalComplexity
+      }
+      else ""
+    }
+
+    /** @return the whole symbol table  in textual form */
+    def toStringTabSymb: String = {
+      tSymbVar.size + " variables sorted by kind and then by spatial or scalar type:\nSpatial types: \n " +
+        sortedindexedByKindThenByType(isSpatial).mkString("\n") +
+        "\nScalar type: \n" +
+        // sortedIdScalar.values.map(_.mkString("\n")) +
+        sortedindexedByKindThenByType(isScalar).filter((x: (VarKind, Map[_, List[String]])) => x._2.nonEmpty).mkString("\n") +
+        "\nnon boolean varaiable are : " + intKeys.map((id: String) => id + ":" + tSymbVar(id).asInstanceOf[InfoNbit[_]].nb + " bit") + "\n"
+    }
+
+    /** @return coalesced registers in textual form with alphabetic ordering on the keys
+     *          so that the register r1,r2... stand out together */
+    def toStringCoalesc: String = if (coalesc == null) "" else {
+      val sortCoalesced = ListMap(coalesced.toSeq.sortBy(_._1): _*)
+      "standalone (also need registers): " + standaloneRegister.mkString(",") + "\n" +
+        "delayed: (need initialize) " + delayed.mkString(",") + "\n" +
+        coalesced.size + " classes of coalesced Ids\n" +
+        coalesced.keys.toList.sorted.mkString(", ") + "\n" +
+        sortCoalesced.grouped(2).map(_.mkString("---")).mkString("\n") + "\n"
+    }
+
+
+    /** @return instructions in textual form */
+    def toStringInstr = "there is " + dagis.visitedL.length + " instructions\n" +
+      dagis.visitedL.reverse.map((i: Instr) => i.toString() + "\n").mkString("")
+
+    /**
+     * @param t declared function, and macro
+     * @tparam T
+     * @return automatically defined macro are moved to last position for clarity.
+     */
+    def listOf[T](t: Map[String, T]): List[(String, T)] = {
+      val (automatic, definedMacros) = t.partition((x: (String, T)) => x._1.startsWith("_fun"));
+      automatic.toList ::: definedMacros.toList
+    }
     toStringFuns + toStringHeader + toStringInstr + toStringTabSymb + toStringCoalesc + "\n" + listOf(funs).mkString("\n\n")
   }
 
@@ -368,7 +397,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
    *
    */
 
-
   def treeIfy(): DataProg[U] = {
     /** we will consider read if it is a parameter is read */
     val isNotReadReg: AstPred = {
@@ -400,7 +428,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     // if a parameter is used two times, the generated affectation will generate a read without the 'p'
     new DataProg(dagis2, funs.map { case (k, v) ⇒ k -> v.treeIfy() }, tSymbVar, paramD, paramR, coalesc)
   }
-
 
   /**
    * @return replaces function call by procedure call
@@ -644,8 +671,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       new DataProg(newDagis, mutable.HashMap.empty, newtSymbVar, fparamDwithoutR, fparamRname).treeIfyParam() //the parameter needs to be treeified
 
     }
-
-
     def NeedBuiltFunOld(finstrs: Iterable[Instr]): Boolean = {
       for (i <- finstrs.filter(_.isInstanceOf[Affect[_]])) if (!i.asInstanceOf[Affect[_]].exp.asInstanceOf[ASTL.ASTLg].justConcatsorBroadcast) return true;
       false
@@ -708,6 +733,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     }
 
 
+
+    //we sort the instructions of dagis, in order to obtain a deterministic labeling of automaticaly defined macro, turn out it is necessary to sort
+    // but later: we sort the components when macroifying
+    //System.out.println(sortedDagis)
     val newDagis: Dag[Instr] = dagis.quotient2(proximity, transform)
     val stillUsed: Set[String] = HashSet() ++ newDagis.visitedL.flatMap(_.names)
     val newTsymbVar: TabSymb[InfoNbit[_]] = mutable.HashMap.empty
@@ -966,7 +995,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     val muI14 = muI13.map(_.coalesc(coalesc2))
     //adds paramD to symbol Table WITH the suffx for specifying direction, since paramD will be deployed.
     //paramR are also deployed but their case is already  handled correctly in the symboltable
-    for ((name, info: InfoNbit[_]) <- p.tSymbVar)
+    for ((name, info: InfoNbit[_]) <- p.tSymbVar) {
       if (info.k == ParamD() || info.k.isInstanceOf[ParamRR] || info.k.isInstanceOf[LayerField]) {
         //we unfold paramD and paramR and also layerField, which can be there for constant layers
         for (nameWithSufx <- deploySpace(name))
@@ -976,7 +1005,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         if (info.locus != V()) tSymbScalar2.addOne(name -> info) //TODO just changed, ca risque de creer du bordel
 
       }
-    return new DataProg(DagInstr(muI13), noSubFun, tSymbScalar2, paramD.flatMap(deploySpace(_)), paramR.flatMap(deploySpace(_)), coalesc2)
+
+    }
+     new DataProg(DagInstr(muI13), noSubFun, tSymbScalar2, paramD.flatMap(deploySpace(_)), paramR.flatMap(deploySpace(_)), coalesc2)
+
   }
 
   /**
@@ -1441,13 +1473,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         neighbors = neighbors ++ isUsing(next.names.head)
       neighbors.map(checkReadiness(_))
     }
-
     result.reverse
   }
 
   def coalesc2(str: String) = coalesc.getOrElse(str, str)
-
-
   /** if an id x is used a single time, remplace read(x) by its expression.
    * This applies in particular, for transfer happenning just before reduction */
   def simplify(): DataProg[InfoType[_]] = {

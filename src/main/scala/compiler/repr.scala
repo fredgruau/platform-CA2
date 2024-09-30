@@ -3,6 +3,8 @@ package compiler
 import compiler.AST.Layer
 import compiler.ASTLt.ConstLayer
 
+import scala.collection.immutable.HashMap
+
 
 /**
  *
@@ -22,11 +24,14 @@ class repr[+L](val name: L)
  * @tparam S1 main simplicial locus
  * @tparam S2 secondary simplicial locus
  */
-class chip[S1 <: S, S2 <: S](val df: ASTLt[T[S1, S2], B])
+//class chip[S1 <: S, S2 <: S](val df: ASTLt[T[S1, S2], B])
+class chip[S1 <: S, S2 <: S](val df: ConstLayer[T[S1, S2], B])
+//class chip[S1 <: S, S2 <: S](val df: Layer[(T[S1, S2], B]))
 
 object chip {
-  /** trahsfer field near the  chip's border, can be undefined, the contant def layers indicates where it is defined,
-   * so as to neutralize artefacts, when doing reductions. */
+  /** trahsfer field near the  chip's border, can be undefined, the constant def layers indicates where it is defined,
+   * so as to neutralize artefacts, when doing reductions.
+   * obsolet: implicit is not longer in use, having been replaced by the miror, which result in much lighter code */
   implicit val borderVe = new chip[V, E](new ConstLayer[T[V, E], B](1, "def"))
   implicit val borderEv = new chip[E, V](null)
   implicit val borderVf = new chip[V, F](new ConstLayer[T[V, F], B](1, "def"))
@@ -34,8 +39,17 @@ object chip {
   implicit val borderFe = new chip[F, E](null)
   implicit val borderEf = new chip[E, F](new ConstLayer[T[E, F], B](1, "def"))
   //todo inclure tout les transfer locus, pas seulement Ve
+}
+/** this regroups layers which can be accessed from any macro $m$. the name of val correspond to
+ * the name of the parameter in the javaloop method compiled for $m$,
+ * therefore, A CA $c$ using m, will be able to find out the layer, generate the code that updates it, allocate it, */
+object Layers {
+  val layers:Map[String,Layer[_]]=HashMap(
+  "defVe"->chip.borderVe.df)
 
 }
+
+
 object repr {
   def apply(a:Any)=new repr(a)
 

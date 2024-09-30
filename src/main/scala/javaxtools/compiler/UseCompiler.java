@@ -18,7 +18,8 @@ public static CAloops2 newCA(String source, String qName) {
             compiler2 = new CharSequenceCompiler<CAloops2>(
                     // Class.forName("compil.Compilo")
                     Class.forName("javaxtools.compiler.UseCompiler").getClassLoader(),
-                    Arrays.asList(new String[]{"-target", "1.8"}));
+                  //  Arrays.asList(new String[]{"-target", "1.8"}));
+                    Arrays.asList(new String[]{"-target", "11"}));
             final DiagnosticCollector<JavaFileObject> errs2 = new DiagnosticCollector<JavaFileObject>();
             Class<CAloops2> compiledCA = compiler2.compile(qName,
                     source, errs2, new Class<?>[]{CAloops2.class});
@@ -27,6 +28,7 @@ public static CAloops2 newCA(String source, String qName) {
             return compiledCA.newInstance();
         } catch (CharSequenceCompilerException e) {
             System.out.print("CharSequenceCompilerException Exeption");
+            System.out.print("Compilation failed probably  because some new macro have been generated. rerun to get it right");
             // log(e.getDiagnostics());
         } catch (ClassNotFoundException e) {
             System.out.print("Ou est compilo??");
@@ -37,7 +39,7 @@ public static CAloops2 newCA(String source, String qName) {
             System.out.print("illegal access");
             System.out.print(e.getMessage().toString());
         }
-        System.out.print("Compilation failed");
+
         return NULL_CA;
     }
 }

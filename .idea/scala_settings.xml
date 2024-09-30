@@ -6,6 +6,7 @@
         <entry key="xml" value="XML" />
       </map>
     </option>
+    <option name="migrateConfigurationsNotificationShown" value="true" />
   </component>
   <component name="WorksheetDefaultProjectSettings">
     <option name="moduleName" value="platform-CA2" />

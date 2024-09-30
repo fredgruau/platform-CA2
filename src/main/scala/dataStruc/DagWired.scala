@@ -24,10 +24,12 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
    * @return new dag produced by computing the connected components, and then transforming them
    */
   def quotient2[T2 <: DagNode[T2] with WiredInOut[T2]](p: (T, T) => Boolean, trans: Iterable[T] => List[T2]): Dag[T2] = {
-    val newDagNodes = components2(p).flatMap(trans).toList //when applied to zone, an alignement is computed on  T's.
+    val unsorted: Iterable[List[T]] = components2(p)
+    val sorted =unsorted.toList.sortBy(_.toString) //we sort the component so that the order of automatically defined macro (and therefore their integer labeling) is deterministic
+    val newDagNodes = sorted.flatMap(trans).toList //when applied to zone, an alignement is computed on  T's.
     WiredInOut.setInputAndOutputNeighbor(newDagNodes)
     val newGenerators = newDagNodes.filter({ case a: WiredInOut[_] => a.outputNeighbors.isEmpty; case _ => true }) // generators are dagNodes with no output
-    new Dag(newGenerators) //reconstruct dag from generators,
+    new Dag(newGenerators) //reconstruct dag from generators, so that they are in topological order.
 
   }
 

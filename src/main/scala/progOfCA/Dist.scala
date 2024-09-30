@@ -22,7 +22,7 @@ class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[
   //however, when computing E meeting point there is a difficulty due to the fact that the orientation matters.
   val b = new Blob(orR(transfer(sloplt)), sloplt, orR2(sloplt)) //when computing brdE, we need it to be either true or false on the border
   // we can decide to set it to true only if there is a blob, or allways, in which case there will be a center all around the chip,
-  // which may be approriate if we want ports all around the chip. If we want this last behavoir
+  // which may be appropriate if we want ports all around the chip. If we want this last behavoir
   // we need to use OR2 instead of OR, where neutral will
   // true instead of false.
   show(b.meetE, b.meetV)

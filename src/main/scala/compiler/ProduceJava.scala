@@ -1,13 +1,15 @@
 package compiler
 
 import compiler.AST.Read
-import compiler.ASTB.{False, True}
-import compiler.Circuit.{TabSymb, compiledCA, iTabSymb}
+import compiler.ASTB.{False, True, nbitExpAndParam}
+import compiler.Circuit.{TabSymb, alreadyCompiled, compiledCA, hasBeenReprogrammed, iTabSymb}
+import compiler.DataProg.{nameDirCompilLoops, nameDirProgLoops}
 import compiler.Instr.deployInt2
 import compiler.Locus.{all2DLocus, allLocus}
-import dataStruc.Util.{append2File, hierarchyDisplayedField, parenthesizedExp, radicalOfVar, radicalOfVar2, radicalOfVarIntComp, radicalOfVarRefined, removeAfterChar, rootOfVar, sameRoot, shortenedSig, writeFile}
+import compiler.ProduceJava.totalGateCount
+import dataStruc.Util.{append2File, copyArray, hierarchyDisplayedField, methodName, parenthesizedExp, radical, radicalOfVar, radicalOfVar2, radicalOfVarIntComp, radicalOfVarRefined, radicalRad, removeAfterChar, rootOfVar, sameRoot, shortenedSig, writeFile}
 import compiler.VarKind.LayerField
-import dataStruc.Named
+import dataStruc.{Named, Util}
 import dataStruc.Named.{isLayer, noDollarNorHashtag, noHashtag}
 import javaxtools.compiler.{CharSequenceCompiler, UseCompiler}
 import simulator.CAloops2
@@ -15,22 +17,27 @@ import simulator.SimulatorUtil.getProg
 import simulator.XMLutilities.readXML
 
 import java.io.File
+import java.lang.reflect.Method
 import java.util.regex.Pattern
 import scala.::
+import scala.collection.IterableOnce.iterableOnceExtensionMethods
 import scala.collection.convert.ImplicitConversions.`collection asJava`
 import scala.collection.{Map, mutable}
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 import scala.xml.{Elem, Node, NodeSeq, XML}
-
+object ProduceJava{
+  /** will contain the gate count, once the calls have been compiled */
+  var totalGateCount=0
+}
 /** provide method in order to  produce the final java code */
 trait ProduceJava[U <: InfoNbit[_]] {
   self: DataProgLoop[U] =>
   /** returns  a big string  storing the code for CAloops, and the code for main calling those CAloops on arrays */
   def produceAllJavaCode: CAloops2 = { //we need to generate spatial signature for macros before we can adress the main.
-    val leafLoops = subDataProgs.filter(p => p._2.isLeafCaLoop)
-    val codeLoops: iTabSymb[String] = leafLoops.map({ case (k, v) => (k -> v.asInstanceOf[ProduceJava[U]].javaCodeCAloop(k)) }) //retrieves all the CA loops
+    val leafLoops = subDataProgs.filter(p => p._2.isLeafCaLoop) //si pas recompilé yaura pas tout!
+    val codeLoops: iTabSymb[String] = leafLoops.map({ case (k, v) => (k -> v.asInstanceOf[ProduceJava[U]].javaCodeCAloop(k)) }) //retrieves all the recompiled CA loops
     val (codeLoopsMacro, codeLoopsAnonymous) = codeLoops.partition({ case (k, v) => !k.startsWith("_fun") }) //anonymous functions start with _fun
     val codeMain: String = javaCodeMain(codeLoopsAnonymous.values.mkString("\n")).replace('#', '$'); //'#' is not a valid char for id
     val nameCA = radicalOfVar(paramR(0)) + "CA" //name of the produced java file is equal to the name of the layer wrapping around all the compiled prog
@@ -45,46 +52,49 @@ trait ProduceJava[U <: InfoNbit[_]] {
     val r = new Random()
     val randClassName = "" + Math.abs(r.nextInt % 1000)
     val qName = PACKAGE_NAME + '.' + nameCA.capitalize //+ randClassName
-
-
-
     writeFile(nameDirCompilCA + nameCAjava, codeMain + "\n") //stores the code of the main plujs anonmymous loop
-   val compiledCA= UseCompiler.newCA(codeMain, qName) //We store the program in a global variable which can then be read by the simulator. This is very dirty but it work
-
 
     //we now process non anonymous macro loop
-    val nameDirCompilLoops = "src/main/scala/compiledMacro/" //where thew will be stored
-    val grouped: Predef.Map[String, Map[String, String]] = codeLoopsMacro.groupBy({ case (k, v) => k.substring(0, k.indexOf(".")) }) //  what comes before the dot is the name of the class where to regroup macros
+     val grouped: Predef.Map[String, Map[String, String]] = codeLoopsMacro.groupBy({ case (k, v) => k.substring(0, k.indexOf(".")) }) //  what comes before the dot is the name of the class where to regroup macros
 
 
-    /** returns name of already defined macro of type macrosType */
-    def alreadyDefined(macrosTypeFile: String): Array[String] =
-      Class.forName(macrosTypeFile).getDeclaredMethods.map(_.getName())
 
     /** contains the loops but also many other parameters */
     var codeAllLoops = ""
     for (k4 <- grouped.keys) { //for loops, the code is distributed in several file, for clarity
       val fileName = k4 + ".java"
+      //we compare date of creation of progOfMacro/filename with compiledMacro.filename, if it is more recent we have to reproduce it all, so we just erase it.
+      if(hasBeenReprogrammed(k4,nameDirProgLoops,nameDirCompilLoops))
+        {val f=new File(nameDirCompilLoops + fileName)
+         f.delete()
+        }
+
       //if macro file does not exists, creates it (preambule + k4 + "{\n" + notYetDefined.values.mkString("\n") + postambule).replace('#', '$'); //'#' is not a valid char for id
-      val ard: Set[String] =   //contient "rand_1"
-        if (!new File(nameDirCompilLoops + fileName).exists()) {
-        val preambule = "package compiledMacro;\n import simulator.PrShift;\n public class "
-        writeFile(nameDirCompilLoops + fileName, preambule + k4 + "{\n }") //new compiled java macro will be inserted just before last acolades.
-        new HashSet[String]() //there is no macro yet defined, since the class was not even existing
-      }
-      else
-        alreadyDefined("compiledMacro." + k4).toSet //name of class contains a dot
-      val notYetDefined = grouped(k4).filter(x => !ard.contains(x._1.drop(x._1.indexOf(".") + 1))) //name of the macro = we drop what's before the dot
+      val alredyDef: Set[String] =   //contient "rand_1"
+        if (!new File(nameDirCompilLoops + fileName).exists())
+        { //this is a brand new set of macros
+          val preambule = "package compiledMacro;\n import simulator.PrShift;\n public class "
+           writeFile(nameDirCompilLoops + fileName, preambule + k4 + "{\n }") //new compiled java macro will be inserted just before last acolades.
+           new HashSet[String]() //there is no macro yet defined, since the class was not even existing (brand new)
+       }
+        else
+          alreadyCompiled("compiledMacro." + k4).toSet //name of class contains a dot
+      val notYetDefined = grouped(k4).filter(x => !alredyDef.contains(x._1.drop(x._1.indexOf(".") + 1))) //name of the macro = we drop what's before the dot
       //we generate the code of the loops correcponding to k4 keys
 
       if (notYetDefined.nonEmpty) {
         val codeK4Loops = (notYetDefined.values.mkString("\n")).replace('#', '$'); //'#' is not a valid char for id
         codeAllLoops = codeK4Loops + codeAllLoops
         append2File(nameDirCompilLoops + fileName, codeK4Loops) //we add the code of the macro which was not yet defined.
+        //and now the gateCount
+
       }
 
     }
-    compiledCA
+    val compiledCA= UseCompiler.newCA(codeMain, qName) //we compile the CA, after generating the macro loop
+        //when there are new loops, it will fail, but at least we have store those new loops before.
+    assert(compiledCA!=null," ouaips, ca a planté, poil au nez") //si ca plante pas besoin de retourner au simulateur
+    compiledCA //we return the compiled CA to the simulator.
     //"" + codeMain + codeAllLoops //returns for direct printing
   }
 
@@ -99,8 +109,21 @@ trait ProduceJava[U <: InfoNbit[_]] {
     val localSpatialLayers = tSymbVar.filter(x => x._2.k.isLayerField && noDollarNorHashtag(x._1))
     val layerNames = localSpatialLayers.keys.toSeq.sorted.toList
 
+
+    val templateURL=if(nameMacro.startsWith("_fun"))
+      "src/main/scala/compiledCA/template/templateCAloop2.txt"
+    else
+      "src/main/scala/compiledCA/template/templateCAloop.txt"  //for macroLoop, we need to store the gatecount
+
+
+    val gateCount=
+     // if(nameMacro.startsWith("_fun"))
+             gateCountMacroLoop
+    //  else   dataStruc.Util.readStaticField("compiledMacro."+radical( nameMacro ) , methodName(nameMacro)+"GateCount")//we need to read a static  "slopDelta_3_1_2_1_1GateCount"  in class "compiledMacro.grad"
+
     //we proceed by filling slot in a template named templateCAloop.txt, each slot is filled using a specific method
-    replaceAll("src/main/scala/compiledCA/template/templateCAloop.txt", Map(
+    replaceAll(templateURL, Map(
+      "GATECOUNT" -> {gateCount.toString },
       "NAMEMACRO" -> {
         def removeBeforeDot(s: String): String =
           if (s.contains('.')) //this is indeed not an anomymous macro
@@ -216,7 +239,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
     val spatialOfffsetsInt = offsetsInt((tSymbVar ++ layerSubProgStrict).filter(x => noDollarNorHashtag(x._1)))
     // val spatialOfffsetsIntMain = offsetsInt((tSymbVar ++ layersMain).filter(x => noDollarNorHashtag(x._1)))
-    val (theCallCode, decompositionLocus, theDisplayed) = javaOfTheCallInTheMain()
+    val (theCallCode: Seq[String], decompositionLocus, theDisplayed) = javaOfTheCallInTheMain()
 
     def initLayer(spatialLayer: Map[String, InfoNbit[_]]): HashMap[String, String] = {
       HashMap[String, String]() ++ spatialLayer.map({ case (s, i) => (s -> i.k.asInstanceOf[LayerField].init) })
@@ -242,7 +265,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
     //we use the same template technique as the one used for CAloops
     replaceAll("src/main/scala/compiledCA/template/templateCA.txt", Map(
-      "GATECOUNT" -> totalOp.toString,
+      "GATECOUNT" -> totalGateCount.toString,//totalOp.toString,
       "NAMECA" -> radicalOfVar(paramR(0)).capitalize,
       "MEMWIDTH" -> ("" + mainHeapSize), //TODO on calcule pas bien la memwidth)
       "DECLNAMED" -> {
@@ -268,7 +291,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
         ("" + declNotNamed(decompositionLocus))
       },
-      "LISTCALL" -> theCallCode.reverse.mkString("\n"),
+      "LISTCALL" -> {(theCallCode.reverse.mkString("\n"))+"\n\n\n"},
       "ANCHORNAMED" -> {
         /** code that anchors named arrays on memory */
         anchorNamed(spatialOfffsetsInt)
@@ -368,20 +391,18 @@ trait ProduceJava[U <: InfoNbit[_]] {
       List[Int], Int]] = HashMap() ++ allLocus.map(_ -> HashMap()) //empty map for each locus
     val theCalls = dagis.visitedL.reverse.asInstanceOf[List[CallProc]] //compiled calls
     var theCallCode: List[String] = List()
-    for (call <- theCalls) { //rewrite the calls, by regroupping parameters
-      var paramsD: List[String] = call.exps.map(_.asInstanceOf[Read[_]].which) //names of parameters passed
+    for (call <- theCalls) { //rewrite the calls, by regrouping parameters
+      val paramsD: List[String] = call.exps.map(_.asInstanceOf[Read[_]].which) //names of parameters passed
       //on rajoute les layers si y en a
-      val paramsR: List[String] = call.names
-      val params = paramsD ::: paramsR
+      val paramsR: List[String] = call.names;     val params = paramsD ::: paramsR;   var callCode = call.procName + "(" //we always put the called procedure name. we now need to add the params
       var i = 0 //counter of scalar parameter
-      var callCode = call.procName + "(" //we always put the called procedure name.we now need to add the params
       var paramCode: List[String] = List() //code of the param for the current considered call
+      var gateCountOfCall=0
       call.procName match {
         //we first consider specific system call show, copy, memo, debug
         case "show" => val callCodeArg = radicalOfVar(call.usedVars().toList.head) //we take the radical for diminishing the number of parameters
           theDisplayed += callCodeArg //sideeffect, update theDisplayed. display has allways a single arg which is the field to be displayed
           callCode += callCodeArg //in fact we could supress calls to show. We still leave them, just so that we can check those in the compiled java.
-
         case "copy" => assert(paramsD.size == 1 && paramsR.size == 1) //we copy bit by bit, hence int by int.
           val pR: String = radicalOfVar(paramsR(0))
           val pD: String = if (tSymbVarSafe(paramsR(0)).t == (V(), B()))
@@ -394,17 +415,22 @@ trait ProduceJava[U <: InfoNbit[_]] {
             callCode = "broadcaast(" //6 copy from 1D array to 1Darray are turned into a call to broaadcast from 1D arrau to 2D array
           //val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet(pR, pD)
           callCode += pD + "," + pR
-        //copy and memo have the same effect
-        case "memo" => val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet() ++ params.map(radicalOfVar(_))
+        case "memo" => val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet() ++ params.map(radicalOfVar(_)) //copy and memo have the same effect
           callCode += l.toList.mkString(",")
         case "bug" => val nameBug = radicalOfVar(call.exps.head.asInstanceOf[Read[_]].which) //on apelle bug avec un read, c'est obligé
           val locusBug = tSymbVar(nameBug).locus.toString.dropRight(2) //dropRight enleve les deux parenthéses
           paramCode = List(nameBug, "llbug" + locusBug, "\"" + nameBug + "\"", "bugs").reverse
-        case _ => //we now consider a call to a real CAloop
+        case _ => //we now consider the interesting case: a call to a real CAloop
           paramCode = List("p") //this is a method PrShift that does a preliminary shift if radius is >0yyy
-          val localprog = subDataProgs(call.procName) //gets the called dataProg
-          val bitSig = localprog.nbitSig
-          for ((spatialType, nbit) <- localprog.spatialSig zip localprog.nbitSig) { //retrieve spatial type and  bitSize   of parameters.
+        //we can reconstruct spatial types, and bit numbers directly from the effective parameters:
+        // call names and expressions, no need for reflection, at the end!:
+          val dataParam=call.exps.map((x)=>x.asInstanceOf[Read[_]].which)
+          val resultParam=call.names
+          val spatialParam= shortenedSig(dataParam:::resultParam)
+          val bitSigSafe=spatialParam.map(tSymbVarSafe(_).nb)
+          val spatialSigSafe=spatialParam.map(tSymbVarSafe(_).t.asInstanceOf[(Locus, Ring)])
+
+          for ((spatialType, nbit) <- spatialSigSafe zip bitSigSafe) { //retrieve spatial type and  bitSize   of parameters.
             val locus: Locus = spatialType._1
             val density = nbit * locus.density
 
@@ -416,10 +442,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
             else {
               val locusParamEf = tSymbVarSafe(radicalOfVar(params(i))).locus
               if (locus.isTransfer && !locusParamEf.isTransfer) //we have done a broacast,
-              { // System.out.println("totoaaa"+ params(i))
-                paramCode = "broadcaast(" + radicalOfVar(params(i)) + ")" :: paramCode
-                i += density
-              }
+              {  paramCode = "broadcaast(" + radicalOfVar(params(i)) + ")" :: paramCode;   i += density         }
               //we prooceed differently depending wether the params are mem (isheap) or name of fields
               else if (isHeap(params(i))) { //its a "mem[x]
                 var indexesMem: List[Int] = List()
@@ -434,18 +457,49 @@ trait ProduceJava[U <: InfoNbit[_]] {
                 paramCode = locus.shortName + (decompositionLocus(locus)(indexesMem)) :: paramCode //name of formal paramer is locus plus rank stored in decompositionLocus
               }
               else //its not  a mem
-              {
-                paramCode = radicalOfVar(params(i)) :: paramCode
-                i += density
-              }
-
+              { paramCode = radicalOfVar(params(i)) :: paramCode;        i += density       }
             }
           }
-          val loops: Iterable[String] = localprog.allLayers.filter(noDollarNorHashtag(_))
-          if (loops.nonEmpty)
-            paramCode = loops.toList ++ paramCode
+          /** see latex, from the call, retrieve the layer used from the parameter names of the already compiled macro loop */
+          def allLayerFromCompiledMacro(myCall: CallProc)={
+            //calcul des layers de la macro appellée
+            val className="compiledMacro."+radical(myCall.procName)
+            // Load the Java class
+            val clazz: Class[_] = Class.forName( className)
+
+            // Get all methods of the class
+            val methods: Array[Method] = clazz.getDeclaredMethods
+            // Get the first method (or whichever you're interested in)
+            val methodVersion  = methods.filter(_.getName.contains(methodName( myCall.procName)))
+            val method:Method=methodVersion.head
+            // Get the parameters of the method
+            val parameters = method.getParameters.map(_.getName)
+            val paramLayers=parameters.reverse.takeWhile(Named.isLayer(_)).reverse
+           // val layers: Array[AST.Layer[_]] =paramLayers.map(Layers.layers(_))
+            paramLayers.toList
+          }
+          /** fundef if recompiled*/
+          val progCalled: DataProgLoop[U] = subDataProgs.getOrElse(call.procName,null)//gets the called dataProg, we won't be able to do that, when doing modular compilation.
+          // CA loops can  contain layers.
+          val  allLayerSafe:List[String]= //we consider the two cases:1- prog is being recompiled, 2-prog has already been compiled
+           if(progCalled!=null)//prog is being recompiled, we can use it to get the layers from the symbolTable
+                  progCalled.allLayers.filter(noDollarNorHashtag(_))
+           else // prog had already been compiled, we retrieve the layer using scala relection, layers are the last parameters to the macro loops.
+                   allLayerFromCompiledMacro(call)
+          if (allLayerSafe.nonEmpty)// CA loops can  contain layers.
+            paramCode =allLayerSafe.toList ++ paramCode //this portion is not suppressed because access to localProg is still possible
+          gateCountOfCall=
+            if(progCalled!=null)
+              progCalled.gateCountMacroLoop// progCalled
+            else dataStruc.Util.readStaticField("compiledMacro."+radical( call.procName) ,
+              methodName(call.procName)+"GateCount").asInstanceOf[Int]//we need to read a static  "slopDelta_3_1_2_1_1GateCount"  in class "compiledMacro.grad"
       }
       callCode += paramCode.reverse.mkString(",") + ");"
+      //had the gateCount as a comment
+      if(gateCountOfCall!=0) {
+         callCode+="// "+ gateCountOfCall + " gate"
+        totalGateCount+=gateCountOfCall
+      }
       if (!callCode.equals(lastCallCode) && !call.locus.equals("show"))
         theCallCode = callCode :: theCallCode //in case of copy or memo of integer, several times the same call code will be generated
       lastCallCode = callCode //in which  case we keep only the first one by ignoring the following

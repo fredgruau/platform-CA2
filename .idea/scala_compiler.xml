@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ScalaCompilerConfiguration">
+    <parameters>
+      <parameter value="-opt:none" />
+    </parameters>
     <profile name="sbt 1" modules="platform-CA2,platform-ca2" />
   </component>
 </project>

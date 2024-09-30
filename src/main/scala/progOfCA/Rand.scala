@@ -9,7 +9,7 @@ import compiler._
 import compiler.SpatialType._
 import progOfmacros.Util.{randE2, randN12, randNext}
 /** Layer implementing a random bit */
-class Rand() extends Layer[(V, B)](1, "random") with ASTLt[V, B] {
+class Rand() extends Layer[(V, B)](1, "random") with ASTLt[V, B]         {
   val next: BoolV = randNext(this) //randDef is used only here, no need for a wrapper!
   lazy val randDir: BoolVe = randN12(this) //only qpointRand uses this
   lazy val randSide: BoolEv = randE2(this) //only qpointRand uses this
@@ -22,9 +22,9 @@ object Rand extends App {
 
 
   new Circuit[V, B]() {
-    val rand = new Rand();
+    val raaand = new Rand();
 
-    def computeRoot: BoolV = rand
+    def computeRoot: BoolV = raaand
   }.compile(hexagon)
 
 

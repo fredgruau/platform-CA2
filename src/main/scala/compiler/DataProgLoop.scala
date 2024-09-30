@@ -117,17 +117,23 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   /**
    * now displaying instructions involves going through the associated loops of loops
    * */
-  override def toStringInstr = "there is " + (if (loops == null) dagis.visitedL.length else loops.length) + " instructions\n" +
+  def toStringInstr = "there is " + (if (loops == null) dagis.visitedL.length else loops.length) + " instructions\n" +
     (if (loops == null) dagis.visitedL.reverse.map((i: Instr) => i.toString() + "\n").mkString("")
     else loops.mkString("\n")) //+  (if(isRootMain) "\n\n"+codeGen().mkString("\n")   else "")
 
 
-  /** compute the number of gates needed to execute the function */
+  lazy val  gateCountMacroLoop:Int={
+    assert( loops!=null)//we must have a leaf CA
+    loops.flatMap(_.loops.map(_.totalOp)).reduce(_ + _)
+  }
+
+  /** compute the number of gates needed to execute the function*/
   def totalOp: Int =
     if (loops != null) //we have a leaf CA
       loops.flatMap(_.loops.map(_.totalOp)).reduce(_ + _)
-    else //we sum the gate count of leaf ca. TODO not sure about that, since a leafCA could be used more than once we should sum over the called macro
-      if (funs.nonEmpty) funs.values.map(_.asInstanceOf[DataProgLoop[_]].totalOp).reduce(_ + _)
+    else //we sum the gate count of leaf ca. TODO not sure about that, since a leafCA could be used more than once we should sum over how many calls
+      if (funs.nonEmpty)
+        funs.values.map(_.asInstanceOf[DataProgLoop[_]].totalOp).reduce(_ + _)
       else 0
 
 
@@ -154,6 +160,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
 
   lazy val totalNamesSubMain: Set[String] = dagis.visitedL.flatMap(_.names).filter(isHeap(_)).toSet //we look at the call
   lazy val totalNamesRootMain: Set[String] = coalesc.values.filter(isHeap(_)).toSet
+
 
   def mainHeapSize = totalNamesSubMain.union(totalNamesRootMain).size
 
@@ -334,7 +341,15 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
 
   // def isIntV1(str: String) = tSymbVarSafe(str).t == (V(), Int(1)) // .isInstanceOf[BoolV]
 
-  // data computed only once from the mainDataProgLoop, using def and lazy
+  //
+
+  /**
+   * @return reconstruct all the macro loop, using a recursive call
+   *  Data computed only once from the mainDataProgLoop, using def and lazy
+   *  or.... may be also for intermediates fun which are not the main but which contain loop.
+   *  carefull: it WILL NOT containt loop which where already compiled
+   *
+   */
   private def subDP: iTabSymb[DataProg[U]] = funs ++ funs.flatMap({ case (k, v) => v.subDP })
 
   /** hashmap of all the progCA except the main. It is undexed by their name,
@@ -347,7 +362,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
    * @param progs map of programms, whose layers have been entered in tabSymb of the main entry point dataProg
    * @return all the layers.
    */
-  def layers(progs: List[DataProgLoop[U]]) = progs.flatMap(_.tSymbVar.filter(x =>
+  def layers(progs: List[DataProgLoop[U]]): Map[String, U] = progs.flatMap(_.tSymbVar.filter(x =>
     Named.isLayer(x._1) && //name should start with "ll"
       x._2.k.isLayerField && //we check the type for it can happen that paramR start with ll
       Named.noDollarNorHashtag(x._1)).toList).toMap //if a $ or a # is present, it not a layer but only a layer component
@@ -355,7 +370,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   /** does not take into account the layers of this */
   lazy val layerSubProgStrict = layers(subDataProgs.values.toList) //: Predef.Map[String, U] = ( subDataProgs.values.toList).flatMap(_.tSymbVar.filter(x => x._2.k.isLayerField).toList).toMap
   /** takes into account the layer of this */
-  lazy val layerSubProg2: Predef.Map[String, U] = layers(this :: subDataProgs.values.toList) //(this :: subDataProgs.values.toList).flatMap(_.tSymbVar.filter(x =>  x._2.k.isLayerField).toList).toMap
+  lazy val layerSubProg2 = layers(this :: subDataProgs.values.toList) //(this :: subDataProgs.values.toList).flatMap(_.tSymbVar.filter(x =>  x._2.k.isLayerField).toList).toMap
   //lazy val layersMain: Predef.Map[String, U] =layers(List(this))
   /**
    *

@@ -7,6 +7,7 @@ import triangulation.Vector2D
 import triangulation.Vector2D.almostEqualS
 
 import java.io.{BufferedWriter, File, FileWriter}
+import java.lang.reflect.Field
 import java.util.regex.Pattern
 import scala.collection.immutable.HashMap
 import scala.collection.{Map, Seq, mutable}
@@ -38,6 +39,37 @@ object Util {
   import scala.swing.Dimension
   import scala.swing.Swing.pair2Dimension
 
+
+  def readStaticField(className: String, fieldName: String): Int = {
+    try {
+      // Load the class by name
+      val clazz: Class[_] = Class.forName(className)
+
+      // Get the field by name
+      val field: Field = clazz.getField(fieldName)
+
+      // Ensure the field is static and public
+      if (java.lang.reflect.Modifier.isStatic(field.getModifiers)) {
+        // Get the value of the static field and print it
+        val fieldValue: Any = field.get(null)  // `null` because it's a static field
+        println(s"Value of static field $fieldName: $fieldValue"); fieldValue.asInstanceOf[Int]
+      } else {
+        println(s"Field $fieldName is not static.");-1
+      }
+
+    } catch {
+      case e: ClassNotFoundException =>
+        println(s"Class $className not found.");-1
+      case e: NoSuchFieldException =>
+        println(s"Field $fieldName not found in class $className.");-1
+      case e: IllegalAccessException =>
+        println(s"Cannot access field $fieldName in class $className.");-1
+      case e: Exception =>
+        e.printStackTrace();-1
+    }
+
+  }
+
   trait border{
     def boundingBox: Dimension
     def right(v:Vector2D):Boolean=almostEqualS(v.x,boundingBox.width);
@@ -53,6 +85,34 @@ object Util {
         left(v1)&&left(v2)||
         right(v1)&&right(v2)
     }
+  }
+
+  def radical(s:String)={
+    assert(s.contains("."),"string "+s+"shoud contain a point .")
+    s.substring(0, s.indexOf("."))
+  }
+  def methodName(s: String)={
+    assert(s.contains("."),"string "+s+"shoud contain a point .")
+    s.drop(s.indexOf(".") + 1)
+  }
+  def radicalRad(s:String)= {
+    assert(s.contains("_"),"string "+s+"shoud contain a dash")
+    s.substring(0, s.indexOf("_"))
+  }
+
+  //def javaFileUrl(s:String)=radical(s)+"."+radicalRad(methodName(s))
+  def dashPart(s:String)=s.drop( s.indexOf("_"))
+  def intBetweenDash(s: String):List[Int]={
+    if (s.length==0)List()
+    else
+    s(0) match{
+      case '_'=> intBetweenDash(s.drop(1))
+      case _ =>
+        assert(s(0).isDigit,"sting "+s+ " should containts only dashes and digits")
+        val res=s(0).toString.toInt
+        res::intBetweenDash(s.drop(1))
+    }
+
   }
 
   trait Rectangle{
@@ -101,6 +161,19 @@ object Util {
   }
 
   def writeFile(filename: String, s: String): Unit = {
+    val file = new File(filename)
+    println("Writing to file: " + file.getAbsolutePath) // Print file path for debugging
+
+    val bw = new BufferedWriter(new FileWriter(file))
+    try {
+      bw.write(s)
+      bw.flush()  // Ensure that the data is flushed to the file
+    } finally {
+      bw.close()  // Close the writer to release system resources
+    }
+  }
+
+  def writeFileOld(filename: String, s: String): Unit = {
     val file = new File(filename)
     val bw = new BufferedWriter(new FileWriter(file))
     bw.write(s)
@@ -248,7 +321,7 @@ object Util {
   /** reconstruit les paramétres de type spatial */
   def shortenedSig(param: List[String]): List[String] = {
     val res: mutable.LinkedHashSet[String] = mutable.LinkedHashSet() //linked est la pour que l'ordre soit conservé
-    for (p <- param) res += radicalOfVar(p)
+    for (p <- param) res += radicalOfVar(p) //comme on a un ensemble les doublons seront fusionné.
     return res.toList;
   }
 
