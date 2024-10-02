@@ -2,6 +2,8 @@ package simulator
 
 import compiler.Circuit
 import compiler.Circuit.compiledCA
+import compiler.DataProg.{nameDirCompilCA, nameDirCompilLoops, nameDirProgCA, nameDirProgLoops}
+import dataStruc.Util.{CustomClassLoader, existInJava, getProg, hasBeenReprogrammed, loadClass}
 import simulator.SimulatorUtil._
 import simulator.XMLutilities._
 import triangulation.Vector2D
@@ -46,14 +48,14 @@ object Simulator extends SimpleSwingApplication {
   override def startup(args: Array[String]): Unit = {
     nameCA = args(0) //name of the CA program
     nameGlobalInit = args(1)
-    globalInit = readXML("src/main/scala/compiledCA/globalInit/" + nameGlobalInit)
+    globalInit = readXML("src/main/java/compiledCA/globalInit/" + nameGlobalInit)
     val nameSimulParam = args(2)
-    simulParam = readXML("src/main/scala/compiledCA/simulParam/" + nameSimulParam)
+    simulParam = readXML("src/main/java/compiledCA/simulParam/" + nameSimulParam)
     displayParam = try {
-      readXML("src/main/scala/compiledCA/displayParam/" + nameCA + ".xml")
+      readXML("src/main/java/compiledCA/displayParam/" + nameCA + ".xml")
     }
     catch {
-      case _: FileNotFoundException => readXML("src/main/scala/compiledCA/displayParam/default.xml")
+      case _: FileNotFoundException => readXML("src/main/java/compiledCA/displayParam/default.xml")
     }
  if(args.length>3) options=args(3)
     super.startup(args)
@@ -66,26 +68,39 @@ object Simulator extends SimpleSwingApplication {
 
   /** hierarchy of swing Jcomponents */
   def top: MainFrame = new MainFrame {
-
-
     /** possible directories where CA can be found */
     val directories = List("compiledCA") //, "compHandCA")
     //find  the right directory
     val nameCACA=nameCA+"CA"
-    val possibleDir = directories //.filter((s: String) => loadClass(s + "." + nameCACA) != null)
+    val possibleDir = directories.filter((s: String) => loadClass(s + "." + nameCACA) != null)
     assert(possibleDir.size > 0, nameCA + " could not be found in any of the directories " + directories)
     assert(possibleDir.size < 2, nameCA + "could  be found two times in the directories " + directories)
-    val chosenDir: String = possibleDir.head //we take the first found directory
+    val chosenDir: String = possibleDir.head //we may later have several directories for compiled CA, chosen dir will select the one containing our class
 
+    /** true if scala CA has been reprogrammed */
+    val reprogrammed=hasBeenReprogrammed(nameDirProgCA+nameCA.capitalize+".scala",nameDirCompilCA+nameCA+"CA.java")
+    /** true if java CA has been deleted */
+    val deletedJava = !existInJava(nameDirCompilCA+nameCA+"CA.java")
     /** contains the loops but also many other parameters */
     val progCA: CAloops2 =
-      if (options.contains("-c"))
-        Circuit.compiledCA(nameCA)  //force la compilation
-      else{
+      if(options.contains("-c")||(options.contains("-b")&&(reprogrammed||deletedJava)))  //we recompile with -c or with -b  if CA code has been deleted or reprogrammeed
+        Circuit.compiledCA(nameCA)  //force  compilation
+      else{ //no recompilation, we directly load the CA
           val classCA: Class[CAloops2] = loadClass(chosenDir + "." + nameCACA)
           getProg(classCA)  //récupére le CA déja compilé et rangé
         }
        //will be used to create the controller, but also the browsable treeLayers.
+     /*if (options.contains("-c")||(options.contains("-b")&&(reprogrammed||deletedJava)))
+      Circuit.compiledCA(nameCA)
+
+    val classCA: Class[CAloops2] = loadClass(chosenDir + "." + nameCACA)
+
+    val classPath = "target/scala-2.13/classes/"
+    // Create a new instance of the custom class loader
+    val customLoader = new CustomClassLoader(classPath)
+    val classCA2: Class[CAloops2] = customLoader.findClass(chosenDir + "." + nameCACA).asInstanceOf[Class[CAloops2]]
+
+    val progCA: CAloops2=getProg(classCA2)  //récupére le CA déja compilé et rangé*/
     title = "spatial computation " + nameCA + " gateCount=" + progCA.gateCount() + " memory Width=" + progCA.CAmemWidth()
 
     /** process the signal we create controller first in order to instanciate state variable used by layerTree */
@@ -212,32 +227,6 @@ object SimulatorUtil {
     }
   }
 
-  /**
-   *
-   * @param path where to find a compiledCA */
-  def loadClass(path: String): Class[CAloops2] = {
-    var res: Class[CAloops2] = null;
-    try {
-      res = Class.forName(path).asInstanceOf[Class[CAloops2]];
-    }
-    catch {
-      case e: ClassNotFoundException =>
-        System.out.println("la classe " + path + " n'existe  pas");
-    }
-    return res;
-  }
-
-  def getProg(progClass: Class[CAloops2]): CAloops2 = {
-    var res: CAloops2 = null
-    try res = progClass.newInstance
-    catch {
-      case e: InstantiationException =>
-        e.printStackTrace()
-      case e: IllegalAccessException =>
-        e.printStackTrace()
-    }
-    res
-  }
 }
   /** contains the types used in the simulator */
   object CAtype {

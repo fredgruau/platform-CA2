@@ -7,10 +7,11 @@ import Instr._
 import VarKind._
 import dataStruc.{Align2, Dag, DagInstr, DagNode, HeapStates, WiredInOut}
 import Circuit._
+import compiler.DataProg.nameDirCompilLoops
 import compiler.SpatialType.{ASTLtG, IntV, UintV}
 import compiler.Packet.BitLoop
 import dataStruc.Align2.{compose, invert}
-import dataStruc.Util.{intBetweenDash, methodName, radical}
+import dataStruc.Util.{existInJava, intBetweenDash, methodName, myGetDeclaredMethod, radical}
 
 import scala.language.postfixOps
 import scala.collection.{mutable, _}
@@ -228,30 +229,34 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
       val newExp = exp.asInstanceOf[ASTLt[_, _]].bitIfyAndExtend(cur, expBitSize, newTSymb)
       newTSymb += s -> new InfoNbit(cur.tSymbVar(s).t, cur.tSymbVar(s).k, expBitSize(newExp));
       Affect(s, newExp).asInstanceOf[Instr]
-    case CallProc(f, names, exps) =>
+    case CallProc(funName, names, exps) =>
       val newexps = exps.map(_.asInstanceOf[ASTLt[_, _]].bitIfyAndExtend(cur, expBitSize, newTSymb))
       val nbitarg = newexps.map(a => expBitSize(a)) //.toList.flatten
-      val namePlusInputsize = f + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _) //we make precise in the function name, the number of bits of arguments
+      val namePlusInputsize = funName + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _) //we make precise in the function name, the number of bits of arguments
 
       //  if (f.size>2 && sysInstr.contains(f.substring(0,3)))
-      if (isSysInstr(f))
+      if (isSysInstr(funName))
       //there is not code to be generated for system calls
-      CallProc(f, names, newexps).asInstanceOf[Instr]
+      CallProc(funName, names, newexps).asInstanceOf[Instr]
       else {//now we have four cases:
         var namePlusOutputsize=""
         var nbitResult2:List[Int]=List() //number of bits of returned result, from the macro. will be computed in distinct ways
-        val freshlyCompiled=cur.funs.contains(f)
+        val freshlyCompiled=cur.funs.contains(funName)
         val nameOfBitified=newFuns.keys.filter(_.startsWith(namePlusInputsize))
         val freshlyCompiledAndBitified=nameOfBitified.nonEmpty
-        val s="compiledMacro."+radical(f)
-        val namePreviouslyCompiledCrude: Array[String] =alreadyCompiled(s)
+        val s="compiledMacro."+radical(funName)
+        val namePreviouslyCompiledCrude: Array[String] =
+          if(existInJava(nameDirCompilLoops+radical(funName)+".java")) //we test existence of the java file of macro, in case we manually destroyed it, because the .class still exist,
+            myGetDeclaredMethod(s)
+          else Array()
+
         val namePreviouslyCompiled= namePreviouslyCompiledCrude.filter(_.startsWith(methodName(namePlusInputsize)))
         val previouslyCompiled=namePreviouslyCompiled.nonEmpty //the compiled java contains one method with corresponiding number of bits for inputs.
         if(previouslyCompiled){
           assert(namePreviouslyCompiled.length==1) //there cannot be two possible outputs for a given input.
           namePlusOutputsize=namePreviouslyCompiled(0)
           val nameWithoutInput=namePlusOutputsize.drop(methodName(namePlusInputsize).length)
-          namePlusOutputsize=radical(f)+"."+ namePlusOutputsize
+          namePlusOutputsize=radical(funName)+"."+ namePlusOutputsize
           nbitResult2=intBetweenDash(nameWithoutInput) //retrieve the int between the dashes
         }
         else if(freshlyCompiledAndBitified)
@@ -262,14 +267,14 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
             nbitResult2 = newProg.paramR.map(s => newProg.tSymbVar(s).nb) //use the previously bitified macro to retrieve the number of bits of results
           }
         else if (freshlyCompiled){ //not yet bitified,
-          val prog: DataProg[InfoType[_]] = cur.funs(f) //the dataprog of this macro is avialbe in the  funs!!!
+          val prog: DataProg[InfoType[_]] = cur.funs(funName) //the dataprog of this macro is available in the  funs!!!
           val newProg = prog.bitIfy(nbitarg) //newProg the macro is "bitified". (we compute the bit cardinality
           nbitResult2 = newProg.paramR.map(s => newProg.tSymbVar(s).nb) //use the just bitified macro to retrieve the number of bits of result
           namePlusOutputsize = namePlusInputsize + nbitResult2.map(_.toString).foldLeft("")(_ + "_" + _)
           newFuns += (namePlusOutputsize -> newProg)
         }
         else { //not freshly compiled,  because that macro was available for another bit size, we will need to do all the compilation again
-                    takeNbOfBitIntoAccount=takeNbOfBitIntoAccount+namePlusInputsize
+                    takeNbOfBitIntoAccount=takeNbOfBitIntoAccount+funName
                     throw new NbOfBitIntoAccountException()
         }
 

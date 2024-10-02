@@ -15,7 +15,7 @@ import progOfmacros.RedSwrapper.border
 import progOfmacros.RedT.cac
 
 
-class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[V, SI] {
+class Dist(val source: Layer[(V, B)],val bitSize:Int) extends Layer[(V, SI)](bitSize, "0") with ASTLt[V, SI] {
   val opp = -this
   val (sloplt: BoolVe, delta, level, gap) = Grad.slopDelta(this) //faudrait que je récupére la date du fichier ou se trouve slopeDelta
   //gabriel centers can be directly obtain simply by taking meeting point of the blob, using sloplt
@@ -38,7 +38,7 @@ class Dist(val source: Layer[(V, B)]) extends Layer[(V, SI)](3, "0") with ASTLt[
 
 trait DistT {
   self: Layer[(V, B)] => //adds a distance to a LayerV todo, it should also limit its movement
-  val d = new Dist(self);
+  val d = new Dist(self,5);
   show(d);
 }
 

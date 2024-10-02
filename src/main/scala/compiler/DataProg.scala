@@ -3,7 +3,7 @@ package compiler
 import java.util.stream.Collectors
 import ASTB._
 import AST.{AstPred, Call, Fundef, Layer, Read, isCons, isNotRead}
-import Circuit.{AstMap, Machine, TabSymb, alreadyCompiled, alreadyCompiledRough, hasBeenReprogrammed, iTabSymb, iTabSymb2}
+import Circuit.{AstMap, Machine, TabSymb, iTabSymb, iTabSymb2, takeNbOfBitIntoAccount}
 import VarKind.{LayerField, MacroField, ParamD, ParamR, ParamRR, StoredField}
 import dataStruc.{Align2, Dag, DagInstr, Named, Schedule, Util, WiredInOut, toSet}
 import dataStruc.WiredInOut.{defby, setInputNeighbor}
@@ -12,7 +12,8 @@ import ASTB.Tminus1
 import ASTBfun.{ASTBg, Fundef2R, concatRedop, redop}
 import ASTL.ASTLg
 import Named.noDollarNorHashtag
-import dataStruc.Util.{methodName, radical}
+import dataStruc.Util.{existInJava, hasBeenReprogrammed, methodName, radical, radicalRad}
+import dataStruct.Name
 
 import java.io.File
 import java.util
@@ -23,10 +24,13 @@ import scala.language.postfixOps
 import scala.util.Try
 
 object DataProg {
-  val nameDirCompilLoops = "src/main/scala/compiledMacro/" //where the compiled loops will be stored
+  val nameDirCompilCA = "src/main/java/compiledCA/" //where the compiled loops will be stored
+  val nameDirProgCA = "src/main/scala/progOfCA/" //where the compiled loops will be stored
+
+  val nameDirCompilLoops = "src/main/java/compiledMacro/" //where the compiled loops will be stored
   val nameDirProgLoops = "src/main/scala/progOfmacros/" //where the source of macro will be stored
   /** set to false after first construct, identifies the mainRoot */
-  var isRootMain = true
+  var isRootMainVar = true
 
 
   /** print a map on several small lines, instead of one big line */
@@ -72,7 +76,7 @@ object DataProg {
     }
     catch {
       case e@(_: dag.CycleException) =>
-        dataStruc.Name.setName(f, "") //permet d'afficher les noms de variables du cycle et donc de
+        Name.setName(f, "") //permet d'afficher les noms de variables du cycle et donc de
         //  Plus facilement identifier ou se trouve le cycle dans le programme
         for (a <- e.cycle)
           print(a + (if (a.name != null) (a.name + "-") else "-"))
@@ -80,7 +84,7 @@ object DataProg {
     }
     while (!instrsCur.isEmpty)
     // we now descend starting from the main circuit, to explore all the field, and then fields of fields.....
-    dataStruc.Name.setName(f, ""); //for ''grad'' to appear as a name, it should be a field of an object extending the fundef.
+    dataStruct.Name.setName(f, ""); //for ''grad'' to appear as a name, it should be a field of an object extending the fundef.
     //we check that each layers is reached by the naming algo
     for(l<-layers)
       assert(l.name!=null,"one of the layers has not been reached by the naming algorithm")
@@ -90,37 +94,54 @@ object DataProg {
     }
 
    //compute the name of the java classes containing the code of macros
-    var javaClassName: Set[String] =funs.keys.map(radical(_)).toSet
+    var javaClassOfMacros: Set[String] =funs.keys.map(radical(_)).toSet
     //removes  previously compiled class of loops, which needs to be compiled again, because source has been updated.
-    for(namejava<-javaClassName)
-      if (hasBeenReprogrammed(namejava,nameDirProgLoops,nameDirCompilLoops)) //there has been a reprogramming
-      {val f=new File(nameDirCompilLoops + namejava)
-        f.delete()
-        javaClassName=javaClassName-namejava
+    for(namejava<-javaClassOfMacros)
+      //if (hasBeenReprogrammed(namejava,nameDirProgLoops,nameDirCompilLoops)) //there has been a reprogramming
+        if (hasBeenReprogrammed(nameDirProgLoops+namejava.capitalize+".scala",nameDirCompilLoops+namejava+".java")) //there has been a reprogramming
+        {
+          val f=new File(nameDirCompilLoops + namejava+".java")
+          f.delete()
+          javaClassOfMacros=javaClassOfMacros-namejava
       }
+      //we remove the classOfMacro if their source has been manually deleted, so as to trigger their recompilation
+    for(namejava<-javaClassOfMacros)
+      if(!existInJava(nameDirCompilLoops+namejava+".java"))
+        javaClassOfMacros=javaClassOfMacros-namejava
     /**
      * builds the map of already compiled macro, for each java file of macro
      */
-    val allAlreadayCompiled:HashMap[String,Array[String]]=
-         HashMap()++javaClassName.map((s:String)=>(s->alreadyCompiledRough("compiledMacro." +s)))
+    val allAlreadayCompiled:HashMap[String,Array[String]]= {
+      /** returns name of already defined macro of type macrosType.
+       *  for example, methods of rand (randV, randE, if macroTypeFile=compiledMacro/rand
+       *  removes the bit size*/
+      def alreadyCompiledForOneBitSize(macrosTypeFile: String): Array[String] =
+        Util.myGetDeclaredMethod(macrosTypeFile).map(radicalRad(_)) //we get the declared metho, but then supress the int size
+      HashMap()++javaClassOfMacros.map((s:String)=>(s->alreadyCompiledForOneBitSize("compiledMacro." +s)))
+    }
 
     /**
      *
      * @param macroNobitSize name of loopmacro not including bit size
      * @return true if one loop $macroNobitSize$ has been compiled for at least one bit size
      */
-    def isCompiled(macroNobitSize:String):Boolean=allAlreadayCompiled(radical( macroNobitSize)).contains(methodName(macroNobitSize))
+    def isCompiled(macroNobitSize:String):Boolean=
+      (allAlreadayCompiled.contains(radical( macroNobitSize)))&&
+      (allAlreadayCompiled(radical( macroNobitSize)).contains(methodName(macroNobitSize)))
+    def needCompiled(macroNobitSize:String):Boolean=
+      takeNbOfBitIntoAccount.contains(macroNobitSize)
 
     /**
      * select which of the fun has already been compiled once for some bit size
      */
-    val notYetCompiledFun=funs.filter((x)=> !isCompiled(x._1))
+    val notYetCompiledFun2: Map[String, Fundef[_]] =funs.filter((x)=> !isCompiled(x._1) || needCompiled(x._1))
+    val notYetCompiledFun=notYetCompiledFun2
     // System.out.println(notYetCompiledFun)
     /** second  gathering of SysInstr which can now access  the layer's name, because  setName has been called   */
     val instrs: List[CallProc] = main :: getSysInstr(dag.visitedL)
     /** adding bug layers */
-    if (isRootMain) {
-      isRootMain = false //the next dataProg will therefore not execute the comming code
+    if (isRootMainVar) {
+      isRootMainVar = false //the next dataProg will therefore not execute the comming code
       //we add the bug layers, we must find out firt on what kind of locus we do have possible bugs.
       layers = bugLayers(instrs) ++ layers.asInstanceOf[List[Layer[_]]]
     }

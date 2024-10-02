@@ -12,34 +12,171 @@ import java.util.regex.Pattern
 import scala.collection.immutable.HashMap
 import scala.collection.{Map, Seq, mutable}
 import scala.reflect.ClassTag
+import compiler.Locus.allLocus
+import compiler.{T, _}
+import dataStruc.Util.{CustomClassLoader, customClassLoader, loadClassAndInstantiate, sameElements}
+import simulator.CAloops2
+import triangulation.{DelaunayTriangulator, NotEnoughPointsException, Triangle2D, Vector2D, Voroonoi}
+
+import java.util
+import scala.::
+import scala.math.cos
+//import de.alsclo.voronoi.graph.Voronoi
+import simulator.CAtype.pointLines
+import simulator.UtilBitJava.{moveBitxtoy, propagateBit14and1, propagateBit6and1, propagateBitxand1}
+import simulator.{Controller, Env, PrShift, UtilBitJava}
+import triangulation.Utility._
+
+import java.awt.Color
+import scala.collection.IterableOnce.iterableOnceExtensionMethods
+import scala.collection.JavaConverters._
+import scala.collection.immutable.{HashMap, HashSet}
+import scala.math.{min, random, round}
+import scala.swing.Dimension
+import scala.swing.Swing.pair2Dimension
+
+
+import java.io.{File, FileInputStream, IOException}
+import java.net.URLClassLoader
+object DynamicLoaderTest {
+  def main(args: Array[String]): Unit = {
+    // Path to the directory containing compiled .class files
+    val classPath = "target/scala-2.13/classes/"
+
+    // Create a new instance of the custom class loader
+    val customLoader = new CustomClassLoader(classPath)
+
+    // Load class `c`
+    val loadedClassC: Class[_] = customLoader.findClass("compiledMacro.grad")
+    //val instantiatedClaccC=loadClassAndInstantiate("compiledMacro.grad",customClassLoader)
+    // Load class `c'`
+    val methods= loadedClassC.getDeclaredMethods
+    val methodMM = loadedClassC.getMethod("toto")   //ca marche avec toto
+    val methodM = loadedClassC.getMethod("slopDelta_4_1_2_1_1") //ben la ca marche plus, juste parceque le nom de la méthode contient des tirets afoison.
+  }
+}
 
 
 object Util {
 
 
-  import compiler.Locus.allLocus
-  import compiler.{T, _}
-  import dataStruc.Util.sameElements
-  import triangulation.{DelaunayTriangulator, NotEnoughPointsException, Triangle2D, Vector2D, Voroonoi}
+  /** returns name of already defined macro of type macrosType.
+   *  for example, methods of rand, if macroTypeFile=compiledMacro/rand*/
+  def myGetDeclaredMethod(macrosTypeFile: String): Array[String] = {
+    try {
+      val c: Class[_] = Class.forName(macrosTypeFile)
+      c.getDeclaredMethods.map(_.getName())
+    }
+    catch{
+      case e: ClassNotFoundException =>  Array() //on trouve pas grad, y a rien dedans
+    }
+  }
 
-  import java.util
-  import scala.::
-  import scala.math.cos
-  //import de.alsclo.voronoi.graph.Voronoi
-  import simulator.CAtype.pointLines
-  import simulator.UtilBitJava.{moveBitxtoy, propagateBit14and1, propagateBit6and1, propagateBitxand1}
-  import simulator.{Controller, Env, PrShift, UtilBitJava}
-  import triangulation.Utility._
+  import java.net.URLClassLoader
+  import java.io.File
 
-  import java.awt.Color
-  import scala.collection.IterableOnce.iterableOnceExtensionMethods
-  import scala.collection.JavaConverters._
-  import scala.collection.immutable.{HashMap, HashSet}
-  import scala.math.{min, random, round}
-  import scala.swing.Dimension
-  import scala.swing.Swing.pair2Dimension
+  /**
+   *
+   * @param path where to find a compiledCA */  //todo enlever CAloops2
+  def loadClass(path: String): Class[CAloops2] = {
+    var res: Class[CAloops2] = null;
+    try {
+      res = Class.forName(path).asInstanceOf[Class[CAloops2]];
+    }
+    catch {
+      case e: ClassNotFoundException =>
+        System.out.println("la classe " + path + " n'existe  pas");
+    }
+    return res;
+  }
+
+  def getProg(progClass: Class[CAloops2]): CAloops2 = {
+    var res: CAloops2 = null
+    try res = progClass.getDeclaredConstructor().newInstance()
+    catch {
+      case e: InstantiationException =>
+        e.printStackTrace()
+      case e: IllegalAccessException =>
+        e.printStackTrace()
+    }
+    res
+  }
+  // Custom ClassLoader that loads classes from a specified directory
+  class CustomClassLoader(directory: String) extends URLClassLoader(Array(new File(directory).toURI.toURL), getClass.getClassLoader) {
+    override def findClass(name: String): Class[_] = {
+      try {
+        super.findClass(name)
+      } catch {
+        case e: ClassNotFoundException =>
+          throw new ClassNotFoundException(s"Could not load class $name from $directory", e)
+      }
+    }
+  }
+
+  // Function to load and instantiate a class using the custom class loader
+  def loadClassAndInstantiate(className: String, classLoader: CustomClassLoader): Any = {
+    val clazz = classLoader.loadClass(className)
+    clazz.getDeclaredConstructor().newInstance() // Instantiate the class
+  }
+
+  // Directory where compiled classes are stored
+  val classOutputDirectory = "target/scala-2.13/classes"
+
+  // Create a custom class loader pointing to the directory with the newly compiled bytecode
+  val customClassLoader = new CustomClassLoader(classOutputDirectory)
+
+  // Load and instantiate c' using the custom class loader
+//  val cPrimeInstance = loadClassAndInstantiate("your.package.ClassCPrime", customClassLoader)
+
+  // Now, c' should reference the new version of c with the updated method m
 
 
+  class CustomClassLoaderOld(classPath: String) extends ClassLoader {
+    @throws[ClassNotFoundException]
+    override def findClass(name: String): Class[_] = {
+      val classData = loadClassData(name)
+      if (classData == null) throw new ClassNotFoundException(name)
+      defineClass(name, classData, 0, classData.length)
+    }
+
+    private def loadClassData(className: String): Array[Byte] = {
+      try {
+        val fileName = s"$classPath/${className.replace('.', '/')}.class"
+        val inputStream = new FileInputStream(fileName)
+        val buffer = new Array[Byte](inputStream.available())
+        inputStream.read(buffer)
+        inputStream.close()
+        buffer
+      } catch {
+        case e: IOException =>
+          e.printStackTrace()
+          null
+      }
+    }
+  }
+
+
+
+  def existInJava( fileCompiledName :String):Boolean={
+    val fileCompiled=new File (fileCompiledName)
+    val res=fileCompiled.exists()
+    res
+  }
+
+  /**
+   *
+   * @param fileprogName source scala
+   * @param fileCompiledName compiled java
+   * @return true if source scala has changed, since last compilation into java   */
+  def hasBeenReprogrammed(fileprogName: String, fileCompiledName :String):Boolean={
+    val fileProg=new File (fileprogName)
+    val fileCompiled=new File (fileCompiledName)
+    val e=fileProg.exists()
+    val dp=fileProg.lastModified()
+    val dc=fileCompiled.lastModified()
+    val res= fileCompiled.exists() && fileProg.lastModified()>fileCompiled.lastModified()
+    res
+  }
   def readStaticField(className: String, fieldName: String): Int = {
     try {
       // Load the class by name
@@ -187,6 +324,7 @@ object Util {
     val file = new File(filePath)
     val bw = new BufferedWriter(new FileWriter(file))
     bw.write(former.dropRight(1) + "\n" + s + "}") //we remove the former parenthesis, which has to be the last char,  and add a new one
+    bw.flush()
     bw.close()
   }
 
@@ -348,4 +486,6 @@ object Util {
   def composeAll2(p: Array[Int], t: iTabSymb2[Array[Int]]): iTabSymb2[Array[Int]] = t.map { case (k, v) => k -> compose(p, v) }
 
   def composeAll(p: Array[Int], t: iTabSymb[Array[Int]]): Map[String, Array[Int]] = t.map { case (k, v) => k -> compose(p, v) }
+
+
 }

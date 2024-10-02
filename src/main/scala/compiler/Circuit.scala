@@ -5,7 +5,8 @@ import ASTB.{Tminus1, shiftL, shiftR}
 import ASTBfun.ASTBg
 import Circuit._
 import compiler.ASTLt.ConstLayer
-import compiler.DataProg.nameDirCompilLoops
+import compiler.DataProg.{isRootMainVar, nameDirCompilLoops}
+import dataStruc.Util
 import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp, radicalRad}
 import progOfCA.Grow
 import simulator.CAloops2
@@ -13,6 +14,7 @@ import simulator.CAloops2
 import java.io.File
 import scala.collection.{mutable, _}
 import scala.collection.immutable.HashMap
+import scala.jdk.CollectionConverters._
 
 /**
  *
@@ -51,10 +53,11 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
    *
    */
 
-  def compile(m: Machine): CAloops2 = {
+  def compile(m: Machine):CAloops2 = {
     body = computeRoot //we pretend that the circuit is a function which returns compute Root
 
     val prog1: DataProg[InfoType[_]] = DataProg(this);
+
     //print(prog1)
 
     val prog2 = prog1.treeIfy();
@@ -67,7 +70,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     // print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
     val prog5: DataProg[InfoNbit[_]] = prog4.macroify();
-    println("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
+    //println("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
     //    print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
@@ -76,13 +79,13 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //print("radiusify555555555555555555555555555555\n" + prog5ter)
 
     val prog6 = prog5ter.unfoldSpace(m); //ajouter les tm1s!!
-    print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
+   // print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
 
     val prog7 = prog6.treeIfy(); //spatiall unfolding generates reused expression that need to be affected again
-    print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
+   // print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
     val prog7bis = prog7.simplify(); //this will remove id which are read only once.
-    print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
+    //print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
 
     val prog8: DataProg[InfoNbit[_]] = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
     print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
@@ -98,7 +101,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
    // ("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaCode)
     //as a result of compiling, compiledCA is available and will be read by the simulator, so we just launch it.
    // val s=new simulator.Simulator()   s.AppletLauncher()
-    prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaCode
+    prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaFile
   }
 
 
@@ -109,15 +112,20 @@ object Circuit {
   final case class NbOfBitIntoAccountException(private val message: String = "",
        private val cause: Throwable = None.orNull)
     extends Exception(message, cause)
-  var takeNbOfBitIntoAccount:Set[String]=immutable.HashSet()
+  var takeNbOfBitIntoAccount:Set[String]=immutable.HashSet() //will contain names of fun which need to be compiled because we have a new bitsize
   /** we restrict ourself to circuit returning a boolV, for the moment */
+
   def main(args: Array[String]) {
-    new Circuit[V, B]() {
+    val myCircuit=new Circuit[V, B]() {
       val root = Class.forName("progOfCA." + args(0)).newInstance.asInstanceOf[ASTLt[V, B]] //asInstanceOf[{ def hello(name: String): String }]
       root.setName(args(0).toLowerCase) //so that the name of the variables start with the name of the CA
       def computeRoot = root
-    }.compile(hexagon)
+    }
+      try {myCircuit.compile(hexagon)}
+     catch{ //the second time it will work because compilation of slopeDelta will be enforced due to seeting of takeNbOfBitIntoAccount
+       case e: NbOfBitIntoAccountException=>myCircuit.compile(hexagon)  }
   }
+/*
   def hasBeenReprogrammed(macroName: String, nameDirProg:String, nameDirCompil :String):Boolean={
     val fileProg=new File (nameDirProg + macroName.capitalize  + ".scala")  //faut capitaliser parcque ce fut minusculisé!
     val fileCompiled=new File (nameDirCompil + macroName + ".java")
@@ -126,26 +134,15 @@ object Circuit {
     val dc=fileCompiled.lastModified()
     val res= fileCompiled.exists() && fileProg.lastModified()>fileCompiled.lastModified()
     res
-  }
-  /** returns name of already defined macro of type macrosType.
-   *  for example, methods of rand, if macroTypeFile=compiledMacro/rand*/
-  def alreadyCompiled(macrosTypeFile: String): Array[String] = {
-    var result: Array[String] = Array()
-    try {
-      val c = Class.forName(macrosTypeFile)
-     c.getDeclaredMethods.map(_.getName())
-  }
-    catch{
-      case e: ClassNotFoundException =>  Array()
-    }
-  }
-  /** returns name of already defined macro of type macrosType.
-   *  for example, methods of rand, if macroTypeFile=compiledMacro/rand
-   *  removes the bit size*/
-  def alreadyCompiledRough(macrosTypeFile: String): Array[String] = {
-    alreadyCompiled(macrosTypeFile).map(radicalRad(_)) //we get the declared metho, but then supress the int size
-  }
+  }*/
 
+  /** returns name of already defined macro of type macrosType.
+   *  for example, methods of rand (randV, randE, if macroTypeFile=compiledMacro/rand
+   *  removes the bit size*/
+  def alreadyCompiledForOneBitSize(macrosTypeFile: String): Array[String] = {
+    val res=Util.myGetDeclaredMethod(macrosTypeFile).map(radicalRad(_)) //we get the declared metho, but then supress the int size
+    res
+  }
 
   /**
    *
@@ -154,17 +151,47 @@ object Circuit {
    */
   def compiledCA(nameCA:String):CAloops2={
     val nameClass=("progOfCA." + nameCA)
-    new Circuit[V, B](){
+   val myCircuit = new Circuit[V, B]() {
       val root = Class.forName(nameClass).newInstance.asInstanceOf[ASTLt[V, B]] //asInstanceOf[{ def hello(name: String): String }]
       root.setName(nameCA.toLowerCase) //so that the name of the variables start with the name of the CA
       def computeRoot = root
-    }.compile(hexagon)
+    }
+    try {myCircuit.compile(hexagon)} //first tour de manége
+    catch{
+      case e: NbOfBitIntoAccountException=>
+        isRootMainVar=true  //on refait un tour de manége, this boolean is initially true for the first fun which is the main, and then flipped to false
+        myCircuit.compile(hexagon)   //the second time it will work because compilation of slopeDelta will be enforced due to seeting of takeNbOfBitIntoAccount
+    }
   }
+  import javax.tools.ToolProvider
+  import java.io.File
+  import java.io.File
+  import javax.tools.{JavaCompiler, ToolProvider, StandardJavaFileManager}
 
+  def compileJavaFiles(javaFiles: List[String]): Boolean = {
+    // Obtain the Java compiler from the ToolProvider
+    val compiler: JavaCompiler = ToolProvider.getSystemJavaCompiler
 
+    // Get the standard file manager
+    val fileManager: StandardJavaFileManager = compiler.getStandardFileManager(null, null, null)
 
+    // Set the output directory for compiled classes
+    val classOutputDirectory = new File("target/scala-2.13/classes")
+    classOutputDirectory.mkdirs() // Ensure the target directory exists
 
+    // Specify the output location for the file manager
+    fileManager.setLocation(javax.tools.StandardLocation.CLASS_OUTPUT, List(classOutputDirectory).asJava)
 
+    // Convert file paths to File objects
+    val fileObjects = fileManager.getJavaFileObjectsFromStrings(javaFiles.asJava)
+
+    // Compile the files
+    val task = compiler.getTask(null, fileManager, null, null, null, fileObjects)
+
+    val success = task.call() // true if compilation succeeds
+    fileManager.close() // Close the file manager
+    success
+  }
 
   type TabSymb[T] = mutable.HashMap[String, T]
   type AstMap[T] = mutable.HashMap[AST[_], T]

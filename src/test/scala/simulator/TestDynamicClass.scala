@@ -1,8 +1,10 @@
 package simulator
 
 import compiler.Locus
+import dataStruc.Util.{getProg, loadClass}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 import simulator.SimulatorUtil._
+
 import scala.collection.JavaConverters._
 
 class TestDynamicClass extends FunSuite with BeforeAndAfter {

@@ -1,6 +1,7 @@
-package dataStruc;
+package dataStruct;
 
 import compiler.AST;
+import dataStruc.Named;
 
 import java.util.HashMap;
 import java.util.Map;

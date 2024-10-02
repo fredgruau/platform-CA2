@@ -2,18 +2,19 @@ package compiler
 
 import compiler.AST.Read
 import compiler.ASTB.{False, True, nbitExpAndParam}
-import compiler.Circuit.{TabSymb, alreadyCompiled, compiledCA, hasBeenReprogrammed, iTabSymb}
-import compiler.DataProg.{nameDirCompilLoops, nameDirProgLoops}
+import compiler.Circuit.{TabSymb, compileJavaFiles, compiledCA, iTabSymb}
+import compiler.DataProg.{nameDirCompilCA, nameDirCompilLoops, nameDirProgLoops}
 import compiler.Instr.deployInt2
 import compiler.Locus.{all2DLocus, allLocus}
 import compiler.ProduceJava.totalGateCount
-import dataStruc.Util.{append2File, copyArray, hierarchyDisplayedField, methodName, parenthesizedExp, radical, radicalOfVar, radicalOfVar2, radicalOfVarIntComp, radicalOfVarRefined, radicalRad, removeAfterChar, rootOfVar, sameRoot, shortenedSig, writeFile}
+import compiler.TestCompile.path
+import dataStruc.Util.{CustomClassLoader, append2File, copyArray, hasBeenReprogrammed, hierarchyDisplayedField, loadClassAndInstantiate, methodName, myGetDeclaredMethod, parenthesizedExp, radical, radicalOfVar, radicalOfVar2, radicalOfVarIntComp, radicalOfVarRefined, radicalRad, removeAfterChar, rootOfVar, sameRoot, shortenedSig, writeFile}
 import compiler.VarKind.LayerField
 import dataStruc.{Named, Util}
 import dataStruc.Named.{isLayer, noDollarNorHashtag, noHashtag}
 import javaxtools.compiler.{CharSequenceCompiler, UseCompiler}
 import simulator.CAloops2
-import simulator.SimulatorUtil.getProg
+import simulator.SimulatorUtil
 import simulator.XMLutilities.readXML
 
 import java.io.File
@@ -35,25 +36,19 @@ object ProduceJava{
 trait ProduceJava[U <: InfoNbit[_]] {
   self: DataProgLoop[U] =>
   /** returns  a big string  storing the code for CAloops, and the code for main calling those CAloops on arrays */
-  def produceAllJavaCode: CAloops2 = { //we need to generate spatial signature for macros before we can adress the main.
+  def produceAllJavaFile:CAloops2 = { //we need to generate spatial signature for macros before we can adress the main.
     val leafLoops = subDataProgs.filter(p => p._2.isLeafCaLoop) //si pas recompilé yaura pas tout!
     val codeLoops: iTabSymb[String] = leafLoops.map({ case (k, v) => (k -> v.asInstanceOf[ProduceJava[U]].javaCodeCAloop(k)) }) //retrieves all the recompiled CA loops
     val (codeLoopsMacro, codeLoopsAnonymous) = codeLoops.partition({ case (k, v) => !k.startsWith("_fun") }) //anonymous functions start with _fun
-    val codeMain: String = javaCodeMain(codeLoopsAnonymous.values.mkString("\n")).replace('#', '$'); //'#' is not a valid char for id
-    val nameCA = radicalOfVar(paramR(0)) + "CA" //name of the produced java file is equal to the name of the layer wrapping around all the compiled prog
-
-    val nameDirCompilCA = "src/main/scala/compiledCA/"
-    val nameCAjava = nameCA.capitalize + ".java"
 
 
-    val PACKAGE_NAME = "compiledCA"
-    //val PACKAGE_SRC = "prog"
-    //val CLASS_NAME = "Output"
+
+  /*  val PACKAGE_NAME = "compiledCA"
+
     val r = new Random()
     val randClassName = "" + Math.abs(r.nextInt % 1000)
     val qName = PACKAGE_NAME + '.' + nameCA.capitalize //+ randClassName
-    writeFile(nameDirCompilCA + nameCAjava, codeMain + "\n") //stores the code of the main plujs anonmymous loop
-
+ */
     //we now process non anonymous macro loop
      val grouped: Predef.Map[String, Map[String, String]] = codeLoopsMacro.groupBy({ case (k, v) => k.substring(0, k.indexOf(".")) }) //  what comes before the dot is the name of the class where to regroup macros
 
@@ -61,41 +56,58 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
     /** contains the loops but also many other parameters */
     var codeAllLoops = ""
-    for (k4 <- grouped.keys) { //for loops, the code is distributed in several file, for clarity
-      val fileName = k4 + ".java"
+    val classPath = "target/scala-2.13/classes/"
+    // Create a new instance of the custom class loader
+    val customLoader = new CustomClassLoader(classPath)
+
+    for (macroLoopName <- grouped.keys) { //for loops, the code is distributed in several file, for clarity. We handle each one, one by one
+      val macroLoopPath = nameDirCompilLoops +macroLoopName+ ".java"
       //we compare date of creation of progOfMacro/filename with compiledMacro.filename, if it is more recent we have to reproduce it all, so we just erase it.
-      if(hasBeenReprogrammed(k4,nameDirProgLoops,nameDirCompilLoops))
-        {val f=new File(nameDirCompilLoops + fileName)
+      //if(hasBeenReprogrammed(k4,nameDirProgLoops,nameDirCompilLoops))
+        if (hasBeenReprogrammed(nameDirProgLoops+macroLoopName.capitalize+".scala",macroLoopPath)) //there has been a reprogramming
+        {val f=new File( macroLoopPath)
          f.delete()
         }
-
-      //if macro file does not exists, creates it (preambule + k4 + "{\n" + notYetDefined.values.mkString("\n") + postambule).replace('#', '$'); //'#' is not a valid char for id
+      //if macro file does not exists, creates it (preambule + macroLoopName + "{\n" + notYetDefined.values.mkString("\n") + postambule).replace('#', '$'); //'#' is not a valid char for id
       val alredyDef: Set[String] =   //contient "rand_1"
-        if (!new File(nameDirCompilLoops + fileName).exists())
+        if (!new File( macroLoopPath).exists())
         { //this is a brand new set of macros
           val preambule = "package compiledMacro;\n import simulator.PrShift;\n public class "
-           writeFile(nameDirCompilLoops + fileName, preambule + k4 + "{\n }") //new compiled java macro will be inserted just before last acolades.
+           writeFile( macroLoopPath, preambule + macroLoopName + "{\n }") //new compiled java macro will be inserted just before last acolades.
            new HashSet[String]() //there is no macro yet defined, since the class was not even existing (brand new)
        }
         else
-          alreadyCompiled("compiledMacro." + k4).toSet //name of class contains a dot
-      val notYetDefined = grouped(k4).filter(x => !alredyDef.contains(x._1.drop(x._1.indexOf(".") + 1))) //name of the macro = we drop what's before the dot
+          myGetDeclaredMethod("compiledMacro." + macroLoopName).toSet //class names contains a dot instead of an antislash
+      val notYetDefined: Map[String, String] = grouped(macroLoopName).filter(x => !alredyDef.contains(x._1.drop(x._1.indexOf(".") + 1))) //name of the macro = we drop what's before the dot
       //we generate the code of the loops correcponding to k4 keys
 
       if (notYetDefined.nonEmpty) {
         val codeK4Loops = (notYetDefined.values.mkString("\n")).replace('#', '$'); //'#' is not a valid char for id
-        codeAllLoops = codeK4Loops + codeAllLoops
-        append2File(nameDirCompilLoops + fileName, codeK4Loops) //we add the code of the macro which was not yet defined.
-        //and now the gateCount
-
+        codeAllLoops = codeK4Loops + codeAllLoops  //codeAllLoops is just for printing
+        append2File(macroLoopPath, codeK4Loops) //we add the code of the macro which was not yet defined.
+        //we compile the macro before the main.
+        val compilationSuccess = compileJavaFiles(List(macroLoopPath))
+        assert(compilationSuccess," compilation macro: "+macroLoopPath+" planté, poil au nez")
+        System.out.println(" compilation macro: "+macroLoopPath+" reussie")
+        val loadedClassC = customLoader.findClass("compiledMacro." + macroLoopName) //we reload the class so that the compmiler of main can access the new macros
       }
-
     }
-    val compiledCA= UseCompiler.newCA(codeMain, qName) //we compile the CA, after generating the macro loop
-        //when there are new loops, it will fail, but at least we have store those new loops before.
+    val codeMain: String = javaCodeMain(codeLoopsAnonymous.values.mkString("\n")).replace('#', '$'); //'#' is not a valid char for id
+    val nameCA = radicalOfVar(paramR(0)) + "CA" //name of the produced java file is equal to the name of the layer wrapping around all the compiled prog
+    val nameCAjava = nameCA.capitalize + ".java"
+    writeFile(nameDirCompilCA+nameCAjava, codeMain + "\n") //stores the code of the main (with anonmymous loop)
+    val sourceFiles = List(nameDirCompilCA+nameCAjava)
+    val compilationSuccess = compileJavaFiles(sourceFiles)
+    assert(compilationSuccess,"compilation of main CA:"+nameDirCompilCA+nameCAjava+ " a planté, poil au nez")
+    System.out.println("compilation of main CA:"+nameDirCompilCA+nameCAjava+ " a réussi")
+    val classCA: Class[_] =customLoader.findClass("compiledCA." + nameCA.capitalize) //we reload the just compiled class
+    val progCA=loadClassAndInstantiate("compiledCA." + nameCA.capitalize,customLoader)
+    progCA.asInstanceOf[CAloops2]
+   //val compiledCA= UseCompiler.newCA(codeMain, qName) //compile the CA, after generating the macro loop, retrieve the bytecode
+ /*       //when there are new loops, it will fail, but at least we have store those new loops before.
     assert(compiledCA!=null," ouaips, ca a planté, poil au nez") //si ca plante pas besoin de retourner au simulateur
-    compiledCA //we return the compiled CA to the simulator.
-    //"" + codeMain + codeAllLoops //returns for direct printing
+     compiledCA //we return the compiled CA to the simulator.
+    //"" + codeMain + codeAllLoops //returns for direct printing*/
   }
 
   /**
@@ -111,9 +123,9 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
 
     val templateURL=if(nameMacro.startsWith("_fun"))
-      "src/main/scala/compiledCA/template/templateCAloop2.txt"
+      "src/main/java/compiledCA/template/templateCAloop2.txt"
     else
-      "src/main/scala/compiledCA/template/templateCAloop.txt"  //for macroLoop, we need to store the gatecount
+      "src/main/java/compiledCA/template/templateCAloop.txt"  //for macroLoop, we need to store the gatecount
 
 
     val gateCount=
@@ -264,7 +276,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
     }
 
     //we use the same template technique as the one used for CAloops
-    replaceAll("src/main/scala/compiledCA/template/templateCA.txt", Map(
+    replaceAll("src/main/java/compiledCA/template/templateCA.txt", Map(
       "GATECOUNT" -> totalGateCount.toString,//totalOp.toString,
       "NAMECA" -> radicalOfVar(paramR(0)).capitalize,
       "MEMWIDTH" -> ("" + mainHeapSize), //TODO on calcule pas bien la memwidth)
