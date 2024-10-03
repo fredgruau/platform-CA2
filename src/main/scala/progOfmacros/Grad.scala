@@ -22,7 +22,7 @@ object Grad {
    * where the gradient is 4 in absolute value, which makes it impossible to decide the slope sign.
    * The vortex can be computed in a second step.
    * */
-  val slopeDeltaDef: Fundef1[(V, SI), ((T[V, E], B), ((V, SI), ((E, B), (E, B))))] = {
+  val slopeDeltaDef: Fundef1[(V, SI), ((T[V, E], B), ((V, SI), ((E, B), (E, B))))] =  {
     val d = pL[V, SI]("dis")
     val dopp = -d
     val se: IntVe = send(List(d, d, d, dopp, dopp, dopp)) //we  apply an opp on distances comming from the center.

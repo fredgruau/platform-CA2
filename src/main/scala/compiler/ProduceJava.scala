@@ -2,17 +2,15 @@ package compiler
 
 import compiler.AST.Read
 import compiler.ASTB.{False, True, nbitExpAndParam}
-import compiler.Circuit.{TabSymb, compileJavaFiles, compiledCA, iTabSymb}
+import compiler.Circuit.{TabSymb, compiledCA, iTabSymb}
 import compiler.DataProg.{nameDirCompilCA, nameDirCompilLoops, nameDirProgLoops}
 import compiler.Instr.deployInt2
 import compiler.Locus.{all2DLocus, allLocus}
 import compiler.ProduceJava.totalGateCount
-import compiler.TestCompile.path
-import dataStruc.Util.{CustomClassLoader, append2File, copyArray, hasBeenReprogrammed, hierarchyDisplayedField, loadClassAndInstantiate, methodName, myGetDeclaredMethod, parenthesizedExp, radical, radicalOfVar, radicalOfVar2, radicalOfVarIntComp, radicalOfVarRefined, radicalRad, removeAfterChar, rootOfVar, sameRoot, shortenedSig, writeFile}
+import dataStruc.Util.{CustomClassLoader, append2File, compileJavaFiles, copyArray, hasBeenReprogrammed, hierarchyDisplayedField, loadClassAndInstantiate, suffixDot, myGetDeclaredMethod, parenthesizedExp, prefixDot, radicalOfVar, radicalOfVar2, radicalOfVarIntComp, radicalOfVarRefined, prefixDash, removeAfterChar, rootOfVar, sameRoot, shortenedSig, writeFile}
 import compiler.VarKind.LayerField
 import dataStruc.{Named, Util}
 import dataStruc.Named.{isLayer, noDollarNorHashtag, noHashtag}
-import javaxtools.compiler.{CharSequenceCompiler, UseCompiler}
 import simulator.CAloops2
 import simulator.SimulatorUtil
 import simulator.XMLutilities.readXML
@@ -35,64 +33,39 @@ object ProduceJava{
 /** provide method in order to  produce the final java code */
 trait ProduceJava[U <: InfoNbit[_]] {
   self: DataProgLoop[U] =>
-  /** returns  a big string  storing the code for CAloops, and the code for main calling those CAloops on arrays */
-  def produceAllJavaFile:CAloops2 = { //we need to generate spatial signature for macros before we can adress the main.
+  /** stores and compiles the java of the macros, stores and compile the CA code, returns  the CA java program,  */
+  def produceStoreAndCompileAllJavaFile:CAloops2 = { //we need to generate spatial signature for macros before we can adress the main.
     val leafLoops = subDataProgs.filter(p => p._2.isLeafCaLoop) //si pas recompilé yaura pas tout!
     val codeLoops: iTabSymb[String] = leafLoops.map({ case (k, v) => (k -> v.asInstanceOf[ProduceJava[U]].javaCodeCAloop(k)) }) //retrieves all the recompiled CA loops
     val (codeLoopsMacro, codeLoopsAnonymous) = codeLoops.partition({ case (k, v) => !k.startsWith("_fun") }) //anonymous functions start with _fun
 
-
-
-  /*  val PACKAGE_NAME = "compiledCA"
-
-    val r = new Random()
-    val randClassName = "" + Math.abs(r.nextInt % 1000)
-    val qName = PACKAGE_NAME + '.' + nameCA.capitalize //+ randClassName
- */
-    //we now process non anonymous macro loop
-     val grouped: Predef.Map[String, Map[String, String]] = codeLoopsMacro.groupBy({ case (k, v) => k.substring(0, k.indexOf(".")) }) //  what comes before the dot is the name of the class where to regroup macros
-
-
-
+    val grouped: Predef.Map[String, Map[String, String]] = codeLoopsMacro.groupBy({ case (k, v) => k.substring(0, k.indexOf(".")) }) //  what comes before the dot is the name of the class where to regroup macros
     /** contains the loops but also many other parameters */
     var codeAllLoops = ""
-    val classPath = "target/scala-2.13/classes/"
-    // Create a new instance of the custom class loader
-    val customLoader = new CustomClassLoader(classPath)
-
+    val customLoader = new CustomClassLoader("target/scala-2.13/classes/") //we have to use the custom loader, because class are compiled at run tim!e
     for (macroLoopName <- grouped.keys) { //for loops, the code is distributed in several file, for clarity. We handle each one, one by one
       val macroLoopPath = nameDirCompilLoops +macroLoopName+ ".java"
-      //we compare date of creation of progOfMacro/filename with compiledMacro.filename, if it is more recent we have to reproduce it all, so we just erase it.
-      //if(hasBeenReprogrammed(k4,nameDirProgLoops,nameDirCompilLoops))
-        if (hasBeenReprogrammed(nameDirProgLoops+macroLoopName.capitalize+".scala",macroLoopPath)) //there has been a reprogramming
-        {val f=new File( macroLoopPath)
-         f.delete()
-        }
-      //if macro file does not exists, creates it (preambule + macroLoopName + "{\n" + notYetDefined.values.mkString("\n") + postambule).replace('#', '$'); //'#' is not a valid char for id
-      val alredyDef: Set[String] =   //contient "rand_1"
-        if (!new File( macroLoopPath).exists())
-        { //this is a brand new set of macros
-          val preambule = "package compiledMacro;\n import simulator.PrShift;\n public class "
+      /** computes which macro are already defined */
+      val alredyDef: Set[String] =
+        if (!new File( macroLoopPath).exists())  //if macro file does not exists, creates it, and initiale its content with a preamble
+        {  val preambule = "package compiledMacro;\n import simulator.PrShift;\n public class " //this is a brand new set of macros
            writeFile( macroLoopPath, preambule + macroLoopName + "{\n }") //new compiled java macro will be inserted just before last acolades.
-           new HashSet[String]() //there is no macro yet defined, since the class was not even existing (brand new)
+           new HashSet[String]() //there is no macro yet defined, since the class is non existing (brand new)
        }
         else
           myGetDeclaredMethod("compiledMacro." + macroLoopName).toSet //class names contains a dot instead of an antislash
-      val notYetDefined: Map[String, String] = grouped(macroLoopName).filter(x => !alredyDef.contains(x._1.drop(x._1.indexOf(".") + 1))) //name of the macro = we drop what's before the dot
-      //we generate the code of the loops correcponding to k4 keys
-
-      if (notYetDefined.nonEmpty) {
-        val codeK4Loops = (notYetDefined.values.mkString("\n")).replace('#', '$'); //'#' is not a valid char for id
-        codeAllLoops = codeK4Loops + codeAllLoops  //codeAllLoops is just for printing
-        append2File(macroLoopPath, codeK4Loops) //we add the code of the macro which was not yet defined.
-        //we compile the macro before the main.
-        val compilationSuccess = compileJavaFiles(List(macroLoopPath))
+      val notYetDefined: Map[String, String] = grouped(macroLoopName).filter(x => !alredyDef.contains(suffixDot( x._1))) //we keep only names which are not already defined
+      if (notYetDefined.nonEmpty) { // generates the code of the loops correcponding to the current java file of macrox
+        val codeLoops = (notYetDefined.values.mkString("\n")).replace('#', '$'); //'#' is not a valid char for id in java
+        codeAllLoops = codeLoops + codeAllLoops  //codeAllLoops is gathered, just for printing/debugging purpose
+        append2File(macroLoopPath, codeLoops) //we add the code of the macro which was not yet defined.
+        val compilationSuccess = compileJavaFiles(List(macroLoopPath)) //we compile the macro before the main, so that the main can use it.
         assert(compilationSuccess," compilation macro: "+macroLoopPath+" planté, poil au nez")
         System.out.println(" compilation macro: "+macroLoopPath+" reussie")
-        val loadedClassC = customLoader.findClass("compiledMacro." + macroLoopName) //we reload the class so that the compmiler of main can access the new macros
+        val loadedClassC = customLoader.findClass("compiledMacro." + macroLoopName) //reload ensures that the compmiler of main can access the new macros
       }
     }
-    val codeMain: String = javaCodeMain(codeLoopsAnonymous.values.mkString("\n")).replace('#', '$'); //'#' is not a valid char for id
+    val codeMain: String = javaCodeMain(codeLoopsAnonymous.values.mkString("\n")).replace('#', '$'); //'#' is not a valid char for id in java file
     val nameCA = radicalOfVar(paramR(0)) + "CA" //name of the produced java file is equal to the name of the layer wrapping around all the compiled prog
     val nameCAjava = nameCA.capitalize + ".java"
     writeFile(nameDirCompilCA+nameCAjava, codeMain + "\n") //stores the code of the main (with anonmymous loop)
@@ -100,34 +73,25 @@ trait ProduceJava[U <: InfoNbit[_]] {
     val compilationSuccess = compileJavaFiles(sourceFiles)
     assert(compilationSuccess,"compilation of main CA:"+nameDirCompilCA+nameCAjava+ " a planté, poil au nez")
     System.out.println("compilation of main CA:"+nameDirCompilCA+nameCAjava+ " a réussi")
-    val classCA: Class[_] =customLoader.findClass("compiledCA." + nameCA.capitalize) //we reload the just compiled class
+    val classCA: Class[_] =customLoader.findClass("compiledCA." + nameCA.capitalize) //we reload the just compiled class, so that it points to the recompiled macro
     val progCA=loadClassAndInstantiate("compiledCA." + nameCA.capitalize,customLoader)
     progCA.asInstanceOf[CAloops2]
-   //val compiledCA= UseCompiler.newCA(codeMain, qName) //compile the CA, after generating the macro loop, retrieve the bytecode
- /*       //when there are new loops, it will fail, but at least we have store those new loops before.
-    assert(compiledCA!=null," ouaips, ca a planté, poil au nez") //si ca plante pas besoin de retourner au simulateur
-     compiledCA //we return the compiled CA to the simulator.
-    //"" + codeMain + codeAllLoops //returns for direct printing*/
   }
 
   /**
    *
-   * @param nameMacro name of a macro CAloop, should be removed the reds. if dot is present
-   * @return codes of the loop
+   * @param nameMacro name of a macro CAloop,
+   * @return java code of this loop, and also number of gates to be consulted using reflection
    */
   def javaCodeCAloop(nameMacro: String): String = {
     val shortSigIn = shortenedSig(paramD);
     val shortSigOut = shortenedSig(paramR)
     val localSpatialLayers = tSymbVar.filter(x => x._2.k.isLayerField && noDollarNorHashtag(x._1))
     val layerNames = localSpatialLayers.keys.toSeq.sorted.toList
-
-
     val templateURL=if(nameMacro.startsWith("_fun"))
       "src/main/java/compiledCA/template/templateCAloop2.txt"
     else
       "src/main/java/compiledCA/template/templateCAloop.txt"  //for macroLoop, we need to store the gatecount
-
-
     val gateCount=
      // if(nameMacro.startsWith("_fun"))
              gateCountMacroLoop
@@ -226,8 +190,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
   /**
    *
-   * @param codeLoopAnonymous this code is grouped together with the main, in order to be only accessible from this mainCA list of calls
-   * @return write in the mainCA file the code of the main plus the anonymous, and in the loopFile, the code of the macro
+   * @param codeLoopAnonymous code of the anonymous macros
+   * @return code of the main regrouped together with the code of the anonymous macro, to make them accessible from the CA's long list of calls
    *
    */
   def javaCodeMain(codeLoopAnonymous: String): String = {
@@ -267,8 +231,6 @@ trait ProduceJava[U <: InfoNbit[_]] {
     }
 
     // def javaIntArray(s: String) = (if (isBoolV(s)) ("int [] ") else ("int [][] ")) + s
-
-
     def anchorNamed(offset: Map[String, List[Int]]): String = {
       val (offset1D, offset2D) = offset.partition(x => isBoolV(x._1)) //x._2.size == 1)
       (if (offset1D.nonEmpty) "int[]" + offset1D.map(anchorOneVar(_)).mkString(",") + ";\n" else "") +
@@ -386,9 +348,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
         codeLoopAnonymous
       }
     ))
-
   }
-
 
   /** the sequence of calls of macros realizing the desired CA computation,
    *
@@ -475,14 +435,14 @@ trait ProduceJava[U <: InfoNbit[_]] {
           /** see latex, from the call, retrieve the layer used from the parameter names of the already compiled macro loop */
           def allLayerFromCompiledMacro(myCall: CallProc)={
             //calcul des layers de la macro appellée
-            val className="compiledMacro."+radical(myCall.procName)
+            val className="compiledMacro."+prefixDot(myCall.procName)
             // Load the Java class
             val clazz: Class[_] = Class.forName( className)
 
             // Get all methods of the class
             val methods: Array[Method] = clazz.getDeclaredMethods
             // Get the first method (or whichever you're interested in)
-            val methodVersion  = methods.filter(_.getName.contains(methodName( myCall.procName)))
+            val methodVersion  = methods.filter(_.getName.contains(suffixDot( myCall.procName)))
             val method:Method=methodVersion.head
             // Get the parameters of the method
             val parameters = method.getParameters.map(_.getName)
@@ -503,8 +463,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
           gateCountOfCall=
             if(progCalled!=null)
               progCalled.gateCountMacroLoop// progCalled
-            else dataStruc.Util.readStaticField("compiledMacro."+radical( call.procName) ,
-              methodName(call.procName)+"GateCount").asInstanceOf[Int]//we need to read a static  "slopDelta_3_1_2_1_1GateCount"  in class "compiledMacro.grad"
+            else dataStruc.Util.readStaticField("compiledMacro."+prefixDot( call.procName) ,
+              suffixDot(call.procName)+"GateCount").asInstanceOf[Int]//we need to read a static  "slopDelta_3_1_2_1_1GateCount"  in class "compiledMacro.grad"
       }
       callCode += paramCode.reverse.mkString(",") + ");"
       //had the gateCount as a comment

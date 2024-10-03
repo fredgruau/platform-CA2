@@ -19,6 +19,7 @@ import simulator.CAloops2
 import triangulation.{DelaunayTriangulator, NotEnoughPointsException, Triangle2D, Vector2D, Voroonoi}
 
 import java.util
+import javax.tools.{JavaCompiler, StandardJavaFileManager, ToolProvider}
 import scala.::
 import scala.math.cos
 //import de.alsclo.voronoi.graph.Voronoi
@@ -38,23 +39,6 @@ import scala.swing.Swing.pair2Dimension
 
 import java.io.{File, FileInputStream, IOException}
 import java.net.URLClassLoader
-object DynamicLoaderTest {
-  def main(args: Array[String]): Unit = {
-    // Path to the directory containing compiled .class files
-    val classPath = "target/scala-2.13/classes/"
-
-    // Create a new instance of the custom class loader
-    val customLoader = new CustomClassLoader(classPath)
-
-    // Load class `c`
-    val loadedClassC: Class[_] = customLoader.findClass("compiledMacro.grad")
-    //val instantiatedClaccC=loadClassAndInstantiate("compiledMacro.grad",customClassLoader)
-    // Load class `c'`
-    val methods= loadedClassC.getDeclaredMethods
-    val methodMM = loadedClassC.getMethod("toto")   //ca marche avec toto
-    val methodM = loadedClassC.getMethod("slopDelta_4_1_2_1_1") //ben la ca marche plus, juste parceque le nom de la méthode contient des tirets afoison.
-  }
-}
 
 
 object Util {
@@ -125,38 +109,11 @@ object Util {
   // Create a custom class loader pointing to the directory with the newly compiled bytecode
   val customClassLoader = new CustomClassLoader(classOutputDirectory)
 
-  // Load and instantiate c' using the custom class loader
-//  val cPrimeInstance = loadClassAndInstantiate("your.package.ClassCPrime", customClassLoader)
-
-  // Now, c' should reference the new version of c with the updated method m
-
-
-  class CustomClassLoaderOld(classPath: String) extends ClassLoader {
-    @throws[ClassNotFoundException]
-    override def findClass(name: String): Class[_] = {
-      val classData = loadClassData(name)
-      if (classData == null) throw new ClassNotFoundException(name)
-      defineClass(name, classData, 0, classData.length)
-    }
-
-    private def loadClassData(className: String): Array[Byte] = {
-      try {
-        val fileName = s"$classPath/${className.replace('.', '/')}.class"
-        val inputStream = new FileInputStream(fileName)
-        val buffer = new Array[Byte](inputStream.available())
-        inputStream.read(buffer)
-        inputStream.close()
-        buffer
-      } catch {
-        case e: IOException =>
-          e.printStackTrace()
-          null
-      }
-    }
-  }
-
-
-
+  /**
+   *
+   * @param fileCompiledName
+   * @return true if the file exists
+   */
   def existInJava( fileCompiledName :String):Boolean={
     val fileCompiled=new File (fileCompiledName)
     val res=fileCompiled.exists()
@@ -224,21 +181,21 @@ object Util {
     }
   }
 
-  def radical(s:String)={
+  def prefixDot(s:String)={
     assert(s.contains("."),"string "+s+"shoud contain a point .")
     s.substring(0, s.indexOf("."))
   }
-  def methodName(s: String)={
+  def suffixDot(s: String)={
     assert(s.contains("."),"string "+s+"shoud contain a point .")
     s.drop(s.indexOf(".") + 1)
   }
-  def radicalRad(s:String)= {
+  def prefixDash(s:String)= {
     assert(s.contains("_"),"string "+s+"shoud contain a dash")
     s.substring(0, s.indexOf("_"))
   }
 
   //def javaFileUrl(s:String)=radical(s)+"."+radicalRad(methodName(s))
-  def dashPart(s:String)=s.drop( s.indexOf("_"))
+  def suffixDash(s:String)=s.drop( s.indexOf("_"))
   def intBetweenDash(s: String):List[Int]={
     if (s.length==0)List()
     else
@@ -488,4 +445,28 @@ object Util {
   def composeAll(p: Array[Int], t: iTabSymb[Array[Int]]): Map[String, Array[Int]] = t.map { case (k, v) => k -> compose(p, v) }
 
 
+  def compileJavaFiles(javaFiles: List[String]): Boolean = {
+    // Obtain the Java compiler from the ToolProvider
+    val compiler: JavaCompiler = ToolProvider.getSystemJavaCompiler
+
+    // Get the standard file manager
+    val fileManager: StandardJavaFileManager = compiler.getStandardFileManager(null, null, null)
+
+    // Set the output directory for compiled classes
+    val classOutputDirectory = new File("target/scala-2.13/classes")
+    classOutputDirectory.mkdirs() // Ensure the target directory exists
+
+    // Specify the output location for the file manager
+    fileManager.setLocation(javax.tools.StandardLocation.CLASS_OUTPUT, List(classOutputDirectory).asJava)
+
+    // Convert file paths to File objects
+    val fileObjects = fileManager.getJavaFileObjectsFromStrings(javaFiles.asJava)
+
+    // Compile the files
+    val task = compiler.getTask(null, fileManager, null, null, null, fileObjects)
+
+    val success = task.call() // true if compilation succeeds
+    fileManager.close() // Close the file manager
+    success
+  }
 }

@@ -12,7 +12,7 @@ import ASTB.Tminus1
 import ASTBfun.{ASTBg, Fundef2R, concatRedop, redop}
 import ASTL.ASTLg
 import Named.noDollarNorHashtag
-import dataStruc.Util.{existInJava, hasBeenReprogrammed, methodName, radical, radicalRad}
+import dataStruc.Util.{existInJava, hasBeenReprogrammed, suffixDot, prefixDot, prefixDash}
 import dataStruct.Name
 
 import java.io.File
@@ -94,7 +94,7 @@ object DataProg {
     }
 
    //compute the name of the java classes containing the code of macros
-    var javaClassOfMacros: Set[String] =funs.keys.map(radical(_)).toSet
+    var javaClassOfMacros: Set[String] =funs.keys.map(prefixDot(_)).toSet
     //removes  previously compiled class of loops, which needs to be compiled again, because source has been updated.
     for(namejava<-javaClassOfMacros)
       //if (hasBeenReprogrammed(namejava,nameDirProgLoops,nameDirCompilLoops)) //there has been a reprogramming
@@ -116,7 +116,7 @@ object DataProg {
        *  for example, methods of rand (randV, randE, if macroTypeFile=compiledMacro/rand
        *  removes the bit size*/
       def alreadyCompiledForOneBitSize(macrosTypeFile: String): Array[String] =
-        Util.myGetDeclaredMethod(macrosTypeFile).map(radicalRad(_)) //we get the declared metho, but then supress the int size
+        Util.myGetDeclaredMethod(macrosTypeFile).map(prefixDash(_)) //we get the declared metho, but then supress the int size
       HashMap()++javaClassOfMacros.map((s:String)=>(s->alreadyCompiledForOneBitSize("compiledMacro." +s)))
     }
 
@@ -126,36 +126,35 @@ object DataProg {
      * @return true if one loop $macroNobitSize$ has been compiled for at least one bit size
      */
     def isCompiled(macroNobitSize:String):Boolean=
-      (allAlreadayCompiled.contains(radical( macroNobitSize)))&&
-      (allAlreadayCompiled(radical( macroNobitSize)).contains(methodName(macroNobitSize)))
+      (allAlreadayCompiled.contains(prefixDot( macroNobitSize)))&&
+      (allAlreadayCompiled(prefixDot( macroNobitSize)).contains(suffixDot(macroNobitSize)))
+
+    /**
+     *
+     * @param macroNobitSize Name of a macro without bit size
+     * @return true if that name has bee stored in takeNbOfBitIntoAccount so as to be considered for the second pass.
+     */
     def needCompiled(macroNobitSize:String):Boolean=
       takeNbOfBitIntoAccount.contains(macroNobitSize)
 
     /**
-     * select which of the fun has already been compiled once for some bit size
+     * map of the funs's name which do need to be compiled
      */
-    val notYetCompiledFun2: Map[String, Fundef[_]] =funs.filter((x)=> !isCompiled(x._1) || needCompiled(x._1))
-    val notYetCompiledFun=notYetCompiledFun2
-    // System.out.println(notYetCompiledFun)
-    /** second  gathering of SysInstr which can now access  the layer's name, because  setName has been called   */
+    val toBeCompiled: Map[String, Fundef[_]] =funs.filter((x)=> !isCompiled(x._1) || needCompiled(x._1))
+    /** second  gathering of SysInstr, wecan now access  the layer's name, because  setName has been called   */
     val instrs: List[CallProc] = main :: getSysInstr(dag.visitedL)
     /** adding bug layers */
     if (isRootMainVar) {
       isRootMainVar = false //the next dataProg will therefore not execute the comming code
-      //we add the bug layers, we must find out firt on what kind of locus we do have possible bugs.
-      layers = bugLayers(instrs) ++ layers.asInstanceOf[List[Layer[_]]]
+      layers = bugLayers(instrs) ++ layers.asInstanceOf[List[Layer[_]]] //we add the bug layers, we must find out firt on what kind of locus we do have possible bugs.
     }
     /** Symbol table  */
     val tsb: TabSymb[InfoType[_]] = mutable.HashMap.empty
     tsb ++= f.p.toList.map(a => ("p" + a.name, InfoType(a, ParamD()))) // stores parameters  in the symbol table.
     tsb ++= layers.map(a => (Named.lify(a.name), InfoType(a, LayerField(a.nbit, a.init)))) // stores layers with bit size, in the symbol table.
     val newProg=new DataProg[InfoType[_]](new DagInstr(instrs, dag),
-      notYetCompiledFun.map //compiles only the recently modified or not yet compiled macro
-      //funs.map //compiles all the macro
-    { case (k, v) ⇒ k -> DataProg(v) },
-      tsb, f.p.toList.map("p" + _.name), List())
-    newProg.checkInvariant
-    newProg
+      toBeCompiled.map { case (k, v) ⇒ k -> DataProg(v) }, tsb, f.p.toList.map("p" + _.name), List())//compiles carefully selected subset of macros.
+    newProg.checkInvariant; newProg
   }
 
   def bugLayers(lesInstr: List[CallProc]) = {

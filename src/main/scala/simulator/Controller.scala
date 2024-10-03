@@ -146,7 +146,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
         })}
         </colorOfField>
       </displayParam>
-    XML.save("src/main/scala/" + chosenDir + "/displayParam/" + nameCA + ".xml", displayParam)
+    XML.save("src/main/java/" + chosenDir + "/displayParam/" + nameCA + ".xml", displayParam)
   }
 
 
@@ -155,7 +155,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
       <initMethod>
         {globalInit \\ "inits"}<selected rank={"" + globalInitNames.indexOf(globalInitList.selection.item)}/>
       </initMethod>
-    XML.save("src/main/scala/" + chosenDir + "/globalInit/" + nameGlobalInit, newGlobalInit)
+    XML.save("src/main/java/" + chosenDir + "/globalInit/" + nameGlobalInit, newGlobalInit)
   }
 
 

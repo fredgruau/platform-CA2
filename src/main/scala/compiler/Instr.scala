@@ -11,7 +11,7 @@ import compiler.DataProg.nameDirCompilLoops
 import compiler.SpatialType.{ASTLtG, IntV, UintV}
 import compiler.Packet.BitLoop
 import dataStruc.Align2.{compose, invert}
-import dataStruc.Util.{existInJava, intBetweenDash, methodName, myGetDeclaredMethod, radical}
+import dataStruc.Util.{existInJava, intBetweenDash, suffixDot, myGetDeclaredMethod, prefixDot}
 
 import scala.language.postfixOps
 import scala.collection.{mutable, _}
@@ -244,19 +244,19 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
         val freshlyCompiled=cur.funs.contains(funName)
         val nameOfBitified=newFuns.keys.filter(_.startsWith(namePlusInputsize))
         val freshlyCompiledAndBitified=nameOfBitified.nonEmpty
-        val s="compiledMacro."+radical(funName)
+        val s="compiledMacro."+prefixDot(funName)
         val namePreviouslyCompiledCrude: Array[String] =
-          if(existInJava(nameDirCompilLoops+radical(funName)+".java")) //we test existence of the java file of macro, in case we manually destroyed it, because the .class still exist,
+          if(existInJava(nameDirCompilLoops+prefixDot(funName)+".java")) //we test existence of the java file of macro, in case we manually destroyed it, because the .class still exist,
             myGetDeclaredMethod(s)
           else Array()
 
-        val namePreviouslyCompiled= namePreviouslyCompiledCrude.filter(_.startsWith(methodName(namePlusInputsize)))
+        val namePreviouslyCompiled= namePreviouslyCompiledCrude.filter(_.startsWith(suffixDot(namePlusInputsize)))
         val previouslyCompiled=namePreviouslyCompiled.nonEmpty //the compiled java contains one method with corresponiding number of bits for inputs.
         if(previouslyCompiled){
           assert(namePreviouslyCompiled.length==1) //there cannot be two possible outputs for a given input.
           namePlusOutputsize=namePreviouslyCompiled(0)
-          val nameWithoutInput=namePlusOutputsize.drop(methodName(namePlusInputsize).length)
-          namePlusOutputsize=radical(funName)+"."+ namePlusOutputsize
+          val nameWithoutInput=namePlusOutputsize.drop(suffixDot(namePlusInputsize).length)
+          namePlusOutputsize=prefixDot(funName)+"."+ namePlusOutputsize
           nbitResult2=intBetweenDash(nameWithoutInput) //retrieve the int between the dashes
         }
         else if(freshlyCompiledAndBitified)

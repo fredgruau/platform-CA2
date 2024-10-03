@@ -1,7 +1,6 @@
 package compiler
 
-import compiler.Circuit.compileJavaFiles
-import dataStruc.Util.writeFile
+import dataStruc.Util.{compileJavaFiles, writeFile}
 
 object TestCompile {
 
