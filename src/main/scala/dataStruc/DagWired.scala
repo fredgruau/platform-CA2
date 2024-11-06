@@ -463,7 +463,7 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
 
   private def checkGenerators = {
     val inter = visitedL.toSet.intersect(allGenerators.toSet)
-    assert(inter.size == allGenerators.size, "there are some generators not in the dag" + allGenerators.toSet.diff(inter) + "\n" + visitedL)
+    assert(inter.size == allGenerators.size, "there are some generators not in the dag, may be a field is printed two times" + allGenerators.toSet.diff(inter) + "\n" + visitedL)
 
   }
   /**
@@ -527,7 +527,7 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
         }
       }
     }
-    //computes transfer variables which are names for which some alignemnent are defined, it is orirented, this is why shift do not appear..
+    /**computes transfer variables which are names for which some alignemnent are defined, it is oriented, this is why shift do not appear..*/
     val transferVariable: Set[String] = HashSet() ++ alignPerm.map({ case ((name, _), _) => name })
     //println(transferVariable)
     /** mapping allowing  to find the wrapper of a given instruction */

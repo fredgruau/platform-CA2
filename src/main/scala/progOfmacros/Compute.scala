@@ -13,7 +13,12 @@ import compiler._
 
 /** Contains the code of spatial macro used as a layer of  building blocks of small bits of spatial operators, compiled with optimal perf. */
 object Compute {
-
+  val implyDef: Fundef2[(V, B), (V, B), (V, B)] = {
+    val a = pL[V, B]("a")
+    val b = pL[V, B]("b")
+    Fundef2("compute.imply", ~a | b, a, b)
+  }
+  def imply(b0: BoolV, b1: BoolV): BoolV = new Call2(implyDef, b0, b1)(repr.nomLR(repr.nomV, repr.nomB)) with BoolV
 
   /*
 

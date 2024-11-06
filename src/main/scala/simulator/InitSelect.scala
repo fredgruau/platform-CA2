@@ -135,7 +135,7 @@ trait InitSelect {
       for (i <- 2 until nbLine - 2) {
         val (j0, j1) = if (i % 2 == 0) (2, nbCol - 1) else (1, nbCol - 2)
         for (j <- j0 until j1) {
-          if (rand.nextFloat() < 0.15) //locusPlane(l)(d)(i)(j).isDefined)
+          if (rand.nextFloat() < 0.03) //locusPlane(l)(d)(i)(j).isDefined)
             f(i)(j) = true
         }
         //setMemField(f, i, j)

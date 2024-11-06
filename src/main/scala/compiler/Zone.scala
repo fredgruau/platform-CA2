@@ -40,10 +40,10 @@ class Zone(val root: Affect[_], val instrs: Iterable[Affect[_]], var constraintS
     def toStringConstr = if (locus == V()) "" else " constr:  " + constraintSchedule
 
     checkInvariant;
-    "*****Zone " + toStringLocus + " {" + vars.mkString(",") + "}" + toStringAlign + toStringFolded + toStringConstr +
+    "*****Zone " + toStringLocus +   " name : " +  name + " {" + vars.mkString(",") + "}" + toStringAlign + toStringFolded + toStringConstr +
       " IN-edges: [" + inputNeighbors.map(_.name) + "]" +
-      " OUT-edges: [" + outputNeighbors.map(_.name) + "]" + "\n"
-    //instrs.toList.mkString("")+ "\n"
+      " OUT-edges: [" + outputNeighbors.map(_.name) + "]" + "\n"+
+      instrs.toList.mkString("")+ "\n"
   }
 
   /** Locus of root */

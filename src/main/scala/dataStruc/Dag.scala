@@ -10,6 +10,7 @@ import java.lang.System
 import scala.Console.out
 import scala.collection.{Map, mutable, _}
 import scala.collection.immutable.{HashMap, HashSet, ListSet}
+import scala.jdk.CollectionConverters._
 
 
 object Dag {
@@ -37,7 +38,13 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
   /** We create an exeption which can store the cycle
    * in order to be able to print it nicely later
    * nicely means with names  identifying fields in the client program */
-  class CycleException(val cycle: Vector[T]) extends Exception("cycle is detected, depth increase from left to right\n" + cycle) {}
+  class CycleException(val cycle: Vector[T]) extends Exception("cycle is detected, depth increase from left to right\n " +
+    "a Tranfer fields y such as defVe is used in two separate expression, e1, and e2, which then get merged in a single Transfer zone $z$.\n " +
+    "furthermore e2 uses an output x produced by e1\n " +
+    "as a result, the zone of x has a link from z and a link to z\n " +
+    "solution is to define a macro for processing of y, and call the macro" +
+    "this will split back zone z. " +
+    "fuuuuuck\n " + cycle) {}
 
 
   /**   all the generators -maximal elements- from which all the other can be reached
@@ -96,6 +103,8 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
    * @return option type with a cycle is there is one. starting and ending with the same element found at a deeper place
    */
   def dfs(n: T, visiting: Vector[T]): Option[Vector[T]] = {
+
+      assert(n!=null," probalement je fait référence a un champ pas encore calculé qui vaut donc null")
     if (visitedS(n)) return None
     else if (visiting.contains(n))
       return Some((visiting).drop(visiting.indexOf(n)) :+ n)
@@ -117,10 +126,29 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
    *         we produce a set in order to be sure to eliminate doublon, we thus loose the order */
   def inputTwice(called: Seq[T] = Seq.empty[T]): Set[T] = {
     val all = (visitedL.flatMap(_.inputNeighbors) ++ called) //multiset with repetition
-    val all2 = all.groupBy(identity)
-    val nUser2 = immutable.HashMap.empty[T, Int] ++ all2.map { case (k, v) ⇒ k -> v.size } //computes multiplicity
-    toSet(visitedL.filter(e => nUser2.contains(e) && nUser2(e) > 1)) //retains elements whose multiplicity is >=2
-  }
+    val all2: Predef.Map[T, List[T]] = all.groupBy(identity)
+    /**
+     *
+     * @param fields identical fields differing only because some had the luch to get a name, and some not.
+     *               this is because we use case class with name, and two instance are equals if they differ only from  the name.
+     * @return the field which has the best name (shortest)
+     */
+    def bestNamed(fields: List[Named]):Named={
+      var res=fields.head
+      for(f<-fields.tail)
+        if(res.name==null||(f.name!=null)&& (Naame.nbCap(f.name)<Naame.nbCap(res.name)))
+          res=f
+      res
+    }
+    /** we select the list of representant with a name, if possible */
+  val res2=all2.flatMap  { case (k, v) ⇒ if(v.size>1)Some(bestNamed(v.asInstanceOf[List[Named]]).asInstanceOf[T]) else None}
+
+   /* val nUser2 = immutable.HashMap.empty[T, Int] ++ all2.map { case (k, v) ⇒ k -> v.size } //computes multiplicity
+    /** select groups whose size is >1 */
+    val listInputTwice = visitedL.filter(e => nUser2.contains(e) && nUser2(e) > 1)
+    val res = toSet(listInputTwice) //retains elements whose multiplicity is >=2*/
+    res2.toSet
+  }//.asJava
 
   /**
    * Adds attributes allowing to compute the union find algorithm

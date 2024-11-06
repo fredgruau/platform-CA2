@@ -85,9 +85,17 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
    ***/
   def affectIfy(toBeReplaced: AstPred, prefix: String, scheduleMatters: Boolean = false): DagInstr = { //TODO faire un seul appel pour éviter de reconstuire le DAG plusieurs fois
     /** reads have already been removed from toBeReplaced to not generate x=x */
-    if (!scheduleMatters && allGenerators.isEmpty)
+    if (!scheduleMatters && allGenerators.isEmpty) {
       throw new Exception("if no schedule then dag is reconstructed from generator which should not be empty")
-    val toBeAffected: List[AST[_]] = dagAst.visitedL.filter(a => toBeReplaced(a) /*&& isNotRead(a)*/);
+    }
+    val toBevisited: Seq[AST[_]] =dagAst.visitedL++visitedL.flatMap(_.exps)
+    val fliesNisv: Seq[AST[_]] =toBevisited.filter(_.name=="fliesNisv")
+    var toBeAffected: List[AST[_]] =   (dagAst.visitedL).filter(a => toBeReplaced(a) /*&& isNotRead(a)*/);  //cela met les arbres dans l'ordre topologique
+      if(toBeReplaced.isInstanceOf[Set[AST[_]]]) { //on a fait gaffe a génerer un tobeReplaced ou le name n'est pas null, et donc on le réutilise quand c'est possibel
+         //cela suffit a régler le probleme des name qui sont null, dans le cas du programme de CA flies. On espére que c'est général.
+        val names=HashMap[AST[_],String]()++  toBeReplaced.asInstanceOf[Set[AST[_]]].map(a=>(a->a.name))
+        toBeAffected.map(a=>a.setName(names(a)))
+      }
     if (toBeAffected.filter(AST.isRead(_)).nonEmpty)
       if (false) //treeIfyParam does affect read, that is not cool
       throw new Exception("we try to affectize read, that would generate silly cycles")
@@ -103,7 +111,7 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
     /** rewrite recursviely the affect expression so as to insert read in them where necessary.  */
     val affectExpList: List[AST[_]] = toBeAffected.map(deDagExclude)
 
-    /** newly generated affectations */
+    /** newly generated affectationsATTENTION, pas necessairement ordonée */
     newAffect = affectExpList.map((e: AST[_]) => Affect(e.name, e))
     val rewrite: Instr => Instr = (i: Instr) => i.propagate(deDagRewrite) //replace the expression by a read(identifier)
     if (scheduleMatters) {
@@ -217,6 +225,8 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
      * @return new best name
      */
     def newName(x: AST[_]) = {
+/*      if(x.name=="fliesNisv")
+        println("ici")*/
       if (x.name.startsWith("shift")) throw new Exception("shift is a reserved prefix, do not use it please")
       if (x.name.startsWith("ll")) throw new Exception("ll is a reserved prefix, do not use it please")
       if (!bestName.contains(x)) x.name

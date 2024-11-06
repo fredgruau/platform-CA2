@@ -6,7 +6,7 @@ import compiler.ASTLfun._
 import compiler.ASTLt.ConstLayer
 import compiler.SpatialType._
 import compiler._
-import progOfmacros.RedSwrapper.exist
+import progOfmacros.Wrapper.existS
 import progOfmacros.RedT.{enlarge, enlargeEF, enlargeFE}
 
 /** sert a tester les fonction utilisant les type T[X,Y] via les operations transfer et sym */

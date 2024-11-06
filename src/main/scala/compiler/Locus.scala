@@ -108,17 +108,6 @@ abstract class S extends Locus /*with Ordered[S] */{
 
 }
 
-class Tata {}
-
-trait Toto {}
-
-case class Tata1() extends Tata {}
-
-case class Tata2() extends Tata {}
-
-object Tata {
-  val tata = new Tata1() with Toto
-}
 final case class V() extends S {
   val sufx  = Array("")
 
@@ -207,7 +196,6 @@ final case class T[+S1 <: S, +S2 <: S](from: S1, to: S2) extends TT {
 
 }
 object Locus {
-  trait Tata {}
 
   /**
    *
@@ -226,11 +214,11 @@ object Locus {
   //static method to be called from java, because V(), E(), F() are not accessible.
   val locusV = V()
 
-  val locusE = E()
+  val locusE: E = E()
 
   val locusF = F()
 
-  val locusVe = T(V(), E())
+  val locusVe: T[V, E] = T(V(), E())
 
   val locusEv = T(E(), V())
 

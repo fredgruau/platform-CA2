@@ -7,8 +7,8 @@ import compiler.ASTBfun.rotUI
 import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.Circuit.hexagon
-import compiler.{V, _}
-import progOfmacros.RedSwrapper.{border, borderDirect}
+import compiler._
+import progOfmacros.Wrapper.{borderS, border}
 import progOfmacros.Topo.nbccDef
 
 object Util {
@@ -50,7 +50,7 @@ object Util {
   private val randE2def: Fundef1[(V, B), (T[E, V], B)] = { //yavait un bug, on a suivi la méthode de deboggage
     // conssitant a nommer les variables contenant les résultats intermediiares, afin de dechifrer le code compilé.
     val b = pL[V, B]("rand")
-    val bE: BoolE = borderDirect[V, E](b)
+    val bE: BoolE = borderS[V, E](b)
     val res2: BoolEv = send[E, V, B](List(bE, ~bE))
     Fundef1("util.randE2", res2, b)
   }

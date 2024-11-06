@@ -39,6 +39,7 @@ object Result {
 
 trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] with MyOpInt2[L, R] {
   self: AST[(L, R)] =>
+
   def locus: L = mym.name._1
 
   def ring: R = mym.name._2
@@ -217,6 +218,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
         case ParamD() | LayerField(_, _) => 0
         case MacroField() => r(s) //we must have computed it before, and stored it in r
         case ParamRR(1) => 1 //we have generated a variable of radius 1, stored it, and now we read it again. ==> potential pb
+        case ParamRR(0) => assert(true, "result of radius O, is that possible?"); 0
       }
 
     }, this)

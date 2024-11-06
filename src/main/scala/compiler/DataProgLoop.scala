@@ -287,7 +287,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
     val emptyCoalesc: iTabSymb[String] = HashMap()
     for (s <- layerSubProg2.keys)
       tSymbVar.addOne((s, layerSubProg2(s))) //adds to tSymbVar, constant layers defined in subProgram in tSymbVar
-    val layerSpace = layerSubProg2.map(l => l._2.asInstanceOf[InfoNbit[_]].density).sum
+    val layerSpace: Int = layerSubProg2.map(l => l._2.asInstanceOf[InfoNbit[_]].density).sum
     //we store all the adresses, layers and heap, as strings so as to store them in allcoalesc
     allAdresses ++= (layerSubProg2.toList.flatMap(l => l._2.locus.deploy2(l._1, l._2.asInstanceOf[InfoNbit[_]])) zip (0 to layerSpace - 1)) //adress of layers
     allAdresses ++= (paramR zip (layerSpace to layerSpace + paramR.length)) //adresses of  result parameter to the mainRoot
@@ -355,17 +355,23 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   /** hashmap of all the progCA except the main. It is undexed by their name,
    * it works only if called from the first global main loop */
 
-  lazy val subDataProgs: iTabSymb[DataProgLoop[U]] = subDP.asInstanceOf[iTabSymb[DataProgLoop[U]]] //used only for the main data Prog, this is why we put a lazy
+  lazy val subDataProgs: iTabSymb[DataProgLoop[U]] = {
+    val sub=subDP.asInstanceOf[iTabSymb[DataProgLoop[U]]] //used only for the main data Prog, this is why we put a lazy
+    sub
+  }
 
   /**
    *
    * @param progs map of programms, whose layers have been entered in tabSymb of the main entry point dataProg
    * @return all the layers.
    */
-  def layers(progs: List[DataProgLoop[U]]): Map[String, U] = progs.flatMap(_.tSymbVar.filter(x =>
-    Named.isLayer(x._1) && //name should start with "ll"
-      x._2.k.isLayerField && //we check the type for it can happen that paramR start with ll
-      Named.noDollarNorHashtag(x._1)).toList).toMap //if a $ or a # is present, it not a layer but only a layer component
+  def layers(progs: List[DataProgLoop[U]]): Map[String, U] = progs.flatMap(
+    _.tSymbVar.filter(x =>
+    {val isll=     Named.isLayer(x._1)  //name should start with "ll"
+    val typeLayer= x._2.k.isLayerField  //we check the type for it can happen that paramR start with ll
+     val nodol= Named.noDollarNorHashtag(x._1)
+  isll&&typeLayer&&nodol}
+  ).toList).toMap //if a $ or a # is present, it not a layer but only a layer component
 
   /** does not take into account the layers of this */
   lazy val layerSubProgStrict = layers(subDataProgs.values.toList) //: Predef.Map[String, U] = ( subDataProgs.values.toList).flatMap(_.tSymbVar.filter(x => x._2.k.isLayerField).toList).toMap

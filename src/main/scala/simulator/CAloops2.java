@@ -1,6 +1,7 @@
 package simulator;
 
 import compiler.Locus;
+import dataStruc.Named;
 import scala.collection.immutable.$colon$colon;
 import scala.collection.immutable.List;
 import scala.collection.immutable.List$;

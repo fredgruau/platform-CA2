@@ -7,7 +7,7 @@ import compiler.ASTB._
 import compiler.ASTBfun._
 import compiler.SpatialType._
 import compiler.ASTLfun.carryV
-import progOfmacros.RedSwrapper._
+import progOfmacros.Wrapper._
 
 /** contains generic building block manipulating ASTLs, without direct access to the constructors
  * they are not implemented in macro, because they are used by macro.
@@ -39,8 +39,8 @@ object ASTLfun {
     //  transfer(symed)
   }
 
-  /** go through the edge to the other neighbor */
-  def toNeighb(msg: BoolVe): BoolVe = transfer(sym(transfer(msg)))
+  /** go through the edge to the other neighbor Ve->Ev->Ev->Ve*/
+  //def toNeighb(arg: BoolVe): BoolVe = transfer(sym(transfer(arg)))
 
   /** either Ef to Vf or vice versa, depending on arg */
   def apex[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, F], R])
@@ -56,7 +56,7 @@ object ASTLfun {
    *         and not reusable when the frontier is encoded as a boolE
    */
   def oneToOneOptimized(is: BoolV): BoolVf = {
-    val brd: BoolE = border(is)
+    val brd: BoolE = borderS(is)
     val brdIn: BoolVe = transfer(v(brd)) & e(is) //builds a Ve true if on the border, and also on the filled side. this transfer needs an implicit
     val cbrdin: BoolFv = transfer(clock(brdIn)) //opposite the edge
     val ccbrdin: BoolVf = transfer(clock(clock(cbrdin))) //we are there
@@ -71,8 +71,8 @@ object ASTLfun {
    * @return boolE x true  iff among the five edges withing the rhombus centered on x , one is true for brd,
    */
   def rhombusExist(brd: BoolE): BoolE = {
-    val brdF: BoolF = exist[E, F](brd)
-    exist[F, E](brdF) //second use of brdE, check that there is a totally empty rhombus between two blobs
+    val brdF: BoolF = existS[E, F](brd)
+    existS[F, E](brdF) //second use of brdE, check that there is a totally empty rhombus between two blobs
 
   }
 
@@ -128,7 +128,7 @@ object ASTLfun {
 
   /** concat two bits into an unsigned int, or one bit and an unsigned int into an unsigned int, or two unsigned int into an unsigned int */
   def concat2UI[L <: Locus, R1 <: Ring, R2 <: Ring](arg1: ASTLt[L, R1], arg2: ASTLt[L, R2])(implicit m: repr[L], n: repr[UI]): ASTLt[L, UI] = {
-    assert(arg1.ring == (B) || arg1.ring == (UI))
+    assert(arg1.ring == B() || arg1.ring == UI())
     binop(ASTBfun.concat2UI.asInstanceOf[Fundef2[R1, R2, UI]], arg1, arg2)
   }
 
@@ -137,6 +137,8 @@ object ASTLfun {
   /** we use macro for computation on three arguments, in order not to have to introduce "triop" but use several binop */
   def cond[L <: Locus, R <: Ring](b: ASTLt[L, B], arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] =
     andLB2R(b, arg1) | andLB2R(~b, arg2)
+
+
 
   /** carryV is not written as a macro to avoid generating too many macro */
   def carryV(b0: BoolV, b1: BoolV, b2: BoolV): BoolV = (b0 & b1) | (b2 & (b0 | b1))
@@ -238,6 +240,8 @@ object ASTLfun {
    * we add a "L" to make sure we can access it.
    * todo not sure about  the need to declare that implicit, also, this has already been declared */
   def uI2SIL[L <: Locus](d: ASTLt[L, UI])(implicit m: repr[L]) = unop(uI2SI, d)
+  def b2SIL[L <: Locus](d: ASTLt[L, B])(implicit m: repr[L]) = unop(b2SI, d)
+
 
 
   def sign[L <: Locus](arg1: ASTLt[L, SI])(implicit m: repr[L]): ASTLt[L, SI] = unop(ASTBfun.sign, arg1)

@@ -24,7 +24,9 @@ trait MyAstlBoolOp[L <: Locus, R <: Ring] {
 
   def ^(that: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = binop(ASTBfun.xor(n), this, that)(m, n)
 
-  def unary_~(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = unop(ASTBfun.neg, this)(m, n)
+  def unary_~(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = {
+    unop(ASTBfun.neg, this)(m, n)
+  }
 }
 /** Integer spatial operators:  we cannot directly check the type constraint R<:I, ( clash with ASTLs, but we can impose that U<:I and U>:R,  which implies that R<:I*/
 trait MyOpInt2[L <: Locus, R <: Ring] {

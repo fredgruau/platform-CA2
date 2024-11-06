@@ -41,7 +41,7 @@ class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class
    */
   var adress: HashMap[String, Int] = HashMap()
 
-  /** a given variables should be present a single time */
+  /** a given variables should be present a single time in the heap*/
   def checkSingleOccurence = {
     var nbOcc = new HashSet[String]()
     for (i <- 0 until heap.size)
@@ -71,7 +71,7 @@ class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class
       if (heap(i) == null) { //we found an empty spot to store one of the time in value
         val e = value.head
         heap = heap.updated(i, e)
-        //System.out.println("HeapState: "+heap)
+      //  System.out.println("HeapState: "+heap)
         checkSingleOccurence
         value = value - e
         if (!adress.contains(e))

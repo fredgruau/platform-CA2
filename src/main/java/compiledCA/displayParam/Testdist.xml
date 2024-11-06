@@ -4,13 +4,15 @@
           testdist
         </Layer><Layer>
           testdistD
+        </Layer><Layer>
+          testdistDB
         </Layer>
       </expandedLayer>
         <colorOfField>
-          <layer color="0xFF0000">
-            testdistD
-          </layer><layer color="0x00FF80">
+          <layer color="0x00FF80">
             testdist
+          </layer><layer color="0xFF0000">
+            testdistD
           </layer>
         </colorOfField>
       </displayParam>

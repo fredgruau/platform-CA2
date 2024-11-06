@@ -42,7 +42,6 @@ object ASTL {
   final case class Broadcast[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[S1, R], m: repr[T[S1, S2]], n: repr[R])
     extends ASTL[T[S1, S2], R]()(repr.nomLR(m, n)) with Singleton[AST[_]]
 
-  trait Toto {}
   def broadcast[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, S2]], n: repr[R]): ASTLt[T[S1, S2], R] =
     new Broadcast[S1, S2, R](arg, m, n) //step 1 is broadcast
 
@@ -490,18 +489,22 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         e.copy(arg = newArg)
       case e@Unop(_, arg, _, _) =>
         e.copy(arg = arg.align(r, tt))
-      case e@Binop(_, arg, arg2, _, _) =>
-        var newArg = arg.align(r, tt)
-        val algn: Map[String, Array[Int]] = r.algn
+      case e@Binop(_, arg, arg2, _, _) => //c'est la qu'on bosse!
+        val r2=Result()
+        var newArg = arg.align(r2, tt)
+       // val algn: Map[String, Array[Int]] = r.algn //on memorize le align de la premiere expression.
+
         var newArg2 = arg2.align(r, tt)
-        val alignedTwice: Predef.Set[String] = algn.keys.toSet.intersect(r.algn.keys.toSet);
-        val alignedTwiceDistinctly = alignedTwice.filter(s => r.algn(s) != algn(s)) //variables with two distinct alignement due to clock/sym operation
+        val alignedTwice: Predef.Set[String] = r.algn.keys.toSet.intersect(r2.algn.keys.toSet);
+        val alignedTwiceDistinctly = alignedTwice.filter(s => r.algn(s) != r2.algn(s)) //variables with two distinct alignement due to clock/sym operation
         if (alignedTwiceDistinctly.size > 1) // we process only the case with a single such variable
           throw new Exception(" more than one to aligne !")
-        if (alignedTwiceDistinctly.nonEmpty && !(algn(alignedTwiceDistinctly.head) sameElements r.algn(alignedTwice.head))) {
+        if (alignedTwiceDistinctly.size== 1)
+          System.out.println("aligned twice")
+        if (alignedTwiceDistinctly.nonEmpty && !(r2.algn(alignedTwiceDistinctly.head) sameElements r.algn(alignedTwice.head))) {
           //k is the aux defined by an instr which will have to use two registers.
           val nome: String = alignedTwiceDistinctly.head //here we assume that there is a single input variable
-          val perm = compose(invert(algn(nome)), r.algn(nome))
+          val perm = compose(invert(r2.algn(nome)), r.algn(nome))
           val shiftedE = "shift" + nome
           r.c = intersect(r.c, Some(Cycle(perm, locus.asInstanceOf[TT])))
           val repr = new repr(tt(nome).t) // asInstanceOf[repr[(L, R)]]
@@ -511,12 +514,12 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
           //TODO le alignperm de shiftInstr on le fait ensuite!
           //    shiftInstr.alignPerm=perm
           r.si += nome -> shiftInstr
-          r.algn += shiftedE -> algn(nome)
+          r.algn += shiftedE -> r2.algn(nome)
           //newArg = newArg.replaceBy(nome, shiftedE) //the first sub expression is left as is
           newArg2 = newArg2.replaceBy(nome, shiftedE) //in the second espression, we will use the shifted variable.
         }
         else //we combined the alignement from each operand of the binop
-          for ((k, v) <- algn)
+          for ((k, v) <- r2.algn)
             r.algn += k -> v
         e.copy(arg = newArg, arg2 = newArg2)
       case e@Redop(_, arg, _, _) => e.copy(arg = arg.align(r, tt))

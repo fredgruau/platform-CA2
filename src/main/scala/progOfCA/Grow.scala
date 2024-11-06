@@ -6,7 +6,7 @@ import compiler.SpatialType._
 import compiler.ASTL._
 import compiler.Circuit.hexagon
 import compiler.{AST, ASTBfun, ASTLt, B, Circuit, E, F, T, V}
-import progOfmacros.RedSwrapper.{exist, border, inside}
+import progOfmacros.Wrapper.{existS, borderS, insideS}
 import compiler.ASTLfun._
 import progOfmacros.Topo.brdin
 
@@ -19,10 +19,10 @@ class GrowVor() extends Layer[(V, B)](1, "global") with BoolV with Blobify {
 }
 /** Simple growth from V to E to V; test of in, and border.we believe that at least for border, and neighbor, it will be reused */
 class Grow extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
-  val n: BoolE = exist(this);
+  val n: BoolE = existS(this);
   // val in: BoolE = inside(this);
-  val brd: BoolE = border(this);
-  override val next: BoolV = exist(n) //   uses  defVe implicitely, the override keyword is mandatory
+  val brd: BoolE = borderS(this);
+  override val next: BoolV = existS(n) //   uses  defVe implicitely, the override keyword is mandatory
   show(this, next, n, brd)
   // he name of root to arg(0).lowercase
 }
@@ -37,8 +37,8 @@ class GrowN extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
 
 /** Growing by passing through from V through F */
 class GrowF extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
-  val nf: BoolF = exist(this); //no use of  defEv
-  override val next: BoolV = exist(nf) //  make use of defVf brough to us implicitely,nb if overrid is not written, it does not work!
+  val nf: BoolF = existS(this); //no use of  defEv
+  override val next: BoolV = existS(nf) //  make use of defVf brough to us implicitely,nb if overrid is not written, it does not work!
   show(this, nf, next)
 
 }
@@ -48,7 +48,7 @@ class GrowEF extends Layer[(E, B)](1, "global") with ASTLt[E, B] {
   val broadcasted = f(this) //step 1 is broadcast
   val transfered = transfer(broadcasted) //step 2 is transfer
   val nf = orR(transfered) //(n,m,d) yzeté implicit killerest
-  override val next: BoolE = exist(nf) //  make use of defVe brough to us implicitely,nb if overrid is not written, it does not work!
+  override val next: BoolE = existS(nf) //  make use of defVe brough to us implicitely,nb if overrid is not written, it does not work!
   show(this, broadcasted, transfered, nf, next)
 }
 
@@ -57,7 +57,7 @@ class GrowEV extends Layer[(E, B)](1, "global") with ASTLt[E, B] {
   val broadcasted = v(this) //step 1 is broadcast
   val transfered = transfer(broadcasted) //step 2 is transfer
   val nv: BoolV = orR(transfered) //(n,m,d) yzeté implicit killerest
-  override val next: BoolE = exist(nv) //  make use of defVe brough to us implicitely,nb if overrid is not written, it does not work!
+  override val next: BoolE = existS(nv) //  make use of defVe brough to us implicitely,nb if overrid is not written, it does not work!
   show(this, broadcasted, transfered, nv, next)
 }
 

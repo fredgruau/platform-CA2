@@ -10,12 +10,13 @@ import compiler.Circuit.hexagon
 import compiler._
 import progOfmacros.Compute._
 import compiler.SpatialType._
+import dataStruc.BranchNamed
 import progOfmacros.Grad
-import progOfmacros.RedSwrapper.border
+import progOfmacros.Wrapper.borderS
 import progOfmacros.RedT.cac
 
 
-class Dist(val source: Layer[(V, B)],val bitSize:Int) extends Layer[(V, SI)](bitSize, "0") with ASTLt[V, SI] {
+class Dist(val source: Layer[(V, B)]/*should be a strate here*/,val bitSize:Int) extends Layer[(V, SI)](bitSize, "0") with ASTLt[V, SI] with BranchNamed{
   val opp = -this
   val (sloplt: BoolVe, delta, level, gap) = Grad.slopDelta(this) //faudrait que je récupére la date du fichier ou se trouve slopeDelta
   //gabriel centers can be directly obtain simply by taking meeting point of the blob, using sloplt
@@ -31,7 +32,7 @@ class Dist(val source: Layer[(V, B)],val bitSize:Int) extends Layer[(V, SI)](bit
   val vortex: BoolF = andR(transfer(cac(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
 
   //  bugif(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
-  show(sloplt, delta, level, vortex, gap) // topoligne,
+  show(level, vortex, gap,sloplt, delta) // topoligne, //,
   val next: ASTLt[V, SI] = this + cond(source.asInstanceOf[BoolV], sign(opp), delta) //faudrait en faire une macro qui prends delta, source et dist et renvoie distNext
 
 }

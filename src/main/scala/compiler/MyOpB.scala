@@ -33,7 +33,8 @@ trait MyOpB[+R <: Ring] {
       case ASTB.False() => ASTB.True()
       case ASTB.True() => ASTB.False()
       case Neg(exp) => exp
-      case _ => Neg(this.asInstanceOf[ASTBt[B]])(repr.nomB).asInstanceOf[ASTBt[B]]
+      case _ =>
+        Neg(this.asInstanceOf[ASTBt[B]])(repr.nomB).asInstanceOf[ASTBt[B]]
     }
 
     /** we use new repr(ring) to obtain the particular type SI or UI we were looking for. */

@@ -11,11 +11,14 @@ import Instr.{a, affectizeReturn}
 import ASTB.Tminus1
 import ASTBfun.{ASTBg, Fundef2R, concatRedop, redop}
 import ASTL.ASTLg
-import Named.noDollarNorHashtag
-import dataStruc.Util.{existInJava, hasBeenReprogrammed, suffixDot, prefixDot, prefixDash}
+import Named.{delify, noDollarNorHashtag}
+import compiler.ASTLt.ConstLayer
+import dataStruc.Util.{existInJava, hasBeenReprogrammed, prefixDash, prefixDot, suffixDot}
 import dataStruct.Name
+import progOfCA.carrySysInstr
 
 import java.io.File
+import java.lang.reflect.Method
 import java.util
 import scala.collection.IterableOnce.iterableOnceExtensionMethods
 import scala.collection.{Iterable, IterableOnce, Map, MapView, Set, immutable, mutable}
@@ -26,13 +29,15 @@ import scala.util.Try
 object DataProg {
   val nameDirCompilCA = "src/main/java/compiledCA/" //where the compiled loops will be stored
   val nameDirProgCA = "src/main/scala/progOfCA/" //where the compiled loops will be stored
-
+  var nameCA3:String=null
   val nameDirCompilLoops = "src/main/java/compiledMacro/" //where the compiled loops will be stored
   val nameDirProgLoops = "src/main/scala/progOfmacros/" //where the source of macro will be stored
   /** set to false after first construct, identifies the mainRoot */
   var isRootMainVar = true
-
-
+/** all the constant layeres to be used in macros */
+  val constLayers:HashMap[String,ConstLayer[_,_]]=new HashMap()+
+    ("defVe" -> (new ConstLayer[T[V, E], B](1, "def"))) +
+    ("defVf"->(new ConstLayer[T[V, F], B](1, "def")))
   /** print a map on several small lines, instead of one big line */
   private def string[T](t: TabSymb[T], s: String): String = t.toList.grouped(4).map(_.mkString(s)).mkString("\n") + "\n"
 
@@ -47,7 +52,7 @@ object DataProg {
    *         The DFS algo of DAG visits all Delayed node recursively as soon as they are created
    *         Variables with varKind paramD and Layer are created
    ***/
-  def apply[T](f: Fundef[T]): DataProg[InfoType[_]] = {
+  def apply[T](f: Fundef[T],racineNommage: Named,nameCA2:String): DataProg[InfoType[_]] = {
     /**
      *
      * @param l list of newly visited  AST Nodes
@@ -56,7 +61,13 @@ object DataProg {
     def getLayers(l: List[AST[_]]) =
       l.collect { case la: Layer[_] => la }
 
-    def getSysInstr(l: List[AST[_]]): List[CallProc] = getLayers(l).flatMap(_.systInstr)
+    def getSysInstr(l: List[AST[_]]): List[CallProc] = {
+      val l1= getLayers(l).flatMap(_.systInstr)
+      val l2: List[CallProc] =l.collect{case  instrs:carrySysInstr=>instrs.syysInstr}.flatten
+      val res=l1++l2
+      assert(res.toSet.size==res.size, "probably the same field is printed two times")
+      res
+    }
     //def getHierarchyDisplay:HashMap[Layer[_],ASTL[_ <: Locus,_ <: Ring]]=new HashMap()++
     //TODO build the layer structure here, exploit that we have it!
     val dag: Dag[AST[_]] = Dag()
@@ -68,15 +79,19 @@ object DataProg {
     var instrsCur = List(main)
     /** contains the current instructions to be explored for retrieving new DagNodes */
     var layers: List[Layer[_]] = List()
-
+    if(isRootMainVar)
+       nameCA3=nameCA2
     do try {
-      val l: List[Layer[_]] = getLayers(dag.addGreaterOf(instrsCur.flatMap(_.exps)))
+      val newElts=dag.addGreaterOf(instrsCur.flatMap(_.exps))
+      val l: List[Layer[_]] = getLayers(newElts)
       layers :::= l;
-      instrsCur = (l.flatMap(_.systInstr)) //as we add generators, we possibly get new call to Display debug or memorize
+      val syysInstrs= newElts.collect{case  instrs:carrySysInstr=>instrs.syysInstr}.flatten //les syysInstr aussi y peuvent ajouter du matos recursif
+      instrsCur = (l.flatMap(_.systInstr)++syysInstrs) //as we add generators, we possibly get new call to Display debug or memorize
     }
     catch {
       case e@(_: dag.CycleException) =>
-        Name.setName(f, "") //permet d'afficher les noms de variables du cycle et donc de
+        //Name.setAllName(f, "") //permet d'afficher les noms de variables du cycle et donc de
+        Name.setAllName(racineNommage, "tata") //permet d'afficher les noms de variables du cycle et donc de
         //  Plus facilement identifier ou se trouve le cycle dans le programme
         for (a <- e.cycle)
           print(a + (if (a.name != null) (a.name + "-") else "-"))
@@ -84,10 +99,19 @@ object DataProg {
     }
     while (!instrsCur.isEmpty)
     // we now descend starting from the main circuit, to explore all the field, and then fields of fields.....
-    dataStruct.Name.setName(f, ""); //for ''grad'' to appear as a name, it should be a field of an object extending the fundef.
+    val stillNullNamed3=dag.visitedL.filter((s:AST[_])=>s match{case t:Named=> t.name==null case _ => false})
+    dataStruc.Naame.setAllName(racineNommage, nameCA2); //for ''grad'' to appear as a name, it should be a field of an object extending the fundef.
+    // dataStruct.Name.setAllName(f, "")
+    val fliesNisv=dag.visitedL.filter((s:AST[_])=>s match{case t:Named=> t.name=="fliesNisv" case _ => false})
+    val stillNullNamed2=dag.visitedL.filter((s:AST[_])=>s match{case t:Named=> t.name==null case _ => false})
+    val notNullNamed2=dag.visitedL.filter((s:AST[_])=>s match{case t:Named=> t.name!=null case _ => false})
     //we check that each layers is reached by the naming algo
-    for(l<-layers)
-      assert(l.name!=null,"one of the layers has not been reached by the naming algorithm")
+    for(l<-layers) {
+      if(l.name==null)
+      throw new Exception("one of the layers has not been reached by the naming algorithm")
+    }
+    val stillNullNamed=dag.visitedL.filter((s:AST[_])=>s match{case t:Named=> t.name==null case _ => false})
+    val notNullNamed=dag.visitedL.filter((s:AST[_])=>s match{case t:Named=> t.name!=null case _ => false})
     val funs: iTabSymb[Fundef[_]] = immutable.HashMap.empty ++ dag.visitedL.collect {
       case l: Call[_] =>
         (l.f.name, l.f)
@@ -142,18 +166,26 @@ object DataProg {
      */
     val toBeCompiled: Map[String, Fundef[_]] =funs.filter((x)=> !isCompiled(x._1) || needCompiled(x._1))
     /** second  gathering of SysInstr, wecan now access  the layer's name, because  setName has been called   */
+    val notToBeCompiled=funs.filter((x)=> ! toBeCompiled.contains(x._1))
+    def getConstLayer(namesProc:List[String])={
+      val names=namesProc.flatMap( allLayerFromCompiledMacro(_)).toSet.map(delify(_))
+       names.map(constLayers(_))
+    }
+
+    val constlayer=getConstLayer(notToBeCompiled.map(x=>x._1).toList)
     val instrs: List[CallProc] = main :: getSysInstr(dag.visitedL)
     /** adding bug layers */
     if (isRootMainVar) {
       isRootMainVar = false //the next dataProg will therefore not execute the comming code
       layers = bugLayers(instrs) ++ layers.asInstanceOf[List[Layer[_]]] //we add the bug layers, we must find out firt on what kind of locus we do have possible bugs.
+      layers=constlayer.toList++layers
     }
     /** Symbol table  */
     val tsb: TabSymb[InfoType[_]] = mutable.HashMap.empty
     tsb ++= f.p.toList.map(a => ("p" + a.name, InfoType(a, ParamD()))) // stores parameters  in the symbol table.
     tsb ++= layers.map(a => (Named.lify(a.name), InfoType(a, LayerField(a.nbit, a.init)))) // stores layers with bit size, in the symbol table.
-    val newProg=new DataProg[InfoType[_]](new DagInstr(instrs, dag),
-      toBeCompiled.map { case (k, v) ⇒ k -> DataProg(v) }, tsb, f.p.toList.map("p" + _.name), List())//compiles carefully selected subset of macros.
+    val newProg=new DataProg[InfoType[_]](new DagInstr(instrs, dag), //alreadycompiled fun will not be in subFun,
+      toBeCompiled.map { case (k, v) ⇒ k -> DataProg(v,v.body,k) }, tsb, f.p.toList.map("p" + _.name), List())//compiles carefully selected subset of macros.
     newProg.checkInvariant; newProg
   }
 
@@ -168,6 +200,24 @@ object DataProg {
       la.setName("bug" + l.shortName);
       la
     }).toList
+  }
+
+  def allLayerFromCompiledMacro(procName:String): List[String] ={
+    //calcul des layers de la macro appellée
+    val className="compiledMacro."+prefixDot(procName)
+    // Load the Java class
+    val clazz: Class[_] = Class.forName( className)
+
+    // Get all methods of the class
+    val methods: Array[Method] = clazz.getDeclaredMethods
+    // Get the first method (or whichever you're interested in)
+    val methodVersion  = methods.filter(_.getName.contains(suffixDot(procName)))
+    val method:Method=methodVersion.head
+    // Get the parameters of the method
+    val parameters = method.getParameters.map(_.getName)
+    val paramLayers=parameters.reverse.takeWhile(Named.isLayer(_)).reverse
+    // val layers: Array[AST.Layer[_]] =paramLayers.map(Layers.layers(_))
+    paramLayers.toList
   }
 }
 
@@ -424,7 +474,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         tSymbVarSafe(x).k == ParamD()
       case _ => true
     }
-    val iT = dagis.inputTwice.filter(isNotReadReg) //should filter out more stuff because it consumes register which are a precious ressource
+    val iT: Set[AST[_]] = dagis.inputTwice.filter(isNotReadReg) //should filter out more stuff because it consumes register which are a precious ressource
     val dagis2: DagInstr = dagis.affectIfy(iT, "auxL", dagisScheduleMatters) //also replaces access to data parameters+layers by read
 
     val (layerFields, macroFields) = dagis.newAffect.map(_.exp).partition(isLayerField(_)) // dagis.newAffect, stores precisely affected expression which are also nonGenerators.
@@ -528,7 +578,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     val affected: Seq[AST[_]] = dagis1.visitedL.filter(_.isInstanceOf[Affect[_]]).map(_.exps.head)
     //  if(redops.intersect(affected.toSet).nonEmpty)  throw new Exception("yes this is usefull")
     val redops2 = redops -- affected //we do not need to affectify, it is already affectified, this looks bugged
-    val redops3 = redops2.filter(isNotRead(_))
+    val redops3: Set[AST[_]] = redops2.filter(isNotRead(_))
     /** values being reduced must be id of variable
      * so we affectify those, before bitIfying,
      * because that puts new ids in the symbol table
@@ -695,10 +745,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       for (i <- finstrs.filter(_.isInstanceOf[Affect[_]])) if (!i.asInstanceOf[Affect[_]].exp.asInstanceOf[ASTL.ASTLg].justConcatsorBroadcast) return true;
       false
     }
-
-
     if (isLeafCaLoop) return p
-
     /** predicate defining connected component forming macros
      *
      * @param src    instruction creating a field $f
@@ -710,7 +757,9 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         case Affect(name, exp) => !needStored(name) && //condition 1= field created by source must not be stored
           (target match {
             case CallProc(namep, _, _) => Instr.isProcessedInMacro(namep) //condition 2 =if target is a system call, it should be memo
-            case _ => true
+            case Affect(nametarget, exptarget)  =>
+             // if(tSymbVarSafe(nametarget).)
+              true
           })
 
         case _ => false
@@ -780,7 +829,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   def addParamRtoDagis2(): DataProg[InfoNbit[_]] = {
     /** @param paramR
      * @return finds out if an "R" has been added due to the fact that it was a result used to compute a redop
-     *         if so, modifies the result's name
+     *         if so, modifies the result's name fuck it produced
+     *         a bug, because I used R also to name a subfield of the main field.
      */
     def addsAnR(paramR: String) = if (tSymbVar.contains(paramR + "R")) paramR + "R" else paramR
 
@@ -965,7 +1015,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       /** dagis completed with shift instructions */
       val dagisWithShift: DagInstr = dagis.propagate(rewrite2)
       //  print("ererererererererererererererererererererererererererererererererererererererererererererer\n" + dagis2)
-      if (!cycleConstraints.isEmpty) println("Constraint: " + cycleConstraints) //we check constraints generated
+      if (!cycleConstraints.isEmpty)
+        println("Constraint: " + cycleConstraints) //we check constraints generated
       //for (i <- dagisWithShift.visitedL) i.reset //will become useless soon
       for (i <- dagisWithShift.visitedL) //adds the names of shifted variables introduced If cycles where present)
         if (i.isShift) {
@@ -1851,7 +1902,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       val iT: collection.Set[AST[_]] = iT1.filter(ASTB.isNotMap1Read(iT1)) //we could filter out more stuff because it consumes register and registers are a precious ressource
       val outputStoredSet = trueDag.dagAst.visitedL.filter(outputStored).toSet //affectify operators which need to store their outputs
       val chDir: Set[ASTBg] = decall.SetDirAndReturnChangedDir()
-      val toBeReplaced = iT.union(outputStoredSet).union(chDir.asInstanceOf[Set[AST[_]]])
+      val toBeReplaced: Set[AST[_]] = iT.union(outputStoredSet).union(chDir.asInstanceOf[Set[AST[_]]])
       //val toBeRepl: List[AST[_]] = trueDag.dagAst.visitedL.filter(a => toBeReplaced(a) && isNotRead(a));
       // toBeRepl.map(_.setNameIfNull3());
       val treeDag: DagInstr = trueDag.affectIfy(toBeReplaced, "_ta")
@@ -1859,7 +1910,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       //we use the prefix "ta" to distinguish the temp scalar register
       //we now update the symbol table with bit size.
       val macroFields = trueDag.newAffect.reverse.map(_.exp) //there is now no layerFields,
-      updateTsymbNbit(macroFields, MacroField()) //modifies the symbol table so as to include the new registers, plus bit size
+      updateTsymbNbit(macroFields, MacroField())     //I added reverse, because in order to be able to compute the bit size, we need to take them in the right order
+                                                            //modifies the symbol table so as to include the new registers, plus bit size
       //println(dagis)
 
       /** cheks that all integer have compatible scanning directions */

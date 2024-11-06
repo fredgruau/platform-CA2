@@ -3,16 +3,16 @@ package progOfCA
 //a singe java is generated, so we can use if for compiling java directly;
 import compiler.AST.Layer
 import compiler.ASTL.{clock, transfer}
-import compiler.ASTLfun.{orR, toNeighb}
+import compiler.ASTLfun.orR
 import compiler.ASTLt.ConstLayer
 import compiler.SpatialType.{BoolE, BoolEf, BoolEv, BoolF, BoolV, BoolVe, BoolVf}
 import compiler._
-import progOfCA.Force.qpointRand
-import progOfmacros.RedSwrapper.exist
+import dataStruc.BranchNamed
+import progOfmacros.Wrapper.existS
 
 import java.util
 /** we test the display using a TVe constant layers, initialized randomly*/
-class Testvoronoi() extends Layer[(T[V,E],B)](1,"global")  with BoolVe{
+class Testvoronoi() extends Layer[(T[V,E],B)](1,"global")  with BoolVe with BranchNamed{
   val Ev:BoolEv=transfer(this)
   val V:BoolV=orR(this)
   val E:BoolE=orR(Ev)

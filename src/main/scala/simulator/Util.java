@@ -40,11 +40,13 @@ public class Util {
     public static void bug(int[][] test, int[][] bugE, String bugName, ArrayList<String> bugs) {
         boolean bug = false;
         for (int i = 0; i < test.length; i++)
-            for (int j = 0; i < test[0].length; i++) {
+            for (int j = 0; j < test[0].length; j++) {
+                //todo we have to do a more precise test, to eliminate border effect on first and last column, first and last column.
                 bug = bug || test[i][j] != 0;
                 bugE[i][j] |= test[i][j];
             }
-        if (bug) bugs.add(bugName);
+        if (bug)
+            bugs.add(bugName);
     }
 
 /*
@@ -112,6 +114,18 @@ public class Util {
     public static void broadcaast(int[] src, int[][] dest) {
         for (int j = 0; j < dest.length; j++)
             copy(src, dest[j]);
+    }
+
+    /**
+     *
+     * @param src represent a boolV
+     * @return Represent a transfer field obtained by 6 ref to the boolV, thus achieving the broadcasting , without allocation memory, yeah
+     */
+    public static int[][] broadcaaast(int[] src) {
+        int dest[][] = new int[6][src.length];
+        for (int j = 0; j < dest.length; j++)
+            copy(src, dest[j]);
+        return dest;
     }
 
     /**

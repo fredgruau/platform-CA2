@@ -1,11 +1,11 @@
 package progOfCA
 
 import compiler.SpatialType._
-import compiler.AST.{Layer, _}
+import compiler.AST._
 import compiler.ASTLfun.inc
 import compiler.SpatialType._
 import compiler.{AST, ASTLt, B, SI, UI, V, repr}
-import progOfmacros.RedSwrapper.leastUI
+import progOfmacros.Wrapper.leastUI
 import simulator.Util.show
 
 /** produce a global uniform field cycling through the 2^nbit values, that can be used for testing */

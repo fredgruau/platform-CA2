@@ -693,7 +693,7 @@ object ASTB {
         if (t.contains(x)) t(x).nb
         else if (c.contains(x) && t.contains(c(x))) t(c(x)).nb
         else
-          throw new Exception("where is " + x + "?")
+          throw new Exception("where is " + x + "?, it is not found in the symbolTable.  Bug is probably instruction in a dag are not in topological order")
     }
   }
 

@@ -7,6 +7,7 @@ import scala.collection.{immutable, mutable}
 
 object Named {
   def lify(s: String): String = "ll" + s
+  def delify(s: String): String = s.drop(2)
 
   def pify(s: String): String = "p" + s
 

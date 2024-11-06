@@ -53,6 +53,16 @@ object Util {
     }
     catch{
       case e: ClassNotFoundException =>  Array() //on trouve pas grad, y a rien dedans
+      case e: NoSuchMethodException =>
+        println("Méthode introuvable: " + e.getMessage);Array()
+      case e: SecurityException =>
+        println("Problème de sécurité: " + e.getMessage);Array()
+      case e:   NoSuchMethodException =>
+        println("nosuchmethod"+ e.getMessage);Array()
+      case e: Exception =>
+        println("Exception inattendue: " + e.getMessage);Array()
+
+
     }
   }
 

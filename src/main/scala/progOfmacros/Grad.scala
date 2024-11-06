@@ -3,7 +3,7 @@ package progOfmacros
 import compiler.B
 import compiler.AST._
 import compiler.SpatialType.{BoolVe, _}
-import compiler.ASTBfun.{addRedop, andRedop, minSignRedop, orRedop, p, redop, xorRedop}
+import compiler.ASTBfun.{addRedop, andRedop, minSignRedop, orRedop, p, redop, uI2SI, xorRedop}
 import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.ASTLt._
@@ -11,7 +11,7 @@ import compiler.Circuit.hexagon
 import compiler._
 import progOfmacros.Compute._
 import compiler.SpatialType._
-import progOfmacros.RedSwrapper.border
+import progOfmacros.Wrapper.borderS
 
 object Grad {
 
@@ -52,4 +52,37 @@ object Grad {
     val e4 = new Taail(t2) with BoolE
     (e1, e2, e3, e4)
   }
+
+
+
+
+  /** macro that, computes the gradient sign, sloplt
+   * Also computes level which is true when the neihgbors are equal,
+   * */
+  val slopeDef: Fundef1[(V, UI), ((T[V, E], B),  (E, B))] =  {
+    val d1 = pL[V, UI]("dis")
+    val d=uI2SIL(d1)
+    val dopp: IntV= -d  //rajoute un bit zero automatique pour passer de UI a SI.
+    val se: IntVe = send(List(d, d, d, dopp, dopp, dopp)) //we  apply an opp on distances comming from the center.
+    val grad3: IntE = reduce(addRedop[SI].asInstanceOf[redop[SI]], transfer(se)) //the trick here is to do the expensive operation (add) only on the three edges locus, instead of the 6 Ve transfer
+    val grad6: IntEv = send(List(-grad3, grad3))
+    val slopEv: BoolEv = ltSI(grad6) //when sending back the result to EV, we have to invert again towards the center
+   // val slop: BoolVe = cond(chip.borderVe.df, transfer(slopEv), false) //faut definir ckispasse au bord. we put zero if unedfined
+   val slop=transfer(slopEv)
+    val level: BoolE = ~reduce(orRedop[B], slopEv) //its equal if it is neither lt nor gt
+    //show(opp) //breaks a cycle
+    level.setName("level"); //vortex.setName("vortex")
+    grad3.setName("grad");
+    slop.setName("slop");
+    Fundef1("grad.slop", Cons(slop, level), d1)
+  }
+
+  /** Calls slope, and separate the four results. */
+  def slope(d: UintV): (BoolVe,  BoolE) = {
+    val r = Call1(slopeDef, d);
+    val e1 = new Heead(r) with BoolVe
+    val e2 = new Taail(r)with BoolE
+    (e1, e2)
+  }
+
 }

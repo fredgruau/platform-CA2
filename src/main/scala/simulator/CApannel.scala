@@ -7,7 +7,7 @@ import simulator.CAtype._
 
 import scala.swing.Swing._
 import scala.swing.event._
-import scala.swing.{Dimension, Frame, MainFrame, Panel, SimpleSwingApplication}
+import scala.swing.{Dimension, Font, Frame, MainFrame, Panel, SimpleSwingApplication}
 import triangulation.{DelaunayTriangulator, NotEnoughPointsException, Triangle2D, Vector2D, Voroonoi}
 
 import scala.collection.JavaConverters._
@@ -19,6 +19,7 @@ import dataStruc.Coord2D
 
 import scala.collection.immutable
 import scala.collection.immutable.HashSet
+import scala.swing.MenuBar.NoMenuBar.font
 import scala.util.Random
 
 /**
@@ -46,8 +47,12 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
       override def fillPolygon(p: Polygon): Unit = g.fillPolygon(p)
 
       override def drawPolygon(p: Polygon): Unit = g.drawPolygon(p)
-
-      override def drawText(s: String, i: Int, j: Int) = g.drawString(s, i, j)
+      import java.awt.{Font}
+      override def drawText(s: String, i: Int, j: Int) = {
+        val font = new Font("Serif", Font.PLAIN, 24); // Remplace "Serif" par le nom de la police souhaitée et 24 par la taille de police désirée
+        g.setFont(font);
+        g.drawString(s, i, j)
+      }
       override def drawPoint(x: Int, y: Int, size:Int): Unit = {
         g.setStroke(new BasicStroke(size))
         g.drawLine(x, y, x, y)
@@ -74,7 +79,8 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
 
     def drawText(c: Color) = {
       g.setColor(c);
-      g.drawText(env.bugs.mkString(","), 0, height - 10)
+      if(env.bugs.nonEmpty)
+        g.drawText("BUG: "+env.bugs.mkString(","), 100, /*height -*/ 100)
     }
     def drawTriangles(c: Color,triangleSoup:List[Triangle2D]) = {
       g.setColor(c);

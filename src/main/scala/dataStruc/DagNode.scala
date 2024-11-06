@@ -24,7 +24,7 @@ trait DagNode[+T <: DagNode[T]] {
 
   /** others are node that should be visited, but are not input neighbors.
    * by default there is none */
-  def other: List[T] = List.empty
+  //def other: List[T] = List.empty
 
   /** we print without parenthesis when there is a single input */
   def toStringTree: String = toString + " " +
@@ -53,10 +53,12 @@ trait DagNode[+T <: DagNode[T]] {
       this.asInstanceOf[AST[_]] match {
         case Read(name) => val rad = radicalOfVar2(name)
           val s = t.tSymbVarSafe(rad)
-          if (s.k.isParamD || s.k.isLayerField) name + "[i]" //no delays for the moment being, when we read
+          if(name.startsWith("fliesDopp"))
+            println("ici")
+          if (s.k.isParamD || s.k.isLayerField || s.k.isParamR) name + "[i]" //no delays for the moment being, when we read
           else name //operand is a loop register.
-        case False() =>
-          "/* False*/" //by simplification a whole expression may reduce to false after simplification.
+        case False() => "0 /*False*/" // I have  put O instead of "/*False*/", it seems to work
+          //"/*False*/" //by simplification a whole expression may reduce to false after simplification.
       }
     }
 

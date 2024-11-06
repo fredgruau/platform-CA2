@@ -148,7 +148,11 @@ object ASTBfun {
   }
   val uI2SI: Fundef1[UI, SI] = { //to be coherent with the other fundef declared as val, we call it uitosi insted uitosidef
     val xui = p[UI]("xuiToSi")
-    Fundef1("uI2SI", Concat2(False(), xui), xui)
+    Fundef1("uI2SI", Concat2( xui,False()), xui)
+  }
+  val b2SI: Fundef1[B,SI] = {
+    val xb = p[B]("xBtoSi")
+    Fundef1("b2SI", Concat2(xb,False()), xb)
   }
   /*
     /** wrapper */
