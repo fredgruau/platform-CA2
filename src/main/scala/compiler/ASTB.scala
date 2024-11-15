@@ -420,8 +420,8 @@ object ASTB {
 
   def affBoolConst(nameb: String, arg: ASTBt[B], g: Packet): ASTBt[B] =
     if (arg.isConst) {
-      if (nameb != null) g.constantTable.addOne(nameb -> fromBoolB(arg));
-      arg
+      if (nameb != null) {g.constantTable.addOne(nameb -> fromBoolB(arg));AffBool(nameb, arg)}
+      else arg
     } //we need to return the constant because it could be afected to other variable
     else {
       if ((nameb != null) && (g.constantTable.contains(nameb))) g.constantTable.remove(nameb) //variable are reused they can loose their status of bieng constant

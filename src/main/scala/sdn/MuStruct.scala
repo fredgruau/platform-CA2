@@ -25,17 +25,21 @@ trait carrySysInstr{
   /** @param v field that should be false everywere unless a bug appears */
   def buugif(v: AST[_]) = syysInstr ::= CallProc("bug", List(), List(v))
 }*/
+
+
 /**
  un element du LDAG, sert a updater toutes les trucs dans l'ordre. */
-abstract class MuStruct[L<:Locus,R<:Ring] extends  DagNode[MuStruct[_<:Locus,_<:Ring]] with Named with BranchNamed{
+abstract class MuStruct[L<:Locus,R<:Ring] extends  DagNode[MuStruct[_<:Locus,_<:Ring]] with Named with BranchNamed with sdn.Util{
   //self: AST[(L,B)] =>
 
   /** support of agent */
 val is: Strate[(L,R)] with ASTLt[L,R] with carrySysInstr
+  /** we add the possibility to display fields */
   protected def shoow(v: AST[_]*) = {
     for (f <- v)
       is.syysInstr ::= CallProc("show", List(), List(f))
   }
+  /** we add the possibility  to declare invariant */
   protected def buugif(v: AST[_]) = {
       is.syysInstr ::= CallProc("bug", List(), List(v))
   }

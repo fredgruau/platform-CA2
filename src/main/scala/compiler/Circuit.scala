@@ -10,6 +10,7 @@ import compiler.SpatialType.BoolV
 import dataStruc.{Named, Util}
 import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp, prefixDash}
 import progOfCA.{Grow, MovableAg, Vagent}
+import sdn.Root4naming
 import simulator.CAloops2
 
 import java.io.File
@@ -44,7 +45,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
 
   /** to be defined in the circuit for collecting all the nodes participating in usefull computation,   "abstract def" because known latter */
   def computeRoot: ASTLt[L, R]
-  val racineNommage:Named=null //on donne une valeur pour pouvoir toujours compiler les ca monocouche
+  val root4naming:Named=null //on donne une valeur pour pouvoir toujours compiler les ca monocouche
   val nameCAlowerCase:String=null //on donne une valeur pour pouvoir toujours compiler les ca monocouche
 
   /**
@@ -58,14 +59,14 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
 
   def compile(m: Machine):CAloops2 = {
     body = computeRoot //we pretend that the circuit is a function which returns compute Root
-    val prog1: DataProg[InfoType[_]] = DataProg(this,racineNommage,nameCAlowerCase);
-   // print(prog1)
+    val prog1: DataProg[InfoType[_]] = DataProg(this,root4naming,nameCAlowerCase);
+    //print(prog1)
 
     val prog2 = prog1.treeIfy();
-    //  print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
+    // print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
 
     val prog3: DataProg[InfoType[_]] = prog2.procedurIfy();
-    //print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
+    //    print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
     val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
     // print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
@@ -77,36 +78,33 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //  print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
 
     val prog5ter: DataProg[InfoNbit[_]] = prog5bis.radiusify3
-    //print("radiusify555555555555555555555555555555\n" + prog5ter)
+    // print("radiusify555555555555555555555555555555\n" + prog5ter)
 
     val prog6 = prog5ter.unfoldSpace(m); //ajouter les tm1s!!
-      // print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
+    //  print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
 
     val prog7 = prog6.treeIfy(); //spatiall unfolding generates reused expression that need to be affected again
-   // print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
+    // print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
     val prog7bis = prog7.simplify(); //this will remove id which are read only once.
-    //ok print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
+    // print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
 
     val prog8: DataProg[InfoNbit[_]] = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
-    print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
+    // print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
     val prog10: DataProgLoop[InfoNbit[_]] = prog8.loopIfy()
-   // print("loopify1010101010101010101010101010101010101010" + prog10)
+    //print("loopify1010101010101010101010101010101010101010" + prog10)
 
     val prog11 = prog10.unfoldInt()
-     print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
+   //print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
     val prog12 = prog11.coaalesc() //allocates memory
-    // System.out.println(prog12.allLayers)
-    //  print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
+    //System.out.println(prog12.allLayers)
+     print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
    // ("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaCode)
     //as a result of compiling, compiledCA is available and will be read by the simulator, so we just launch it.
    // val s=new simulator.Simulator()   s.AppletLauncher()
     prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceStoreAndCompileAllJavaFile
   }
-
-
-
 }
 
 
@@ -121,32 +119,33 @@ object Circuit {
     compiledCA(args(0))
     ()
   }
-/*
-  def hasBeenReprogrammed(macroName: String, nameDirProg:String, nameDirCompil :String):Boolean={
-    val fileProg=new File (nameDirProg + macroName.capitalize  + ".scala")  //faut capitaliser parcque ce fut minusculisé!
-    val fileCompiled=new File (nameDirCompil + macroName + ".java")
-    val e=fileProg.exists()
-    val dp=fileProg.lastModified()
-    val dc=fileCompiled.lastModified()
-    val res= fileCompiled.exists() && fileProg.lastModified()>fileCompiled.lastModified()
-    res
-  }*/
 
   /**
    *
    * @param nameCA name of the CA program
    *               returns an instance of CAloops2 that does he convolution, ready for simulation
-   *               is called either for a static compilation, or directly from the simulator
+   *               It is called either for a static compilation, or dynamically from the simulator
    */
   def compiledCA(nameCA:String):CAloops2={
    val myCircuit = new Circuit[V, B]() {
      /** from the AST given, we are able to reconstruct all the layer, plus system instructions.  */
-     val root4naming: Named= Class.forName("progOfCA." + nameCA).getDeclaredConstructor().newInstance().asInstanceOf[Named]
-     override val racineNommage: Named =  root4naming
+     /** class name specified for compilation*/
+     val rootClass=Class.forName("progOfCA." + nameCA)
+     /**  creates an instance object*/
+     /** The root4naming is wrapping the agent, so as to enable its decalration sooner and break a dependency cycle */
+     val wrappe4naming=new Root4naming()
+     override val root4naming: Named =  wrappe4naming//rootObject
+      val rootObject: Named= rootClass.getDeclaredConstructor().newInstance().asInstanceOf[Named]
+     wrappe4naming.setRootMustruct(rootObject)
+
+     /** rootObject which will be the root for naming. Everything that we want to display must be accessibe from the root objec*/
      override val nameCAlowerCase=nameCA.toLowerCase
-     val rootAst:ASTLt[V, B]=root4naming match {  //retrieving the AST depends depending if we have a single layer ca,an agent,  or a system of agent
-          case ast:BoolV=> ast  //we have a single layer CA, the root for naming is also the ast
-           case ag:MovableAg[V] with Vagent =>ag.is//ag is the root agent such as kernel,  its update needs (triggers loading of) all the other layers.
+     /** rootAST contains all the code, its location depends on the program category, wether we have a single layer, a single  agent,  or a system of agent */
+     val rootAst:ASTLt[V, B]=rootObject match {  //
+          case ast:BoolV
+             => ast  //if we have a single layer CA, by convention it is a boolV, and also  the root Ast
+          case ag:MovableAg[V] with Vagent
+             =>ag.is //if we have a single agent,  the update of its chi layer is the rootAST, therefore, it has to need  all the other layers.
       }
       def computeRoot = rootAst
     }

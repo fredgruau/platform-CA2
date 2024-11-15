@@ -26,6 +26,8 @@ class repr[+L](val name: L)
  */
 //class chip[S1 <: S, S2 <: S](val df: ASTLt[T[S1, S2], B])
 class chip[S1 <: S, S2 <: S](val df: ConstLayer[T[S1, S2], B])
+class chips[S1 <: S](val df: ConstLayer[S1, B])
+
 //class chip[S1 <: S, S2 <: S](val df: Layer[(T[S1, S2], B]))
 
 object chip {
@@ -38,6 +40,7 @@ object chip {
   implicit val borderFv = new chip[F, V](null)
   implicit val borderFe = new chip[F, E](null)
   implicit val borderEf = new chip[E, F](new ConstLayer[T[E, F], B](1, "def"))
+  implicit val borderE = new chips[E](new ConstLayer[E, B](1, "def"))
   //todo inclure tout les transfer locus, pas seulement Ve
 }
 /** this regroups layers which can be accessed from any macro $m$. the name of val correspond to

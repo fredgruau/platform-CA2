@@ -11,6 +11,7 @@ import dataStruc.BranchNamed
 import java.util
 import scala.collection.immutable.HashMap
 
+/** a single layer works as a program to be simulated */
 class   Testdist() extends ConstLayer[V, B](1, "global") with DistT with BranchNamed{
   show(this);
 } //root classe compilable

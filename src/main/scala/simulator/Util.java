@@ -32,7 +32,7 @@ public class Util {
     }
 
     /**
-     * @param test    should allways be false, 2D arrays
+     * @param test    2D arrays, should allways be false, otherwise there is a bug
      * @param bugE    accumulates edge or face or transfer bug, 2D arrays
      * @param bugName identifies the bug
      * @param bugs    stores detected bug

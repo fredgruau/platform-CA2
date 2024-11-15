@@ -212,8 +212,8 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
    * @return the Dag where expression used more than once are replaced by read.
    *         generates ASTs such as READ that preserve the implementation of  ASTLscal by using "with"
    */
-  override def setReadNode(usedTwice: AstPred, repr: Map[AST[_], String]): ASTBt[R] = {
-    val rewrite: rewriteASTBt[R] = (d: ASTBt[R]) => d.setReadNode(usedTwice, repr)
+  override def setReadNodeRemoveDelayed(usedTwice: AstPred, repr: Map[AST[_], String]): ASTBt[R] = {
+    val rewrite: rewriteASTBt[R] = (d: ASTBt[R]) => d.setReadNodeRemoveDelayed(usedTwice, repr)
     val newD: ASTBt[R] = if (usedTwice(this)) new Read[R](repr(this))(mym) with ASTBt[R]
     else this match {
       case a: ASTB[R] => a.propagateASTB(rewrite)
@@ -222,11 +222,11 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
         case l: Layer[_] => (new Read[R](Named.lify(repr(this)))(mym) with ASTBt[R])
         case Read(_) => this //throw new RuntimeException("Deja dedagifié!")
         case Delayed(arg) => //arg.asInstanceOf[ASTLt[L, R]].propagate(rewrite)
-          arg().asInstanceOf[ASTBt[R]].setReadNode(usedTwice, repr) //the useless delayed node is supressed
-        case Call1(f, a) => new Call1(f.asInstanceOf[Fundef1[Any, R]], a.asInstanceOf[ASTBg].setReadNode(usedTwice, repr))(mym) with ASTBt[R]
+          arg().asInstanceOf[ASTBt[R]].setReadNodeRemoveDelayed(usedTwice, repr) //the useless delayed node is supressed
+        case Call1(f, a) => new Call1(f.asInstanceOf[Fundef1[Any, R]], a.asInstanceOf[ASTBg].setReadNodeRemoveDelayed(usedTwice, repr))(mym) with ASTBt[R]
         case Call2(f, a, a2) => new Call2(f.asInstanceOf[Fundef2[Any, Any, R]],
-          a.asInstanceOf[ASTBg].setReadNode(usedTwice, repr),
-          a2.asInstanceOf[ASTBg].setReadNode(usedTwice, repr))(mym) with ASTBt[R]
+          a.asInstanceOf[ASTBg].setReadNodeRemoveDelayed(usedTwice, repr),
+          a2.asInstanceOf[ASTBg].setReadNodeRemoveDelayed(usedTwice, repr))(mym) with ASTBt[R]
       }
     }
     newD.setName(if (repr.contains(this)) repr(this) else this.name);

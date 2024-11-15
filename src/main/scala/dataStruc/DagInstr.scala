@@ -105,9 +105,9 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
     /** associate a unique id for each affectation that will be generated */
     val repr: Map[AST[_], String] = represent(toBeAffected)
 
-    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.setReadNode(toBeReplaced, repr)
+    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.setReadNodeRemoveDelayed(toBeReplaced, repr)
     /** avoid generating x=x when  the affected expression is itself rewritten recursively */
-    val deDagExclude: rewriteAST2 = (e: AST[_]) => e.setReadNode((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
+    val deDagExclude: rewriteAST2 = (e: AST[_]) => e.setReadNodeRemoveDelayed((e2: AST[_]) => (toBeReplaced(e2) && (e2 != e)), repr)
     /** rewrite recursviely the affect expression so as to insert read in them where necessary.  */
     val affectExpList: List[AST[_]] = toBeAffected.map(deDagExclude)
 
@@ -134,10 +134,10 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
     //  toBeRepl.map(_.forwardName()) //that's because we will remove tm1
     val repr = represent(tm1s) //2(toBeRepl)
     val tm1Set = tm1s.toSet
-    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.setReadNode(tm1s.toSet.asInstanceOf[Set[AST[_]]], repr) //replaces tm1s by read
+    val deDagRewrite: rewriteAST2 = (e: AST[_]) => e.setReadNodeRemoveDelayed(tm1s.toSet.asInstanceOf[Set[AST[_]]], repr) //replaces tm1s by read
     /** avoid generate e=read(e) when  the affected expression is itself rewritten recursively */
 
-    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.setReadNode((e2: AST[_]) =>
+    val deDagExclude: AST[_] => AST[_] = (e: AST[_]) => e.setReadNodeRemoveDelayed((e2: AST[_]) =>
       (tm1Set(e2.asInstanceOf[ASTBt[_]]) && (e2 != e)), repr)
     // for affect(var<-tm1(exp)) we have  e2=e, and both are tm1s, in  this case we should replace
     /** rewrite recursively the affect expression. we use this slightly modified dedagExclude instead of dedagRewrite

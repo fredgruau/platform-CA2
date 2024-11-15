@@ -1,7 +1,7 @@
 package dataStruc
 
 import compiler.AST.Read
-import compiler.ASTB.{AffBool, False}
+import compiler.ASTB.{AffBool, False, True}
 import compiler.{AST, ASTB, Affect, DataProg, InfoType}
 import compiler.Circuit.TabSymb
 import dataStruc.Util.{radicalOfVar, radicalOfVar2}
@@ -53,11 +53,19 @@ trait DagNode[+T <: DagNode[T]] {
       this.asInstanceOf[AST[_]] match {
         case Read(name) => val rad = radicalOfVar2(name)
           val s = t.tSymbVarSafe(rad)
-          if(name.startsWith("fliesDopp"))
+          if(name.startsWith("slopLt"))
             println("ici")
-          if (s.k.isParamD || s.k.isLayerField || s.k.isParamR) name + "[i]" //no delays for the moment being, when we read
+          if (s.k.isParamD || s.k.isLayerField || s.k.isParamR) {
+            if(s.k.isRadius1)
+              name + "[i-1]"
+            else
+              name + "[i]"
+          } //no delays for the moment being, when we read
           else name //operand is a loop register.
-        case False() => "0 /*False*/" // I have  put O instead of "/*False*/", it seems to work
+        case False() =>    "0 /*False*/"
+        case True() =>    "-1 /*True*/"
+
+        // I have  put O instead of "/*False*/", it seems to work
           //"/*False*/" //by simplification a whole expression may reduce to false after simplification.
       }
     }

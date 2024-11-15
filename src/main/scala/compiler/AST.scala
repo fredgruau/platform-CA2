@@ -131,8 +131,8 @@ abstract class AST[+T]()(implicit m: repr[T]) extends DagNode[AST[_]] with Named
    *         where delayed are removed, and expression usedTwice are replaced by read.
    *         transformation is applied on the whole tree, so subtree verifying usedTwice will form an independant family  */
 
-  def setReadNode(usedTwice: AstPred, idRepr: Map[AST[_], String]): AST[T] = {
-    val rewrite: AST[T] => AST[T] = (d: AST[T]) => d.setReadNode(usedTwice, idRepr)
+  def setReadNodeRemoveDelayed(usedTwice: AstPred, idRepr: Map[AST[_], String]): AST[T] = {
+    val rewrite: AST[T] => AST[T] = (d: AST[T]) => d.setReadNodeRemoveDelayed(usedTwice, idRepr)
     if (usedTwice(this)) new Read[T](idRepr(this))(mym.asInstanceOf[repr[T]])
     else this.propagate(rewrite)
   }
@@ -268,9 +268,6 @@ object AST {
     lazy val delayed = _arg;
     new Delayed[T](() => delayed)
   }
-
-  //on se sert de DELAYED que dans ASTL, donc on va directement l'y mettre.
-  //def delayed3[L<:Locus,R<:Ring](_arg: => AST[Tuple2[L,R]])(implicit m: repr[Tuple2[L,R]])   = { lazy val delayed4 = _arg with AST2[L,R];new Delayed(() => delayed4) }
 
   /** Strate are field defined at t and t+1 */
   trait Strate[T] {

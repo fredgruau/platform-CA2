@@ -74,15 +74,16 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
    * @param usedTwice dags which are used twice, or which need to be affected for some other reason.
    * @param idRepr    :id of representant of the equivalence class with respect to equal on case class hierarchy
    * @return transformed tree  with preserved L,R type, for type checking consistency
-   *         where delayed are removed, and expression usedTwice are replaced by read.
+   *         where delayed are removed,
+   *         and expression usedTwice are replaced by read.
    *         generates ASTs such as READ, but implementing ASTLt by creating them using "with ASTLt"
    *         transformation is applied on the whole tree, so subtree verifying usedTwice will
    *         form an independant family */
-  override def setReadNode(usedTwice: AstPred, idRepr: Map[AST[_], String]): ASTLt[L, R] = {
+  override def setReadNodeRemoveDelayed(usedTwice: AstPred, idRepr: Map[AST[_], String]): ASTLt[L, R] = {
     val newD: ASTLt[L, R] = if (usedTwice(this)) new Read[(L, R)](idRepr(this))(mym) with ASTLt[L, R]
     else this match {
       case a: ASTL[L, R] =>
-        a.propagateASTL((d: ASTLt[L, R]) => d.setReadNode(usedTwice, idRepr))
+        a.propagateASTL((d: ASTLt[L, R]) => d.setReadNodeRemoveDelayed(usedTwice, idRepr))
       case _ => this.asInstanceOf[AST[_]] match {
         //  case Param(_) => new Read[(L, R)]("p" + idRepr(this))(mym) with ASTLt[L, R]
         case u@Param(_) => new Read[(L, R)]("p" + u.nameP)(mym) with ASTLt[L, R]
@@ -90,8 +91,8 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
         case l: Layer[_] => new Read[(L, R)](Named.lify(idRepr.getOrElse(this, name)))(mym) with ASTLt[L, R]
         case Read(_) => this //throw new RuntimeException("Deja dedagifié!")
         case Delayed(arg) => //arg.asInstanceOf[ASTLt[L, R]].propagate(rewrite)
-          arg().asInstanceOf[ASTLt[L, R]].setReadNode(usedTwice, idRepr /* + (arg()->name)*/) //the useless delayed node is supressed
-        case _ => this.propagate((d: AST[(L, R)]) => d.setReadNode(usedTwice, idRepr))
+          arg().asInstanceOf[ASTLt[L, R]].setReadNodeRemoveDelayed(usedTwice, idRepr /* + (arg()->name)*/) //the useless delayed node is supressed
+        case _ => this.propagate((d: AST[(L, R)]) => d.setReadNodeRemoveDelayed(usedTwice, idRepr))
       }
     }
     if (idRepr.contains(this))

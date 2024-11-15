@@ -25,24 +25,30 @@ trait BranchNamed
       }
       return caps
     }
-    private def capitalizeFirst(s: String): String = ("" + s.charAt(0)).toUpperCase + s.substring(1).toLowerCase
+    private def capitalizeFirst(s: String): String = if(s=="") "" else ("" + s.charAt(0)).toUpperCase + s.substring(1).toLowerCase
 
-       def setName(spatialFieldToBeNamed: Named, fieldName: String)=
+    def removeDot(input: String): String = {
+      input.replace(".", "")
+    }
+
+    def setName(spatialFieldToBeNamed: Named, fieldName: String)=
       Named.OkToUseForName(fieldName) &&
         spatialFieldToBeNamed.name == null ||
+        spatialFieldToBeNamed.name == "" ||
         spatialFieldToBeNamed.name != null &&
           nbCap(spatialFieldToBeNamed.name) > nbCap(fieldName) &&
           !((spatialFieldToBeNamed.isInstanceOf[AST.Fundef[_]]))
     /**
      * for hashtable, name = connteneur name + hashtablename + "yyy*+ the key name.
      *
-     * @param conteneur     all the layers starting from the top most
+     * @param conteneur     all the layers starting from the top most, or agents with syysinstr
      * @param conteneurName the current accumulated name
      *
      */
     def setAllName(conteneur: Named, newName: String): Unit = {
     conteneur match{
-      case m:HashMap[_, _]=>for ((key, value) <- m) {
+      case m:HashMap[_, _]=>
+        for ((key, value) <- m) {
         val suffix: String = key match {
           case n: Named => n.name
           case i: Int => "" + i
@@ -52,20 +58,30 @@ trait BranchNamed
           case v: Named => setAllName(v, newName + "yyy" + suffix)
         }
       }
+      /*case t:Array[_]=>  //marche pas car array ne peut pas étendre Named.
+        for(i <- 0 until t.length)
+          t(i) match {
+            case v: Named => setAllName(v, newName + "ttt" +i)
+          }*/
       case _ =>
         val setable = setName(conteneur, newName)
         if (setable) {
-          conteneur.setName(newName)
+          if(conteneur.name!="")
+            conteneur.setName(removeDot( newName)) //le name empty string est un cas spécial
           // setFieldValue(conteneur, "name", newName)
           //if (setable || Set("root", "rootagent", "rootis").contains(newName)) {
           //  val correctNewName=  if(Set("root", "rootagent", "rootis").contains(newName)) conteneur.name else newName
           if (conteneur.isInstanceOf[BranchNamed]) { //we traverse the fields that can be reached from the root of naming
             val fields: Seq[(String, Any)] = getAllFieldValues(conteneur)
             val fieldsWithName = fields.filter(_._2.isInstanceOf[Named])
+            val fieldHasMap=fields.filter(_._2.isInstanceOf[HashMap[_,_]])
+
             fieldsWithName.foreach { case (name, value) =>
               //println(s"$name: $value")
               value match {
-                case t: Named => setAllName(t, newName + capitalizeFirst(name))
+                case t: Named =>
+                  val nameOublieN=if(t.name=="") "" else name
+                  setAllName(t, newName + removeDot( capitalizeFirst(nameOublieN)))
                 case _ =>
               }
 
@@ -134,11 +150,10 @@ trait BranchNamed
               }
           }
         }
-
       currentClassFields ++ superclassFields
     }
 
-
+/** programme de test */
       def main(args: Array[String]): Unit = {
 
       class MyClassSubmember extends Named {

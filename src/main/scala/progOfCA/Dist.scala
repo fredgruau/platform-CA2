@@ -8,7 +8,6 @@ import compiler.ASTLfun._
 import compiler.ASTLt._
 import compiler.Circuit.hexagon
 import compiler._
-import progOfmacros.Compute._
 import compiler.SpatialType._
 import dataStruc.BranchNamed
 import progOfmacros.Grad

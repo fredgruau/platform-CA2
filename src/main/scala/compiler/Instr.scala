@@ -230,6 +230,8 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
       newTSymb += s -> new InfoNbit(cur.tSymbVar(s).t, cur.tSymbVar(s).k, expBitSize(newExp));
       Affect(s, newExp).asInstanceOf[Instr]
     case CallProc(funName, names, exps) =>
+      if(funName.startsWith("grad.slopDelta"))
+        println("ici")
       val newexps = exps.map(_.asInstanceOf[ASTLt[_, _]].bitIfyAndExtend(cur, expBitSize, newTSymb))
       val nbitarg = newexps.map(a => expBitSize(a)) //.toList.flatten
       val namePlusInputsize = funName + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _) //we make precise in the function name, the number of bits of arguments

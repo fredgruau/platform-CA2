@@ -23,7 +23,7 @@ object ASTBfun {
   def p[R <: Ring](name: String)(implicit n: repr[R]) = new Param[R](name) with ASTBt[R]
 
   //---------------------------------------------Logical operation--------------------------//
-  /*
+
     /** Used for debug */
     val identityB: Fundef1R[B] = {
       val xb = p[B]("xIdentityB");
@@ -38,7 +38,8 @@ object ASTBfun {
     val identityUI: Fundef1R[UI] = {
       val xi = p[UI]("xidentityUI");
       Fundef1("identityUI", Mapp1(identityB, List(xi)), xi)
-    }*/
+    }
+
   val negB: Fundef1R[B] = {
     val xb = p[B]("xNegB");
     Fundef1("negB", Neg(xb), xb)
@@ -149,7 +150,7 @@ object ASTBfun {
   val uI2SI: Fundef1[UI, SI] = { //to be coherent with the other fundef declared as val, we call it uitosi insted uitosidef
     val xui = p[UI]("xuiToSi")
     Fundef1("uI2SI", Concat2( xui,False()), xui)
-  }
+  }  /** the rand layers used to build an integer are stored in a hashMap, so as to be found by the naming algo */
   val b2SI: Fundef1[B,SI] = {
     val xb = p[B]("xBtoSi")
     Fundef1("b2SI", Concat2(xb,False()), xb)

@@ -5,7 +5,7 @@ import ASTB._
 import AST.{AstPred, Call, Fundef, Layer, Read, isCons, isNotRead}
 import Circuit.{AstMap, Machine, TabSymb, iTabSymb, iTabSymb2, takeNbOfBitIntoAccount}
 import VarKind.{LayerField, MacroField, ParamD, ParamR, ParamRR, StoredField}
-import dataStruc.{Align2, Dag, DagInstr, Named, Schedule, Util, WiredInOut, toSet}
+import dataStruc.{Align2, Dag, DagInstr, Naame, Named, Schedule, Util, WiredInOut, toSet}
 import dataStruc.WiredInOut.{defby, setInputNeighbor}
 import Instr.{a, affectizeReturn}
 import ASTB.Tminus1
@@ -14,7 +14,6 @@ import ASTL.ASTLg
 import Named.{delify, noDollarNorHashtag}
 import compiler.ASTLt.ConstLayer
 import dataStruc.Util.{existInJava, hasBeenReprogrammed, prefixDash, prefixDot, suffixDot}
-import dataStruct.Name
 import progOfCA.carrySysInstr
 
 import java.io.File
@@ -91,7 +90,7 @@ object DataProg {
     catch {
       case e@(_: dag.CycleException) =>
         //Name.setAllName(f, "") //permet d'afficher les noms de variables du cycle et donc de
-        Name.setAllName(racineNommage, "tata") //permet d'afficher les noms de variables du cycle et donc de
+        Naame.setAllName(racineNommage, "tata") //permet d'afficher les noms de variables du cycle et donc de
         //  Plus facilement identifier ou se trouve le cycle dans le programme
         for (a <- e.cycle)
           print(a + (if (a.name != null) (a.name + "-") else "-"))
@@ -1331,6 +1330,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   def scheduleMuCode(muI: Map[String, List[Instr]], dagis: DagInstr, defI: Map[String, Instr], tZone: Map[String, Zone], myRoot: Map[String, Instr]) = {
     /** mu-Instruction left to execute */
     var muI2: Map[String, List[Instr]] = muI //HashMap.empty
+    def  allInstructionCleared=muI2.values.filter(_.nonEmpty).isEmpty
     // val tabInstr = dagis.visitedL.toArray
     /** variables using a given instruction */
     var isUsing: HashMap[String, HashSet[String]] = HashMap.empty
@@ -1522,9 +1522,11 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
      **/
     def fire(i: Instr): Instr = {
       consumeToken(i.names.head)
+      if(i.names(0).startsWith("auxO01"))
+        println("ici")
       val locus = tSymbVar(i.names.head).locus
       val input = usedVar2(i.names.head)
-      val singleInputParamD = input.size == 1 && tSymbVar(input.head).k.isParam //we here consider reduction of a paramD
+      val singleInputParamD = input.size == 1 && tSymbVar(input.head).k.isParamD //we here consider reduction of a paramD
       if (inputLessInstr.contains(i.names.head) || singleInputParamD || {
         val inputLocus = tSymbVar(usedVar2(i.names.head).head).locus
         weSend(locus, tSymbVar(input.head).locus, i.names.head)
@@ -1538,12 +1540,15 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
        print("rer")*/
     while (readyInstr.nonEmpty) { //main loop
       val next: Instr = defI(readyInstr.dequeue())
+      if(next.names.head.startsWith("slopeLt"))
+        println("ici")
       result = fire(next) :: result
       var neighbors = usedVar2(next.names.head) + next.names.head
       if (isUsing.contains(next.names.head))
         neighbors = neighbors ++ isUsing(next.names.head)
       neighbors.map(checkReadiness(_))
     }
+    assert(allInstructionCleared) //si ca marche pas probleme dans le scheduling
     result.reverse
   }
 
@@ -1603,10 +1608,11 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     val newTsymbar = p.tSymbVar
     if (isLeafCaLoop) {
       val idUsedOnce: Predef.Set[String] = p.dagis.usedOnce().map(_.names(0)).toSet
-      val idCandidate4Simplif = checkIfRedefined(idUsedOnce)
+      val idUsedOnceNotResult: Predef.Set[String] =idUsedOnce.filter(!tSymbVarSafe(_).k.isParamR)
+      val idCandidate4Simplif = checkIfRedefined(idUsedOnceNotResult)
       var defs: Map[String, Instr] = defby(dagis.visitedL)
-      /* if(idCandidate4Simplif.contains("frontierEtm1#1"))
-         println("")*/
+
+
       val idCand4Simplnotsdwich = idCandidate4Simplif.filter((s: String) => checkNotSandwich(defs(s).asInstanceOf[Affect[_]]))
 
       val newVisitedL = dagis.visitedL.reverse.map((f: Instr) =>

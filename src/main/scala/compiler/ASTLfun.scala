@@ -138,6 +138,8 @@ object ASTLfun {
   def cond[L <: Locus, R <: Ring](b: ASTLt[L, B], arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] =
     andLB2R(b, arg1) | andLB2R(~b, arg2)
 
+  def imply[L <: Locus](a: ASTLt[L, B], b: ASTLt[L, B])(implicit m: repr[L]): ASTLt[L, B] =  ~a | b
+
 
 
   /** carryV is not written as a macro to avoid generating too many macro */

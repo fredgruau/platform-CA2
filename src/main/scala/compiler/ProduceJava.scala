@@ -113,7 +113,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
         /** add type to parameters, either int[] or int[][],
          * one dimension is enough for spatial type boolV, two dimensions are needed for other locus */
         def javaIntArray(s: String) = (if (isBoolV(s)) ("int [] ") else ("int [][] ")) + s
-
+        if(nameMacro.startsWith("compute.implique"))
+          println("ici")
         val parameters = (shortSigIn ::: (shortSigOut ::: layerNames)).map(javaIntArray(_))
         parameters.mkString(",")
       },

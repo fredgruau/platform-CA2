@@ -8,6 +8,7 @@ import compiler.SpatialType.{BoolE, BoolEv, BoolV, BoolVe}
 import dataStruc.Named
 import progOfmacros.Wrapper.borderS
 import progOfmacros.RedT.clock2
+import sdn.Rand
 /** adds the possibility of using a randomizer */
 trait rando {
    val _rand = new Rand()  // Champ privé

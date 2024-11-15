@@ -21,7 +21,7 @@ object Topo {
     val nbChanges: UintV = sum3V(n0 | n1, n2 | n3, n4 | n5)
     Fundef1("topo.nbcc", nbChanges, ve)
   }
-
+ 
   /** wrapper to  Call nbcc */
   def nbcc(b: BoolVe): UintV = new Call1[(T[V, E], B), (V, UI)](nbccDef, b) with UintV
 

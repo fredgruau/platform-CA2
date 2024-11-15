@@ -27,6 +27,19 @@ object Comm {
   /** wrapper .  */
   def apexV(ef: BoolEf): BoolVf = new Call1[(T[E, F], B), (T[V, F], B)](apexVDef, ef) with BoolVf
 
+  /** From a boolfV, computes the appex vertices boolfE */
+  val apexEDef: Fundef1[(T[V, F], B), (T[E, F], B)] = {
+    val ef = pL[T[V, F], B]("distantEdgeef")
+    val apexEf: BoolEf = transfer(sym(transfer(ef)))
+    apexEf.setName("apexEf");
+    Fundef1("comm.apexEtoV", apexEf, ef)
+  }
+
+  /** wrapper .  */
+  def apexE(ef: BoolVf): BoolEf = new Call1[(T[V, F], B), (T[E, F], B)](apexEDef, ef) with BoolEf
+
+
+
   def apexVnoMacro(ef: BoolEf): BoolVf = transfer(sym(transfer(ef))) //pour tester le calcul du rayon avec une non augmentation
 
 

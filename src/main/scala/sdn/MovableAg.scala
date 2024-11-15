@@ -5,7 +5,7 @@ import compiler.ASTB.True
 import compiler.ASTBfun.{addRedop, orRedop, redop}
 import compiler.ASTLfun.{cond, e, ltSI, neighbors, orR, reduce, uI2SIL, v}
 import compiler.ASTL.{delayedL, send, transfer}
-import compiler.SpatialType.{BoolE, BoolEv, BoolV, BoolVe, IntE, IntEv, IntV, IntVe}
+import compiler.SpatialType.{BoolE, BoolEv, BoolV, BoolVe, IntE, IntEv, IntV, IntVe, UintV}
 import compiler.{AST, ASTLfun, ASTLt, B, E, Locus, Ring, SI, T, UI, V, repr}
 import compiler.repr.nomV
 import dataStruc.BranchNamed
@@ -56,31 +56,18 @@ trait Vagent extends UtilVagent {
 }
 
 
-trait RandInt2 {
-   val _rand1 = new Rand()  // Champ privé
-   val _rand2 = new Rand()  // Champ privé
- val d1: ASTLt[V, UI] =ASTLfun.concat2UI (_rand1,_rand2  )      // Getter public pour le champ
-  //val d1 = pL[V, UI]("dis")
-  //val d: ASTLt[V, SI] =ASTLfun.uI2SIL(d1)
-  val d=uI2SIL(d1)
-  val dopp: IntV= -d  //rajoute un bit zero automatique pour passer de UI a SI.
-  val se: IntVe = send(List(d, d, d, dopp, dopp, dopp)) //we  apply an opp on distances comming from the center.
-  val grad3: IntE = reduce(addRedop[SI].asInstanceOf[redop[SI]], transfer(se)) //the trick here is to do the expensive operation (add) only on the three edges locus, instead of the 6 Ve transfer
-  val grad6: IntEv = send(List(-grad3, grad3))
-  val slopEv: BoolEv = ltSI(grad6) //when sending back the result to EV, we have to invert again towards the center
-  // val slop: BoolVe = cond(chip.borderVe.df, transfer(slopEv), false) //faut definir ckispasse au bord. we put zero if unedfined
-  val sloplt=transfer(slopEv)
-  val level: BoolE = ~reduce(orRedop[B], slopEv) //its equal if it is neither lt nor gt
-
-
-  //val (sloplt: BoolVe,  level) = Grad.slope(randInt)
+/** support location is computed from parent's support (input neighbors of the DAG */
+abstract class BoundAg[L <: Locus](implicit m: repr[L]) extends  Agent[L]{
+  val inheritedFlip:BoolV
+  /** initial flip is computed from the parent */
+  override val initialFlip: BoolV = inheritedFlip
 }
-
-
 /**  code  common to Movable agents*/
 abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] with EmptyBag[MuStruct[_<: Locus,_<:Ring]]  {
-
-
+  override val prioRand: UintV = randUintV(5)
+ override val prio =prioRand //pour le moment on n'a pas encore plusieurs move possible, dans pas longtemps on va programmer prio et initalflip
+//method that depends on the spatial type of the support:
+  /** compute next value of is, from flip */
   def flip2next: AST[(L, B)]
   /** convert a centered move into a flip
    * invariant to check invade and empty are not simultaneously true**/
@@ -100,7 +87,8 @@ abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] wit
   def move(force: Force) = addMoves(force.action(this), force.prio)
   /** convert centered move into one single BoolV flip */
 
-  override def setFlip:BoolV={
+
+  override lazy val initialFlip:BoolV={
     //we consider only a single move
     move2flip(moves(10).asInstanceOf[MoveC1])
   }

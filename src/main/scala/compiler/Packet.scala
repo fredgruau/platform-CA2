@@ -168,7 +168,7 @@ object Packet {
     /* display  direction and number of iterations of loop */
     val info = dir + " " + loopSize + " bits "
     /* display the instruction in topological order, starting with the pipelined if any, and avoiding redundant display*/
-    val pipelined = instrs.filter(!affects.toSet.contains(_)) //all the instructions not leading to affectation, will be pipelined.
+    val pipelined: Seq[Instr] = instrs.filter(!affects.toSet.contains(_)) //all the instructions not leading to affectation, will be pipelined.
     //variables computed and then consumed during the loops, we do not need to instantiate,    except if they are live after the pacquet.
     val affected = (if (pipelined.nonEmpty) "pipelined" + pipelined.reverse.mkString("\n                      ") + "\n              " else "") +
       "affected " + affects.mkString("\n                       ") //print pipelined in the right order. we put many space characters to obtain a correct alinement
@@ -305,7 +305,11 @@ object Packet {
         i = i + step
       }
       while (i != fin)
+      val toto=result.length
+      println(toto)
       result = result.filter(e => e != False() && e != True()) //sometimes true or false do not get simplified and appear as leftover debris that we should remove
+      if(result.length<toto)
+        println("ici")
       result // contains boolean register affectation to interpret one affectation
     }
 
