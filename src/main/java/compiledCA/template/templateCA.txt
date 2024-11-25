@@ -16,6 +16,7 @@ public int CAmemWidth() {return {{MEMWIDTH}};}
 
 @Override public ArrayList<String> theLoops(PrShift p,int[][] m) {ArrayList<String> bugs=new ArrayList<>();
 {{ANCHORNAMED}}{{ANCHORNOTNAMED}}
+{{PREPAREBITS}}
 {{LISTCALL}} return bugs;}
 
 

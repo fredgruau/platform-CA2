@@ -57,10 +57,6 @@ public class Name {
               f.setAccessible(true);
               String fieldName = f.getName(); //fieldname is the name given in the scala/java source code
 	       System.out.println("conteneur: "+ conteneur.name()+ ", class: "+c.getName()+", conteneurName:"+conteneurName+",field: "+fieldName);
-           if(conteneurName.equals( "fliesNisv"))
-               System.out.println("ici");
-           if(c.getName()=="sdn.Vagent")
-               System.out.println("ici");
            try {
                   o2 = f.get(conteneur);
               } catch (IllegalArgumentException e) {

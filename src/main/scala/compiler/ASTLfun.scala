@@ -111,7 +111,7 @@ object ASTLfun {
   def lt2[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = {
     if (!n.name.isInstanceOf[UI]) //we never have to compare signed int, what we do is  take the sign.
       assert(false)
-      binop(ASTBfun.ltUI2.asInstanceOf[Fundef2[R, R, B]], arg1, arg2)
+    binop(ASTBfun.ltUI2.asInstanceOf[Fundef2[R, R, B]], arg1, arg2)
     }
 
 
@@ -172,6 +172,16 @@ object ASTLfun {
     val newArg: ASTLt[T[S1, S2], R] = if (d.df == null) arg else
       cond[T[S1, S2], R](d.df, arg, neutralElt)
     redop[S1, S2, R](op, newArg)
+  }
+
+  /** when reducing towards an edge, there is only two values to combine */
+  def ltUiEdge [ S2 <: S](arg: ASTLt[T[E, S2], UI])(implicit m2: repr[S2], d:chip[E,S2]): ASTLt[E, B] = {
+    binopEdge(ltUI2,arg)
+    //reduce(ltUiRedop, arg).asInstanceOf[BoolE]
+  }
+  def eqUiEdge [ S2 <: S](arg: ASTLt[T[E, S2], UI])(implicit m2: repr[S2], d:chip[E,S2]): ASTLt[E, B] = {
+    binopEdge(eqUI2,arg)
+    //reduce(ltUiRedop, arg).asInstanceOf[BoolE]
   }
 
 

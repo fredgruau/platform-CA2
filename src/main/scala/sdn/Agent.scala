@@ -3,7 +3,7 @@ package sdn
 import compiler.ASTBfun.{addRedop, orRedop, redop}
 import compiler.ASTL.{delayedL, send, transfer}
 import compiler.ASTLfun.{b2SIL, imply, ltSI, reduce, uI2SIL, v}
-import compiler.SpatialType.{BoolE, BoolEv, BoolV, BoolVe, IntE, IntEv, IntV, IntVe, UintV}
+import compiler.SpatialType.{BoolE, BoolEv, BoolV, BoolVe, IntE, IntEv, IntV, IntVe, UintV, UintVx}
 import compiler.repr.nomE
 import compiler.{ASTLfun, ASTLt, B, Locus, SI, UI, V}
 import dataStruc.{BranchNamed, Named}
@@ -11,7 +11,6 @@ import progOfCA._
 import progOfmacros.{Compute, Grad}
 import progOfmacros.Compute.implique
 import progOfmacros.Wrapper.{exist, inside, insideS}
-
 
 import scala.collection.convert.ImplicitConversions.`map AsJavaMap`
 import scala.collection.mutable.HashMap
@@ -27,14 +26,14 @@ case class One(noFill: Boolean) extends Impact //on veut pouvoir calculer le com
 /** agents are boolean muStruct */
 abstract class Agent[L <: Locus] extends MuStruct[L, B]
  {
-  /** for the moment, priority is pure random */
-  val prioRand:UintV
- val prio:UintV
+   /** break symetry in case of tournament with equal priority */
+  val prioRand:UintVx
+   /** used for mutex tournament */
+ val prio:UintVx
 
-  /** used for mutex tournament */
-//  val prioLt: BoolEv= Grad.lt(uI2SIL(prio))
-   val (  prioLt, level)=Grad.slopeLt(uI2SIL(delayedL( prioRand)))
-  /**
+
+
+   /**
    *
    * @param ags one or two agents on which to apply constraint
    *            constraints are inner classes of agents, so that they can access is.
@@ -75,7 +74,7 @@ class KeepFlipIf(i: Impact,val loc:BoolV) extends Constr(Array(this), i)
       case One(v) =>  insideS(currentFlip & (if (v) isV else (NisV))) // result also depend on impact
     })
     /** flip is ok if prio is minimum with respect to the other side */
-      def tmp=imply(v(mutrig),ags.head.prioLt)
+      def tmp=imply(v(mutrig),ags.head.prio.lt)
     def where=inside(transfer(tmp))
   }
   class MutCancelFlipIf(i: Impact,val mutex:BoolE) extends Constr(Array(this), i) {
@@ -85,7 +84,7 @@ class KeepFlipIf(i: Impact,val loc:BoolV) extends Constr(Array(this), i)
       case One(v) =>  insideS(currentFlip & (if (v) isV else (NisV))) // result also depend on impact
     })
     /** flip is ok if prio is minimum with respect to the other side */
-    def tmp=imply(v(mutrig),prioLt)
+    def tmp=imply(v(mutrig),prio.lt)
     def where=inside(transfer(~tmp))
   }
   /**
@@ -100,7 +99,7 @@ class KeepFlipIf(i: Impact,val loc:BoolV) extends Constr(Array(this), i)
       case One(v) =>  insideS(currentFlip & (if (v) isV else (NisV))) // result also depend on impact
     })
     /** flip is ok if prio is minimum with respect to the other side */
-    def tmp=imply(v(mutrig),prioLt)
+    def tmp=imply(v(mutrig),prio.lt)
     def where=inside(transfer(tmp))
   }
   /** any agent, bounded or movable, can be constrained */
@@ -149,9 +148,10 @@ class KeepFlipIf(i: Impact,val loc:BoolV) extends Constr(Array(this), i)
   }
 
 
-  /** used to compute flip cancelation depending on impact */
+  /** used for computing flip cancelation depending on impact */
   val isV: BoolV
-  val NisV :BoolV
+   /** can be defined on agent, but needs a delayed for isV is not known yet */
+  val NisV :BoolV= ~delayedL(isV)
   /** applying constraints identifies PEs where flip should be canceled, cancelFlip will implement this cancelation */
 //  def cancelFlip(where: BoolV)
 }

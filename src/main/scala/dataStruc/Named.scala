@@ -6,6 +6,15 @@ import scala.collection.immutable.HashMap
 import scala.collection.{immutable, mutable}
 
 object Named {
+  var nameCompteuraux = 0
+
+  def getCompteurAux: Int = {
+    nameCompteuraux += 1;
+    nameCompteuraux
+  }
+
+  def newAuxTmp(): String = "auxTmp" + getCompteurAux
+
   def lify(s: String): String = "ll" + s
   def delify(s: String): String = s.drop(2)
 
@@ -37,10 +46,6 @@ object Named {
     compteurs(prefix)
   }
 
-  def getCompteurAux: Int = {
-    compteurAux += 1;
-    compteurAux
-  }
 
   def getCompteur2: Int = {
     nameCompteur2 += 1;

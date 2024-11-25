@@ -11,7 +11,7 @@ import progOfmacros.Compute
 import progOfmacros.Compute.implique
 import progOfmacros.Wrapper.{exist, existS, inside, insideS}
 import progOfmacros.RedT.clock2
-
+/** field needed for a quasipoint */
 trait QPointify {
   self: Vagent => //quasiPoints are blobs.
   /** true for the vertices of a qpt consiting exactly of one vertices */
@@ -30,12 +30,13 @@ trait QPointify {
   val tripletonV: BoolV = existS[F, V](tripleton)
 }
 
+/** quasi point agent, defines all the constraint that should be met by a quasipoint
+ * it should extends Vagent automatically, (since its locus is determined) */
 class Qpoint extends MovableAg[V] with Vagent with QPointify with rando {
   /** true if selected by a random angle among 12 */
   val effRandDir: ASTLt[T[V, E], B] = rand.randDir & isVe
   val touchedByRandDir: BoolV = exist(neighborsSym(effRandDir))
-
-  /** true if qpoint wants to flip towards all directions, lazy because flip is not available yet */
+  /** true if qpoint wants to flip towards all directions, it is a method because flip is not available yet */
   def ringOfFlip: BoolV = inside(neighborsSym(e(currentFlip))) & singleton
   def breakRingOfFlip:BoolV=implique(exist(neighborsSym(e(ringOfFlip))), touchedByRandDir)
   /** cancel ring growth of singleton, exept if it happens to be selected by random angles thereafter, we will be able to shring flip not forming a ring */
@@ -45,8 +46,6 @@ class Qpoint extends MovableAg[V] with Vagent with QPointify with rando {
   val leq4: Constr = new KeepFlipIf(One(false),implique(next2NonSingleton, isApexV))
   /** singleton cannot flip */
   val diseaperSingle = new CancelFlipIf(One(true),singleton)
-
-
   /** doubleton cannot flip two*/
   val diseaperDouble = new MutKeepFlipIf(One(true),doubleton) with BranchNamed {}
 

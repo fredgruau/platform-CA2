@@ -17,7 +17,8 @@ import scala.collection.immutable.HashSet
 import scala.collection.{mutable, _}
 import scala.reflect.ClassTag
 import scala.language.implicitConversions
-import dataStruc.Util.{composeAll2, rot, rotPerm, rotR}
+import dataStruc.Util.{composeAll2, dupliqueOrTriplique, rot, rotPerm, rotR}
+import sdn.Compar
 /**
  * todo we must distinguish between the wrapper of the constructors, and the higher order function which can be defined in another object
  * At some point, we decided to store the type information for each distinct constructor, in order to have direct access to this info
@@ -45,7 +46,8 @@ object ASTL {
   def broadcast[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[S1, R])(implicit m: repr[T[S1, S2]], n: repr[R]): ASTLt[T[S1, S2], R] =
     new Broadcast[S1, S2, R](arg, m, n) //step 1 is broadcast
 
-  /** a bit more subtle than broadcast, sends a distinct component to each of T[S1,S2] */
+  /** a bit more subtle than broadcast, sends a distinct component to each of T[S1,S2]
+   * size of the list is equal to fanout of locus for vertex it is 6, For edge it is 2.  */
   private[ASTL] final case class Send[S1 <: S, S2 <: S, R <: Ring](args: List[ASTLt[S1, R]])
                                                                   (implicit m: repr[T[S1, S2]], n: repr[R])
     extends ASTL[T[S1, S2], R]() with Neton[AST[_]]
@@ -95,9 +97,20 @@ object ASTL {
     override def redExpr: List[AST[_]] = List(arg)
   }
 
-
   def redop[S1 <: S, S2 <: S, R <: Ring](op: redop[R], arg: ASTLt[T[S1, S2], R])(implicit m: repr[S1], n: repr[R]): ASTLt[S1, R]
   = Redop[S1, S2, R](op, arg, m, n)
+
+/** We can apply a binop on two Ev or two Ef */
+  private[ASTL] final case class BinopEdge[ S2 <: S, R <: Ring, P<: Ring](op: Fundef2RP[R,P], arg: ASTLt[T[E, S2], R], m: repr[E], n: repr[R], n2: repr[P])
+    extends ASTL[E, P]()(repr.nomLR(m, n2)) with Singleton[AST[_]] {
+  override def binopEdgeExpr: List[AST[_]] = List(arg)
+    /** used to compute the expression being reduced.  */
+   // override def redExpr: List[AST[_]] = List(arg)
+  }
+
+  def binopEdge[S2 <: S, R <: Ring, P <: Ring](op:  Fundef2RP[R,P], arg: ASTLt[T[E,S2], R])(implicit m: repr[E], n: repr[R], n2: repr[P]): ASTLt[E, P]
+  = BinopEdge[ S2, R, P](op, arg, m, n, n2)
+
 
 
 
@@ -167,6 +180,8 @@ object SpatialType {
   type IntEf = ASTLt[T[E, F], SI];
   type IntFe = ASTLt[T[F, E], SI]
   type UintV = ASTLt[V, UI];
+  /** Unsigned int for which lt,gt,eq,le,ge are defined submembers */
+  type UintVx = UintV with Compar;
   type UintE = ASTLt[E, UI];
   type UintF = ASTLt[F, UI]
   type UintEv = ASTLt[T[E, V], UI];
@@ -201,6 +216,19 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case _ => false
     }
 
+  override def isBinopEdge =
+    this.asInstanceOf[ASTL[_, _]] match {
+      case BinopEdge(_, _, _, _,_) => true
+      case _ => false
+    }
+
+  override def isSend=
+    this.asInstanceOf[ASTL[_, _]] match {
+      case Send(_) => true
+      case _ => false
+    }
+
+
   def opRedop =
     this.asInstanceOf[ASTL[_, _]] match {
       case Redop(op, _, _, _) => op
@@ -216,6 +244,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       //  case Multop(op, args,_,_)      => op.toString
       case Unop(op, _, _, _) => op.name
       case Redop(op: (Fundef2R[Ring], ASTBt[Ring]), _, _, _) => "red" + op._1.name
+      case BinopEdge(op, _, _, _, _) => "binopEdge" + op.name
       case RedopConcat(_, _, _) => "redConcat"
       case Clock(_, dir, _, _, _) => if (dir) "clock" else "anticlock"
       case e@Broadcast(_, _, _) => "Broadcast" + ("" + (e.locus.asInstanceOf[T[_, _]] match {
@@ -242,6 +271,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case e@Unop(_, a, _, _) => e.copy(arg = id2(a))
       case e@Binop(_, a, a2, _, _) => e.copy(arg = id2(a), arg2 = id2(a2))
       case e@Redop(_, a, _, _) => e.copy(arg = id2(a))
+      case e@BinopEdge(_, a, _, _, _) => e.copy(arg = id2(a))
       case e@RedopConcat(a, _, _) => e.copy(arg = id2(a))
       case e@Clock(a, _, _, _, _) => e.copy(arg = id2(a)) //(lpart(e.mym), rpart(e.mym))
       case e@Sym(a, _, _, _) => e.copy(arg = id2(a))
@@ -290,8 +320,10 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
           case Redop(op, _, _, _) =>
             if (op._1 == concatB)
               this.locus.fanout
+            //else if (op._1.body.mym.name==B())    1//we can reduce int an produce boolean, on Edges.
             else
               argBitSize()
+          case BinopEdge(op,arg,  _, _, _) =>if (op.body.mym.name==B()) 1 else throw new Exception("faut chercher le bitsize de l'op")
           case Send(_) => ASTbitSize(newthis.asInstanceOf[Neton[AST[_]]].args.head)
           case RedopConcat(exp, _, _) => this.locus.fanout //for the concat redop, the number of bit must take into account the arity (2,3, or 6)
 
@@ -386,9 +418,14 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         /** creates a binary tree of several call to opred       */
         def reduceEncapsulated(as: Array[ASTBt[R]], opred: redop[R]) =
           as.toList.tail.foldLeft(as(0))(new Call2(opred._1, _, _)(r) with ASTBt[R])
-
         a.unfoldTransfer(m).map((x: ArrAst) =>
           reduceEncapsulated(x.asInstanceOf[Array[ASTBt[R]]], op.asInstanceOf[redop[R]])).asInstanceOf[ArrAst]
+      case BinopEdge(op, a, _, _, _) =>
+        /** creates three binary tree of op     */
+       val t=a.unfoldTransfer(m)
+         assert(t.size==3)
+        //op peut ne pas etre symmetrique, faut donc vérifier l'ordre.
+        t.map((x: ArrAst) =>new Call2(op, x(0), x(1))(r) with ASTBt[R])
       case RedopConcat(a, _, _) =>
         def reduceConcatEncapsulated(as: Array[ASTBt[B]]): ASTBt[UI] =
           as.toList.tail.foldLeft(as(0).asInstanceOf[ASTBt[UI]])(new Concat2[UI, B, UI](_, _))
@@ -435,6 +472,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         })
       })
       case Redop(_, _, _, _) => throw new RuntimeException("Reduces create a simplicial type, not a transfer type")
+      case BinopEdge(_, _, _, _, _) => throw new RuntimeException("BinopEdge creates a simplicial type, not a transfer type")
       case Clock(a, dir, _, _, _) =>
         val T(_, src) = a.locus
         val trigo = !dir
@@ -477,9 +515,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         e.copy(arg = newArg)
 
 
-      case e@Send(args) => val newArgs = args.map(_.align(r, tt)) //collects results in $r
-        r.algn = r.algn.map { case (k, v) => k -> args.head.locus.proj } //does not depend on v, because v is constant
-        e.copy(args = newArgs)(lpart(e.mym), rpart(e.mym))
+
       case e@Transfer(arg, _, _) =>
         val T(s1, s2) = arg.locus;
         val t = hexPermut((s1, s2));
@@ -489,9 +525,31 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         e.copy(arg = newArg)
       case e@Unop(_, arg, _, _) =>
         e.copy(arg = arg.align(r, tt))
-      case e@Binop(_, arg, arg2, _, _) => //c'est la qu'on bosse!
+
+      case e@Send(args: List[ASTLt[S, Ring]]) => //pour binopEdge, se traite comme binop en fait.
+        //val newArgs = args.map(_.align(r, tt)) //collects results in $r
+        //r.algn = r.algn.map { case (k, v) => k -> args.head.locus.proj } //does not depend on v, because v is constant
+        //e.copy(args = newArgs)(lpart(e.mym), rpart(e.mym))
+        var newArgs:List[ASTLt[S, Ring]]=List()
+      for(arg<-args){
         val r2=Result()
-        var newArg = arg.align(r2, tt)
+        var newArg = arg.align(r2, tt) //r2 contient un align de edge, avec trois composante, (ou de face avec deux!)
+        val alignedTwice: Predef.Set[String] = r.algn.keys.toSet.intersect(r2.algn.keys.toSet);
+        val alignedTwiceDistinctly = alignedTwice.filter(s => !r.algn(s).sameElements(  dupliqueOrTriplique(r2.algn(s)))) //variables with two distinct alignement due to clock/sym operation
+        if (alignedTwiceDistinctly.size > 0) // we process only the case with a single such variable
+          throw new Exception(" send implies some more alignement, like binop,  we should look more closeley !")
+        else {
+          for ((k, v) <- r2.algn)
+            r.algn += k -> dupliqueOrTriplique(v)  //pour passer d'un align de edge a un align de Ev, on duplique
+          newArgs=newArg::newArgs
+        }
+      }
+
+        e.copy(args = newArgs)(lpart(e.mym), rpart(e.mym))
+
+      case e@Binop(_, arg1, arg2, _, _) => //c'est la qu'on bosse!
+        val r2=Result()
+        var newArg = arg1.align(r2, tt)
        // val algn: Map[String, Array[Int]] = r.algn //on memorize le align de la premiere expression.
 
         var newArg2 = arg2.align(r, tt)
@@ -506,7 +564,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
           val nome: String = alignedTwiceDistinctly.head //here we assume that there is a single input variable
           val perm = compose(invert(r2.algn(nome)), r.algn(nome))
           val shiftedE = "shift" + nome
-          r.c = intersect(r.c, Some(Cycle(perm, locus.asInstanceOf[TT])))
+          r.c = intersect(r.c, Some(Cycle(perm, locus.asInstanceOf[TT]))) //ici on ajoute une contrainte de cycle sur la zone, via r
           val repr = new repr(tt(nome).t) // asInstanceOf[repr[(L, R)]]
           val read = new Read(nome)(repr) with ASTLt[L, R] //not used at the end!
           val shiftInstr = Affect(shiftedE, read) //we shift the clock in order to obtain the right correspondance
@@ -518,11 +576,12 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
           //newArg = newArg.replaceBy(nome, shiftedE) //the first sub expression is left as is
           newArg2 = newArg2.replaceBy(nome, shiftedE) //in the second espression, we will use the shifted variable.
         }
-        else //we combined the alignement from each operand of the binop
+        else //we combine the alignement from each operand of the binop
           for ((k, v) <- r2.algn)
             r.algn += k -> v
         e.copy(arg = newArg, arg2 = newArg2)
       case e@Redop(_, arg, _, _) => e.copy(arg = arg.align(r, tt))
+      case e@BinopEdge(_, arg, _, _, _) => e.copy(arg = arg.align(r, tt))
       case e@Clock(arg, dir, _, _, _) =>
         val newArg = arg.align(r, tt)
         val T(_, des) = this.locus;
@@ -597,6 +656,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       //for other cases we do nothing
       case b@Broadcast(arg, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
       case b@Redop(_, arg, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
+      case b@BinopEdge(_, arg, _, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
       case b@RedopConcat(arg, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])
       // case b@Clock(arg, _) =>  val (rad,newArg) = arg.radiusify3(r, t);(rad,b.copy(arg=newArg).asInstanceOf[ASTL[L,R]])
       case b@Sym(arg, _, _, _) => val (rad, newArg) = arg.radiusify3(r, t); (rad, b.copy(arg = newArg).asInstanceOf[ASTL[L, R]])

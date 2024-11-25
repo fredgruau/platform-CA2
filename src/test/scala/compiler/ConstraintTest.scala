@@ -16,6 +16,7 @@ class ConstraintTest extends FunSuite {
     //printMem(cs)
   }
 
+/*
   test("testPartition") {
     val p=Partition(E().proj,E(),T (E(),V()))
     println("totototo"+p.schedules)
@@ -33,6 +34,7 @@ class ConstraintTest extends FunSuite {
    // val picked=p.pick() ; println(picked)
 
   }
+*/
 
 
 

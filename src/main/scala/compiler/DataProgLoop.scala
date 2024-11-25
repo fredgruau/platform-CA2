@@ -54,9 +54,11 @@ class InstrLoop(val affect: Instr, val loops: List[Packet], val instrNumber: Int
    *         for each instructions, we indicate how many loops are needed, then we list those loops, and
    *         for each loop, we show the direction, bit size, then the pipelined affect, the affect, and the binary code
    */
-  override def toString = "INSTR " + instrNumber + " ON " + loops.size + " LOOPS     " + affect +
-    /*     coalescTmp +*/ "\n" +
-    loops.mkString("\n") + "\n"
+  override def toString = {
+    val c= loops.mkString("\n")
+    "INSTR " + instrNumber + " ON " + loops.size + " LOOPS     " + affect +
+      /*     coalescTmp +*/ "\n" + c+ "\n"
+  }
 
   /** number of temporary registers needed to implement the instructions, initialized when we instanciate the registers */
   var nbTmpReg: Int = -1
@@ -106,10 +108,17 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
    */
 
   /**
-   * entire binary code of CAloop, before coalesc
+   * entire binary code of CAloop, coalesced
    */
-  lazy val totalCode: List[ASTBt[B]] = if (loops != null)
-    loops.flatMap(_.loops.flatMap(_.boboolAST)) else null
+  def totalCodeCoalesced: List[ASTBt[B]] =
+    if (loops != null)
+      loops.flatMap(_.loops.flatMap(_.boboolAST)) else null
+  /**
+   * entire binary code of CAloop, not coalesced
+   */
+  def totalCodeUnCoalesced: List[ASTBt[B]] =
+    if (loops != null)
+      loops.flatMap(_.loops.flatMap(_.boolAST)) else null
 
   /** name of scan variables, that should enter the symbol table. */
   var scNames: List[String] = null
@@ -117,7 +126,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   /**
    * now displaying instructions involves going through the associated loops of loops
    * */
-  def toStringInstr = "there is " + (if (loops == null) dagis.visitedL.length else loops.length) + " instructions\n" +
+  override def toStringInstr = "there is " + (if (loops == null) dagis.visitedL.length else loops.length) + " instructions\n" +
     (if (loops == null) dagis.visitedL.reverse.map((i: Instr) => i.toString() + "\n").mkString("")
     else loops.mkString("\n")) //+  (if(isRootMain) "\n\n"+codeGen().mkString("\n")   else "")
 
@@ -143,7 +152,7 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   def isMacro(s: String): Boolean = tSymbVarSafe(removeAfterChar(s, '#')).k == MacroField()
 
   lazy val totalNames: Set[String] =
-    ASTB.names(totalCode).filter(isMacro(_))
+    ASTB.names(totalCodeCoalesced).filter(isMacro(_))
 
   private def registerCount: Int = {
     assert(loops != null)
@@ -186,12 +195,18 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
    * @return we need to add the coalescing of temporary variables.
    */
   override def toString = {
-    super.toString +
-      // (if(coalescTMP!= null&&coalescTMP.size>0) "tmp registers:" + toStringCoalesc(coalescTMP) else "" ) +
-      (if (loops != null) "Total code of macro: " +
+    val s=super.toString
+    s
+      // +(if(coalescTMP!= null&&coalescTMP.size>0) "tmp registers:" + toStringCoalesc(coalescTMP) else "" ) +
+    /*  (if (loops != null) {
+        val t=totalCodeUnCoalesced
+        assert(t!=null)//detect too early call to totalCode
+        "Total code of macro: " +
         //totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ") else "")
-        totalCode.map(_.toStringTreeInfix(this.asInstanceOf[DataProg[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ") else "")
-
+        t.map(_.toStringTreeInfix(this.asInstanceOf[DataProg[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ")
+      }
+      else "")
+*/
   }
   /**
    * @return generates a list of list of boolean affectations for each instruction
@@ -235,7 +250,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
     def extendToBool(coal: iTabSymb[String]) = {
       var result: iTabSymb[String] = HashMap()
       for (k <- coal.keys)
-        if (tSymbVarSafe(k).nb > 1)
+        //if (tSymbVarSafe(k).nb > 1)
+          if (tSymbVarSafe(k).ring != B())  //on décide qu'on séme du #0 a tout vent
         //we need to check if k+"#"+i happens to also be coalesced to k, in which case we have a "chained coalesc"
           for (i <- 0 to tSymbVarSafe(k).nb - 1) {
             result = result + (k + "#" + i -> (coal(k) + "#" + i))
@@ -338,7 +354,11 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   }
 
   def isBoolV(str: String) = tSymbVarSafe(str).t == (V(), B()) // .isInstanceOf[BoolV]
-
+  def needOnlyoneBit(str: String)= {
+    val one=tSymbVarSafe(str).nb==1
+    val l=tSymbVarSafe(str).locus
+    val two = (l==V())
+    one && two  }
   // def isIntV1(str: String) = tSymbVarSafe(str).t == (V(), Int(1)) // .isInstanceOf[BoolV]
 
   //

@@ -2,23 +2,26 @@ package compiler
 
 import java.util.stream.Collectors
 import ASTB._
-import AST.{AstPred, Call, Fundef, Layer, Read, isCons, isNotRead}
+import AST.{AstPred, Call, Call2, Fundef, Layer, Read, isCons, isNotRead}
 import Circuit.{AstMap, Machine, TabSymb, iTabSymb, iTabSymb2, takeNbOfBitIntoAccount}
 import VarKind.{LayerField, MacroField, ParamD, ParamR, ParamRR, StoredField}
 import dataStruc.{Align2, Dag, DagInstr, Naame, Named, Schedule, Util, WiredInOut, toSet}
 import dataStruc.WiredInOut.{defby, setInputNeighbor}
-import Instr.{a, affectizeReturn}
+import Instr.{a, affectizeReturn, readR}
 import ASTB.Tminus1
-import ASTBfun.{ASTBg, Fundef2R, concatRedop, redop}
+import ASTBfun.{ASTBg, Fundef2R, Fundef2RB, concatRedop, redop}
 import ASTL.ASTLg
-import Named.{delify, noDollarNorHashtag}
+import Named.{delify, newAuxTmp, noDollarNorHashtag}
 import compiler.ASTLt.ConstLayer
+import compiler.Constraint.{Aligned, H1beforeH2}
+import compiler.SpatialType.ASTLtG
 import dataStruc.Util.{existInJava, hasBeenReprogrammed, prefixDash, prefixDot, suffixDot}
 import progOfCA.carrySysInstr
 
 import java.io.File
 import java.lang.reflect.Method
 import java.util
+import scala.List
 import scala.collection.IterableOnce.iterableOnceExtensionMethods
 import scala.collection.{Iterable, IterableOnce, Map, MapView, Set, immutable, mutable}
 import scala.collection.immutable.{HashMap, HashSet, ListMap}
@@ -368,6 +371,11 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
    * we distinguish between the various segment to print.
    * @return
    */
+
+  /** @return instructions in textual form will be redefiened in DataProgLoop in order to include code of loops*/
+  def toStringInstr = "there is " + dagis.visitedL.length + " instructions\n" +
+    dagis.visitedL.reverse.map((i: Instr) => i.toString() + "\n").mkString("")
+
   override def toString: String = {
 
     def toStringFuns: String = {
@@ -413,11 +421,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         sortCoalesced.grouped(2).map(_.mkString("---")).mkString("\n") + "\n"
     }
 
-
-    /** @return instructions in textual form */
-    def toStringInstr = "there is " + dagis.visitedL.length + " instructions\n" +
-      dagis.visitedL.reverse.map((i: Instr) => i.toString() + "\n").mkString("")
-
     /**
      * @param t declared function, and macro
      * @tparam T
@@ -427,7 +430,9 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       val (automatic, definedMacros) = t.partition((x: (String, T)) => x._1.startsWith("_fun"));
       automatic.toList ::: definedMacros.toList
     }
-    toStringFuns + toStringHeader + toStringInstr + toStringTabSymb + toStringCoalesc + "\n" + listOf(funs).mkString("\n\n")
+    val l=listOf(funs)
+    val codefuns=l.mkString("\n\n")
+    toStringFuns + toStringHeader + toStringInstr + toStringTabSymb + toStringCoalesc + "\n" + codefuns
   }
 
 
@@ -571,20 +576,27 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
     val l = dagis1.dagAst.visitedL.asInstanceOf[List[ASTLt[_, _]]]
     val redops: HashSet[AST[_]] = HashSet() ++
-      l.flatMap {
-        _.redExpr
-      } ++ l.filter(_.isRedop)
+      l.flatMap { _.redExpr  } ++ l.filter(_.isRedop)
     val affected: Seq[AST[_]] = dagis1.visitedL.filter(_.isInstanceOf[Affect[_]]).map(_.exps.head)
     //  if(redops.intersect(affected.toSet).nonEmpty)  throw new Exception("yes this is usefull")
     val redops2 = redops -- affected //we do not need to affectify, it is already affectified, this looks bugged
     val redops3: Set[AST[_]] = redops2.filter(isNotRead(_))
+
+    //on copie sur redop pour traiter binopEdge
+    val binopEdge=  HashSet() ++ l.flatMap { _.binopEdgeExpr  } ++ l.filter(_.isBinopEdge)
+    val binopEdge2 = binopEdge -- affected //we do not need to affectify, it is already affectified, this looks bugged
+    val binopEdge3= binopEdge2.filter(isNotRead(_))
+
+    val binredop= redops3 ++ binopEdge3
+
     /** values being reduced must be id of variable
      * so we affectify those, before bitIfying,
      * because that puts new ids in the symbol table
      * for  which we will also need to know the bit size
      * We also affectify the reduced value in order to reuse the register
      * which accumulates the reduction */
-    val dagis2 = dagis1.affectIfy(redops3(_), "auxO");
+   // val dagis2 = dagis1.affectIfy(redops3(_), "auxO");
+    val dagis2 = dagis1.affectIfy(binredop(_), "auxO");
     p.updateTsymb(dagis1.newAffect.map(_.exp), storeOrMacroField)
 
 
@@ -873,7 +885,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       align2root: Schedule,
 
       /** map from instruction to root instruction */
-      myRoot) = dagis.alignedComponents(proximity2, alignPerm, hasToAlign) //an alignement is computed on  T's.
+      myRoot: Map[String, Instr]) = dagis.alignedComponents(proximity2, alignPerm, hasToAlign) //an alignement is computed on  T's.
 
 
     def transform(g: Iterable[Instr]): List[Zone] = List(Zone(constraints, g.asInstanceOf[Iterable[Affect[_]]], alignPerm, align2root,
@@ -957,7 +969,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
    * @param d
    * @return computes the mu Instructions of a main (non-leaf CA loop), which remains in the same order,
    *         no scheduling needed.
-   *         retruns also the symbol table with added scalar
+   *         returns also the symbol table with added scalar
    */
   private def muInstrMain(d: DagInstr): (List[Instr], TabSymb[InfoNbit[_]]) = { //: (Map[String, List[Instr]],TabSymb[InfoNbit[_]] )
     val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
@@ -997,9 +1009,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       return new DataProg(DagInstr(muI.reverse), funs.map { case (k, v) => k -> v.unfoldSpace(m) },
         tSymbScalar, paramD.flatMap(deploySpace(_)), paramR.flatMap(deploySpace(_)), HashMap.empty) //no coalesced registers we put empty to enforce schedule matters
     }
-
     val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
     /** tabAlign((i1,i2) stores alignement of i1's result with respect to i2's result, i2's name must be used by i1 */
+    if(p.keys(0)=="slopeEv")
+      println("ici")
     val tabAlign: mutable.Map[(String, String), Array[Int]] = mutable.HashMap.empty
     /** used to collect econstraint  generated when aligning */
     val cycleConstraints: TabSymb[Constraint] = mutable.HashMap.empty
@@ -1026,18 +1039,47 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       new DataProg(dagisWithShift, noSubFun, p.tSymbVar, paramD, paramR)
     }
 
-    val p2 = alignShift() //produces tabAlign, introduit deux shifts.
-    print(tabAlign.map({ case (k, v) => "" + k + v.toSeq }))
-    println("dag produced by alignShift\n" + p2) //display result of  alignShift.
-    val (z2, myRoot, align2root: Map[String, Array[Int]]) = p2.zones2(cycleConstraints, tabAlign)
+    val p2: DataProg[InfoNbit[_]] = alignShift() //produces tabAlign, introduit deux shifts.
+   // print(tabAlign.map({ case (k, v) => "" + k + v.toSeq }))
+    //println("dag produced by alignShift\n" + p2) //display result of  alignShift.
+
+    //we have computed cycle cosntraint due to shift, in cycleConstraints
+    //we now compute sendCosntraint due to send. between the source Ev, and the reconstitute target Ev
+    val sendConstraints: TabSymb[Constraint] = mutable.HashMap.empty //will be indexed by name defined by send Instructions
+    val sendInstrs=p2.dagis.visitedL.filter ((i:Instr) => {i match {
+       case Affect(n,e:ASTLtG) => e.isSend
+        case _ => false
+    }} ).asInstanceOf[List[Affect[_]]]
+   if(sendInstrs.nonEmpty) {
+     println("ici")
+     for(i<-sendInstrs) {
+       val dev=i.inputNeighbors(0).inputNeighbors(0).asInstanceOf[Affect[_]]
+       sendConstraints(dev.name)= H1beforeH2 (i.locus.get) //send is used in combination with binop, and should be
+         //constrained h1 before h2, d1 before d2, ad1 before ad2, because of      }
+   }}
+   val computedConstraint: TabSymb[Constraint] = mutable.HashMap.empty
+    computedConstraint++= cycleConstraints
+    computedConstraint++= sendConstraints
+    val (z2: Dag[Zone], myRoot: Map[String, Instr], align2root: Map[String, Array[Int]]) = p2.zones2(computedConstraint, tabAlign) //send Constraint will endup in the right zone.
 
     println(z2) //displays zone,
+    val tZone2: Map[String, Zone] = defby(z2.visitedL) //associe une root a une zone.
+    val defI2: Map[String, Instr] = p2.dagis.defby
+
+    /*//Now, we need to update the src field of each sendConstraint.
+    for(sendConstraint<- sendConstraints.values){
+      val aligned=sendConstraint.asInstanceOf[Aligned]
+      val instr: Affect[_] =aligned.srcInstr
+      val root=myRoot(instr.name)  //root Instruction
+      val zone=tZone2(root.names.head)
+      aligned.src=zone
+    }*/
+
 
     val muI10: Map[String, List[Instr]] = muInstr(m, p2.dagis)
 
     z2.visitedL.reverse.map(_.pick()) //pick one schedule for each zone, starting from the first instruction
-    val tZone2: Map[String, Zone] = defby(z2.visitedL)
-    val defI2: Map[String, Instr] = p2.dagis.defby
+    println(z2)
 
     var (muI12: Map[String, List[Instr]], tSymbScalar2, coalesc2) = permuteAndFixScheduledMu(muI10, p2.dagis, tZone2, defI2, myRoot, align2root) // revisit muI 's'reduce when reduced exression is folded
     //we separate the reduction in two parts: one that can do at tm1 and the rest that is done now.
@@ -1128,40 +1170,100 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       val permuted: List[Instr] =
         if (a(i).isRedop)
           foldRedop(a(i))
-        else if (i.isV) oldmuI(name) //simplest case
+        else if (a(i).isBinopEdge) {
+         // val s: Array[Int] = i.mySchedule2(tZ, myRoot, align2root)
+          foldBinopEdge(a(i))
+        } else if (i.isV)
+          oldmuI(name) //simplest case
         else if (i.isFolded2(tZ, myRoot)) {
-          if (i.isShift) foldShift(a(i))
+          if (i.isShift)
+            foldShift(a(i))
           else {
-            val s: Array[Int] = i.mySchedule2(tZ, myRoot, align2root)
-            if (s != null) dataStruc.Align2.compose2(s, oldmuI(name).toArray).toList
-            else throw (new Exception("problem in aligning on root"))
+            val s: Array[Int] = i.mySchedule2(tZ, myRoot, align2root) //get the schedule computed when slicing in zones.
+            if (s != null)
+              dataStruc.Align2.compose2(s, oldmuI(name).toArray).toList
+            else
+              throw (new Exception("problem in aligning on root"))
           }
         }
-        else if (!i.isTransfer) oldmuI(name) //canonical order, no need to permute
+        else if (!i.isTransfer)
+          oldmuI(name) //canonical order, no need to permute
         else throw (new Exception("look more closely why transfer zone is not folded in order to guess what to do"))
       newMuI += name -> permuted;
       // computes coalesc mapping and tSymbScalar
       if (!a(i).isRedop) { //for redop the coalesc mapping and tSymbScalar are already done
         val l = a(i).locus.get
         val names = l.deploy(i.names.head)
-
-        if (i.isFolded2(tZ, myRoot) && !tSymbVar(i.names.head).k.isInstanceOf[ParamRR] &&
-          !isJustReadingLayer(i)
-        ) {
+       // on update coalesc si c'est folded
+        if (i.isFolded2(tZ, myRoot) && !tSymbVar(i.names.head).k.isInstanceOf[ParamRR] &&  !isJustReadingLayer(i)) {
           for (n <- names)
-            coalesc += (n -> i.names.head) //we coalesc several symbol
+            coalesc += (n -> i.names.head) //we register the fact that  several symbol are coalesced
           //and we add the single coalesced symbol
           tSymbScalar.addOne(i.names.head -> tSymbVar(i.names.head).asInstanceOf[InfoNbit[_]])
         }
         else {
           tSymbScalar.addOne(name -> tSymbVar(i.names.head).asInstanceOf[InfoNbit[_]]) //adds spatial type
-          for (n <- names) //no coalesced needed, we add several symbols
+          for (n <- names) //no coalesced needed, instead we add several symbols
             tSymbScalar.addOne(n -> tSymbVar(i.names.head).asInstanceOf[InfoNbit[_]].scalarified) //adds scalar type
         }
       }
       permuted
     }
+    /**
+     *
+     * @param i instruction doing the affect
+     * @return scheduled  muinstruction for foldBinopEdge.
+     *         it depends wether the reduced field is folded or not
+     *         Reduction can happen in successive step to optimize register use
+     *         a suffix #1 #2 #3 is appended to indicate which stage we are
+     **/
+    def  foldBinopEdge(i: Affect[_]): List[Instr]={
+        val treeInstr: List[Instr] =oldmuI(i.name)
+         //todo faut vérifier l'ordre en regardant le schedule des zones.
+         val input: Instr =i.inputNeighbors(0)
+      val schedulei=i.mySchedule2(tZ, myRoot, align2root) //1,0,2,3,4,5
+      val scheduleInput=input.mySchedule2(tZ, myRoot, align2root) //1,0,2,3,4,5
+      val locusInput: Locus =input.locus.get
+      val locusRing=input.ring.get //UI
+      val nbit=tSymbScalar(input.names.head).nb
+      val newVar=newAuxTmp() //we need a tmp variable
+      tSymbScalar.addOne(newVar -> new InfoNbit(locusRing, MacroField() , nbit) )//(name + "#" + i -> new InfoNbit[B](B(), tSymbVar(name).k, 1)
+      var result:List[Instr]=List()
+      val call2=treeInstr(0).asInstanceOf[Affect[_]].exp.asInstanceOf[Call2[_,_,_]]
+      val f=call2.f.asInstanceOf[Fundef2RB[Ring]]
+        for(k<-0 until 3){
+          val resSufx=E().the6sufx(schedulei(k))
+         // In case of binop, we force the order, because the op in the binop may not be symmetric; example is lt
+         val arg1Sufx=locusInput.the6sufx(scheduleInput(2*k))
+         val arg2Sufx=locusInput.the6sufx(scheduleInput(2*k+1))
 
+          result=result:::dedouble2(i.name+"$"+resSufx, newVar, f, input.names.head + "$"+arg1Sufx, input.names.head + "$"+arg2Sufx)
+      }
+
+     // val binop=call2.f.asInstanceOf[Fundef2RB[Ring]]
+    //  val res=dedouble2( ,newVar,binop,Instr.readR(,r) )
+
+         def dedouble(newTmp:String, c:Instr):List[Instr]={
+           val call2=c.asInstanceOf[Affect[_]].exp.asInstanceOf[Call2[_,_,_]] //on doit avoir déja appelé le binopEdge
+         val instr1=Affect(newTmp,call2.arg)
+          // val instr1=Affect(newTmp,oldmuI(input))
+           val r=new repr[Ring](new Ring())
+           val instr2=Affect(c.names.head, new Call2(call2.f.asInstanceOf[Fundef2RB[Ring]],Instr.readR(newTmp,r) , call2.arg2)(new repr[B](B())))
+           List(instr1, instr2)
+         }
+      //val res=treeInstr.flatMap(dedouble(newVar,_))
+      def dedouble2(nameEdge:String, newTmp:String, f:Fundef2RB[Ring],arg1:String,arg2:String):List[Instr]={
+        // val instr1=Affect(newTmp,call2.arg)
+        val r=new repr[Ring](new Ring())
+        val ui=new repr[UI](UI())
+        val instr1=Affect(newTmp,readR(arg1,ui))
+        val instr2=Affect(nameEdge, new Call2(f,Instr.readR(newTmp,ui) , Instr.readR(arg2,ui))(new repr[B](B()))with ASTBt[B])
+        List(instr1, instr2)
+      }
+
+      result
+      //List(i)
+    }
     /**
      *
      * @param i instruction doing the affect
@@ -1237,7 +1339,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
             val coalescedName = (if (i.isFolded2(tZ, myRoot) || i.isV) i.name else names(numI)) //+ (if (cpt(numI) * d >= 6) "" else optionalPrefix)
             coalesc += (nameOfAffectedNow -> coalescedName)
             tSymbScalar.addOne(coalescedName -> tSymbVar(i.name).asInstanceOf[InfoNbit[_]]) //.regifyIf(coalescedName != names(numI)))
-            val iInputMuInstName = iInputMuInst.names.head
+            val iInputMuInstName: String = iInputMuInst.names.head
             val readNextMuVar = Instr.readR(iInputMuInstName, r)
             val readCurrentRedVar = Instr.readR(nameOfAffectedPrevious, r)
             val newMuInstrExp =
@@ -1288,7 +1390,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         result.toList
       }
     }
-
     /**
      *
      * @param i shifting instruction
@@ -1306,7 +1407,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       permutedMuShifted(5) = inew
       Util.rotRn(permutedMuShifted, 1).toList
     }
-
     for (name <- oldmuI.keys)
       permuteAndFixScheduledMu2(name)
     (newMuI, tSymbScalar, coalesc)
@@ -1458,8 +1558,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
      * @param i
      * @return true if instruction is ready to fire
      */
-    def isReady(i: String) = defI.contains(i) && noTokenOutput(i) && oneTokenOnEveryInput(i) &&
-      muI2(i).size > 0 //there are still muInstruciolns to schedule
+    def isReady(i: String) = defI.contains(i) && noTokenOutput(i) &&
+      muI2(i).size > 0  && oneTokenOnEveryInput(i) //there are still muInstruciolns to schedule
+
+    def isBinopEdge(i:String)=(""+ defI(i).exps.head).startsWith("binopEdge")
 
     /**
      *
@@ -1508,7 +1610,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       {
         val iisfolded = defI(i).isFolded2(tZone, myRoot)
         if (iisfolded)
-          (muI2(i).size - 1) % l.fanout == 0
+          (muI2(i).size - 1) % l.fanout == 0  //this has been programmed with reduction in mind
         //muI2(i).size mu instructions left to execute
         else (muI2(i).size == 1) //if its not folded the reduction is done in a single mu instr?I'd rather write true here
       }
@@ -1522,14 +1624,12 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
      **/
     def fire(i: Instr): Instr = {
       consumeToken(i.names.head)
-      if(i.names(0).startsWith("auxO01"))
-        println("ici")
       val locus = tSymbVar(i.names.head).locus
       val input = usedVar2(i.names.head)
       val singleInputParamD = input.size == 1 && tSymbVar(input.head).k.isParamD //we here consider reduction of a paramD
       if (inputLessInstr.contains(i.names.head) || singleInputParamD || {
         val inputLocus = tSymbVar(usedVar2(i.names.head).head).locus
-        weSend(locus, tSymbVar(input.head).locus, i.names.head)
+        weSend(locus, tSymbVar(input.head).locus, i.names.head) //we send will be  sometimes false for reduction . This is a delicate place.
       })
         addSeveralToken(i.names.head, locus)
       nextMuInstr(i.names.head)
@@ -1540,10 +1640,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
        print("rer")*/
     while (readyInstr.nonEmpty) { //main loop
       val next: Instr = defI(readyInstr.dequeue())
-      if(next.names.head.startsWith("slopeLt"))
-        println("ici")
       result = fire(next) :: result
-      var neighbors = usedVar2(next.names.head) + next.names.head
+      var neighbors: Set[String] = usedVar2(next.names.head) + next.names.head
       if (isUsing.contains(next.names.head))
         neighbors = neighbors ++ isUsing(next.names.head)
       neighbors.map(checkReadiness(_))
@@ -1675,7 +1773,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         toBeMet = toBeMet + (nom -> u)
       }
       for (m <- toBeMet) {
-        if (u.contains(m._1))
+        if (u.contains(m._1)||coalesc(m._1)==coalesc(instr.names.head))
           toBeMet -= m._1 //case closed negatively
         if (m._2.contains(nom)) {
           if (toBeMet(m._1).contains((nom))) {

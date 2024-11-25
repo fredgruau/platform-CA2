@@ -2,7 +2,7 @@ package compiler
 
 import AST.{Call1, Fundef2, _}
 import ASTB.{Elt, Scan1, _}
-import compiler.ASTBfun.{Fundef2R, Fundef3R, fundef2Bop2, negB, p}
+import compiler.ASTBfun.{Fundef2R, Fundef3R, fundef2Bop2, negB, p, redop}
 import compiler.ASTLfun.halve
 import compiler.SpatialType.BoolV
 import ASTLfun._
@@ -18,6 +18,9 @@ object ASTBfun {
   type ASTBg = ASTBt[_ <: Ring]
   type Fundef3R[R <: Ring] = Fundef3[R, R, R, R]
   type Fundef2R[R <: Ring] = Fundef2[R, R, R]
+
+  type Fundef2RB[R <: Ring] = Fundef2[R, R, B]
+  type Fundef2RP[R <: Ring,P<:Ring] = Fundef2[R, R, P]
   type Fundef1R[R <: Ring] = Fundef1[R, R]
   type Op2 = (BB, BB) => BB
   def p[R <: Ring](name: String)(implicit n: repr[R]) = new Param[R](name) with ASTBt[R]
@@ -155,6 +158,7 @@ object ASTBfun {
     val xb = p[B]("xBtoSi")
     Fundef1("b2SI", Concat2(xb,False()), xb)
   }
+
   /*
     /** wrapper */
     def uItoSIcall(xui: Uint): Sint = new Call1[UI, SI](uItoSI, xui) with Sint
@@ -385,8 +389,27 @@ object ASTBfun {
     case UI() => orScanRightUI
   }).asInstanceOf[Fundef1[R, R]]
 
+  /** equality between two unsigned integers, */
+  val eqUI2: Fundef2[UI, UI, B] = {
+    val (xui, yui) = (p[UI]("xminUI"), p[UI]("yminUI")); //a t-on x < y
+    val difference = xui ^ yui //true for bits which differs betwen xui and yu
+    Fundef2("eqUI", new Call1[UI, B](eqUI, difference) with ASTBt[B], xui, yui) //todo ecrire des xor et des and pour les ui
+  } //TODO a faire correct en utilisant ltUI.
+
   /** optimal implementation of comparison between two unsigned integers, using orscanright like operators, */
   val ltUI2: Fundef2[UI, UI, B] = {
+    val (xui, yui) = (p[UI]("xminUI"), p[UI]("yminUI")); //a t-on x < y
+    val difference = xui ^ yui //true for bits which differs betwen xui and yui
+    val segmentOf1: Uint = Scan1(difference, orB, False(), Right(), initUsed = false) //fills with one, starting from the rightmost 1 to the first leftmost least significant bit
+    //we have to affect segmentof1 because it is read simultaneously at two indexes, for first1.
+    val first1: Uint = ~(new Call1[UI, UI](halveBUI, segmentOf1) with ASTBt[UI]) & segmentOf1 //only the rightmost msb bits remains. halveBui must comes first otherwise it bugs
+    // true if yui is true for i being the index of the  with most significant bit of difference, that is a strict lower than
+    Fundef2("ltUI", new Call1[UI, B](neqUI, first1 & yui) with ASTBt[B], xui, yui) //todo ecrire des xor et des and pour les ui
+  } //TODO a faire correct en utilisant ltUI.
+
+
+  /** optimal implementation of comparison, reprogram ltUI2 in order to also output equality */
+  val lteqUI2: Fundef2[UI, UI, B] = {
     val (xui, yui) = (p[UI]("xminUI"), p[UI]("yminUI")); //a t-on x < y
     val difference = xui ^ yui //true for bits which differs betwen xui and yui
     val segmentOf1: Uint = Scan1(difference, orB, False(), Right(), initUsed = false) //fills with one, starting from the rightmost 1 to the first leftmost least significant bit
@@ -415,11 +438,10 @@ object ASTBfun {
   //(orI.asInstanceOf[Fundef2[R, R, R]], False[R]
   /** a reduction operator is a function taking two arguement of the same type R, and returning a result also of type R. plus a neutral value */
   type redop[R <: Ring] = (Fundef2R[R], ASTBt[R])
+  //type fakeRedop[R <: Ring] = (Fundef2RB[R], False)
 
-  /** *
-   * todo finish
-   * @return
-   */
+  def ltUiRedop: redop[UI]=(ltUI2.asInstanceOf[Fundef2R[UI]],False().asInstanceOf[Uint])
+
   def concatRedop[R <: Ring](implicit n: repr[R]): redop[R] = {
     (concatB.asInstanceOf[Fundef2R[R]], Intof[UI](-1).asInstanceOf[ASTB[R]]) //neutral is wrong
   }

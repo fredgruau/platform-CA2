@@ -35,7 +35,7 @@ case class MoveC1 (val empty: BoolV, val push: BoolVe) extends MoveC{
 /**
  * a centered move can take into account the fact that we can force no change
  * @param yes for setting flip
- * @param no for securing absence of flip  using nopush or noEmpty
+ * @param no for specifying absence of flip ,  using either no.push or no.Empty
  */
 case class MoveC2(val yes:MoveC1,val no:MoveC1) extends MoveC{
   override val push=yes.push

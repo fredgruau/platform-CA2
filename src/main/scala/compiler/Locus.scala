@@ -35,6 +35,7 @@ sealed abstract class Locus extends Ordered[Locus ]{
 
   /** generates allways 6 suffixe */
   def the6sufx: Array[String]
+  def printOneSchedule(s:List[Int])=s.map(the6sufx(_))    //    s.map(locus.the6sufx(_)).mkString("->")
 
   /** adds a suffix to a name in order to distinguish between the associated scalars encoding the spatial locus */
 

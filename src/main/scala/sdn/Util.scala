@@ -8,6 +8,7 @@ import compiler._
 import compiler.SpatialType._
 import dataStruc.{BranchNamed, Named}
 import progOfCA.MuStruct
+import progOfmacros.Grad
 import progOfmacros.Util.{randE2, randN12, randNext}
 import sdn.Globals.{root4naming, setRoot4naming}
 
@@ -40,21 +41,32 @@ class Root4naming() extends Named with BranchNamed{
   /** random bits  are stored in a mutable hashmap*/
   val rands=new mutable.HashMap[Int,UintV]() with Named{}
   /** adds a random boolean bit, which will be named */
-  def addRands(): UintV ={
+  def addRand(): UintV ={
     val res=new Rand().asInstanceOf[UintV]
     rands(rands.size)=res //add a new random bits to the already existing, its index is just the hashmap size
     res //random bit is returned
   }
 }
 
-
-trait Util {
-  /** return an unsigned vertex random integer of $n$ bits */
-  def randUintV(nbits: Int): UintV = {
-    Array.fill(nbits)(root4naming.addRands()).reduce(_ :: _)  //all the random bits get concatenated.
-  }
+trait Compar{
+  self:UintV=>
+  val (lt,eq)=Grad.slopeLt(delayedL( this)) //voir si on peut enlever ce delayed, quand meme.
 }
 
+object Util {
+  /** return an unsigned vertex random integer of $n$ bits */
+  def randUintV(nbits: Int): UintV = {
+    Array.fill(nbits)(root4naming.addRand()).reduce(_ :: _)  //all the random bits get concatenated.
+    //pb: quand ya un seul bit, ya pas de concat, et ca renvoie un boolV
+  }
+
+  /** delayedL reprograms delayed, in order to add the trait ASTLt[L, R] */
+  def addLt(_arg: => UintV):UintV with Compar= {
+    lazy val delayed = _arg;
+    new Delayed[(V, UI)](() => delayed) with ASTLt[V, UI] with Compar with Named with BranchNamed {}
+
+  }
+}
 
 /** Layer implementing a random bit */
 class Rand() extends Layer[(V, B)](1, "random") with ASTLt[V, B]         {
@@ -63,5 +75,4 @@ class Rand() extends Layer[(V, B)](1, "random") with ASTLt[V, B]         {
   lazy val randSide: BoolEv = randE2(this) //only qpointRand uses this
 }
 
-object Util {
-}
+

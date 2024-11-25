@@ -27,7 +27,7 @@ import scala.collection.immutable.HashSet
 /**
  * Class use to collect information computed by the align "visitor"
  *
- * @param c    a possible cycle constraint
+ * @param c    a possible cycle constraint or align constraint from another zone.
  * @param si   new affect instructions for shift
  * @param algn alignement on input variables
  */
@@ -68,8 +68,8 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
 
   def childSameBitSize: Set[ASTLg] = HashSet()
   def isRedop: Boolean = false
-
-
+  def isBinopEdge: Boolean = false
+  def isSend: Boolean = false
   /**
    * @param usedTwice dags which are used twice, or which need to be affected for some other reason.
    * @param idRepr    :id of representant of the equivalence class with respect to equal on case class hierarchy
@@ -182,7 +182,7 @@ trait ASTLt[L <: Locus, R <: Ring] extends AST[(L, R)] with MyAstlBoolOp[L, R] w
 
   /** Defined non empty in ASTL */
   def redExpr = List.empty[AST[_]]
-
+  def binopEdgeExpr = List.empty[AST[_]]
 
   def align(r: Result, t: TabSymb[InfoNbit[_]]): ASTLt[L, R] =
     this.asInstanceOf[AST[_]] match {

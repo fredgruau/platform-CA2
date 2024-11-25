@@ -1,3 +1,4 @@
+/*
 import scala.reflect.runtime.universe._
 import scala.reflect.runtime.{currentMirror => cm}
 
@@ -105,3 +106,4 @@ object FieldValuesExtraactor {
     println(s"Nouvelle valeur de naame: ${myInstance.member.asInstanceOf[MyTrait].naame}")
   }
 }
+*/

@@ -7,8 +7,7 @@ import compiler.ASTLfun.{orR, reduce}
 import compiler.ASTLt.ConstLayer
 import compiler.SpatialType.{BoolE, BoolV}
 import compiler.{AST, ASTLt, B, E, V, repr}
-import sdn.{Qpoint}
-
+import sdn.{Compar, Qpoint}
 import java.util.HashMap
 import java.util
 
@@ -34,10 +33,11 @@ class Flies() extends Qpoint //with Blobify with QPointify
   shoow(is)
   shoow(NisV)
   shoow(doubleton,singleton)
-  shoow(next2NonSingleton,isApexV)
+  shoow(next2NonSingleton,doubletonV,tripletonV,isApexV)
   val defE=new ConstLayer[E, B](1, "def")
-  val twoLt: BoolE =reduce(andRedop[B], prioLt)
-  shoow(twoLt,touchedByRandDir,prioLt,level,prioRand)
+  val twoLt: BoolE =reduce(andRedop[B], prio.lt)
+  shoow(twoLt,touchedByRandDir,prio.lt,prioRand)
+  shoow(prio.eq)
   //shoow(sloplt,level,twoLt,dopp,se,grad3,grad6)
   buugif(twoLt&defE) //marche pas, je pensais que oui, mais en fait non.
   //shoow(bugE)

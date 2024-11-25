@@ -11,9 +11,9 @@ import compiler.repr.nomV
 import dataStruc.BranchNamed
 import dataStruc.DagNode.EmptyBag
 import progOfmacros.Comm.neighborsSym
-import progOfmacros.Grad
 import progOfmacros.Wrapper.{borderS, exist, xorBin}
-import sdn.Agent
+import sdn.{Agent, Compar}
+import sdn.Util.{addLt, randUintV}
 
 import scala.collection.immutable.HashMap
 /** all the agent's methods which needs a processing dependant  on the locus L in V,E,Ve, F...
@@ -28,7 +28,7 @@ trait vef[L<:Locus]{
    * invariant to check yes and no are not simultaneously true*/
   def move2yesNoFlip(m:MoveC):(BoolV,Option[BoolV])
 }
-/** contains fields we often used on Vagent. Could be made lazy */
+/** contains fields we often use on Vagent. Could be made lazy */
 trait UtilVagent extends BranchNamed{
   self:Vagent=>
   lazy val brdE:BoolE=borderS(isV) //push everywhere possible.
@@ -37,13 +37,11 @@ trait UtilVagent extends BranchNamed{
   /** Ve edges leaving the support */
   lazy val brdVe=transfer(v(brdE)) & isVe
 }
-trait Vagent extends UtilVagent {
+
+trait Vagent extends vef[V] with UtilVagent {
   self:MovableAg[V] =>
   override val isV: BoolV = is
-  override val NisV=  ~isV
-  //override val NisV= ~isV
-  //private val _NisV= ~isV  // Champ privé  //override def NisV = _NisV
-
+  //override val NisV=  ~isV
   override def flip2next=  delayedL( xorBin(currentFlip,is) )//delayed is necessary in order to get the very last update of flip
   override def move2flip(m:MoveC1):BoolV= {
     val invade = exist(neighborsSym(m.push));  val empty = m.empty   //bugif empty & invade
@@ -63,18 +61,12 @@ abstract class BoundAg[L <: Locus](implicit m: repr[L]) extends  Agent[L]{
   override val initialFlip: BoolV = inheritedFlip
 }
 /**  code  common to Movable agents*/
-abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] with EmptyBag[MuStruct[_<: Locus,_<:Ring]]  {
-  override val prioRand: UintV = randUintV(5)
+abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] with vef[L] with EmptyBag[MuStruct[_<: Locus,_<:Ring]]  {
+  override val prioRand= addLt(randUintV(5))
+  /** for the moment, priority is pure random */
  override val prio =prioRand //pour le moment on n'a pas encore plusieurs move possible, dans pas longtemps on va programmer prio et initalflip
 //method that depends on the spatial type of the support:
-  /** compute next value of is, from flip */
-  def flip2next: AST[(L, B)]
-  /** convert a centered move into a flip
-   * invariant to check invade and empty are not simultaneously true**/
-  def move2flip(m:MoveC1):BoolV
-  /** convert a centered move with a possible "no component" into a flip with a possible "noflip component"
-   * invariant to check yes and no are not simultaneously true*/
-  def move2yesNoFlip(m:MoveC):(BoolV,Option[BoolV])
+
 
   /** Movable Agent's support is memorized in a layer. */
   override val is=new Layer[(L, B)](1, "global") with ASTLt[L,B] with carrySysInstr {

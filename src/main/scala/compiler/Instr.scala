@@ -230,8 +230,6 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
       newTSymb += s -> new InfoNbit(cur.tSymbVar(s).t, cur.tSymbVar(s).k, expBitSize(newExp));
       Affect(s, newExp).asInstanceOf[Instr]
     case CallProc(funName, names, exps) =>
-      if(funName.startsWith("grad.slopDelta"))
-        println("ici")
       val newexps = exps.map(_.asInstanceOf[ASTLt[_, _]].bitIfyAndExtend(cur, expBitSize, newTSymb))
       val nbitarg = newexps.map(a => expBitSize(a)) //.toList.flatten
       val namePlusInputsize = funName + nbitarg.map(_.toString).foldLeft("")(_ + "_" + _) //we make precise in the function name, the number of bits of arguments
@@ -610,6 +608,9 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
 
   def isRedop = exp.asInstanceOf[ASTL.ASTLg]
     .isRedop
+  def isBinopEdge= exp.asInstanceOf[ASTL.ASTLg]
+    .isBinopEdge
+
 
   val names = List(name);
   val namesDefined = List(name);
@@ -830,15 +831,7 @@ object Instr {
   private def deploy(n: String, tSymb: TabSymb[InfoNbit[_]]): List[String] =
     Locus.deploy(n, tSymb(n).t.asInstanceOf[(_ <: Locus, _)]._1)
 
-  private var nameCompteuraux = 0
 
-  def getCompteurAux: Int = {
-    nameCompteuraux += 1;
-    nameCompteuraux
-  }
-
-
-  private def newAux(): String = "_aux" + getCompteurAux
 
   /**
    *

@@ -225,8 +225,6 @@ class DagInstr(generators: List[Instr], private var dag: Dag[AST[_]] = null)
      * @return new best name
      */
     def newName(x: AST[_]) = {
-/*      if(x.name=="fliesNisv")
-        println("ici")*/
       if (x.name.startsWith("shift")) throw new Exception("shift is a reserved prefix, do not use it please")
       if (x.name.startsWith("ll")) throw new Exception("ll is a reserved prefix, do not use it please")
       if (!bestName.contains(x)) x.name

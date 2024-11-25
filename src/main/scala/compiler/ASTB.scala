@@ -420,7 +420,10 @@ object ASTB {
 
   def affBoolConst(nameb: String, arg: ASTBt[B], g: Packet): ASTBt[B] =
     if (arg.isConst) {
-      if (nameb != null) {g.constantTable.addOne(nameb -> fromBoolB(arg));AffBool(nameb, arg)}
+      if (nameb != null) {
+        g.constantTable.addOne(nameb -> fromBoolB(arg));
+        fromBoolB(arg)    //pas besoin d'affecter pisque la valeur de la variable se trouve dans le tableau de constante le quel sera consulté, en bonne logique! AffBool(nameb, arg)}
+      }
       else arg
     } //we need to return the constant because it could be afected to other variable
     else {

@@ -111,10 +111,10 @@ trait ProduceJava[U <: InfoNbit[_]] {
       },
       "PARAMETERS" -> {
         /** add type to parameters, either int[] or int[][],
-         * one dimension is enough for spatial type boolV, two dimensions are needed for other locus */
-        def javaIntArray(s: String) = (if (isBoolV(s)) ("int [] ") else ("int [][] ")) + s
-        if(nameMacro.startsWith("compute.implique"))
-          println("ici")
+         * one dimension is enough for spatial type boolV, two dimensions are needed for other locus
+         * //parameters are also passed as 1D array if they are Uint of one bit, and V().*/
+        def javaIntArray(s: String) = (if (needOnlyoneBit(s)) ("int [] ") else ("int [][] ")) + s
+
         val parameters = (shortSigIn ::: (shortSigOut ::: layerNames)).map(javaIntArray(_))
         parameters.mkString(",")
       },
@@ -131,7 +131,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
             else {
               var j = 0; //j iterates on the indexes of the different scalar componendt
               try while (radicalOfVar(original(i)) == s) { //we scan through the parameter having same radical
-                res = original(i) + "=" + s + "[" + j + "]" :: res;
+                val crochets=if(needOnlyoneBit(s)) "" else  "[" + j + "]"
+                res = original(i) + "=" + s + crochets :: res;
                 j += 1;
                 i += 1 //affect each scala component
               } catch {
@@ -146,7 +147,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
         val anchor = (anchorParam(shortSigIn, paramD) ::: anchorParam(shortSigOut, paramR) ::: anchorParam(layerNames, layerNames.flatMap(s => tSymbVar(s).locus.deploy(s)))).reverse.mkString(",")
         if (anchor.size > 0) "int[] " + anchor + ";" else "" //we may not need to anchor anything.
       },
-      "PROPAGATEFIRSTBIT" -> {
+      /*"PROPAGATEFIRSTBIT" -> {
         val callsToPropagate: Seq[String] = paramD.map((s: String) => "p.prepareBit(" + s + ")") //for the moment we do the propagation on all data parameters
         val callsToPropagate2 = shortSigIn.map((s: String) => "p.prepareBit(" + s + ")")
 
@@ -155,7 +156,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
           "p.mirror(" + s + ",compiler.Locus." + l.javaName + ")"
         })
         callsToMirror.mkString(";") + ";\n" + callsToPropagate2.mkString(";") + "\n"
-      },
+      },*/
       "CALINENUMBER" -> (paramD ::: paramR)(0), //There must be at least one param,we need to read it so as to know the length which is the number of CA lines.
       "DECLINITPARAM" -> {
         /** declares all the variables local to the loops, and initializes them to zero if needed */
@@ -185,7 +186,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
         //certaine expression se simplifie sur false ou true
 
         // totalCode.map(_.toStringTreeInfix(tSymbVar.asInstanceOf[TabSymb[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ")
-        totalCode.map(_.toStringTreeInfix(this.asInstanceOf[DataProg[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ")
+        totalCodeCoalesced.map(_.toStringTreeInfix(this.asInstanceOf[DataProg[InfoType[_]]])).grouped(4).map(_.mkString(";")).mkString(";\n ")
       }
     ))
   }
@@ -347,6 +348,17 @@ trait ProduceJava[U <: InfoNbit[_]] {
         iL.map((kv: (String, String)) =>
           " map.put(\"" + kv._1 + "\",\"" + kv._2 + "\")").mkString(";\n") + ";\n"
       },
+      "PREPAREBITS" ->{
+        val layers: Map[String, U] =layerSubProg2
+
+          val callsToPropagate2 = layers.keys.map((s: String) => "p.prepareBit(" + s + ")")
+
+          val callsToMirror = layers.keys.map((s: String) => {
+            val l = tSymbVar(s).t.asInstanceOf[(Locus, Ring)]._1
+            "p.mirror(" + s + ",compiler.Locus." + l.javaName + ")"
+          })
+          callsToMirror.mkString(";") + ";\n" + callsToPropagate2.mkString(";") + ";\n"
+      },
       "ANONYMOUSLOOP" -> {
         codeLoopAnonymous
       }
@@ -399,8 +411,6 @@ trait ProduceJava[U <: InfoNbit[_]] {
           paramCode = List("p") //this is a method PrShift that does a preliminary shift if radius is >0yyy
         //we can reconstruct spatial types, and bit numbers directly from the effective parameters:
         // call names and expressions, no need for reflection, at the end!:
-          if (call.procName.startsWith("comm.neighbors_1_1"))
-            System.out.println("ici")
           val dataParam=call.exps.map((x)=>x.asInstanceOf[Read[_]].which)
           val resultParam=call.names
           val spatialParam= shortenedSig(dataParam:::resultParam)
@@ -419,6 +429,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
             //until now we applied same processing wether it is a name or a heap variable
             else {
               /** we look at the type of effective parameter, in order to find the type of the formal parameter */
+
               val locusParamEf = tSymbVarSafe(radicalOfVar(params(i))).locus //this does not work, because effective parameter has been obtained by duplication using a direct interpretation of broadcast
               if (!locusParamPossiblyWrong.isTransfer && densityDirect==6/* !locusParamEf.isTransfer*/ )//we detect that we have done a broacast,
                 if (spatialType == (V(), B()))
@@ -439,7 +450,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
                 paramCode = locusParamPossiblyWrong.shortName + (decompositionLocus(locusParamPossiblyWrong)(indexesMem)) :: paramCode //name of formal paramer is locus plus rank stored in decompositionLocus
               }
               else //its not  a mem
-              { paramCode = radicalOfVar(params(i)) :: paramCode;        i += densityParamPossiblyWrong       }
+              { paramCode = radicalOfVar(params(i)) :: paramCode;
+                i += densityParamPossiblyWrong       }
             }
           }
            /** fundef if recompiled*/

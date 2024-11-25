@@ -53,8 +53,6 @@ trait DagNode[+T <: DagNode[T]] {
       this.asInstanceOf[AST[_]] match {
         case Read(name) => val rad = radicalOfVar2(name)
           val s = t.tSymbVarSafe(rad)
-          if(name.startsWith("slopLt"))
-            println("ici")
           if (s.k.isParamD || s.k.isLayerField || s.k.isParamR) {
             if(s.k.isRadius1)
               name + "[i-1]"
@@ -62,8 +60,10 @@ trait DagNode[+T <: DagNode[T]] {
               name + "[i]"
           } //no delays for the moment being, when we read
           else name //operand is a loop register.
-        case False() =>    "0 /*False*/"
-        case True() =>    "-1 /*True*/"
+        case False() =>
+          "0 /*False*/"
+        case True() =>
+          "-1 /*True*/"
 
         // I have  put O instead of "/*False*/", it seems to work
           //"/*False*/" //by simplification a whole expression may reduce to false after simplification.
@@ -82,11 +82,16 @@ trait DagNode[+T <: DagNode[T]] {
       this.asInstanceOf[AST[_]] match {
         case ASTB.AffBool(name, _) =>
           val nameRad = radicalOfVar2(name);
+          try{
           val k = t.tSymbVarSafe(nameRad).k
           if (!k.isParam) toString //affectation is done to a register local in the loop.
           else if (k.isRadius1) name + "[i-1]=" //Radius can be either 0 or 1 here we should also take into account the store.
           else if (k.isRadiusm1) name + "[i+1]=" //Radius can be either 0 or 1 here we should also take into account the store.
           else name + "[i]="
+          }
+          catch{
+            case e:java.lang.Exception=>toString //je fait l'hypothése que on n'a pas trouvé l'id car il s'agit de nom de variable temporaraire, non stockés
+          }
       }
     }
 

@@ -16,6 +16,7 @@ public interface PrShift {
 
     public void prepareBit(int[][] h);
 
+    /** does a miror on the border */
     public void mirror(int[][] h, Locus l);
 
     public void mirror(int[] h, Locus l);

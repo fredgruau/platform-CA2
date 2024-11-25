@@ -73,7 +73,11 @@ trait BranchNamed
           //  val correctNewName=  if(Set("root", "rootagent", "rootis").contains(newName)) conteneur.name else newName
           if (conteneur.isInstanceOf[BranchNamed]) { //we traverse the fields that can be reached from the root of naming
             val fields: Seq[(String, Any)] = getAllFieldValues(conteneur)
-            val fieldsWithName = fields.filter(_._2.isInstanceOf[Named])
+            val fieldsNonRecur = fields.filter(_._2 != conteneur)
+            val fieldsUnique=fieldsNonRecur.toSet.toList //on enleve les doublons, poil au fion
+            val fieldsWithName =fieldsUnique.filter(_._2.isInstanceOf[Named])
+
+
             val fieldHasMap=fields.filter(_._2.isInstanceOf[HashMap[_,_]])
 
             fieldsWithName.foreach { case (name, value) =>
@@ -183,123 +187,5 @@ trait BranchNamed
       println(s"Nouvelle valeur du name de member: ${myInstance.member.asInstanceOf[Named].name}")
     }
 
-    /*def mainOK(args: Array[String]): Unit = {
-
-      class MyClassMember{
-        val subField="subfield"
-      }
-      trait MyTrait {
-        self:MyClassMember=>
-        val traitField: String = "Trait Field"+subField
-        var naame: String = "rr"
-      }
-
-      class SuperClass {
-        val superField: Int = 42
-      }
-      class MyClas
-      class MyClass extends SuperClass  {
-        var mutableField: String = "Initial"
-        val member:MyClassMember=new MyClassMember with MyTrait {}
-      }
-
-      // Création d'une instance de MyClass
-      val myInstance = new MyClass
-
-      // Modification du champ mutable dans le trait
-      //setFieldValue(myInstance, "traitFieldMutable", "tt")
-
-      // Récupération des champs et affichage des valeurs
-      val fields: Seq[(String, Any)] = Naame.getAllFieldValues(myInstance)
-      fields.foreach { case (name, value) =>
-        println(s"$name: $value")
-        value match {
-          case t:MyTrait =>  t.setName("tttt")
-          case _ =>
-        }
-      }
-
-      // Vérification finale de la valeur du champ
-      println(s"Nouvelle valeur de traitFieldMutable: ${myInstance.member.asInstanceOf[MyTrait].naame}")
-    }
-
-    def mainOld(args: Array[String]): Unit = {
-
-      class MyClassMember extends MyTrait {
-        val subField="subfield"
-      }
-      trait MyTrait {
-        self:MyClassMember=>
-        val traitField: String = "Trait Field"+subField
-        var naame: String = "rr"
-      }
-
-      class SuperClass {
-        val superField: Int = 42
-      }
-      class MyClas
-      class MyClass extends SuperClass  {
-        var mutableField: String = "Initial"
-        val member:MyClassMember=new MyClassMember
-      }
-
-      // Création d'une instance de MyClass
-      val myInstance = new MyClass
-
-      // Modification du champ mutable dans le trait
-      //setFieldValue(myInstance, "traitFieldMutable", "tt")
-
-      // Récupération des champs et affichage des valeurs
-      val fields: Seq[(String, Any)] = getAllFieldValues(myInstance)
-      fields.foreach { case (name, value) =>
-        println(s"$name: $value")
-        value match {
-          case t:MyTrait =>  setFieldValue(t, "naame", "tttt")
-          case _ =>
-        }
-      }
-
-      // Vérification finale de la valeur du champ
-      println(s"Nouvelle valeur de traitFieldMutable: ${myInstance.member.asInstanceOf[MyTrait].naame}")
-    }
-
-    def main2(args: Array[String]): Unit = {
-      trait MyTrait  {
-        val traitField: String = "Trait Field"
-      }
-
-      class SuperClass {
-        val superField: Int = 42
-        val subClass45=new Leave with MyTrait with Named
-      }
-      class MyClassMember extends SuperClass
-      class Leave
-      class MyClass extends SuperClass  {
-        var mutableField: String = "Initial"
-        val subClass= new MyClassMember with MyTrait with Named
-      }
-
-      // Création d'une instance de MyClass
-      val myInstance = new MyClass with Named
-     // setAllName(myInstance,"raaa")
-      // Modification du champ mutable dans le trait
-      // setFieldValue(myInstance, "naame", "tt")
-
-      // Récupération des champs et affichage des valeurs
-
-
-
-      val fields: Seq[(String, Any)] = getAllFieldValues(myInstance)
-      fields.foreach { case (name, value) =>
-        println(s"$name: $value")
-        value match {
-          case t:MyTrait =>  setFieldValue(t, "naame", "tt")
-          case _ =>
-        }
-      }
-
-      // Vérification finale de la valeur du champ
-      println(s"Nououvelle valeur de traitFieldMutable: ${myInstance.subClass.name}")
-    }*/
   }
 

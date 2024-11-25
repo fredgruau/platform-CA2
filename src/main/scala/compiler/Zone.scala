@@ -4,6 +4,8 @@ import Circuit.TabSymb
 import Constraint.{Partition, empty, noneIsEmpty, propagate}
 import Instr.a
 import dataStruc.{DagNode, Schedule, WiredInOut, isIdentity, toSet}
+
+import scala.::
 import scala.collection.{Iterable, Map}
 import scala.collection.immutable.{HashMap, HashSet}
 
@@ -133,13 +135,14 @@ class Zone(val root: Affect[_], val instrs: Iterable[Affect[_]], var constraintS
   def pick() = if (folded) {
     val foldedInNeighbors = inputNeighbors.filter(_.folded) //we consider only folded neighbors.
     // TODO why not consider all neighors to determine a schedule for everybody even unfolded zones
-    val propagateConstr = foldedInNeighbors.map((z: Zone) => propagate(partitionnedInOut(z.name), z.constraintSchedule))
+    val propagateConstr: List[Constraint] = foldedInNeighbors.map((z: Zone) => propagate(partitionnedInOut(z.name), z.constraintSchedule))
     val newConstr = Constraint.intersect(constraintSchedule :: propagateConstr, constraintSchedule.locus)
     if (newConstr.empty) folded = false
     else constraintSchedule = newConstr.pick()
   }
 
-  def pickedSchedule = constraintSchedule.schedules.head
+  def pickedSchedule =
+    constraintSchedule.schedules.head
 }
 
 object Zone {
@@ -147,7 +150,7 @@ object Zone {
   val id6: Array[Int] = Array(0, 1, 2, 3, 4, 5)
 
   /**
-   * @param constraints cycle constrains computed during the align phase
+   * @param constraints cycle constrains computed during the align phase, or align(dev) constraint attached to send instruction
    * @param instrs      instructions associated to the zone.
    * @param myRoot      mapping a name to the root instruction
    * @param align2root  alignement on root

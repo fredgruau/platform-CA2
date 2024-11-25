@@ -29,7 +29,7 @@ trait carrySysInstr{
 
 /**
  un element du LDAG, sert a updater toutes les trucs dans l'ordre. */
-abstract class MuStruct[L<:Locus,R<:Ring] extends  DagNode[MuStruct[_<:Locus,_<:Ring]] with Named with BranchNamed with sdn.Util{
+abstract class MuStruct[L<:Locus,R<:Ring] extends  DagNode[MuStruct[_<:Locus,_<:Ring]] with Named with BranchNamed {
   //self: AST[(L,B)] =>
 
   /** support of agent */

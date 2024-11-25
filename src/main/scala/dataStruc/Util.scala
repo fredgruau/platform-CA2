@@ -156,9 +156,11 @@ object Util {
       if (java.lang.reflect.Modifier.isStatic(field.getModifiers)) {
         // Get the value of the static field and print it
         val fieldValue: Any = field.get(null)  // `null` because it's a static field
-        println(s"Value of static field $fieldName: $fieldValue"); fieldValue.asInstanceOf[Int]
+        //println(s"Value of static field $fieldName: $fieldValue");
+        fieldValue.asInstanceOf[Int]
       } else {
-        println(s"Field $fieldName is not static.");-1
+       // println(s"Field $fieldName is not static.");
+        -1
       }
 
     } catch {
@@ -448,6 +450,16 @@ object Util {
     val r = new Array[Int](6);
     for (i <- 0 to 5) r(i) = (i + dec) % 6;
     r
+  }
+
+  def dupliqueOrTriplique(a:Array[Int]): Array[Int]={
+    assert(a.size<6) //sinon y a rien a faire!
+    val result: Array[Int]=new Array(6)
+    val fanout=6/a.length
+    for(i<-0 until a.length)
+      for(j<-0 until fanout)
+        result(i*fanout+j)=a(i)
+    result
   }
 
   def composeAll2(p: Array[Int], t: iTabSymb2[Array[Int]]): iTabSymb2[Array[Int]] = t.map { case (k, v) => k -> compose(p, v) }
