@@ -2,12 +2,13 @@ package sdn
 
 import compiler.ASTBfun.{addRedop, orRedop, redop}
 import compiler.ASTL.{delayedL, send, transfer}
-import compiler.ASTLfun.{b2SIL, imply, ltSI, reduce, uI2SIL, v}
-import compiler.SpatialType.{BoolE, BoolEv, BoolV, BoolVe, IntE, IntEv, IntV, IntVe, UintV, UintVx}
+import compiler.ASTLfun.{b2SIL, f, imply, ltSI, reduce, uI2SIL, v}
+import compiler.SpatialType.{BoolE, BoolEv, BoolF, BoolV, BoolVe, BoolVf, IntE, IntEv, IntV, IntVe, UintV, UintVx}
 import compiler.repr.nomE
-import compiler.{ASTLfun, ASTLt, B, Locus, SI, UI, V}
+import compiler.{ASTLfun, ASTLt, B, E, F, Locus, SI, T, UI, V}
 import dataStruc.{BranchNamed, Named}
 import progOfCA._
+import progOfmacros.Comm.{apexE, apexV}
 import progOfmacros.{Compute, Grad}
 import progOfmacros.Compute.implique
 import progOfmacros.Wrapper.{exist, inside, insideS}
@@ -30,8 +31,6 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
   val prioRand:UintVx
    /** used for mutex tournament */
  val prio:UintVx
-
-
 
    /**
    *
@@ -74,7 +73,8 @@ class KeepFlipIf(i: Impact,val loc:BoolV) extends Constr(Array(this), i)
       case One(v) =>  insideS(currentFlip & (if (v) isV else (NisV))) // result also depend on impact
     })
     /** flip is ok if prio is minimum with respect to the other side */
-      def tmp=imply(v(mutrig),ags.head.prio.lt)
+      def tmp: ASTLt[T[E, V], B] =imply(v(mutrig),ags.head.prio.lt)
+    /** flip is preserved if no neighbor edge present a problem */
     def where=inside(transfer(tmp))
   }
   class MutCancelFlipIf(i: Impact,val mutex:BoolE) extends Constr(Array(this), i) {
@@ -94,49 +94,92 @@ class KeepFlipIf(i: Impact,val loc:BoolV) extends Constr(Array(this), i)
    */
   class MutApexKeepFlipIf(i: Impact,val mutex:BoolE) extends Constr(Array(this), i) {
     /** mutex is triggered if there is indeed two flips on each side of the mutex, and in the right state. */
-    def mutrig:BoolE =mutex &  (impact  match {
-      case Both() => insideS(currentFlip)
-      case One(v) =>  insideS(currentFlip & (if (v) isV else (NisV))) // result also depend on impact
-    })
-    /** flip is ok if prio is minimum with respect to the other side */
-    def tmp=imply(v(mutrig),prio.lt)
-    def where=inside(transfer(tmp))
-  }
-  /** any agent, bounded or movable, can be constrained */
-  var constrs: List[Constr] = List() //si je met private, ca plante. j'ai fait un catch pour récupérer inaccesible
+    //var mutrigv:BoolE=null technique pour afficher mutrig
 
-  /** add c to the list of constraint */
-  def constrain(c: Constr) = {
-    constrs = c :: constrs
+    def mutrig:BoolE ={
+      //mutrigv=
+        mutex &  (impact  match {
+        case Both() => inside(apexE(f(currentFlip)))
+        case One(v) =>  inside(apexE(f(currentFlip & (if (v) isV else (NisV)))))// result also depend on impact
+      });
+     // mutrigv.name="fliesMutrigv";      mutrigv
+    }
+
+    /** flip is ok if prio is minimum with respect to the other side */
+    def tmp=imply(f(mutrig),prio.ltApex)
+    def where=inside(apexV(tmp))
   }
+   /**
+    *
+    * @param i
+    * @param mutex not more than one will flip each side of mutex
+    */
+   class TriKeepFlipIf(i: Impact,val tritex: BoolF) extends Constr(Array(this), i) {
+     /** mutex is triggered if there is indeed two flips on each side of the mutex, and in the right state. */
+     def tritrig:BoolF =tritex &  (impact  match {  //y a moyen d'écrire un trigger générique pour mut,tri, et loc
+       case Both() => insideS(currentFlip)
+       case One(v) =>  insideS(currentFlip & (if (v) isV else (NisV))) // result also depend on impact
+     })
+     /** flip is ok if prio is minimum with respect to the other side */
+     def tmp: BoolVf =imply(transfer(v(tritrig)),ags.head.prio.lt3)
+     /** flip is preserved if no neighbor edge present a problem */
+     def where=inside(tmp)
+   }
+
+
+
+   /** any agent, bounded or movable, can be constrained */
+  var constrsOld: List[Constr] = List() //si je met private, ca plante. j'ai fait un catch pour récupérer inaccesible
+  val constrs= new scala.collection.mutable.LinkedHashMap[String,Constr]()
+
+   /** add c to the list of constraint */
+ def constrain(name:String,c: Constr) = {
+   if(constrs.contains(name))
+     throw new Exception("une contrainte du nom "+name+" exite déja, changez le nom siou plait")
+   constrs(name)=c
+ }
+
 
 
 
   //var initialFlip:BoolV=null
   /** PEs where movements trigger changes in Agent's support. Either by filling, or by emptying
      flip is eith computed from the move for movableAgent, or  computed from the parent for bounded agent*/
-  val flip= new mutable.HashMap[Int,BoolV]() with Named {}
+  val realFlipCancel= new mutable.HashMap[String,BoolV]() with Named {}
+   val rawFlipCancel= new mutable.HashMap[String,BoolV]() with Named {}
 
-  //var flip2:HashMap[Int,BoolV]=HashMap()
+  /*
   def currentFlip: BoolV =
     flip(flip.size-1)
   def updateFlip(v:BoolV)={
     flip(flip.size)=v }
+   */
   /** initial value of flip */
-  val initialFlip: BoolV
+  val flipCreatedByMoves: BoolV
 
   /** priority of the force causing the move. priority 0 is strongest
    * prio is defined for bounded agents, because it could happen they are also submitted to mutex
    * they will inherit the priority from their parents, pb if there is two parents.
    * */
 
+  var currentFlip :BoolV = null
+  def refineFlip() = {
+    currentFlip=flipCreatedByMoves
+    for ((name, c) <- constrs) {
+      rawFlipCancel(name)=c.where
+      val oldFlip = currentFlip
+      currentFlip = currentFlip & c.where
+      realFlipCancel(name) = oldFlip & ~ currentFlip  //flip real measures the diminution in flip
 
-  def refineFlip = {
-    for (c <- constrs.reverse) {
+    }
+  }
+
+ /* def refineFlipOld = {
+    for (c <- constrsOld.reverse) {
       updateFlip(currentFlip & c.where)
     }
 
-  }
+  }*/
 
   /** moves are stored in centered form, so that we can restrict them */
   var moves: HashMap[Int, MoveC] = HashMap()

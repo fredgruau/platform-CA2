@@ -1,4 +1,4 @@
-package progOfCA
+package sdn
 
 import compiler.AST.{Layer, Strate}
 import compiler.SpatialType.BoolV
@@ -9,7 +9,8 @@ import dataStruc.DagNode.EmptyBag
 import sdn.Agent
 
 import scala.collection.immutable.HashMap
-/** adds system instruction to selected AST, on top of layers, so that the compiler can retrieve them*/
+/** allow to use system instruction (show, debug...) by adding them to selected AST, so that the compiler can retrieve them
+ * previously only layers could use system instructions, but it turns out to be not sufficient*/
 trait carrySysInstr{
   var syysInstr: List[CallProc] = List.empty;
 }

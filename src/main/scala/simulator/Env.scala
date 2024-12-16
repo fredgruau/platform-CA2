@@ -11,6 +11,7 @@ import java.lang.Thread.sleep
 import scala.collection.convert.ImplicitConversions.`map AsScala`
 import scala.collection.immutable.HashMap
 import scala.collection.mutable
+import scala.swing._
 import scala.util.Random
 
 /**
@@ -22,11 +23,9 @@ import scala.util.Random
  * @param initName   init method for root layer, which can vary
  * @param randomRoot so that we can reproduce same list of random numbers
  */
-class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, initName: HashMap[String, String]) {
+class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, initName: HashMap[String, String],val t0:Int) {
   /** current time */
-  var t = 0
-
-
+  var t = -1 //incoherent value, should be initialized
 
   val medium: Medium with encodeByInt with InitSelect = arch match {
     case "christal" => christal(nbLine, nbCol, controller.CAwidth) //default medium is christal
@@ -39,8 +38,8 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
   val mem: Array[Array[Int]] = Array.ofDim[Int](controller.progCA.CAmemWidth(), medium.nbInt32total)
 
   /** associated pannel */
-  var pannel: CApannel = null //to be set latter due to mutual recursive definition
-
+  var caPannel: CApannel = null //to be set latter due to mutual recursive definition
+  val iterationLabel=new Label(""+t)
   //init() // this initialization is to be called after creation, because pannes cannot be set at creation
   // at runtime, when the user restarts the whole simulation from the restart button
 
@@ -77,8 +76,9 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
       medium.voronoise(controller.displayedLocus, controller.currentProximityLocus) //we have to compute the voronoi upon medium's creation
     initMemCA() //invariant stipulates that memory should be filled so we fill it already right when we create it
 // System.out.println( medium.pointSet(V()).size)
+    t=0
     forward() //we do one forward, so as to be able to show the fields.
-    for (_ <- 0 until controller.t0) //forward till to
+    for (_ <- 1 until t0) //forward till to
       forward()
     computeVoronoirColors() // for the initial painting
     repaint() //  cannot be called now, because the associated pannel has not been created yet.
@@ -143,7 +143,7 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
           forward()
           if (bugs.size > 0) controller.isPlaying = false
           repaint()
-          sleep(50) // slow the loop down a bit
+          sleep(50) // slows down the loop  a bit
         }
       }
     }
@@ -158,11 +158,12 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
     //  controller.progCA.anchorFieldInMem(mem) //todo a refaire seulement si meme change (quand on display ou qu'on display plus)
     bugs = controller.progCA.theLoops(medium.propagate4Shift, mem).asScala //we retrieve wether there was a bug
     t += 1
+    iterationLabel.text="" + t
   }
 
   def repaint(): Unit = {
     computeVoronoirColors()
-    pannel.repaint()
+    caPannel.repaint()
   }
 
 }

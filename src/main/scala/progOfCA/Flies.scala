@@ -7,39 +7,36 @@ import compiler.ASTLfun.{orR, reduce}
 import compiler.ASTLt.ConstLayer
 import compiler.SpatialType.{BoolE, BoolV}
 import compiler.{AST, ASTLt, B, E, V, repr}
-import sdn.{Compar, Qpoint}
+import sdn.Util.addBlobV
+import sdn.{BlobConstrain, BlobV, BlobVouE, Compar, Force, MovableAg, MovableAgentV, QpointConstrain}
+
 import java.util.HashMap
 import java.util
 
 
-/** we test simple movement, using a single agents*/
-class Flies() extends Qpoint //with Blobify with QPointify
-{  val b:Boolean=true
-  move(Force.total)
+/** flies is constrained with blob, so as to be preserved , with qpoint so that their support remains of size <3 */
+class Flies() extends  MovableAgentV  with QpointConstrain with BlobVouE with BlobConstrain
+{  move(Force.total)
+   //updateFlip(flipCreatedByMoves) //calcul de flip0
 
-  updateFlip(initialFlip) //calcul de flip0
-  constrain(leq4)
-  constrain(diseaperSingle)
-  constrain(breakRingFlip)
-  val nutrig=diseaperDouble.mutrig
-  val where=diseaperDouble.where
-  val tmp=diseaperDouble.tmp
-  constrain(diseaperDouble)
-  refineFlip //calcul de flip1,flip2,....
+// val nutrig=appearDouble.mutrig
+  /** we create val so as to show them */
 
-  shoow(nutrig, where,tmp)
-  for (v<-flip.values) shoow(v) //display intermediate, decreasing  flip value
 
-  shoow(is)
-  shoow(NisV)
+  refineFlip() //calcul de flip1,flip2,....
+ for (v<-rawFlipCancel.values) shoow(v) //display intermediate, decreasing  flip value
+  for (v<-realFlipCancel.values) shoow(v) //display intermediate, decreasing  flip value
+ // shoow(meetE,meetV,nbCc,lateBrdE)
+  shoow(is,NisV)
   shoow(doubleton,singleton)
   shoow(next2NonSingleton,doubletonV,tripletonV,isApexV)
   val defE=new ConstLayer[E, B](1, "def")
   val twoLt: BoolE =reduce(andRedop[B], prio.lt)
-  shoow(twoLt,touchedByRandDir,prio.lt,prioRand)
-  shoow(prio.eq)
+  shoow(twoLt,touchedByRandDir,prioRand.lt,prioRand)
+  shoow(prioRand.eq)
   //shoow(sloplt,level,twoLt,dopp,se,grad3,grad6)
-  buugif(twoLt&defE) //marche pas, je pensais que oui, mais en fait non.
+  buugif(twoLt&defE) //marche
+  //shoow(appearDouble.mutrigv)
   //shoow(bugE)
 
 }

@@ -51,7 +51,10 @@ trait BranchNamed
         for ((key, value) <- m) {
         val suffix: String = key match {
           case n: Named => n.name
-          case i: Int => "" + i
+          case s:String =>
+            s
+          case i: Int =>
+            "" + i
           case _ => null
         }
         if (suffix != null) value match {
@@ -84,7 +87,10 @@ trait BranchNamed
               //println(s"$name: $value")
               value match {
                 case t: Named =>
-                  val nameOublieN=if(t.name=="") "" else name
+                  val nameOublieN=
+                    if(t.name=="")
+                       ""
+                    else name
                   setAllName(t, newName + removeDot( capitalizeFirst(nameOublieN)))
                 case _ =>
               }

@@ -47,12 +47,10 @@ sealed abstract class Constraint(val locus:Locus)
     result
   }
 
-
-
   /** Compute a joint constraint.  generates the schedules for the smallest card, and verify with the other.
    * unless specific cases where it can be deduced in a cheaper way */
   def intersect(c: Constraint): Constraint = {
-    require(c.locus == this.locus, "intersected constraint have identical loci")
+    require(c.locus == this.locus, "intersected constraint must have identical loci")
     if (c.isInstanceOf[AllConstr] || (c == this)) this
     else if (c.card < card) c.intersect(this) // c has smallest card
     else Schedules(HashSet.empty[Seq[Int]] ++ schedules.filter(c.verified(_)), c.locus)

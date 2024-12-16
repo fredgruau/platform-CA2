@@ -8,13 +8,13 @@ import compiler.Circuit.iTabSymb
 import compiler._
 
 import scala.collection.immutable.HashMap
-/** propose des fun trés simple qui applique juste un operateur binaire, ce pour éviter de generer des fundef anonymes, tout le temps. */
+/** Construit des macro trés simple qui applique juste un operateur binaire, cela évite d'avoir a générer des fundef anonymes, tout le temps.
+ * et rends le code plus lisibles.  */
 object Bino {
-
-
 
   private var binmem: iTabSymb[Fundef2[(Locus, Ring),(Locus, Ring),(Locus, Ring) ]] = HashMap()
 
+  /** prefix contains the family name "bino", and the name. the suffix stores locus and ring of both operands.  */
   private def binfunName[L<:Locus, R <: Ring](op:Fundef2R[R], l:Locus)(implicit m: repr[L],  q: repr[R]) = {
     val y = 0
     ("" + "bino" + op.name + "." + l.shortName+q.name).toLowerCase.dropRight(2)

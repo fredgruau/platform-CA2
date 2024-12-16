@@ -1,7 +1,5 @@
 package progOfCA
 
-package progOfCA
-
 import compiler.AST.Layer
 import compiler.ASTL._
 import compiler.ASTLfun.{orR}

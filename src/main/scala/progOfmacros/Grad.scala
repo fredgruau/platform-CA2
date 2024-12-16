@@ -3,14 +3,14 @@ package progOfmacros
 import compiler.B
 import compiler.AST._
 import compiler.SpatialType.{BoolEv, BoolVe, _}
-import compiler.ASTBfun.{addRedop, andRedop, minSignRedop, orRedop, p, redop, uI2SI, xorRedop}
+import compiler.ASTBfun.{addRedop, andRedop, derivative, minSignRedop, orRedop, p, redop, uI2SI, xorRedop}
 import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.ASTLt._
 import compiler.Circuit.hexagon
 import compiler._
 import progOfmacros.Compute._
-import progOfmacros.Wrapper.borderS
+import progOfmacros.Wrapper.{borderS, not, segment1}
 
 object Grad {
 
@@ -52,25 +52,23 @@ object Grad {
     (e1, e2, e3, e4)
   }
 
-
-  /** macro that, computes the  slopLt,
-   * which is true  on the side where the Vertice has a lower integer value (used for priority)
-   * Also computes level,  a boolE which is true when the neihgbors on each side are equal,
+  /** former way of computing together both lt and eq, may be not so bad, but eq has to be used, which is prone to error
+   * because quite often we are only interested by lt
    * */
   val slopeLtDef: Fundef1[(V, UI), ((T[E, V], B),  (E,B))] =  {
     val d = pL[V, UI]("dis")
     //val d=uI2SIL(d1)
     val dEv: UintEv = transfer(e(d))//send(List(d, d, d, d,d,d)) //we  apply an opp on distances comming from the center.
+    dEv.setName("dev")
     //val grad3: IntE = reduce(addRedop[SI].asInstanceOf[redop[SI]], transfer(se)) //the trick here is to do the expensive operation (add) only on the three edges locus, instead of the 6 Ve transfer
     val lt:BoolE=ltUiEdge(dEv);lt.setName("lt")
     val eq:BoolE=eqUiEdge(dEv);eq.setName("eq")
     val gt:BoolE= ~(lt|eq);gt.setName("gt")
-    //reste a calculer eq de la meme facon.
     val slopEv: BoolEv = send(List(gt,lt)) //when sending back the result to EV, we have to invert again towards the center
     slopEv.setName("slopeEv")
+    Fundef1("grad.slopLt", Cons(slopEv, eq), d)
     Fundef1("grad.slop", Cons(slopEv, eq), d)
   }
-
 
   /** Calls slopeLt, and separate the two results. */
   def slopeLt(d: UintV): (BoolEv,  BoolE) = {
@@ -81,9 +79,64 @@ object Grad {
   }
   /** macro that, computes the  slopLt,
    * which is true  on the side where the Vertice has a lower integer value (used for priority)
-   * Also computes level,  a boolE which is true when the neihgbors on each side are equal,
    * */
-  val ltDef: Fundef1[(V, UI), (T[E, V], B)] =  {
+
+
+  val ltDef: Fundef2[(V, UI),(E, UI), (T[E, V], B)] =  {
+    /** main variable that we want to compare */
+    val d = pL[V, UI]("dis")
+    /** segment is used for computing eq, so we  compute it separately*/
+    val segmentOf1 =pL[E, UI]("segment")
+    /** this was also computed when xor was computed, but we save memory by recomputing it, and it is small */
+    val dEv: UintEv = transfer(e(d))
+    /** binop edge that forget the second component */
+    val devLeft:UintE= firstEdge(dEv);
+    /** true if both values are different */
+    val diff= elt(0,segmentOf1)
+    val lt1: BoolE =neq(unop(derivative, segmentOf1)&devLeft);
+    /** strictly greater means not strictly smaller, and different */
+    val gt1:BoolE= ~lt1 & diff;
+    val lt: BoolEv = send(List(lt1,gt1))
+    Fundef2("grad.lt", lt, d,segmentOf1)
+  }
+
+  /** Calls pure lt, result will be true on the side of the cell having smallest value  */
+  def lt(d: UintV,s:UintE)(implicit n: repr[B],l:repr[T[E,V]]): BoolEv = {
+    new Call2[(V,UI),(E,UI),(T[E, V], B)] (ltDef, d,s)with BoolEv
+  }
+
+  import progOfmacros.Comm._
+
+ /** same as lt, but with respect to Ef, and apex */
+
+  val ltDefApex: Fundef2[(V, UI),(E, UI), (T[E, F], B)] =  {
+    /** main variable that we want to compare */
+    val d = pL[V, UI]("dis")
+    /** segment is used for computing eq, so we  compute it separately*/
+    val segmentOf1 =pL[E, UI]("segment")
+    /** this was already computed when xor was computed, but we save memory by recomputing it, and it is small */
+    val dEf: UintEf = apexEui(f(d))
+    /** binop edge that forget the second component */
+    val devLeft:UintE= firstEdge(dEf);
+    /** true if both values are different */
+    val diff= elt(0,segmentOf1)
+    val lt1: BoolE =neq(unop(derivative, segmentOf1)&devLeft);
+    /** strictly greater means not strictly smaller, and different */
+    val gt1:BoolE= ~lt1 & diff;
+    val lt: BoolEf = send(List(lt1,gt1))
+    Fundef2("grad.lt", lt, d,segmentOf1)
+  }
+
+  /** Calls pure lt, result will be true on the side of the cell having smallest value  */
+  def ltApex(d: UintV,s:UintE)(implicit n: repr[B],l:repr[T[E,V]]): BoolEf = {
+    new Call2[(V,UI),(E,UI),(T[E, F], B)] (ltDefApex, d,s)with BoolEf
+  }
+
+
+
+
+  /** yet another way on computing lt, remember, we spent a lot of time on this! */
+  val ltDefOld: Fundef1[(V, UI), (T[E, V], B)] =  {
     val d = pL[V, UI]("dis")
     //val d=uI2SIL(d1)
     val dEv: UintEv = transfer(e(d))//send(List(d, d, d, d,d,d)) //we  apply an opp on distances comming from the center.
@@ -97,8 +150,8 @@ object Grad {
     Fundef1("grad.slop", slopEv, d)
   }
   /** Calls pure slope, result will be true on the side of the cell having greater value  */
-  def lt(d: UintV)(implicit n: repr[B],l:repr[T[E,V]]): BoolEv = {
-    new Call1[(V,UI),(T[E, V], B)] (ltDef, d)with BoolEv
+  def ltOld(d: UintV)(implicit n: repr[B],l:repr[T[E,V]]): BoolEv = {
+    new Call1[(V,UI),(T[E, V], B)] (ltDefOld, d)with BoolEv
   }
 
 

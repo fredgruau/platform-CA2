@@ -4,6 +4,7 @@ import compiler.Circuit
 import compiler.Circuit.compiledCA
 import compiler.DataProg.{nameDirCompilCA, nameDirCompilLoops, nameDirProgCA, nameDirProgLoops}
 import dataStruc.Util.{CustomClassLoader, existInJava, getProg, hasBeenReprogrammed, loadClass}
+//import simulator.Simulator.SimulatorUtil.envs
 import simulator.SimulatorUtil._
 import simulator.XMLutilities._
 import triangulation.Vector2D
@@ -31,6 +32,7 @@ object Simulator extends SimpleSwingApplication {
 
   /** name of Cellular automaton being simulated, to be set by method startUp, and then used by method top */
   var nameCA: String = " "
+  var nameSimulParam: String = " "
   /** parameters defining sizes, t0, isPlaying, common to all simulations */
   var simulParam: Node = null
   /** contains info about which layers are expanded, what where the already  used colors. */
@@ -49,7 +51,7 @@ object Simulator extends SimpleSwingApplication {
     nameCA = args(0) //name of the CA program
     nameGlobalInit = args(1)
     globalInit = readXML("src/main/java/compiledCA/globalInit/" + nameGlobalInit)
-    val nameSimulParam = args(2)
+     nameSimulParam = args(2)
     simulParam = readXML("src/main/java/compiledCA/simulParam/" + nameSimulParam)
     displayParam = try {
       readXML("src/main/java/compiledCA/displayParam/" + nameCA + ".xml")
@@ -104,7 +106,7 @@ object Simulator extends SimpleSwingApplication {
     title = "spatial computation " + nameCA + " gateCount=" + progCA.gateCount() + " memory Width=" + progCA.CAmemWidth()
 
     /** process the signal we create controller first in order to instanciate state variable used by layerTree */
-    val controller = new Controller(nameCA, globalInit, nameGlobalInit, simulParam, displayParam, progCA, chosenDir, this)
+    val controller = new Controller(nameCA, globalInit, nameGlobalInit, simulParam,nameSimulParam, displayParam, progCA, chosenDir, this)
     /** Tree for browsing the hierarchy of layers and which field to display */
     val xmlLayerTree: Elem = readXmlTree(progCA.displayableLayerHierarchy())
     System.out.println("the displayable layers are\n" + xmlLayerTree)
@@ -131,22 +133,28 @@ object Simulator extends SimpleSwingApplication {
       var numCell = 0
       //how many columns
       val nbColPannel: Int = xInt(simulParam, "display", "@nbCol")
-      for (env: Env <- iterEnvs) { //effectivement, lorsque on crée les envs, il n'ont as encore leur pannel
+      for (env: Env <- iterEnvs) { //effectivement, lorsque on crée les envs, il n'ont pas encore leur pannel
         controller.envList = controller.envList :+ env //we will need to acess the list of env, from the controler
-        env.pannel = new CApannel(controller.CAwidth, controller.CAheight, env, progCA) // the number of CAlines is 1/ sqrt(2) the number of CA colomns.
-        if (env.medium.nbCol >= 30) { // if the CA has too many columns, it get displayed on multiple columns
+
+        env.caPannel = new CApannel(controller.CAwidth, controller.CAheight, env, progCA) // the number of CAlines is 1/ sqrt(2) the number of CA colomns.
+          /** allows to add widjet for each CA, such as the time */
+          val envPanel = new BoxPanel(Orientation.Vertical) {
+            contents += env.iterationLabel
+            contents += env.caPannel
+          }
+            if (env.medium.nbCol >= 30) { // if the CA has too many columns, it get displayed on multiple columns
           assert(numCell % nbColPannel == 0, "you must garantee that CA whose number of columns is >=30 are displayed on multiple of nbColPannel")
-          add(env.pannel, constraints(numCell % nbColPannel, numCell / nbColPannel, nbColPannel, GridBagPanel.Fill.Horizontal)) //adds the pannel using the Grid layout (GridBagPnnel)
+          add(envPanel, constraints(numCell % nbColPannel, numCell / nbColPannel, nbColPannel, GridBagPanel.Fill.Horizontal)) //adds the pannel using the Grid layout (GridBagPnnel)
           numCell += nbColPannel
         }
         else {
-          add(env.pannel, constraints(numCell % nbColPannel, numCell / nbColPannel)) //adds the pannel in a single cell
+          add(envPanel, constraints(numCell % nbColPannel, numCell / nbColPannel)) //adds the pannel in a single cell
           numCell += 1
         }; numEnv += 1
         // controller.progCA.anchorFieldInMem(env.mem)
         //should be env.init
         //controller.progCA.initLayer(env.mem)
-        env.init() // could not be done in the creation of the env, because pannel was not create yet
+        env.init() // could not be done in the creation of the env, because pannel was not created yet
       }
     }
     val scrollablPannels = new ScrollPane(pannels) // we generate many pannels and the mouse wheel will allow to easily scroll
@@ -184,6 +192,7 @@ object SimulatorUtil {
     val simulParam = controller.simulParam
     /** When simulating CAs whose number of Lines and columns augment */
     val gridSizes: collection.Seq[(Int, Int)] = fromXMLasListIntCouple(simulParam, "sizes", "size", "@nbLine", "@nbCol")
+    val t0s=fromXMLasList(simulParam, "sizes", "size", "@t0")
     /** When simulating CAs with different init */
     val multiInits = xArrayString(simulParam, "multiInit", "@inits")
     val rootLayer: String = if (multiInits.nonEmpty) x(simulParam, "multiInit", "@layer") else null
@@ -207,6 +216,7 @@ object SimulatorUtil {
         var initRoot: HashMap[String, String] = HashMap.empty
         /** coded as a method because when iterating through the CAsizes, nbColCA is modified */
         val arch: String = x(simulParam, "machine", "@arch")
+       // var t0= -1 //xInt(simulParam, "simul", "@t0") //default tO
 
 
         /** @return `true` if there is a next element, `false` otherwise */
@@ -215,13 +225,14 @@ object SimulatorUtil {
         /** @return next element */
         override def next(): Env = {
           iter match {
-            case "CAsize" => nbLineCA = gridSizes(nbIter)._1; nbColCA = gridSizes(nbIter)._2
+            case "CAsize" => nbLineCA = gridSizes(nbIter)._1; nbColCA = gridSizes(nbIter)._2;
             case "multiInit" => initRoot = HashMap(rootLayer -> multiInits(nbIter))
             case "random" => controller.randomRoot = nbIter
             case _ =>
           } //inital value of nbLineCA
+          val  t0=t0s(nbIter).toInt//saved starting time
           nbIter = nbIter + 1
-          new Env(arch, nbLineCA, nbColCA, controller, initRoot)
+          new Env(arch, nbLineCA, nbColCA, controller, initRoot, t0)
         }
       }
     }

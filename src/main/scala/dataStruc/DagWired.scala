@@ -23,8 +23,13 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
    * @param trans a partir d'une composante connexe, calcule un ou plusieurs neoud du output Dag cible
    * @return new dag produced by computing the connected components, and then transforming them
    */
-  def quotient2[T2 <: DagNode[T2] with WiredInOut[T2]](p: (T, T) => Boolean, trans: Iterable[T] => List[T2]): Dag[T2] = {
-    val unsorted: Iterable[List[T]] = components2(p)
+  def quotient2[T2 <: DagNode[T2] with WiredInOut[T2]](p: (T, T) => Boolean,  processCyclePairs: Set[String]=>Unit, trans: Iterable[T] => List[T2]): Dag[T2] = {
+    val (unsorted: Iterable[List[T]] ,cyclePairs)= components2(p)
+    var becomeStored:Set[String]=HashSet()
+    for((src,target)<- cyclePairs)
+      becomeStored=becomeStored+target.names.head  //calcule les variables qui doivent maintenant etre en stored.
+    processCyclePairs(becomeStored)
+
     val sorted =unsorted.toList.sortBy(_.toString) //we sort the component so that the order of automatically defined macro (and therefore their integer labeling) is deterministic
     val newDagNodes = sorted.flatMap(trans).toList //when applied to zone, an alignement is computed on  T's.
     WiredInOut.setInputAndOutputNeighbor(newDagNodes)

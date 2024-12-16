@@ -147,7 +147,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
         val anchor = (anchorParam(shortSigIn, paramD) ::: anchorParam(shortSigOut, paramR) ::: anchorParam(layerNames, layerNames.flatMap(s => tSymbVar(s).locus.deploy(s)))).reverse.mkString(",")
         if (anchor.size > 0) "int[] " + anchor + ";" else "" //we may not need to anchor anything.
       },
-      /*"PROPAGATEFIRSTBIT" -> {
+      "PROPAGATEFIRSTBIT" -> {
         val callsToPropagate: Seq[String] = paramD.map((s: String) => "p.prepareBit(" + s + ")") //for the moment we do the propagation on all data parameters
         val callsToPropagate2 = shortSigIn.map((s: String) => "p.prepareBit(" + s + ")")
 
@@ -156,7 +156,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
           "p.mirror(" + s + ",compiler.Locus." + l.javaName + ")"
         })
         callsToMirror.mkString(";") + ";\n" + callsToPropagate2.mkString(";") + "\n"
-      },*/
+      },
       "CALINENUMBER" -> (paramD ::: paramR)(0), //There must be at least one param,we need to read it so as to know the length which is the number of CA lines.
       "DECLINITPARAM" -> {
         /** declares all the variables local to the loops, and initializes them to zero if needed */
@@ -397,11 +397,15 @@ trait ProduceJava[U <: InfoNbit[_]] {
           else radicalOfVar(paramsD(0))
           val locuspR = tSymbVarSafe(pR).locus
           val locuspD = tSymbVarSafe(pD).locus
-
-          if (locuspR.isTransfer && !locuspD.isTransfer)
-            callCode = "broadcaast(" //6 copy from 1D array to 1Darray are turned into a call to broaadcast from 1D arrau to 2D array
+//si on utilise Elt i, y aura un #i a la fin de paramD et pas de # a la fin de paramR
+          val weHaveAnElt=paramsD(0).dropRight(1).endsWith("#") && !(paramsR(0).dropRight(1).endsWith("#"))
+          val specifComponent:String=  if(weHaveAnElt)
+                ","+paramsD(0).last
+          else " " //rajoute le numéro de la component, pour elt.
+           if (locuspR.isTransfer && !locuspD.isTransfer) //marche pas pour E,F
+            callCode = "broadcaast("+6/locuspD.density+"," //6 copy from 1D array to 1Darray are turned into a call to broaadcast from 1D arrau to 2D array
           //val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet(pR, pD)
-          callCode += pD + "," + pR
+          callCode += pD + specifComponent + "," + pR
         case "memo" => val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet() ++ params.map(radicalOfVar(_)) //copy and memo have the same effect
           callCode += l.toList.mkString(",")
         case "bug" => val nameBug = radicalOfVar(call.exps.head.asInstanceOf[Read[_]].which) //on apelle bug avec un read, c'est obligé
@@ -416,26 +420,32 @@ trait ProduceJava[U <: InfoNbit[_]] {
           val spatialParam= shortenedSig(dataParam:::resultParam)
           val bitSigSafe=spatialParam.map(tSymbVarSafe(_).nb)
           val spatialSigSafe=spatialParam.map(tSymbVarSafe(_).t.asInstanceOf[(Locus, Ring)])
+          /** for each radical, the number of effective parameter with identical radical if it is 6, it does not imply that we have a transfer*/
            val densityDirectlyMeasured: List[Int] =spatialParam.map(s=>params.filter(radicalOfVar(_)==(radicalOfVar(s))).size) //on teste l'egalité pour eviter les pb avc les prefixes.
           assert(densityDirectlyMeasured.sum == params.size, "regardez si y a pas un nom de parametre qui est suffixe d'un autre"+ params.size + "neq" + densityDirectlyMeasured.sum)
 
              for ( ((spatialType, nbit),densityDirect) <- spatialSigSafe zip bitSigSafe zip densityDirectlyMeasured) { //retrieve spatial type and  bitSize   of parameters.
-            val locusParamPossiblyWrong: Locus = spatialType._1 //locus is wrong because it is computed from the name of the effective parameter. It is not to be trusted, when broadcasting is done.
-            val densityParamPossiblyWrong = nbit * locusParamPossiblyWrong.density  //locus is wrong implies density is wrong too
-            if (spatialType == (V(), B()) && densityDirect<6) { //we can have seedDist$2 passed to a boolV, therefore, we should transform it into seedDist[2]
-              paramCode = radicalOfVarIntComp(params(i)) :: paramCode; //this is what is done by radicalOfVarIntComp
+               val locusParamPossiblyWrong: Locus = spatialType._1 //locus is wrong because it is computed from the name of the effective parameter. It is not to be trusted, when broadcasting is done.
+
+               var densityParamPossiblyWrong = nbit * locusParamPossiblyWrong.density  //locus is wrong implies density is wrong too
+               //pour elt, densityParamPossiblyWrong is wrong, because we pass only one of the numerous bits forming an uint, so we take intoaccount the density directly measured
+               if(densityParamPossiblyWrong>densityDirect)   densityParamPossiblyWrong=densityDirect
+               if (spatialType == (V(), B()) && densityDirect<6) { //we can have seedDist$2 passed to a boolV, therefore, we should transform it into seedDist[2]
+               paramCode = radicalOfVarIntComp(params(i)) :: paramCode; //this is what is done by radicalOfVarIntComp
                i+= 1
             }
             //until now we applied same processing wether it is a name or a heap variable
             else {
-              /** we look at the type of effective parameter, in order to find the type of the formal parameter */
 
-              val locusParamEf = tSymbVarSafe(radicalOfVar(params(i))).locus //this does not work, because effective parameter has been obtained by duplication using a direct interpretation of broadcast
-              if (!locusParamPossiblyWrong.isTransfer && densityDirect==6/* !locusParamEf.isTransfer*/ )//we detect that we have done a broacast,
+              /** we look at the type of effective parameter, in order to find the type of the formal parameter */
+              val infoParamEF=tSymbVarSafe(radicalOfVar(params(i)))
+              val locusParamEF = infoParamEF.locus //this does not work, because effective parameter has been obtained by duplication using a direct interpretation of broadcast
+              val nbitParamEF=infoParamEF.nb //since we directly measure how much bits are sent in the effective parameters, we have to take the number of bits into account.
+              if (!locusParamPossiblyWrong.isTransfer && densityDirect/nbitParamEF==6/* !locusParamEf.isTransfer*/ )//we detect that we have done a broacast,
                 if (spatialType == (V(), B()))
                 {  paramCode = "broadcaaast(" + radicalOfVar(params(i)) + ")" :: paramCode;   i += densityDirect         }
                 else
-              {  paramCode = "broadcaast(" + radicalOfVar(params(i)) + ")" :: paramCode;   i += densityDirect         }
+              { paramCode = "broadcaast(" + 6/locusParamPossiblyWrong.density+","+ radicalOfVar(params(i)) + ")" :: paramCode;   i += densityDirect         }
               //we prooceed differently depending wether the params are mem (isheap) or name of fields
               else if (isHeap(params(i))) { //its a "mem[x]
                 var indexesMem: List[Int] = List()

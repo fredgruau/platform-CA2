@@ -250,7 +250,7 @@ object ASTBfun {
   private val (neqSI, neqUI) = {
     def neqI[R <: I](implicit n: repr[R]): Fundef1[R, B] = {
       val x12 = p[R]("xneqSI");
-      Fundef1("notNull", Reduce(x12, orB, False()), x12)
+      Fundef1("notFalse", Reduce(x12, orB, False()), x12)
     }
 
     (neqI[SI], neqI[UI])
@@ -396,6 +396,11 @@ object ASTBfun {
     Fundef2("eqUI", new Call1[UI, B](eqUI, difference) with ASTBt[B], xui, yui) //todo ecrire des xor et des and pour les ui
   } //TODO a faire correct en utilisant ltUI.
 
+  val firstOfTwoUI: Fundef2[UI,UI,UI] ={
+    val (xui, yui) = (p[UI]("xUI"), p[UI]("yUI"))
+    Fundef2("firstOfTwoUI", xui, xui, yui)
+  }
+
   /** optimal implementation of comparison between two unsigned integers, using orscanright like operators, */
   val ltUI2: Fundef2[UI, UI, B] = {
     val (xui, yui) = (p[UI]("xminUI"), p[UI]("yminUI")); //a t-on x < y
@@ -405,6 +410,21 @@ object ASTBfun {
     val first1: Uint = ~(new Call1[UI, UI](halveBUI, segmentOf1) with ASTBt[UI]) & segmentOf1 //only the rightmost msb bits remains. halveBui must comes first otherwise it bugs
     // true if yui is true for i being the index of the  with most significant bit of difference, that is a strict lower than
     Fundef2("ltUI", new Call1[UI, B](neqUI, first1 & yui) with ASTBt[B], xui, yui) //todo ecrire des xor et des and pour les ui
+  } //TODO a faire correct en utilisant ltUI.
+
+  /** optimal implementation of comparison between two unsigned integers, using orscanright like operators, missing just the first and final xor, so as to reuse first¯1, */
+  val orScan: Fundef1[UI, UI] = {
+    val difference = p[UI]("diff");
+    val segmentOf1: Uint = Scan1(difference, orB, False(), Right(), initUsed = false) //fills with one, starting from the rightmost 1 to the first leftmost least significant bit
+    Fundef1("orScan",segmentOf1, difference ) //todo ecrire des xor et des and pour les ui
+  } //TODO a faire correct en utilisant ltUI.
+
+  val derivative: Fundef1[UI, UI] = {
+    val segmentOf1 = p[UI]("segment");
+    //we have to affect segmentof1 because it is read simultaneously at two indexes, for first1.
+    val first1: Uint = ~(new Call1[UI, UI](halveBUI, segmentOf1) with ASTBt[UI]) & segmentOf1 //only the rightmost msb bits remains. halveBui must comes first otherwise it bugs
+    // true if yui is true for i being the index of the  with most significant bit of difference, that is a strict lower than
+    Fundef1("derivative",first1, segmentOf1 ) //todo ecrire des xor et des and pour les ui
   } //TODO a faire correct en utilisant ltUI.
 
 

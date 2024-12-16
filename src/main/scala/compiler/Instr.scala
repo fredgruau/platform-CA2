@@ -76,6 +76,7 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
     new Affect(names(0), newExp)
   }
 
+
   /** recursive removes the first tm1 */
   def detm1iseR: Instr = {
     new Affect(names(0), exps(0).asInstanceOf[ASTBt[Ring]].detm1iseR)
@@ -90,7 +91,7 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
 
   def unShifted = names(0).drop(5)
 
-  def myZone2(tZone: Map[String, Zone], myRoot: Map[String, Instr]) =
+  def myZone2(tZone: Map[String, Zone], myRoot: Map[String, Instr]): Zone =
     tZone(myRoot(names.head).names.head)
 
   def isFolded2(tZ: Map[String, Zone], myRoot: Map[String, Instr]) = myZone2(tZ, myRoot).folded
@@ -99,8 +100,11 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
 
   def mySchedule2(tZ: Map[String, Zone], myRoot: Map[String, Instr], align2Root: Map[String, Array[Int]]): Array[Int] = {
     // if(names(0)=="distTslope")     printf("jysuis\njysuis\njysuis\njysuis\njysuis\njysuis\njysuis\njysuis\njysuis\n")
-    val ps = myZone2(tZ, myRoot).pickedSchedule //schedule of root which is aux5 must be O51324
-    val a = align2Root(names.head) //alignement to root must be 240513 for distTslope
+    val z= myZone2(tZ, myRoot)
+    val ps: scala.Seq[Int] =z.pickedSchedule //schedule of root which is aux5 must be O51324
+    var a: Array[Int] = align2Root(names.head) //alignement to root must be 240513 for distTslope
+    if(a==null&& !z.locus.isTransfer) //we assume it must be the schedule of the root.
+      a=ps.toArray
     val res = if (a != null) compose(ps, invert(a)) else null //must give 234501 will be null for shift instr
     res
   }
@@ -163,8 +167,10 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
    * @param tl  and tail  are built, in order to  find out the id of formal parameter passed by results. */
   def buildhdtl(hd: TabSymb[String], tl: TabSymb[String]): Unit = this match {
     case Affect(_, exp) => exp match {
-      case Heead(Read(s)) => hd += s -> exp.name
-      case Taail(Read(s)) => tl += s -> exp.name
+      case Heead(Read(s)) =>
+        hd += s -> exp.name
+      case Taail(Read(s)) =>
+        tl += s -> exp.name
       case _ =>
     }
     case _ =>
@@ -183,7 +189,13 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
      * @param s
      * @return names of ASTL variables, associated to variable of type cons(cons...))
      */
-    def subNames(s: String): List[String] = if (hd.contains(s)) hd(s) :: subNames(tl(s)) else List(s)
+    def subNames(s: String): List[String] =
+      if (hd.contains(s)) {
+        if(!tl.contains(s))
+          throw new Exception("a varialble has been computed by macro: "+hd(s) +" but is not used, all computed result have to be used otherwise it bugs")
+        else
+        hd(s) :: subNames(tl(s))
+      } else List(s)
 
     /**
      *
@@ -208,7 +220,8 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
           for (r <- res ::: c.args.toList.map(_.name))
             if (t.contains(r) && t(r).k == MacroField()) t += r -> new InfoType(t(r).t, StoredField()); // register the fact that results must be stored.
           List(CallProc(c.f.name, res, c.args.toList))
-        case Taail(_) | Heead(_) => List() //we do not need those any more.
+        case Taail(_) | Heead(_) =>
+          List() //we do not need those any more.
         case _ => List(this)
       }
 
@@ -273,7 +286,7 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
           namePlusOutputsize = namePlusInputsize + nbitResult2.map(_.toString).foldLeft("")(_ + "_" + _)
           newFuns += (namePlusOutputsize -> newProg)
         }
-        else { //not freshly compiled,  because that macro was available for another bit size, we will need to do all the compilation again
+        else { //not freshly compiled,  because that macro was available, but for another bit size, we will need to do all the compilation again
                     takeNbOfBitIntoAccount=takeNbOfBitIntoAccount+funName
                     throw new NbOfBitIntoAccountException()
         }
@@ -528,7 +541,8 @@ case class Loop(names: List[String], exps: List[AffBool]) extends Instr {
 
 //todo on aurait pas du prendre de case class pour affect ou callProc.
 case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
-
+   if(name.equals(""))
+     throw new Exception("name of result is emptystring")
   /* def encpasulatedConcats(s:String, e:ASTBt[UI]):ASTBt[UI]={
      var res=e
      for(i<- (1 to 5).reverse){

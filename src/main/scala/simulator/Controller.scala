@@ -7,7 +7,7 @@ import simulator.Controller.disableBinding
 import simulator.CAtype._
 import simulator.ExampleData._
 import simulator.Medium.christal
-import simulator.Simulator.{displayParam, nameGlobalInit, simulParam}
+import simulator.Simulator.{displayParam, nameGlobalInit, nameSimulParam, simulParam}
 import simulator.XMLutilities._
 import simulator.colors.mainColors
 import triangulation.Vector2D
@@ -22,7 +22,7 @@ import scala.collection.immutable
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.swing._
 import scala.swing.event.{ButtonClicked, EditDone, Key, KeyReleased, SelectionChanged}
-import scala.xml.{Node, NodeSeq, XML}
+import scala.xml.{Attribute, Elem, Node, NodeSeq, Null, XML}
 
 /**
  *
@@ -32,11 +32,12 @@ import scala.xml.{Node, NodeSeq, XML}
  * @param chosenDir directory containing the CA code
  */
 class Controller(val nameCA: String, var globalInit: Node, val globalInitName: String,
-                 var simulParam: Node, var displayParam: Node,
+                 var simulParam: Node, val simulParamName:String, var displayParam: Node,
                  val progCA: CAloops2, val chosenDir: String, val mf: MainFrame)
   extends ToolBar() { //the controller inherits the toolBar, so that it can easily identifies which button was ckicqued, using the button's variable  name
-
+  /** sometimes we try different random root, so as to explore different possible runs. */
   var randomRoot: Int = xInt(simulParam, "simul", "@randomRoot")
+  //var t:Int=xInt(simulParam, "simul", "@t0")
   /** we need to know the locus of fields which are either displayed or initialized */
   val locusOfDisplayedOrDirectInitField: Map[String, Locus] = progCA.fieldLocus.asScala.toMap
   /** we need to know the number of ints of fields which are either displayed or initialized */
@@ -118,7 +119,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   private def proximityLocus(loci:Set[Locus]): Map[Locus, Set[Locus]] =  christal(6, 8, 200).proximityLocus(loci)
 
     /** we'll applies t0 iterations upon initialization to speed up going directly to the interesting cases */
-  val t0: Int = xInt(simulParam, "simul", "@t0")
+ // val t0: Int = xInt(simulParam, "simul", "@t0")
   /** true if we start to play immediately */
   var isPlaying: Boolean = xBool(simulParam, "simul", "@isPlaying")
   var showMore:Boolean=true
@@ -153,10 +154,20 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   private def updateAndSaveXMLGlobalInit(): Unit = {
     val newGlobalInit =
       <initMethod>
-        {globalInit \\ "inits"}<selected rank={"" + globalInitNames.indexOf(globalInitList.selection.item)}/>
+        {globalInit \\ "inits"}<selected rank={"" + globalInitNames.indexOf(globalInitList.selection.item)} seed={"" + randomRoot }/>
       </initMethod>
     XML.save("src/main/java/" + chosenDir + "/globalInit/" + nameGlobalInit, newGlobalInit)
   }
+
+  private def updateAndSaveXMLSimulParam(): Unit = {
+    val newSimulparam = simulParam.asInstanceOf[Elem].copy(child = simulParam.child.map {
+      case simul @ <simul>{_*}</simul> =>
+        simul.asInstanceOf[Elem] % Attribute(null, "randomRoot", randomRoot.toString, Null)
+      case other => other
+    })
+    XML.save("src/main/java/" + chosenDir + "/simulParam/" + nameSimulParam, newSimulparam)
+  }
+
 
 
   class SimpleButton(ic: javax.swing.Icon) extends Button() {
@@ -164,6 +175,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
     contents += this
     Controller.this.listenTo(this) //Controller.this refer to the enclsing controller
   }
+
 
 
   val ForwardButton = new SimpleButton(forwardIcon) //myButton(forwardIcon, this)
@@ -179,8 +191,9 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
     selection.item = globalInitNames(selectedGlobalInit)
   }
   val randomInitList = new ComboBox[Int](randomInitNames) {
-    selection.item = 0
+    selection.item = randomRoot
   }
+
   //val randomRootField = new TextField("" + randomRoot, 2)
   contents += (globalInitList, randomInitList) //, randomRootField)
   listenTo(globalInitList.selection, randomInitList.selection)
@@ -277,6 +290,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
     case SelectionChanged(`randomInitList`) =>
       randomRoot = randomInitList.selection.item
       initButtonClick()//InitButton.doClick()
+      updateAndSaveXMLSimulParam()
 
   }
   /** ca bug si je fait initButton.doClick(), je ne sais pas pourquoi peut etre parceque

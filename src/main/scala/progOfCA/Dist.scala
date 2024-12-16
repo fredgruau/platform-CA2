@@ -12,7 +12,8 @@ import compiler.SpatialType._
 import dataStruc.BranchNamed
 import progOfmacros.Grad
 import progOfmacros.Wrapper.borderS
-import progOfmacros.RedT.cac
+import progOfmacros.RedT.cacOld
+import sdn.BlobOld
 
 
 class Dist(val source: Layer[(V, B)]/*should be a strate here*/,val bitSize:Int) extends Layer[(V, SI)](bitSize, "0") with ASTLt[V, SI] with BranchNamed{
@@ -20,7 +21,7 @@ class Dist(val source: Layer[(V, B)]/*should be a strate here*/,val bitSize:Int)
   val (sloplt: BoolVe, delta, level, gap) = Grad.slopDelta(this) //faudrait que je récupére la date du fichier ou se trouve slopeDelta
   //gabriel centers can be directly obtain simply by taking meeting point of the blob, using sloplt
   //however, when computing E meeting point there is a difficulty due to the fact that the orientation matters.
-  val b = new Blob(orR(transfer(sloplt)), sloplt, orR2(sloplt)) //when computing brdE, we need it to be either true or false on the border
+  val b = new BlobOld(orR(transfer(sloplt)), sloplt, orR2(sloplt)) //when computing brdE, we need it to be either true or false on the border
   // we can decide to set it to true only if there is a blob, or allways, in which case there will be a center all around the chip,
   // which may be appropriate if we want ports all around the chip. If we want this last behavoir
   // we need to use OR2 instead of OR, where neutral will
@@ -28,7 +29,7 @@ class Dist(val source: Layer[(V, B)]/*should be a strate here*/,val bitSize:Int)
   show(b.meetE, b.meetV)
   //the idea here is to compute all what is neccessary from the gradient, so that we do not need to store the gradient which would be heavey
   //val topoligne: BoolE = border(elt(2, this)); //allows to visualize the field by coloring edges instead of  vertices
-  val vortex: BoolF = andR(transfer(cac(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
+  val vortex: BoolF = andR(transfer(cacOld(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
 
   //  bugif(vortex) //rajoute l'instruction bugif dans la liste des instructions de slope.
   show(level, vortex, gap,sloplt, delta) // topoligne, //,

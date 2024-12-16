@@ -1,7 +1,6 @@
 package dataStruc
-
+import scala.Predef
 import compiler.Circuit.iTabSymb
-
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.collection.{immutable, mutable}
 import scala.collection.mutable.LinkedHashSet
@@ -94,7 +93,7 @@ class HeapStates[T <: WiredInOut[T]](val packets: List[T], //todo use this class
   override def iterator: Iterator[(Vector[String], iTabSymb[Int])] = new Iterator[(Vector[String], iTabSymb[Int])] {
     //initialisation of iterator
     var liveVar = liveVars.head
-    //checkNoneInHeap(liveVar.toSet) todo decomment when pb
+    checkNoneInHeap(liveVar.toSet) //todo decomment when pb
     place(liveVar) //not sure we should do that, because parameters are already placed.
     var liveVarLeft = liveVars.tail
     var packetLeft = packets

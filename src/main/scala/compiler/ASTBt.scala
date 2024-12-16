@@ -320,6 +320,8 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
   def unfoldInt(t: TabSymb[InfoNbit[_]]): immutable.List[ASTBt[B]] = this.asInstanceOf[AST[_]]
   match {
     case Read(which) =>
+      if(!t.contains(which))
+        throw new Exception("t(which)")
       if (t(which).t == B()) List(this.asInstanceOf[ASTBt[B]]) else //nothing to do, it's already OK
         Instr.deployInt2(which, t(which)).map((s: String) => new Read(s)(repr.nomB) with ASTBt[B])
   }

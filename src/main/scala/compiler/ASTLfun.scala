@@ -73,7 +73,6 @@ object ASTLfun {
   def rhombusExist(brd: BoolE): BoolE = {
     val brdF: BoolF = existS[E, F](brd)
     existS[F, E](brdF) //second use of brdE, check that there is a totally empty rhombus between two blobs
-
   }
 
   // _____________________________________________arithmetic operation ___________________________________________________________________________
@@ -101,7 +100,7 @@ object ASTLfun {
   /** return true if arg1 is zero, */
   def eq0[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = unop(ASTBfun.eq, arg1);
 
-
+/** returns true if argument is not zero, it makes an or reduction on the bits. */
   def neq[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = unop(ASTBfun.neq, arg1);
 
 
@@ -169,7 +168,7 @@ object ASTLfun {
   def reduce[S1 <: S, S2 <: S, R <: Ring](op: redop[R], arg: ASTLt[T[S1, S2], R])
                                          (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chip[S1, S2]): ASTLt[S1, R] = {
     val neutralElt: ASTLt[T[S1, S2], R] = const[T[S1, S2], R](op._2)
-    val newArg: ASTLt[T[S1, S2], R] = if (d.df == null) arg else
+    val newArg: ASTLt[T[S1, S2], R] = if (d.df == null || true) arg else //enlever le || true pour re-avoir l'usage des def.
       cond[T[S1, S2], R](d.df, arg, neutralElt)
     redop[S1, S2, R](op, newArg)
   }
@@ -181,6 +180,11 @@ object ASTLfun {
   }
   def eqUiEdge [ S2 <: S](arg: ASTLt[T[E, S2], UI])(implicit m2: repr[S2], d:chip[E,S2]): ASTLt[E, B] = {
     binopEdge(eqUI2,arg)
+    //reduce(ltUiRedop, arg).asInstanceOf[BoolE]
+  }
+
+  def firstEdge[ S2 <: S](arg: ASTLt[T[E, S2], UI])(implicit m2: repr[S2],r:repr[UI], d:chip[E,S2]): ASTLt[E, UI] = {
+    binopEdge(firstOfTwoUI,arg)
     //reduce(ltUiRedop, arg).asInstanceOf[BoolE]
   }
 

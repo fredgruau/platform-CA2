@@ -2,7 +2,7 @@ package compiler
 
 import java.util.stream.Collectors
 import ASTB._
-import AST.{AstPred, Call, Call2, Fundef, Layer, Read, isCons, isNotRead}
+import AST.{AstPred, Call, Call2, Fundef, Fundef2, Layer, Read, isCons, isNotRead}
 import Circuit.{AstMap, Machine, TabSymb, iTabSymb, iTabSymb2, takeNbOfBitIntoAccount}
 import VarKind.{LayerField, MacroField, ParamD, ParamR, ParamRR, StoredField}
 import dataStruc.{Align2, Dag, DagInstr, Naame, Named, Schedule, Util, WiredInOut, toSet}
@@ -16,16 +16,19 @@ import compiler.ASTLt.ConstLayer
 import compiler.Constraint.{Aligned, H1beforeH2}
 import compiler.SpatialType.ASTLtG
 import dataStruc.Util.{existInJava, hasBeenReprogrammed, prefixDash, prefixDot, suffixDot}
-import progOfCA.carrySysInstr
+import org.w3c.dom.events.MutationEvent
+import sdn.carrySysInstr
 
 import java.io.File
 import java.lang.reflect.Method
 import java.util
 import scala.List
+import scala.Predef.ArrowAssoc
 import scala.collection.IterableOnce.iterableOnceExtensionMethods
 import scala.collection.{Iterable, IterableOnce, Map, MapView, Set, immutable, mutable}
 import scala.collection.immutable.{HashMap, HashSet, ListMap}
 import scala.language.postfixOps
+import scala.Predef._
 import scala.util.Try
 
 object DataProg {
@@ -439,7 +442,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   /** add new symbol created through affectize */
   private def updateTsymb[U](l: List[AST[_]], v: VarKind): mutable.Map[String, InfoType[_]] =
     tSymbVar.asInstanceOf[TabSymb[InfoType[_]]] ++= l.map((e: AST[_]) => (e.name, new InfoType(e.mym.name, v)))
-
+  def storeFieldise2(v:String)={
+    val tSymbVarbit=tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]]
+    tSymbVarbit(v)=tSymbVarbit(v).storedFieldise2
+  }
 
   /** add new symbol created through affectize with number of bits , using only the symbol table */
   private def updateTsymbNbit[U](l: List[AST[_]], v: VarKind): mutable.Map[String, InfoNbit[_]] = {
@@ -586,7 +592,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     val binopEdge=  HashSet() ++ l.flatMap { _.binopEdgeExpr  } ++ l.filter(_.isBinopEdge)
     val binopEdge2 = binopEdge -- affected //we do not need to affectify, it is already affectified, this looks bugged
     val binopEdge3= binopEdge2.filter(isNotRead(_))
-
     val binredop= redops3 ++ binopEdge3
 
     /** values being reduced must be id of variable
@@ -634,7 +639,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
    * @return true if e reads a layer
    */
   private def isLayerField(e: AST[_]): Boolean = e match {
-    case AST.Read(s) => tSymbVar(s).k.isLayerField
+    case AST.Read(s) =>
+     s.startsWith("ll")// we change to cope with ll  tSymbVar(s).k.isLayerField
     case _ => false
   }
 
@@ -648,7 +654,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
    * todo we need to check this on loop-macro produced by macroified */
   def treeIfyParam(): DataProg[U] = {
     val isNotReadOrParam: AstPred = {
-      case r@AST.Read(_) => tSymbVar(r.which).k == ParamD();
+      case r@AST.Read(_) =>
+        tSymbVar(r.which).k == ParamD();
       case _ => true
     }
     val isReadAndParam: AstPred = {
@@ -709,6 +716,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       /** @param i an instruction
        * @return true if instruction $i produces a result that needs to be stored in a CA layer   */
       def resultNeedStored(i: Instr) = i.names.filter(needStored).nonEmpty || i.tobeProcessedInMacro //(either instruction is a call to a memo, a layer next's value, a paramR, a StoredField,
+      //for(i<-finstrs)
+     //   if(i.names.head=="auxL00") println("ici")
 
       /** transforms memo system calls into affectation */
       val pureAffect: Iterable[Instr] = finstrs.map(_.callProcToAffect)
@@ -717,13 +726,17 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       /** resultParameters's id are the variables that need to be stored */
       val fparamRname = fparamR.flatMap(_.names).filter(needStored)
       /** DataParameters'id are the variables that need to be stored */
-      val locallyComputer = finstrs.flatMap(_.names).toSet
-      val fparamD: Set[String] = toSet(pureAffect.flatMap(_.exps)
-        .flatMap(_.symbolsExcepLayers).filter(i => needStored(i) && !locallyComputer.contains(i)))
+      val locallyComputed = finstrs.flatMap(_.names).toSet
+      val fparamDbrut: Set[String] = toSet(pureAffect.flatMap(_.exps)
+        .flatMap(_.symbolsExcepLayers).filter(!locallyComputed.contains(_)))
+      val fparamDstored: Set[String] = fparamDbrut. filter (needStored(_)) //on accepte que les parametres soient des macro, cela peut arriver maitenant qu'on casse des marco en deux pour éviter les cycles dans le dag quotieht
+      /** contains macro fields which becomes stored field due to cycle detection. */
+      val fparamDmacro: Set[String] = fparamDbrut. filter (!needStored(_)) //on accepte que les parametres soient des macro, cela peut arriver maitenant qu'on casse des marco en deux pour éviter les cycles dans le dag quotieht
       /** Variables that are both dataParameter, and not computed within new function     */
+        val fparamD=fparamDmacro.union(  fparamDstored)
       val fparamDwithoutR = fparamD.filter(!fparamRname.contains(_)).toList
       //if there is paramD which are also parameR then fparamDwithoutR va etre strictement plus petit que fparamD
-      if (fparamDwithoutR.size < fparamD.size)
+      if (fparamDwithoutR.size < fparamDstored.size)
         throw new RuntimeException("Macro has parameter which are both data and result") // _we have to consider this case more carefully
 
 
@@ -808,16 +821,22 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       if (!NeedBuiltFun(g))
         return g.toList
       val name = newFunName()
+    //  if(name == "_fun19")     println("ici")
       newFuns.addOne(name -> builtFun(g))
       List(CallProc(name, newFuns(name))) //replaces the list of instruction by a CallProc to the new created function
     }
+    def processCyclePairs(vars:Set[String])=
+      for(v<-vars)
+        storeFieldise2(v)
 
 
 
     //we sort the instructions of dagis, in order to obtain a deterministic labeling of automaticaly defined macro, turn out it is necessary to sort
     // but later: we sort the components when macroifying
     //System.out.println(sortedDagis)
-    val newDagis: Dag[Instr] = dagis.quotient2(proximity, transform)
+    val newDagis: Dag[Instr] = dagis.quotient2(proximity,processCyclePairs, transform)
+
+
     val stillUsed: Set[String] = HashSet() ++ newDagis.visitedL.flatMap(_.names)
     val newTsymbVar: TabSymb[InfoNbit[_]] = mutable.HashMap.empty
     //we filter out macro Fields
@@ -1045,7 +1064,20 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
     //we have computed cycle cosntraint due to shift, in cycleConstraints
     //we now compute sendCosntraint due to send. between the source Ev, and the reconstitute target Ev
-    val sendConstraints: TabSymb[Constraint] = mutable.HashMap.empty //will be indexed by name defined by send Instructions
+    val binopEdgeConstraints: TabSymb[Constraint] = mutable.HashMap.empty //wi
+    val binopEdgeInstrs=p2.dagis.visitedL.filter ((i:Instr) => {i match {
+      case Affect(n,e:ASTLtG) => e.isBinopEdge
+      case _ => false
+    }} ).asInstanceOf[List[Affect[_]]]
+    if(binopEdgeInstrs.nonEmpty) {
+      for(i<-binopEdgeInstrs) if(i.inputNeighbors.size>0) {  //it can be the case that the dev field is used twice and stored, in which case there is no more cosntraints to register        val dev=i.inputNeighbors(0).asInstanceOf[Affect[_]]
+        val dev=i.inputNeighbors(0).asInstanceOf[Affect[_]]
+        assert(dev.locus.get==T(E(),V())) //inputedge operates on a TEv
+        binopEdgeConstraints(dev.name)= H1beforeH2 (dev.locus.get) //send is used in combination with binop, and should be
+        //constrained h1 before h2, d1 before d2, ad1 before ad2, because of      }
+      }}
+
+/*    val sendConstraints: TabSymb[Constraint] = mutable.HashMap.empty //will be indexed by name defined by send Instructions
     val sendInstrs=p2.dagis.visitedL.filter ((i:Instr) => {i match {
        case Affect(n,e:ASTLtG) => e.isSend
         case _ => false
@@ -1056,10 +1088,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
        val dev=i.inputNeighbors(0).inputNeighbors(0).asInstanceOf[Affect[_]]
        sendConstraints(dev.name)= H1beforeH2 (i.locus.get) //send is used in combination with binop, and should be
          //constrained h1 before h2, d1 before d2, ad1 before ad2, because of      }
-   }}
+   }}*/
    val computedConstraint: TabSymb[Constraint] = mutable.HashMap.empty
     computedConstraint++= cycleConstraints
-    computedConstraint++= sendConstraints
+    computedConstraint++= binopEdgeConstraints//au lieu de sendConstraints qu'on jette
     val (z2: Dag[Zone], myRoot: Map[String, Instr], align2root: Map[String, Array[Int]]) = p2.zones2(computedConstraint, tabAlign) //send Constraint will endup in the right zone.
 
     println(z2) //displays zone,
@@ -1218,48 +1250,55 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
      *         a suffix #1 #2 #3 is appended to indicate which stage we are
      **/
     def  foldBinopEdge(i: Affect[_]): List[Instr]={
-        val treeInstr: List[Instr] =oldmuI(i.name)
+
+      val isFolded = i.isFolded2(tZ, myRoot)
+      if (!isFolded) return oldmuI(i.name)
          //todo faut vérifier l'ordre en regardant le schedule des zones.
          val input: Instr =i.inputNeighbors(0)
       val schedulei=i.mySchedule2(tZ, myRoot, align2root) //1,0,2,3,4,5
       val scheduleInput=input.mySchedule2(tZ, myRoot, align2root) //1,0,2,3,4,5
       val locusInput: Locus =input.locus.get
       val locusRing=input.ring.get //UI
-      val nbit=tSymbScalar(input.names.head).nb
+      val tbit = tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]]
+      val nbit=
+        if(tSymbScalar.contains(input.names.head))
+          tSymbScalar(input.names.head).nb
+        else
+          tbit(input.names.head).nb
       val newVar=newAuxTmp() //we need a tmp variable
       tSymbScalar.addOne(newVar -> new InfoNbit(locusRing, MacroField() , nbit) )//(name + "#" + i -> new InfoNbit[B](B(), tSymbVar(name).k, 1)
       var result:List[Instr]=List()
+      val treeInstr: List[Instr] =oldmuI(i.name)
       val call2=treeInstr(0).asInstanceOf[Affect[_]].exp.asInstanceOf[Call2[_,_,_]]
-      val f=call2.f.asInstanceOf[Fundef2RB[Ring]]
+      val f=call2.f.asInstanceOf[Fundef2[UI,UI,_<:Ring]]//.asInstanceOf[Fundef2RB[Ring]]
         for(k<-0 until 3){
           val resSufx=E().the6sufx(schedulei(k))
          // In case of binop, we force the order, because the op in the binop may not be symmetric; example is lt
          val arg1Sufx=locusInput.the6sufx(scheduleInput(2*k))
          val arg2Sufx=locusInput.the6sufx(scheduleInput(2*k+1))
-
-          result=result:::dedouble2(i.name+"$"+resSufx, newVar, f, input.names.head + "$"+arg1Sufx, input.names.head + "$"+arg2Sufx)
+          result=result:::dedouble2(i.name+"$"+resSufx, newVar, f, input.names.head + "$"+arg1Sufx, input.names.head + "$"+arg2Sufx)(f.body.mym.asInstanceOf[repr[Ring]])
       }
 
      // val binop=call2.f.asInstanceOf[Fundef2RB[Ring]]
     //  val res=dedouble2( ,newVar,binop,Instr.readR(,r) )
 
-         def dedouble(newTmp:String, c:Instr):List[Instr]={
-           val call2=c.asInstanceOf[Affect[_]].exp.asInstanceOf[Call2[_,_,_]] //on doit avoir déja appelé le binopEdge
-         val instr1=Affect(newTmp,call2.arg)
-          // val instr1=Affect(newTmp,oldmuI(input))
-           val r=new repr[Ring](new Ring())
-           val instr2=Affect(c.names.head, new Call2(call2.f.asInstanceOf[Fundef2RB[Ring]],Instr.readR(newTmp,r) , call2.arg2)(new repr[B](B())))
-           List(instr1, instr2)
-         }
-      //val res=treeInstr.flatMap(dedouble(newVar,_))
-      def dedouble2(nameEdge:String, newTmp:String, f:Fundef2RB[Ring],arg1:String,arg2:String):List[Instr]={
-        // val instr1=Affect(newTmp,call2.arg)
-        val r=new repr[Ring](new Ring())
-        val ui=new repr[UI](UI())
-        val instr1=Affect(newTmp,readR(arg1,ui))
-        val instr2=Affect(nameEdge, new Call2(f,Instr.readR(newTmp,ui) , Instr.readR(arg2,ui))(new repr[B](B()))with ASTBt[B])
+     // def reduceR(a1: ASTBg, a2: ASTBg, opred: redop[Ring], m: repr[Ring]) =  new Call2(opred._1, a1, a2)(m) with ASTBt[Ring]
+
+      def dedouble2[To1 <: Ring](nameEdge: String, newTmp: String, f: Fundef2[UI, UI, To1], arg1: String, arg2: String)(implicit reprTo1: repr[To1]): List[Instr] = {
+        val ui = new repr[UI](UI())
+        val instr1 = Affect(newTmp, readR(arg1, ui))
+        val instr2 = Affect(nameEdge,
+          new Call2[UI, UI, To1](f, Instr.readR(newTmp, ui).asInstanceOf[AST[UI]], Instr.readR(arg2, ui).asInstanceOf[AST[UI]]  ) with  ASTBt[To1] )
         List(instr1, instr2)
       }
+
+/*      def dedouble2(nameEdge:String, newTmp:String, f:Fundef2[UI,UI,_<:Ring],arg1:String,arg2:String):List[Instr]={
+         val r=new repr[Ring](new Ring())
+        val ui=new repr[UI](UI())
+        val instr1=Affect(newTmp,readR(arg1,ui))
+        val instr2=Affect(nameEdge, new Call2(f,Instr.readR(newTmp,ui) , Instr.readR(arg2,ui)) with ASTBt[UI])
+      List(instr1, instr2)
+      }*/
 
       result
       //List(i)
@@ -1411,7 +1450,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       permuteAndFixScheduledMu2(name)
     (newMuI, tSymbScalar, coalesc)
   }
-
   /**
    *
    * @param muI    muInstructions assodciated to instructions
@@ -1572,8 +1610,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       if (isReady(i) && defI.contains(i))
         readyInstr += i
     }
-
-
     def init() = {
       //send token to input instructions
       for (p <- paramD) {
@@ -1636,8 +1672,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     }
 
     init()
-    /* if (shifts.nonEmpty)
-       print("rer")*/
+
     while (readyInstr.nonEmpty) { //main loop
       val next: Instr = defI(readyInstr.dequeue())
       result = fire(next) :: result
@@ -1773,7 +1808,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         toBeMet = toBeMet + (nom -> u)
       }
       for (m <- toBeMet) {
-        if (u.contains(m._1)||coalesc(m._1)==coalesc(instr.names.head))
+        if (u.contains(m._1)||(coalesc.contains(m._1) && coalesc.contains(instr.names.head)&& coalesc(m._1)==coalesc(instr.names.head)))
           toBeMet -= m._1 //case closed negatively
         if (m._2.contains(nom)) {
           if (toBeMet(m._1).contains((nom))) {
@@ -1797,7 +1832,36 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
    * @return
    */
   private def detmANDmove(reInsertion: Map[String, String], instrs: List[Instr]) = {
-    var tobeMoved: iTabSymb[Instr] = HashMap()
+    var tobeMoved: iTabSymb[Instr] = HashMap() //contient l'instruction detmisée auxLO1=auxLO2  detmisése d auxLO1=tm1(auxLO2) insérée trois fois
+
+    val instrSansLesTm=instrs.flatMap(
+      (instr: Instr) => {
+        val nom = instr.names(0)
+        //if(nom=="auxL31")println("ici")
+
+        if (reInsertion.values.toSet.contains(nom)) {
+       //   tobeMoved += (nom -> instr.detm1iseHead); //detm1iseR should remove only one tm1, instead of two if there is two. instructions that should be moved
+          tobeMoved += (nom -> instr.detm1iseR);
+          List()
+        }
+        else List(instr)
+      })
+    instrSansLesTm.reverse.flatMap(   //we insert starting from the end of the instruction list,
+      (instr: Instr) => {
+        val nom = instr.names(0)
+        var resu = List(instr)
+        if (reInsertion.keys.toSet.contains(nom)&&tobeMoved.contains(reInsertion(nom))) {
+          resu ::= tobeMoved(reInsertion(nom))
+          tobeMoved-=reInsertion(nom) // and once we inserted once, we stop inserting more by forgeting the resinserted instr, from the twobeMoved map. youpee
+        }
+        resu
+      }
+
+    ).reverse //pour annuler l'autre reverse!
+  }
+  private def detmANDmoveOld(reInsertion: Map[String, String], instrs: List[Instr]) = {
+    var tobeMoved: iTabSymb[Instr] = HashMap() //contient l'instruction detmisée auxLO1=auxLO2  detmisése d auxLO1=tm1(auxLO2) insérée trois fois
+
     instrs.flatMap(
       (instr: Instr) => {
         val nom = instr.names(0)
@@ -1807,7 +1871,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         }
         else {
           var resu = List(instr)
-          if (reInsertion.keys.toSet.contains(nom))
+          if (reInsertion.keys.toSet.contains(nom))   //we also need to count occurences.
             resu ::= tobeMoved(reInsertion(nom))
           resu.reverse
         }
@@ -1828,7 +1892,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
   /**
    *
    * @param instrs instructions to analyse
-   * @return instruction with a single tm1 of the form tm1(variable)
+   * @return (x,y) where there exist an instruction with a single tm1 of the form x= exp .... tm1(y)
+   *  mais il est pas forcément qui démarrent l'expression.
    */
   private def instrsWithaTm1Reg(instrs: List[Instr]) = {
     var result: HashMap[String, String] = HashMap()
@@ -1856,10 +1921,10 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
    *         // rule B   if R1 is not affected before the instruction
    *         //      and R2 is not affected after the instruction, until last R1's use ==>
    *         move the instruction after last R1's use
-   * @param candReg
+   * @param candReg instruction which contains a tm1(var) somewhere
    * @param instrs
    */
-  private def ruleAandB(candReg: Map[String, String], instrs: List[Instr]) = {
+  private def ruleAandB(candReg: Map[String, String], instrs: List[Instr]): (Predef.Set[String], HashMap[String, String]) = {
     var candA = candReg.keys.toSet //candidR1.keys.toSet //candidate for simplest rule
     //data parameters need to be delayed.
     candA = candA.filter(r => !tSymbVarSafe(candReg(r)).k.isParamD)
@@ -1897,7 +1962,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
     def pred(s: (String, String)) = candB.contains(s._1) //we need a map for candB to know where to move.
 
-    val reInsertionB = lastUse.filter(pred).map(_ swap) //allows to reuse move
+    val reInsertionB = lastUse.filter(pred).map(_ swap) //allows to reuse move, unfortunately, there can be several such lastUse, so we need reverse order? or count number of occurence of the instruction.
     (candA, reInsertionB)
   }
 
@@ -1912,9 +1977,11 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
     val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
     if (isLeafCaLoop) {
-      val candReg: Map[String, String] = instrsWithaTm1Reg(p.dagis.visitedL)
-      val (candA: Predef.Set[String], reInsertionB) = ruleAandB(candReg, p.dagis.visitedL)
+     // if(p.dagis.visitedL.size==20)  println("ici")
 
+      val candReg: Map[String, String] = instrsWithaTm1Reg(p.dagis.visitedL)
+      val (candA: Predef.Set[String], reInsertionB: Map[String, String]) = ruleAandB(candReg, p.dagis.visitedL)
+//signification du couple reInsertion b: (var1, var2) faut déplacer l'affectationn var1 aprés var2?
       if (candA.nonEmpty) {
         System.out.println("attention, flat detmisation of " + candA)
         //we now  remove tm1s, from candA
@@ -2048,7 +2115,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       }
 
       val wrap = immutable.HashMap.empty[Instr, treeDag.Wrap] ++ treeDag.visitedL.map(x => x -> treeDag.Wrap(x))
-      val loops1: Map[Instr, List[Instr]] = treeDag.indexedComponents(pipelineProximity2, true, wrap)
+      val (loops1: Map[Instr, List[Instr]],_) = treeDag.indexedComponents(pipelineProximity2, true, wrap)
       //todo construire un dag produit un topological sort gratuitement, comme on a fait pour le Dag de zone, ca serai plus élegant.
       val loops2: Seq[List[Instr]] = treeDag.topologicSort2(loops1, wrap).reverse //we sort them so as to process them in the right order
       var result: List[Packet] = List()

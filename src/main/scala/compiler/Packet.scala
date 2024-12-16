@@ -86,7 +86,6 @@ abstract class Packet(val instrs: List[Instr],
    */
   def addUnfoldInt() = {
     boolAST = unfoldInt().reverse.filter(e => e != False() && e != True()) //whole expression may reduce to False() or True() after simplification. We remove those débris
-    println("ici")
   } // unfoldInt return affectations in reverse order because last affectation are inserted on the head, so it must be reversed
 
   def addCoalesc(c: iTabSymb[String]) = {

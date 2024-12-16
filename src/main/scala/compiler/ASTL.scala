@@ -18,7 +18,7 @@ import scala.collection.{mutable, _}
 import scala.reflect.ClassTag
 import scala.language.implicitConversions
 import dataStruc.Util.{composeAll2, dupliqueOrTriplique, rot, rotPerm, rotR}
-import sdn.Compar
+import sdn.{Compar, Compar3, ComparApex}
 /**
  * todo we must distinguish between the wrapper of the constructors, and the higher order function which can be defined in another object
  * At some point, we decided to store the type information for each distinct constructor, in order to have direct access to this info
@@ -81,12 +81,12 @@ object ASTL {
   }
 
   private[ASTL] final case class Binop[L <: Locus, R1 <: Ring, R2 <: Ring, R3 <: Ring](
-                                                                                        op: Fundef2[R1, R2, R3], arg: ASTLt[L, R1], arg2: ASTLt[L, R2], m: repr[L], n: repr[R3])
+             op: Fundef2[R1, R2, R3], arg: ASTLt[L, R1], arg2: ASTLt[L, R2], m: repr[L], n: repr[R3])
     extends ASTL[L, R3]()(repr.nomLR(m, n)) with Doubleton[AST[_]]
 
   def binop[L <: Locus, R1 <: Ring, R2 <: Ring, R3 <: Ring](op: Fundef2[R1, R2, R3], arg: ASTLt[L, R1], arg2: ASTLt[L, R2])
                                                            (implicit m: repr[L], n3: repr[R3]): ASTLt[L, R3]
-  = Binop[L, R1, R2, R3](op, arg, arg2, m, n3)
+  = new Binop[L, R1, R2, R3](op, arg, arg2, m, n3)
 
   /**
    * @tparam S1 towards wich we reduce
@@ -181,7 +181,7 @@ object SpatialType {
   type IntFe = ASTLt[T[F, E], SI]
   type UintV = ASTLt[V, UI];
   /** Unsigned int for which lt,gt,eq,le,ge are defined submembers */
-  type UintVx = UintV with Compar;
+  type UintVx = UintV with Compar with ComparApex with Compar3;
   type UintE = ASTLt[E, UI];
   type UintF = ASTLt[F, UI]
   type UintEv = ASTLt[T[E, V], UI];
@@ -221,6 +221,12 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case BinopEdge(_, _, _, _,_) => true
       case _ => false
     }
+
+ /* override def isElt =
+    this.asInstanceOf[ASTL[_, _]] match {
+      case Unop(elt: Elt[_], _, _, _) => true
+      case _ => false
+    }*/
 
   override def isSend=
     this.asInstanceOf[ASTL[_, _]] match {
@@ -323,7 +329,8 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
             //else if (op._1.body.mym.name==B())    1//we can reduce int an produce boolean, on Edges.
             else
               argBitSize()
-          case BinopEdge(op,arg,  _, _, _) =>if (op.body.mym.name==B()) 1 else throw new Exception("faut chercher le bitsize de l'op")
+          case BinopEdge(op,arg,  _, _, _) =>if (op.body.mym.name==B()) 1 else
+           newtSymb(arg.name).nb //on pari que c'est la taille de l'operande.//throw new Exception("faut chercher le bitsize de l'op")
           case Send(_) => ASTbitSize(newthis.asInstanceOf[Neton[AST[_]]].args.head)
           case RedopConcat(exp, _, _) => this.locus.fanout //for the concat redop, the number of bit must take into account the arity (2,3, or 6)
 

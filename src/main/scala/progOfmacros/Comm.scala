@@ -4,7 +4,7 @@ import compiler.SpatialType._
 import compiler.AST._
 import compiler.ASTL._
 import compiler._
-
+/** contains communication primitives using rotations and symmetries */
 object Comm {
   /** From a boolfE, computes the appex vertices boolfV */
   val neighborsDef: Fundef1[(T[V, E], B), (T[V, E], B)] = {
@@ -23,22 +23,39 @@ object Comm {
     apexVf.setName("apexVf");
     Fundef1("comm.apexEtoV", apexVf, vf)
   }
-
   /** wrapper .  */
   def apexV(ef: BoolEf): BoolVf = new Call1[(T[E, F], B), (T[V, F], B)](apexVDef, ef) with BoolVf
+
+
 
   /** From a boolfV, computes the appex vertices boolfE */
   val apexEDef: Fundef1[(T[V, F], B), (T[E, F], B)] = {
     val ef = pL[T[V, F], B]("distantEdgeef")
     val apexEf: BoolEf = transfer(sym(transfer(ef)))
     apexEf.setName("apexEf");
-    Fundef1("comm.apexEtoV", apexEf, ef)
+    Fundef1("comm.apexVtoE", apexEf, ef)
   }
-
   /** wrapper .  */
   def apexE(ef: BoolVf): BoolEf = new Call1[(T[V, F], B), (T[E, F], B)](apexEDef, ef) with BoolEf
 
 
+  val apexEuiDef: Fundef1[(T[V, F], UI), (T[E, F],UI)] = {
+    val ef = pL[T[V, F],UI]("distantEdgeef")
+    val apexEf: UintEf = transfer(sym(transfer(ef)))
+    apexEf.setName("apexEf");
+    Fundef1("comm.apexEtoVui", apexEf, ef)
+  }
+
+  /** wrapper .  */
+  def apexEui(ef: UintVf): UintEf = new Call1[(T[V, F], UI), (T[E, F],UI)](apexEuiDef, ef) with UintEf
+  /** From a boolfV, computes the appex vertices boolfE */
+
+
+  /** symetrie Ev=>Ev */
+  val symEvDef: Fundef1[(T[E, V], B), (T[E, V], B)] = {val ev = pL[T[E, V], B]("ev");  Fundef1("comm.symev", sym(ev) ,ev)  }
+  def symEv(ev: BoolEv): BoolEv = new Call1[(T[E, V], B),(T[E, V], B)](symEvDef, ev) with BoolEv
+  val symEfDef: Fundef1[(T[E, F], B), (T[E, F], B)] = {val ev = pL[T[E, F], B]("ev");  Fundef1("comm.symev", sym(ev) ,ev)  }
+  def symEf(ev: BoolEf): BoolEf = new Call1[(T[E, F], B),(T[E, F], B)](symEfDef, ev) with BoolEf
 
   def apexVnoMacro(ef: BoolEf): BoolVf = transfer(sym(transfer(ef))) //pour tester le calcul du rayon avec une non augmentation
 

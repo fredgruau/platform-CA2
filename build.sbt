@@ -2,7 +2,6 @@ name := "platform-CA2"
 
 version := "0.1"
 scalaVersion := "2.13.12"
-
 ////scalaVersion := "2.13.1"   //ce que j'avais originellement avant tortue sandwich
 
 //scalaVersion := "2.13.10"

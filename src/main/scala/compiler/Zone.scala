@@ -195,8 +195,11 @@ object Zone {
       if (ns.size != 1) return None
       val n = ns.head
       if (constraints.contains(n)) {
-        val c = Some(constraints(n).permute(align2root(i.names.head), myRoot(i.names.head).locus.get))
-        c
+        if(!i.locus.get.isTransfer)
+          Some(constraints(n)) //for simplicial zone, align2root is always identity so no need to apply a permut.
+        else
+          Some(constraints(n).permute(align2root(i.names.head), myRoot(i.names.head).locus.get))
+
       } else None
     }
 

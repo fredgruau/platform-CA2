@@ -7,7 +7,7 @@ import compiler.ASTLt.ConstLayer
 import compiler.SpatialType._
 import compiler._
 import progOfmacros.Wrapper.existS
-import progOfmacros.RedT.{enlarge, enlargeEF, enlargeFE}
+import progOfmacros.RedT.{enlargeOld, enlargeEF, enlargeFE}
 
 /** sert a tester les fonction utilisant les type T[X,Y] via les operations transfer et sym */
 class SimpleTest extends ConstLayer[V, UI](3, "global") with UintV {

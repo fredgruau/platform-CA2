@@ -1,4 +1,5 @@
-package progOfCA
+package sdn
+
 
 import compiler.AST.{Call2, Fundef2}
 import compiler.ASTL.{sym, transfer}
@@ -25,6 +26,7 @@ abstract class MoveC extends Named {
   val push: BoolVe
   val empty: BoolV
 }
+
 /** @param empty where to withdraw at
  * @param push  where to extends towards
  */
@@ -54,12 +56,12 @@ abstract class Force extends  Named {
   /**
    * @return an agent-centered move   * when applied, the movement produced is already centered on the agents.
    */
-  def actionV(ag:Vagent): MoveC= {assert(false,"force "+name+"undefined on Vagent");null}
+  def actionV(ag:MovableAgentV): MoveC= {assert(false,"force "+name+"undefined on Vagent");null}
   //def actionVe(ag:VeAg): MoveC={assert(false,"force "+name+"undefined on Veagent");null}
   /** when applied, the movement produced is already centered on the agents.*/
   def action (ag: MovableAg[_<:Locus]): MoveC=
     ag.locus match {
-    case V() => actionV(ag.asInstanceOf[Vagent])
+    case V() => actionV(ag.asInstanceOf[MovableAgentV])
    // case T(V(),E()) => actionVe(ag.asInstanceOf[MovAgVe])
   }
   val prio:Int
@@ -70,7 +72,7 @@ object Force{
   /** produce maximum possible move, rely on priority to obtain random movement */
   val total:Force=new Force(){
     val prio=TOTAL_PRIO
-    override def actionV(ag: Vagent): MoveC = MoveC1(ag.isV,ag.brdVe)//extends and empties everywhere possible.
+    override def actionV(ag: MovableAgentV): MoveC = MoveC1(ag.isV,ag.brdVe)//extends and empties everywhere possible.
   }
   /** we designed a random move that does not break the quasipoint property,
    * eliminating the need for checking gate-expensive mutex

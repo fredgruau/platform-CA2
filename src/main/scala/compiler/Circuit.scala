@@ -9,7 +9,7 @@ import compiler.DataProg.{isRootMainVar, nameDirCompilLoops}
 import compiler.SpatialType.BoolV
 import dataStruc.{Named, Util}
 import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp, prefixDash}
-import progOfCA.{Grow, MovableAg, Vagent}
+import sdn.{ MovableAg, MovableAgentV}
 import sdn.Root4naming
 import simulator.CAloops2
 
@@ -90,16 +90,16 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     // print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
 
     val prog8: DataProg[InfoNbit[_]] = prog7bis.detm1Ify() //Will also generate instruction store and remove tm1 when applied just before storing, transforming it into an integer argument.
-    // print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
+    //  print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
     val prog10: DataProgLoop[InfoNbit[_]] = prog8.loopIfy()
-    //print("loopify1010101010101010101010101010101010101010" + prog10)
+    print("loopify1010101010101010101010101010101010101010" + prog10)
 
     val prog11: DataProgLoop[InfoNbit[_]] = prog10.unfoldInt()
-   print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
+   //print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
     val prog12: DataProgLoop[InfoNbit[_]] = prog11.coaalesc() //allocates memory
     //System.out.println(prog12.allLayers)
-    // print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
+   // print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
    // ("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaCode)
     //as a result of compiling, compiledCA is available and will be read by the simulator, so we just launch it.
    // val s=new simulator.Simulator()   s.AppletLauncher()
@@ -144,18 +144,26 @@ object Circuit {
      val rootAst:ASTLt[V, B]=rootObject match {  //
           case ast:BoolV
              => ast  //if we have a single layer CA, by convention it is a boolV, and also  the root Ast
-          case ag:MovableAg[V] with Vagent
+          case ag:MovableAg[V] with MovableAgentV
              =>ag.is //if we have a single agent,  the update of its chi layer is the rootAST, therefore, it has to need  all the other layers.
       }
       def computeRoot = rootAst
     }
-    try {myCircuit.compile(hexagon)} //first tour de manége
+    var notCompiled=true; var limit=0 //evite la boucle trop grosse
+    var result:CAloops2=null
+   while(notCompiled&&limit<10)
+       try { notCompiled=false;result=myCircuit.compile(hexagon)} //autre tour de manége, avec plus de fun a compiler
     catch{
       case e: NbOfBitIntoAccountException=>
+        notCompiled=true;limit+=1
+        assert(limit<10,"y a eu plus de 10 fonctions a recompiler avec une différente bit size, ca commence a faire beaucoup, faut regarde de plus prés ckiskispasse")
         isRootMainVar=true  //on refait un tour de manége, this boolean is initially true for the first fun which is the main, and then flipped to false
-        myCircuit.compile(hexagon)   //the second time it will work because compilation of slopeDelta will be enforced due to seeting of takeNbOfBitIntoAccount
+           //the second time it will more likely work because compilation of slopeDelta will be enforced due to seeting of takeNbOfBitIntoAccount
     }
+  result
   }
+
+
   
   type TabSymb[T] = mutable.HashMap[String, T]
   type AstMap[T] = mutable.HashMap[AST[_], T]
