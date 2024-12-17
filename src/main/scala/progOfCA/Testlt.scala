@@ -14,6 +14,6 @@ class   Testlt() extends ConstLayer[V, B](1, "global")  with BranchNamed{
   val prioRand = randUintV(6) //rand1::rand2
   val toto=addLt(prioRand)
  //val (lt,eq)= Grad.slopeLt(prioRand)
- show(prioRand,toto.diff,toto.eq,toto.lt,toto.gt);
+ show(prioRand,toto.eq,toto.lt,toto.gt);
 } //root classe compilable
 

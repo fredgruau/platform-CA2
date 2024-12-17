@@ -104,6 +104,16 @@ public class Util {
             copy(src[i*rapport +component], dest[i]);
     }
 
+    /** use for compiling the elt operator.*/
+    public static int[][] copy(int[][] src, int component,int scalarDensitySrc) {
+        assert (src.length % scalarDensitySrc == 0);
+        int [][] res=new int[src.length/scalarDensitySrc][src[0].length];
+        for (int i = 0; i < res.length; i++)
+            copy(src[i*scalarDensitySrc +component], res[i]);
+        return res;
+    }
+
+
 
     /**
      * when doing a braodcast from E or F we need to double , resp triple the array size

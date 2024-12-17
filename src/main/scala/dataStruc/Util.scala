@@ -388,6 +388,8 @@ object Util {
     truncateBefore(s, "#")
   }
 
+  def componentNumber(chaine:String)= chaine.substring(chaine.indexOf("#") + 1)
+
   /** returns the index of first non lowercase or string size if everything is uppercase. */
   def indexOfFirstUpperCase(v: String): Int = {
     var i = 0

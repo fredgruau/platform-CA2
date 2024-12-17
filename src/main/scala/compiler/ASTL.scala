@@ -222,7 +222,7 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case _ => false
     }
 
- /* override def isElt =
+  /*override def isElt =
     this.asInstanceOf[ASTL[_, _]] match {
       case Unop(elt: Elt[_], _, _, _) => true
       case _ => false
