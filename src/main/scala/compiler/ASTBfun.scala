@@ -2,7 +2,7 @@ package compiler
 
 import AST.{Call1, Fundef2, _}
 import ASTB.{Elt, Scan1, _}
-import compiler.ASTBfun.{Fundef2R, Fundef3R, fundef2Bop2, negB, p, redop}
+import compiler.ASTBfun.{Fundef1R, Fundef2R, Fundef3R, fundef2Bop2, negB, p, redop}
 import compiler.ASTLfun.halve
 import compiler.SpatialType.BoolV
 import ASTLfun._
@@ -88,6 +88,11 @@ object ASTBfun {
   val concatB: Fundef2[B, UI, UI] = {
     val (xb, yui) = (p[B]("xb"), p[UI]("yui"))
     Fundef2("concat2", Concat2(xb, yui), xb, yui)
+  }
+
+  val concatUI: Fundef2[UI, UI, UI] = {
+    val (xui, yui) = (p[UI]("xui"), p[UI]("yui"))
+    Fundef2("concaat2", Concat2(xui, yui), xui, yui)
   }
 
 
@@ -244,6 +249,10 @@ object ASTBfun {
     val x = p[SI]("xOppSi");
     Fundef1("opp",
       new Call1[SI, SI](incSI, (new Call1[SI, SI](negSI, x) with ASTBt[SI])) with ASTBt[SI], x)
+  }
+  val allOneUI: Fundef1[UI,B]= {
+      val x13 = p[UI]("xallOneUI");
+      Fundef1("allOneUI", Reduce(x13, andB, False()), x13)
   }
 
   //Comparison operation
@@ -419,6 +428,7 @@ object ASTBfun {
     Fundef1("orScan",segmentOf1, difference ) //todo ecrire des xor et des and pour les ui
   } //TODO a faire correct en utilisant ltUI.
 
+  /** applied after orscan so as to identify the first true bit, which will be marked as one. Return null otherwise */
   val derivative: Fundef1[UI, UI] = {
     val segmentOf1 = p[UI]("segment");
     //we have to affect segmentof1 because it is read simultaneously at two indexes, for first1.
@@ -463,6 +473,9 @@ object ASTBfun {
   def ltUiRedop: redop[UI]=(ltUI2.asInstanceOf[Fundef2R[UI]],False().asInstanceOf[Uint])
 
   def concatRedop[R <: Ring](implicit n: repr[R]): redop[R] = {
+    (concatUI.asInstanceOf[Fundef2R[R]], Intof[UI](-1).asInstanceOf[ASTB[R]]) //neutral is wrong
+  }
+  def concatRedopold[R <: Ring](implicit n: repr[R]): redop[R] = {
     (concatB.asInstanceOf[Fundef2R[R]], Intof[UI](-1).asInstanceOf[ASTB[R]]) //neutral is wrong
   }
 

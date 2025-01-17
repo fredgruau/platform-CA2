@@ -9,7 +9,6 @@ import compiler._
 import progOfmacros.RedD.{redfunDef, redfunName, redmem}
 
 import scala.collection.immutable.HashMap
-/** allow to automatically generates unaru operations*/
 
 /** allow to automatically generates direct reductions */
 object RedD {

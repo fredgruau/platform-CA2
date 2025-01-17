@@ -6,7 +6,7 @@ import compiler.ASTL._
 import compiler._
 /** contains communication primitives using rotations and symmetries */
 object Comm {
-  /** From a boolfE, computes the appex vertices boolfV */
+  /** Unary function: From a boolVe computes another symetric boolVe, exploiting the sym operator on edges */
   val neighborsDef: Fundef1[(T[V, E], B), (T[V, E], B)] = {
     val ve = pL[T[V,E], B]("ngh")
     val ver: BoolVe = transfer(sym(transfer(ve)))
@@ -15,6 +15,16 @@ object Comm {
   }
   /** wrapper   */
   def neighborsSym(ve: BoolVe): BoolVe = new Call1[(T[V,E], B), (T[V, E], B)](neighborsDef, ve) with BoolVe
+
+  val neighborsDefUI: Fundef1[(T[V, E], UI), (T[V, E], UI)] = {
+    val ve = pL[T[V,E],UI]("ngh")
+    val ver: UintVe = transfer(sym(transfer(ve)))
+    ver.setName("ver");
+    Fundef1("comm.neighborsUI", ver, ve)
+  }
+
+
+  def neighborsSymUI(ve: UintVe): UintVe = new Call1[(T[V,E], UI), (T[V, E], UI)](neighborsDefUI, ve) with UintVe
 
   /** From a boolfE, computes the appex vertices boolfV */
   val apexVDef: Fundef1[(T[E, F], B), (T[V, F], B)] = {

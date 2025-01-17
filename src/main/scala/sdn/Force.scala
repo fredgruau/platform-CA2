@@ -10,6 +10,7 @@ import dataStruc.Named
 import progOfmacros.Wrapper.borderS
 import progOfmacros.RedT.clock2
 import sdn.Rand
+import sdn.Util.addSym
 /** adds the possibility of using a randomizer */
 trait rando {
    val _rand = new Rand()  // Champ privé

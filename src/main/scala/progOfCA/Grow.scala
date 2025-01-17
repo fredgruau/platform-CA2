@@ -19,7 +19,8 @@ import sdn.{BlobE, BlobV, Compar, Compar3, ComparApex}
 /** test growVorV/E/Ve by wrapping in a useless constant layer */
 class GrowVorTest()  extends ConstLayer[V, B](1, "global")  with BranchNamed{
   //  val g=new GrowVorVTest();show(g,g.meetE,g.meetV)
-  val g=new GrowVorETest();show(g,g.edge.meetE,g.edge.meetV) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
+  val g=new GrowVorETest();
+  show(g,g.edge.meetE,g.edge.meetV) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
   //val g=new GrowVorVeTest();show(g,g.ve.meetE,g.ve.meetV) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
 }
 

@@ -10,7 +10,7 @@ import sdn.{MovableAg, MovableAgentV}
 import progOfmacros.Comm.{apexV, neighborsSym}
 import progOfmacros.Compute
 import progOfmacros.Compute.implique
-import progOfmacros.Wrapper.{exist, existS, inside, insideS}
+import progOfmacros.Wrapper.{exist, existS, inside, insideS, not}
 import progOfmacros.RedT.clock2
 /** field needed to compute the contstraint of  a quasipoint, and possibly elsewehere */
 trait QPointFields {
@@ -20,7 +20,7 @@ trait QPointFields {
   val singleton: BoolV = noNeighbor & isV
 
   /** true if both apex vertices of the edge are empty */
-  val bothApexEmpty: BoolE = ~orR(apex[V, E, B](f(isV)))
+  val bothApexEmpty: BoolE = not(orR(apex[V, E, B](f(isV))))
   /** true for the edge inside qpt consiting exactly of two vertices */
   val doubleton: BoolE = insideS[V, E](isV) & bothApexEmpty
   val doubletonV: BoolV = existS[E, V](doubleton)
@@ -44,27 +44,27 @@ self: MovableAgentV => //a quasi point  is a movableAgentV
   val breakRing: Constr ={
 
     /** true if qpoint wants to flip towards all directions, it is a method because flip is not available yet */
-    def ringOfFlip: BoolV = inside(neighborsSym(e(currentFlip))) & singleton
-    def breakRingOfFlip:BoolV=implique(exist(neighborsSym(e(ringOfFlip))), touchedByRandDir)
+    val ringOfFlip: BoolV = inside(neighborsSym(e(flipOfMove))) & singleton
+    val breakRingOfFlip:BoolV=implique(exist(neighborsSym(e(ringOfFlip))), touchedByRandDir)
     /** cancel ring growth of singleton, exept if it happens to be selected by random angles thereafter, we will be able to shring flip not forming a ring */
-    new KeepFlipIfWithDef(One(false)){def loc:BoolV=breakRingOfFlip}  } //le boolV ne sera pas instancié tant que on ne contraindra pas
+    new KeepFlipIf(One(false),breakRingOfFlip,flipOfMove) } //le boolV ne sera pas instancié tant que on ne contraindra pas
   constrain("breakRing",breakRing)
   /** cancel growth for non singleton, exept for doubleton, on appex, this needs a tournament */
   val next2NonSingleton = exist(neighborsSym(e(doubletonV | tripletonV)))
   val leqQuatre: Constr ={
-   new KeepFlipIf(One(false),implique(next2NonSingleton, isApexV))}
+   new KeepFlipIf(One(false),implique(next2NonSingleton, isApexV),flipOfMove)}
   constrain("leqQuatre",leqQuatre)
   /** singleton cannot flip */
-  val diseaperSingle = new CancelFlipIf(One(true),singleton)
+  val diseaperSingle = new CancelFlipIf(One(true),singleton,flipOfMove)
   constrain("diseaperSingle",diseaperSingle)
   /**a doubleton cannot flip both vertices*/
-  val diseaperDouble = new MutKeepFlipIf(One(true),doubleton) with BranchNamed {}
+  val diseaperDouble = new MutKeepFlipIf(One(true),doubleton,flipOfMove) with BranchNamed {}
   constrain("diseaperDouble",diseaperDouble)
   /** cannot grow from two, to four on both apex */
-  val appearDouble = new MutApexKeepFlipIf(One(false),doubleton) with BranchNamed {}
+  val appearDouble = new MutApexKeepFlipIf(One(false),doubleton,flipOfMove) with BranchNamed {}
   constrain("appearDouble",appearDouble)
   /**  a tripleton cannot flip its three vertices*/
-  val diseaperTriple=new TriKeepFlipIf(One(true),tripleton) with BranchNamed {}
+  val diseaperTriple=new TriKeepFlipIf(One(true),tripleton,flipOfMove) with BranchNamed {}
   constrain("diseaperTriple",diseaperTriple)
 
   //val extend2side: BoolVe = clock2(transfer(sym(v(doubleton) & rand.randSide)))

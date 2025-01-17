@@ -37,16 +37,17 @@ public class Util {
      * @param bugName identifies the bug
      * @param bugs    stores detected bug
      */
-    public static void bug(int[][] test, int[][] bugE, String bugName, ArrayList<String> bugs) {
+    public static boolean bug(int[][] test, int[][] bugE, String bugName, ArrayList<String> bugs) {
         boolean bug = false;
-        for (int i = 0; i < test.length; i++)
+        for (int i = 2; i < test.length-1; i++) //on zappe les deux premieres et la derniére ligne, car il arrive que y ais des "reste de miroir brisés " la dessus.
             for (int j = 0; j < test[0].length; j++) {
-                //todo we have to do a more precise test, to eliminate border effect on first and last column, first and last column.
+                //todo we have to do a more precise test, to eliminate border effect on first and last line, first and last column.
                 bug = bug || test[i][j] != 0;
                 bugE[i][j] |= test[i][j];
             }
         if (bug)
             bugs.add(bugName);
+        return bug;
     }
 
 /*
@@ -74,6 +75,19 @@ public class Util {
         assert (src.length == dest.length);
         System.arraycopy(src, 0, dest, 0, src.length);
     }
+
+    /** reset to zero the line that are initialized by miror, but not covered by loop
+     * oboqlete, we reprogram the bug detection in order to zap the first two and the last line. */
+    public static void resetArrayFirst2LastLineToZero(int[][] a) {
+            for (int j = 0; j < a[0].length; j++) {
+                a[0][j] = 0;a[1][j] = 0;
+                a[a.length-1][j] = 0;
+            }}
+    /** reset everything to zero, not necessary*/
+    public static void resetArrayToZero(int[][] array) {
+        for (int i = 0; i < array.length; i++) {
+            for (int j = 0; j < array[i].length; j++) {
+                array[i][j] = 0;}}}
 
     /**
      * System call
@@ -104,6 +118,20 @@ public class Util {
             copy(src[i*rapport +component], dest[i]);
     }
 
+    /**
+     *
+     * @param src
+     * @param index
+     * @param dest
+     */
+    public static void proj(int[][] src, int index, int[][] dest) {
+        assert (src.length >= dest.length);
+        assert (src.length % dest.length == 0);
+        int rapport = src.length / dest.length;
+        for (int i = 0; i < dest.length; i++)
+            copy(src[i +index*rapport], dest[i]);
+    }
+
     /** use for compiling the elt operator.*/
     public static int[][] copy(int[][] src, int component,int scalarDensitySrc) {
         assert (src.length % scalarDensitySrc == 0);
@@ -128,14 +156,22 @@ public class Util {
                 copy(src[i], dest[i * rapport + j]);
         return dest;
     }
-
+    /**we need to pass the rapport as a parameter, when using uint */
+    public static int[][] broadcaastOld(int rapport,int[][] src) {
+        if (rapport == 1) return src;
+        int dest[][] = new int[rapport * src.length][src[0].length];
+        for (int i = 0; i < src.length; i++) //parcourt les bits a dupliquer
+            for (int j = 0; j < rapport; j++) //parcours les 6 voisins
+                copy(src[i], dest[i * rapport + j]);
+        return dest;
+    }
     /**we need to pass the rapport as a parameter, when using uint */
     public static int[][] broadcaast(int rapport,int[][] src) {
         if (rapport == 1) return src;
         int dest[][] = new int[rapport * src.length][src[0].length];
-        for (int i = 0; i < src.length; i++)
-            for (int j = 0; j < rapport; j++)
-                copy(src[i], dest[i * rapport + j]);
+        for (int i = 0; i < src.length; i++) //parcourt les bits a dupliquer
+            for (int j = 0; j < rapport; j++) //parcours les 6 voisins
+                copy(src[i], dest[i  + j*src.length]);
         return dest;
     }
 

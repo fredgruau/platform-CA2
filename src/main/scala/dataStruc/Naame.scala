@@ -52,7 +52,7 @@ trait BranchNamed
         val suffix: String = key match {
           case n: Named => n.name
           case s:String =>
-            s
+            s.toLowerCase()
           case i: Int =>
             "" + i
           case _ => null

@@ -326,13 +326,16 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
           case Redop(op, _, _, _) =>
             if (op._1 == concatB)
               this.locus.fanout
-            //else if (op._1.body.mym.name==B())    1//we can reduce int an produce boolean, on Edges.
+            else if (op._1 == concatUI) {
+              this.locus.fanout*argBitSize()
+            } //else if (op._1.body.mym.name==B())    1//we can reduce int an produce boolean, on Edges.
             else
               argBitSize()
           case BinopEdge(op,arg,  _, _, _) =>if (op.body.mym.name==B()) 1 else
            newtSymb(arg.name).nb //on pari que c'est la taille de l'operande.//throw new Exception("faut chercher le bitsize de l'op")
           case Send(_) => ASTbitSize(newthis.asInstanceOf[Neton[AST[_]]].args.head)
-          case RedopConcat(exp, _, _) => this.locus.fanout //for the concat redop, the number of bit must take into account the arity (2,3, or 6)
+          case RedopConcat(exp, _, _) =>
+            this.locus.fanout   //for the concat redop, the number of bit must take into account the arity (2,3, or 6)
 
         })
         newthis

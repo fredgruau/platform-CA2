@@ -68,11 +68,12 @@ val ef=apexEui(f(this))
   val gtApex=symEf(ltApex)
 }
 
+
 trait Compar{
   self:UintV=>
   //var delay: ASTLt[V, UI] =delayedL(this)"3"
 
-  /** xor can be usefull for other things, so we keep a pointer to it */
+  /** xor can be usefull for other things, so we keep a pointer to it, it is an UintE which stores the difference */
   val bord: UintE =Wrapper.borderS[V,E,UI](this)
   //val bord: UintE =Wrapper.border[V,E,UI](dEv) //a déja calculé dev.
   /**  usefull both for lt, and for eq a single bit is on, iff operand on each edge side differ */
@@ -81,7 +82,7 @@ trait Compar{
   val diff= elt(0,segmentOf1)
   /** true if both values are equal */
   val eq= not(diff);
-  val lt=Grad.lt(this,segmentOf1)
+  val lt: BoolEv =Grad.lt(this,segmentOf1)
   val gt=symEv(lt)
 }
 
@@ -90,16 +91,24 @@ trait Compar3 {
   self: UintV with Compar =>
   val lt3:BoolVf=shrink(transfer(lt))
 }
+
+trait Sym extends BoolVe {
+  val sym=neighborsSym(this)
+}
+trait SymUI extends UintVe {
+  val symUI=neighborsSymUI(this)
+}
+
 /** contains addxxxx(arg) function which managas to add the functionality xxx to the argument arg */
 object Util {
   /** return an unsigned vertex random integer of $n$ bits */
-  def randUintV(nbits: Int): UintV = {
-    Array.fill(nbits)(root4naming.addRand()).reduce(_ :: _)  //all the random bits get concatenated.
-    //pb: quand ya un seul bit, ya pas de concat, et ca renvoie un boolV
+  def randUintV(nbits: Int): UintV = {//pb: quand nbits=1 ya un seul bit, ya pas de concat, et ca renvoie un boolV
+    val tmp: Array[UintV] =Array.fill(nbits)(root4naming.addRand())
+      tmp.reduce(_ :: _)  //all the random bits get concatenated.
   }
 
-  /** we directly re use Delayedc reation, in order to be able to add  COmparison operators,
-   * this naming will automatically define trucLt, trucEq, trucGt, trucLe, trucGe*/
+  /** we directly re use Delayed reaction, in order to be able to add  COmparison operators,
+   * this naming will automatically define trucLt, trucEq, trucGt, trucLe, trucGe, mais sur les edges*/
   def addLt(_arg: => UintV): UintVx = {// with Compar with ComparApex with Compar3
     lazy val delayed = _arg;
     new AST.Delayed[(V, UI)](() => delayed) with ASTLt[V, UI] with Compar with ComparApex  with Compar3 with Named with BranchNamed {}
@@ -125,6 +134,18 @@ object Util {
     new AST.Delayed[(T[V,E], B)](() => delayed) with BoolVe with BlobVe with Named with BranchNamed {override val brdVe: BoolVe = delayed}
   }
 
+
+  /** provide a boolVe with an additional fields sym */
+  def addSym(_arg: => BoolVe) = {// with Compar with ComparApex with Compar3
+    lazy val delayed = _arg;
+    new AST.Delayed[(T[V,E], B)](() => delayed) with BoolVe with Sym with Named with BranchNamed {}
+  }
+
+  /** provide a boolVe with an additional fields sym */
+  def addSymUI(_arg: => UintVe) = {// with Compar with ComparApex with Compar3
+    lazy val delayed = _arg;
+    new AST.Delayed[(T[V,E], UI)](() => delayed) with UintVe with SymUI with Named with BranchNamed {}
+  }
   /**
    *
    * @param b represent a boolV offering computation of meeting points

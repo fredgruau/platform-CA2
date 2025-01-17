@@ -6,7 +6,7 @@ import compiler.Circuit.iTabSymb
 import compiler.{Locus, Ring, repr}
 
 import scala.collection.immutable.HashMap
-/** uses to automatically compile the java code of unop */
+/** uses to automatically generate macro for unop */
 object Unop {
 
   object Unop{

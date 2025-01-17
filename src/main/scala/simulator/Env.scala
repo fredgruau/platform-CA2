@@ -122,15 +122,19 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
     for ((layerName, color) <- controller.colorDisplayedField) { //process fiedls to be displayed, one by one
       val locus: Locus = controller.locusOfDisplayedOrDirectInitField(layerName)
       val bitSize: Int = controller.bitSizeDisplayedOrDirectInitField.getOrElse(layerName, 1) //default bitsize is one, for boolean
+      /** 1D array of  integers reprensenting the fields */
       val bitPlane: Array[Array[Int]] = memFields(layerName).toArray
       val density = locus.density * bitSize
+      if(density>8)
+        println("ici")
       var colorAjusted: Color = if (bitSize > 1) halve(color) else color //if we print int, we have to make a sum of colors, so we first take halve
       assert(density == bitPlane.size, "the number of bit plane should be equal to the field's density")
-      for (i <- (0 until bitSize).reverse) { //reverse so that bit 0 gets smallest color
-        //we decompose an int into its bits, first bit are strongest bit
-        val bitiOfLocus = (0 until locus.density).map(j => bitPlane(i + j * bitSize)).toList
-        sumColorVoronoi(locus, colorAjusted, bitiOfLocus) // bitPlane.slice(i * locus.density, (i + 1) * locus.density))
-        colorAjusted = halve(colorAjusted)
+      for (i <- (0 until bitSize).reverse) { //loops over the bits of integers reverse so that bit 0 gets smallest color
+        //we decompose an int into its  bits, first bit are strongest bit
+        /** bitiof locus's arity is locus density */
+        val bitiOfLocus: List[Array[Int]] = (0 until locus.density).map(j => bitPlane(i + j * bitSize)).toList
+        sumColorVoronoi(locus, colorAjusted, bitiOfLocus) // on est ramené au cas d'imprimer un  boolV
+        colorAjusted = halve(colorAjusted)// on divise par deux pour arriver au bit de point moins fort.
       }
     }
   }

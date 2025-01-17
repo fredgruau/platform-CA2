@@ -43,6 +43,9 @@ import java.net.URLClassLoader
 
 object Util {
 
+   //def orderDisplayed(displayed:List[String])
+
+
 
   /** returns name of already defined macro of type macrosType.
    *  for example, methods of rand, if macroTypeFile=compiledMacro/rand*/
@@ -339,8 +342,11 @@ object Util {
    * @return a parenthesized expression encoding the subtree starting at "root". */
   def parenthesizedExp(root: String, father2son: Map[String, Set[String]]): String = {
     if (!father2son.contains(root)) return root //"(" + root + ")"
-    val sons = father2son(root)
-    root + "(" + sons.map(parenthesizedExp(_, father2son)).mkString(")(") + ")" // + "." //the point is necessaru when the tree is reduced to a single root
+    val sons: List[String] = father2son(root).toList.sorted.reverse
+    val (fieldDir,fields)=sons.partition(father2son.contains(_))
+    val (hashmapField,fifields)=fields.partition(_.contains("yyy"))
+    val orderedSons: List[String] =fieldDir:::hashmapField:::fifields
+    root + "(" + orderedSons.map(parenthesizedExp(_, father2son)).mkString(")(") + ")" // + "." //the point is necessaru when the tree is reduced to a single root
   }
 
   /** If we directly set the name of a variable, the danger is that its name will not encode a path in layer, and therefore, will not be displayed */
@@ -389,6 +395,13 @@ object Util {
   }
 
   def componentNumber(chaine:String)= chaine.substring(chaine.indexOf("#") + 1)
+
+  /** checks that the params correspond to select a given component */
+  def checkSingleComponentNumber(params:List[String])={
+    val components:Set[Int]=params.map(componentNumber(_).toInt).toSet
+    if(components.size!=1)
+      throw new Exception("ben non y en a plus que une composante")
+  }
 
   /** returns the index of first non lowercase or string size if everything is uppercase. */
   def indexOfFirstUpperCase(v: String): Int = {

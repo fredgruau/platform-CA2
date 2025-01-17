@@ -11,6 +11,7 @@ import progOfmacros.RedS.getRedSFun
 
 import scala.collection.immutable.HashMap
 
+/** allows to automatically generate macro for simplicial reductions */
 object RedS {
   /** memoizes all the already used Boolean reduction */
   private var redSmem: iTabSymb[Fundef1[(S, Ring), (S, Ring)]] = HashMap()

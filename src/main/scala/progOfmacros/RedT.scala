@@ -10,7 +10,7 @@ import compiler._
 import progOfmacros.Topo.nbccDef
 
 import scala.collection.immutable.HashMap
-/** contains and manages so-called "Transfer-reduction" such as from Ve to Vf more generally from Zy to Zy
+/** allows to automatically generate macro for  "Transfer-reduction" such as from Ve to Vf more generally from Zy to Zy
  * the number of operands are two
  * operands can be boolean or integers */
 object RedT {
@@ -20,7 +20,7 @@ object RedT {
    * It appliers a Clockwise, and an AntiClockwise rotation, and applies the bionop
    * This is not really a reduction, just a binop, so it does not need to define neutral elements, because
    * either an S1 site is defined and so are it transfer around,
-   * or S1 is not and also so are its transfer around it.
+   * or S1 is not and also so are its transfer around it.TODO remplacer par un wrapper sur RedT
    */
   def cacOld[S1 <: S, S2 <: S, S3 <: S, R <: Ring](r: Fundef2R[R], arg: ASTLt[T[S1, S2], R])(implicit m1: repr[S2], m2: repr[S1], m3: repr[S3], n: repr[R], a: AntiClock[S1, S2, S3]): ASTLt[T[S1, S3], R] = {
     binop(r, clock(arg), anticlock(arg))

@@ -7,7 +7,7 @@ import compiler.DataProg.{allLayerFromCompiledMacro, nameCA3, nameDirCompilCA, n
 import compiler.Instr.deployInt2
 import compiler.Locus.{all2DLocus, allLocus}
 import compiler.ProduceJava.totalGateCount
-import dataStruc.Util.{CustomClassLoader, append2File, compileJavaFiles, componentNumber, copyArray, hasBeenReprogrammed, hierarchyDisplayedField, loadClassAndInstantiate, myGetDeclaredMethod, parenthesizedExp, prefixDash, prefixDot, radicalOfVar, radicalOfVar2, radicalOfVarIntComp, radicalOfVarRefined, removeAfterChar, rootOfVar, sameRoot, shortenedSig, suffixDot, writeFile}
+import dataStruc.Util.{CustomClassLoader, append2File, compileJavaFiles, componentNumber, copyArray, hasBeenReprogrammed, hierarchyDisplayedField, loadClassAndInstantiate, myGetDeclaredMethod, parenthesizedExp, pop, prefixDash, prefixDot, radicalOfVar, radicalOfVar2, radicalOfVarIntComp, radicalOfVarRefined, removeAfterChar, rootOfVar, sameRoot, shortenedSig, suffixDot, writeFile}
 import compiler.VarKind.LayerField
 import dataStruc.{Named, Util}
 import dataStruc.Named.{isLayer, noDollarNorHashtag, noHashtag}
@@ -350,8 +350,10 @@ trait ProduceJava[U <: InfoNbit[_]] {
         {
           if (theDisplayed.isEmpty)
             throw (new Exception("you forgot to call show, no field are displayed "))
-          if (!sameRoot(theDisplayed))
+          if (!sameRoot(theDisplayed)) {
             throw (new Exception("some fields do not encode a path" + theDisplayed))
+            //val ordered=orderDisplayed(theDisplayed)
+          }
           val s = parenthesizedExp(rootOfVar(theDisplayed.head), hierarchyDisplayedField(theDisplayed));
           s + "."
         },
@@ -445,59 +447,61 @@ trait ProduceJava[U <: InfoNbit[_]] {
             var densityParamPossiblyWrong = nbit * locusParamPossiblyWrong.density //locus is wrong implies density is wrong too
             //pour elt, densityParamPossiblyWrong is wrong, because we pass only one of the numerous bits forming an uint, so we take intoaccount the density directly measured
 
-            if (densityParamPossiblyWrong > densityDirect) {
-              //we identify wether the current parameter is a component.
-              val isComponent: Boolean = {
-                nbit > 1 && //todo test removing this, because integer can have a single bit.
-                  spatialType._2 != B() && //we take components of either UI or SI
-                  densityDirect * nbit == densityParamPossiblyWrong //density possibly wrong is density of parameter before taking a component.
-              }
-              if (isComponent) {
-                val rad = radicalOfVar(params(i))
-                val component = componentNumber(params(i))
-                paramCode = "copy(" + rad + "," + component + "," + nbit + ")" :: paramCode
-              }
-              else
-                densityParamPossiblyWrong = densityDirect
+
+            //we identify wether the current parameter is a component.
+            val isComponent: Boolean = {
+              nbit > 1 && //todo test removing this, because integer can have a single bit==>  test prog with one bit integer
+                spatialType._2 != B() && //we take components of either UI or SI
+                densityDirect * nbit == densityParamPossiblyWrong //density possibly wrong is density of parameter before taking a component.
             }
-            if (spatialType == (V(), B()) && densityDirect < 6) { //we can have seedDist$2 passed to a boolV, therefore, we should transform it into seedDist[2]
-              paramCode = radicalOfVarIntComp(params(i)) :: paramCode; //this is what is done by radicalOfVarIntComp
-              i += 1
+            if (isComponent) {
+              val rad = radicalOfVar(params(i))
+              Util.checkSingleComponentNumber(params.filter(radicalOfVar(_)==rad))
+              val component = componentNumber(params(i))
+              paramCode = "copy(" + rad + "," + component + "," + nbit + ")" :: paramCode
+              i+=densityDirect
             }
-            //until now we applied same processing wether it is a name or a heap variable
-            else {
-              /** we look at the type of effective parameter, in order to find the type of the formal parameter */
-              val infoParamEF = tSymbVarSafe(radicalOfVar(params(i)))
-              val locusParamEF = infoParamEF.locus //this does not work, because effective parameter has been obtained by duplication using a direct interpretation of broadcast
-              val nbitParamEF = infoParamEF.nb //since we directly measure how much bits are sent in the effective parameters,
-              // we have to take the number of bits into account.
-              if (!locusParamPossiblyWrong.isTransfer && densityDirect / nbitParamEF == 6 /* !locusParamEf.isTransfer*/ ) //we detect that we have done a broacast,
-                if (spatialType == (V(), B())) {
-                  paramCode = "broadcaaast(" + radicalOfVar(params(i)) + ")" :: paramCode; i += densityDirect
-                }
-                else {
-                  paramCode = "broadcaast(" + 6 / locusParamPossiblyWrong.density + "," + radicalOfVar(params(i)) + ")" :: paramCode; i += densityDirect
-                }
-              //we prooceed differently depending wether the params are mem (isheap) or name of fields
-              else if (isHeap(params(i))) { //its a "mem[x]
-                var indexesMem: List[Int] = List()
-                for (j <- 0 until densityParamPossiblyWrong) { //iterate over the nbit scalar parameters of the form mem[2]
-                  indexesMem = adress(params(i)) :: indexesMem; i += 1
-                } //builds the list of memory offset associated to the locus
-                indexesMem = indexesMem.reverse
-                if (!decompositionLocus(locusParamPossiblyWrong).contains(indexesMem)) { //check wether that array2D of memory slices has already been used
-                  val newMapOfLocus = decompositionLocus(locusParamPossiblyWrong) + (indexesMem -> decompositionLocus(locusParamPossiblyWrong).size)
-                  decompositionLocus = decompositionLocus + (locusParamPossiblyWrong -> newMapOfLocus)
-                }
-                paramCode = locusParamPossiblyWrong.shortName + (decompositionLocus(locusParamPossiblyWrong)(indexesMem)) :: paramCode //name of formal paramer is locus plus rank stored in decompositionLocus
+            else
+            { if (densityParamPossiblyWrong > densityDirect)
+              densityParamPossiblyWrong = densityDirect  //je sais plus trop pourquoi
+              if (spatialType == (V(), B()) && densityDirect < 6) { //we can have seedDist$2 passed to a boolV, therefore, we should transform it into seedDist[2]
+                paramCode = radicalOfVarIntComp(params(i)) :: paramCode; //this is what is done by radicalOfVarIntComp
+                i += 1
               }
-              else //its not  a mem
-              {
-                paramCode = radicalOfVar(params(i)) :: paramCode;
-                i += densityParamPossiblyWrong
+              //until now we applied same processing wether it is a name or a heap variable
+              else {
+                /** we look at the type of effective parameter, in order to find the type of the formal parameter */
+                val infoParamEF = tSymbVarSafe(radicalOfVar(params(i)))
+                val locusParamEF = infoParamEF.locus //this does not work, because effective parameter has been obtained by duplication using a direct interpretation of broadcast
+                val nbitParamEF = infoParamEF.nb //since we directly measure how much bits are sent in the effective parameters,
+                // we have to take the number of bits into account.
+                if (!locusParamPossiblyWrong.isTransfer && densityDirect / nbitParamEF == 6 /* !locusParamEf.isTransfer*/ ) //we detect that we have done a broacast,
+                  if (spatialType == (V(), B())) {
+                    paramCode = "broadcaaast(" + radicalOfVar(params(i)) + ")" :: paramCode; i += densityDirect
+                  }
+                  else {
+                    paramCode = "broadcaast(" + 6 / locusParamPossiblyWrong.density + "," + radicalOfVar(params(i)) + ")" :: paramCode; i += densityDirect
+                  }
+                //we prooceed differently depending wether the params are mem (isheap) or name of fields
+                else if (isHeap(params(i))) { //its a "mem[x]
+                  var indexesMem: List[Int] = List()
+                  for (j <- 0 until densityParamPossiblyWrong) { //iterate over the nbit scalar parameters of the form mem[2]
+                    indexesMem = adress(params(i)) :: indexesMem; i += 1
+                  } //builds the list of memory offset associated to the locus
+                  indexesMem = indexesMem.reverse
+                  if (!decompositionLocus(locusParamPossiblyWrong).contains(indexesMem)) { //check wether that array2D of memory slices has already been used
+                    val newMapOfLocus = decompositionLocus(locusParamPossiblyWrong) + (indexesMem -> decompositionLocus(locusParamPossiblyWrong).size)
+                    decompositionLocus = decompositionLocus + (locusParamPossiblyWrong -> newMapOfLocus)
+                  }
+                  paramCode = locusParamPossiblyWrong.shortName + (decompositionLocus(locusParamPossiblyWrong)(indexesMem)) :: paramCode //name of formal paramer is locus plus rank stored in decompositionLocus
+                }
+                else //its not  a mem
+                {
+                  paramCode = radicalOfVar(params(i)) :: paramCode;
+                  i += densityParamPossiblyWrong
+                }
               }
-            }
-          }
+            }}
           /** fundef if recompiled */
           val progCalled: DataProgLoop[U] = subDataProgs.getOrElse(call.procName, null) //gets the called dataProg, we won't be able to do that, when doing modular compilation.
           // CA loops can  contain layers.

@@ -77,11 +77,10 @@ object Grad {
     val level = new Taail(r)with BoolE
     (slopeLtEv, level)
   }
-  /** macro that, computes the  slopLt,
-   * which is true  on the side where the Vertice has a lower integer value (used for priority)
+  /** macro that, computes Lt, optimally,
+   * lt  is true  on the side where the Vertice has a lower integer value (used for priority)
+   * lt is needed for comparison of priority, when doing mutex tournament
    * */
-
-
   val ltDef: Fundef2[(V, UI),(E, UI), (T[E, V], B)] =  {
     /** main variable that we want to compare */
     val d = pL[V, UI]("dis")
@@ -135,7 +134,7 @@ object Grad {
 
 
 
-  /** yet another way on computing lt, remember, we spent a lot of time on this! */
+  /** yet another way on computing lt, on which we spent a bit of time! */
   val ltDefOld: Fundef1[(V, UI), (T[E, V], B)] =  {
     val d = pL[V, UI]("dis")
     //val d=uI2SIL(d1)

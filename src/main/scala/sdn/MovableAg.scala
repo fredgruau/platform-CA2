@@ -13,7 +13,7 @@ import dataStruc.DagNode.EmptyBag
 import progOfmacros.Comm.neighborsSym
 import progOfmacros.Wrapper.{borderS, exist, xorBin}
 import sdn.{Agent, Compar, carrySysInstr}
-import sdn.Util.{addLt, randUintV}
+import sdn.Util.{addLt, addSym, randUintV}
 
 import scala.collection.immutable.HashMap
 /** list the  movable-agent's methods which needs a processing dependant  on the locus L in V,E,Ve, F...
@@ -34,8 +34,8 @@ trait UtilVagent extends BranchNamed{
   lazy   val brdE:BoolE=borderS(isV) //push everywhere possible.
   lazy val isVe:BoolVe=e(isV)
   lazy val notVe= ~isVe
-  /** Ve edges leaving the support */
-  lazy val brdVe=transfer(v(brdE)) & isVe
+  /** Ve edges leaving the support , we know we my take a sym so we prepare for it, to get a meaningfull name brdVe.sym*/
+  lazy val brdVe=addSym( transfer(v(brdE)) & isVe)
 }
 
 /** defines the methods in vef[V], adds UtilVagent, which mixin some further usefull field*/
@@ -43,9 +43,11 @@ trait MovableAgentV extends MovableAg[V] with vef[V] with UtilVagent {
   self:MovableAg[V] =>
   override val isV: BoolV = is
   //override val NisV=  ~isV
-  override def flip2next=  delayedL( xorBin(currentFlip,is) )//delayed is necessary in order to get the very last update of flip
+  override def flip2next=  delayedL( xorBin(flipAfterLocalConstr,is) )//delayed is necessary in order to get the very last update of flip
+
   override def move2flip(m:MoveC1):BoolV= {
-    val invade = exist(neighborsSym(m.push));  val empty = m.empty   //bugif empty & invade
+     val invade = exist(m.push.asInstanceOf[Sym].sym);  val empty = m.empty   //bugif empty & invade
+    //  val invade = exist(neighborsSym(m.push));  val empty = m.empty   //bugif empty & invade
     cond(isV,empty,invade)
   }
   override def move2yesNoFlip(m:MoveC):(BoolV,Option[BoolV])=m match{
@@ -57,15 +59,19 @@ trait MovableAgentV extends MovableAg[V] with vef[V] with UtilVagent {
 
 /** support location is computed from parent's support (input neighbors of the DAG */
 abstract class BoundAg[L <: Locus](implicit m: repr[L]) extends  Agent[L]{
+  /** describes how to computes flip from parents */
   val inheritedFlip:BoolV
   /** initial flip is computed from the parent */
-  override val flipCreatedByMoves: BoolV = inheritedFlip
+  override def flipCreatedByMoves: BoolV = inheritedFlip
 }
 /**  code  common to Movable agents*/
 abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] with vef[L] with EmptyBag[sdn.MuStruct[_<: Locus,_<:Ring]]  {
   override val prioRand= addLt(randUintV(5)).asInstanceOf[UintVx] //si on met pas asInstance il gueule non compatibilité de override entre addLt e UintVx
-  /** for the moment, priority is pure random */
+  /** for the moment, priority is pure random.  formulation  casse gueule, car une variable a deux noms de reflection possible: prio et prioRand*/
   override val prio =prioRand //pour le moment on n'a pas encore plusieurs move possible, dans pas longtemps on va programmer prio et initalflip
+
+
+
   //method that depends on the spatial type of the support:
 
 
@@ -81,9 +87,13 @@ abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] wit
   /** convert centered move into one single BoolV flip */
 
 
-  override lazy val flipCreatedByMoves:BoolV={
+  /** priority of the force causing the move. priority 0 is strongest
+   * prio is defined for bounded agents, because it could happen they are also submitted to mutex
+   * they will inherit the priority from their parents, pb if there is two parents.
+   * */
+  override def flipCreatedByMoves:BoolV={
     //we consider only a single move
-    move2flip(moves(10).asInstanceOf[MoveC1])
+    move2flip(moves(10).asInstanceOf[MoveC1]) //on sait qu'on a mis 10 sur le mvTotal
   }
 
 

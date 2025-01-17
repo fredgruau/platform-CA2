@@ -102,6 +102,8 @@ object ASTLfun {
 
 /** returns true if argument is not zero, it makes an or reduction on the bits. */
   def neq[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = unop(ASTBfun.neq, arg1);
+  def allOne[L <: Locus](arg1: ASTLt[L, UI])(implicit m: repr[L]): ASTLt[L, B] = unop(ASTBfun.allOneUI, arg1);
+
 
 
   /** lt2 is  defined differently on SI, and UI, it uses an optimized algo for UI, that does not subtract
@@ -205,7 +207,13 @@ object ASTLfun {
  */
 
   /** We had to use a reduction, bool,bool->boole which forces us to retrieve a bool, but we need a UI so we do a cast */
-  def concatR[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])
+  def concatR[S1 <: S, S2 <: S, R<:Ring](arg: ASTLt[T[S1, S2], R])
+                               (implicit m: repr[S1], m2: repr[S2]): ASTLt[S1, UI] = {
+    val res = redop[S1, S2, UI](concatRedop, arg.asInstanceOf[ASTLt[T[S1, S2], UI]])
+    res.asInstanceOf[ASTLt[S1, UI]]
+  }
+
+  def concatRold[S1 <: S, S2 <: S](arg: ASTLt[T[S1, S2], B])
                                (implicit m: repr[S1], m2: repr[S2]): ASTLt[S1, UI] = {
     val res = redop[S1, S2, UI](concatRedop, arg.asInstanceOf[ASTLt[T[S1, S2], UI]])
     res.asInstanceOf[ASTLt[S1, UI]]

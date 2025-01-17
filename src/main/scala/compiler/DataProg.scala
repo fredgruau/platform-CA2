@@ -194,7 +194,7 @@ object DataProg {
     newProg.checkInvariant; newProg
   }
 
-  def bugLayers(lesInstr: List[CallProc]) = {
+  def bugLayers(lesInstr: List[CallProc]): List[Layer[_]] = {
     val bugInstr = lesInstr.filter(_.procName == "bug")
     //we add the bug layers, we must find out firt on what kind of locus we do have possible bugs.
     var locusBug: Set[Locus] = bugInstr.map(_.exps.head.mym.name.asInstanceOf[(Locus, Ring)]._1).toSet
