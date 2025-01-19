@@ -441,8 +441,6 @@ trait ProduceJava[U <: InfoNbit[_]] {
           assert(densityDirectlyMeasured.sum == params.size, "regardez si y a pas un nom de parametre qui est suffixe d'un autre" + params.size + "neq" + densityDirectlyMeasured.sum)
 
           for (((spatialType, nbit), densityDirect) <- spatialSigSafe zip bitSigSafe zip densityDirectlyMeasured) { //retrieve spatial type and  bitSize   of parameters.
-            if (call.procName == "unopnegb.e_1_1")
-              println("ici")
             val locusParamPossiblyWrong: Locus = spatialType._1 //locus is wrong because it is computed from the name of the effective parameter. It is not to be trusted, when broadcasting is done.
             var densityParamPossiblyWrong = nbit * locusParamPossiblyWrong.density //locus is wrong implies density is wrong too
             //pour elt, densityParamPossiblyWrong is wrong, because we pass only one of the numerous bits forming an uint, so we take intoaccount the density directly measured

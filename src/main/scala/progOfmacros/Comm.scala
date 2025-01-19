@@ -28,10 +28,10 @@ object Comm {
 
   /** From a boolfE, computes the appex vertices boolfV */
   val apexVDef: Fundef1[(T[E, F], B), (T[V, F], B)] = {
-    val vf = pL[T[E, F], B]("distantEdgevf")
-    val apexVf: BoolVf = transfer(sym(transfer(vf)))
+    val ef = pL[T[E, F], B]("distantEdgevf")
+    val apexVf: BoolVf = transfer(sym(transfer(ef)))
     apexVf.setName("apexVf");
-    Fundef1("comm.apexEtoV", apexVf, vf)
+    Fundef1("comm.apexEtoV", apexVf, ef)
   }
   /** wrapper .  */
   def apexV(ef: BoolEf): BoolVf = new Call1[(T[E, F], B), (T[V, F], B)](apexVDef, ef) with BoolVf

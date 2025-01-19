@@ -157,7 +157,7 @@ public class Util {
         return dest;
     }
     /**we need to pass the rapport as a parameter, when using uint */
-    public static int[][] broadcaastOld(int rapport,int[][] src) {
+    public static int[][] broadcaastVersion1(int rapport,int[][] src) {
         if (rapport == 1) return src;
         int dest[][] = new int[rapport * src.length][src[0].length];
         for (int i = 0; i < src.length; i++) //parcourt les bits a dupliquer
@@ -165,8 +165,9 @@ public class Util {
                 copy(src[i], dest[i * rapport + j]);
         return dest;
     }
+
     /**we need to pass the rapport as a parameter, when using uint */
-    public static int[][] broadcaast(int rapport,int[][] src) {
+    public static int[][] broadcaastVersion2Int(int rapport,int[][] src) {
         if (rapport == 1) return src;
         int dest[][] = new int[rapport * src.length][src[0].length];
         for (int i = 0; i < src.length; i++) //parcourt les bits a dupliquer
@@ -174,6 +175,12 @@ public class Util {
                 copy(src[i], dest[i  + j*src.length]);
         return dest;
     }
+    /**we need to pass the rapport as a parameter, when using uint */
+    public static int[][] broadcaast(int rapport,int[][] src) {
+        //hypothese de travail le resultat est toujours transfer. faut qu'on sache le nombre de bit.
+        return(broadcaastVersion1(rapport,src));
+    }
+
 
 
     public static void broadcaast(int[] src, int[][] dest) {
@@ -201,6 +208,18 @@ public class Util {
         for (int j = 0; j < arity; j++)
             for (int i = 0; i < src.length; i++)
                 copy(src[i], dest[j * src.length + i]);
+    }
+    /**
+     * used to broadcast an IntE field, such as a distance to an int Transfer field
+     */
+    public static void broadcaast(int rapport, int[][] src, int[][] dest) {
+        int arity = dest.length / src.length; //
+        int nbit= dest.length/6;
+
+        for (int i = 0; i < nbit; i++)
+                for (int j = 0; j < src.length; j++)
+                    for (int k = 0; k < rapport; k++)
+                copy(src[i+j*nbit], dest[i+j*rapport*nbit+k*nbit]);
     }
     /**
      * System call used to update layers, same as copy, we use demo for clarity

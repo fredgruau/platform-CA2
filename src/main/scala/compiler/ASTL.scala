@@ -133,7 +133,7 @@ object ASTL {
     extends ASTL[T[S1, S2new], R]()(repr.nomLR(m, n)) with Singleton[AST[_]]
 
   def sym[S1 <: S, S2 <: S, S3 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])
-                                               (implicit t: CentralSym[S2, S1, S3], m: repr[T[S1, S3]], n: repr[R]): ASTLt[T[S1, S3], R] = Sym(arg, m, t, n)
+               (implicit t: CentralSym[S2, S1, S3], m: repr[T[S1, S3]], n: repr[R]): ASTLt[T[S1, S3], R] = Sym(arg, m, t, n)
 
 
   /** the concat reduction takes a bool transfer, and produces an unsigned int. n=UI */
@@ -495,8 +495,11 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
           case V() => atr0.map(rotR(_)).map(rotR(_)).map(rotR(_)) //throw new RuntimeException("sym not defined on V in the general case")
           case E() => atr0.map(rotR(_)); // la composée de deux rotation est une rotation simple qui est aussi une permutation pour E.
           case F() => src match {
-            case E() | V() => val Array(Array(db, ds1, ds2), Array(ub, us1, us2)) = atr0;
-              Array(Array(db, ds2, ds1), Array(ub, us2, us1))
+            case E() => val Array(Array(db, ds1, ds2), Array(ub, us1, us2)) = atr0;
+             // Array(Array(db, ds2, ds1), Array(ub, us2, us1))
+              Array(Array(db, ds2, ds1), Array(ub, us2, us1)) //on inverse 1 et 2
+            case  V() => val Array(Array(db, ds1, ds2), Array(ub, us1, us2)) = atr0;
+              Array(Array(db, ds2, ds1), Array(ub, us2, us1)) //on inverse 1 et 2, c'est symetrique
             //case V() identical to case E
           }
           //if (src < des) atr else atr.map(rotR(_)) //we follow trigonometric, the composition of tree anticlock  must add one rotation, if not(src<des).

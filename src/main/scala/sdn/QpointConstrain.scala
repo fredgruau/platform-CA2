@@ -4,7 +4,7 @@ import compiler.ASTL.{delayedL, sym, transfer}
 import compiler.ASTLfun.{andR, apex, e, f, neighbors, orR, v}
 import compiler.SpatialType.{BoolE, BoolEf, BoolF, BoolV, BoolVe}
 import compiler.{AST, ASTLt, B, E, F, Locus, T, V}
-import dataStruc.BranchNamed
+import dataStruc.{BranchNamed, Named}
 import sdn.rando
 import sdn.{MovableAg, MovableAgentV}
 import progOfmacros.Comm.{apexV, neighborsSym}
@@ -25,7 +25,8 @@ trait QPointFields {
   val doubleton: BoolE = insideS[V, E](isV) & bothApexEmpty
   val doubletonV: BoolV = existS[E, V](doubleton)
   val doubletonEf: BoolEf = f(doubleton)
-  val isApexV: BoolV = exist[F, V](apexV(doubletonEf))
+  val testApexV=apexV(doubletonEf)
+  val isApexV: BoolV = exist[F, V](testApexV )
 
   /** true for the face inside a qpt consiting exactly of three adjacent  vertices */
   val tripleton: BoolF = insideS[V, F](isV)
@@ -52,7 +53,7 @@ self: MovableAgentV => //a quasi point  is a movableAgentV
   /** cancel growth for non singleton, exept for doubleton, on appex, this needs a tournament */
   val next2NonSingleton = exist(neighborsSym(e(doubletonV | tripletonV)))
   val leqQuatre: Constr ={
-   new KeepFlipIf(One(false),implique(next2NonSingleton, isApexV),flipOfMove)}
+   new KeepFlipIf(One(false),implique(next2NonSingleton, isApexV),flipOfMove) with Named with BranchNamed {}}
   constrain("leqQuatre",leqQuatre)
   /** singleton cannot flip */
   val diseaperSingle = new CancelFlipIf(One(true),singleton,flipOfMove)

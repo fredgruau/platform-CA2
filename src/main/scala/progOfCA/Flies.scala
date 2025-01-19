@@ -31,6 +31,7 @@ class Flies() extends  MovableAgentV with BlobVouE with QpointConstrain with Blo
  shoow(meetE,meetV,nbCc,lateBrdE)
  shoow(prioRand.eq,prioRand,prio.lt)
 shoow(doubleton,singleton)
+ shoow(next2NonSingleton,leqQuatre.where, isApexV)
   //shoow(next2NonSingleton,doubletonV,tripletonV,isApexV)
 
 
