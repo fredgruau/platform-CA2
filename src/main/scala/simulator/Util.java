@@ -5,6 +5,7 @@ import scala.collection.immutable.List;
 import scala.collection.immutable.List$;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
 /**
  * static methods of general utility plus
@@ -156,7 +157,25 @@ public class Util {
                 copy(src[i], dest[i * rapport + j]);
         return dest;
     }
-    /**we need to pass the rapport as a parameter, when using uint */
+    /** we now explicitely pass the number of bits.
+     * this version takes the two aspect into account: number of bits, and density rapport */
+
+    public static int[][] broadcaast33(int nbit,int rapport, int[][] src) {
+        if (rapport == 1) return src; //nothing to do if densities are equal
+        assert(rapport==2 || rapport == 3 || rapport == 6);
+        assert(src.length % nbit == 0);
+        int dest[][] = new int[rapport * src.length][src[0].length]; //interpret rapport
+        for (int i = 0; i < src.length/nbit; i++) //parcourt src
+            for (int j = 0; j < rapport; j++) //parcours les 2,3, ou 6 voisins vers lesquels on broadcast
+                for (int k = 0; k < nbit; k++) //parcours les 2,3, ou 6 voisins vers lesquels on broadcast
+                    copy(src[i*nbit+k], dest[i *nbit * rapport + j*nbit+ k]);
+        return dest;
+    }
+
+    /**we  pass the rapport as a parameter,
+     * this version works for boolean, for boolE broadcasterd to boolEv for example
+     * a given component is reproduced.
+     * hypothese de travail le resultat est toujours transfer. faut qu'on sache le nombre de bit.*/
     public static int[][] broadcaastVersion1(int rapport,int[][] src) {
         if (rapport == 1) return src;
         int dest[][] = new int[rapport * src.length][src[0].length];

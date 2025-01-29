@@ -418,8 +418,10 @@ trait ProduceJava[U <: InfoNbit[_]] {
           val specifComponent: String = if (weHaveAnElt)
             "," + paramsD(0).last
           else " " //rajoute le numéro de la component, pour elt.
-          if (locuspR.isTransfer && !locuspD.isTransfer) //marche pas pour E,F
-            callCode = "broadcaast(" + 6 / locuspD.density + "," //6 copy from 1D array to 1Darray are turned into a call to broaadcast from 1D arrau to 2D array
+          if (locuspR.isTransfer && !locuspD.isTransfer) { //marche pas pour E,F
+            //c'est le broadcast qui renvoie void je pense, utilisé par copy
+            callCode = "broadcaast(" + 6 / locuspD.density + ","
+          } //6 copy from 1D array to 1Darray are turned into a call to broaadcast from 1D arrau to 2D array
           //val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet(pR, pD)
           callCode += pD + specifComponent + "," + pR
         case "memo" => val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet() ++ params.map(radicalOfVar(_)) //copy and memo have the same effect
@@ -478,7 +480,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
                     paramCode = "broadcaaast(" + radicalOfVar(params(i)) + ")" :: paramCode; i += densityDirect
                   }
                   else {
-                    paramCode = "broadcaast(" + 6 / locusParamPossiblyWrong.density + "," + radicalOfVar(params(i)) + ")" :: paramCode; i += densityDirect
+                    paramCode = "broadcaast33(" +nbitParamEF+","+ 6 / locusParamPossiblyWrong.density + "," + radicalOfVar(params(i)) + ")" :: paramCode; i += densityDirect
                   }
                 //we prooceed differently depending wether the params are mem (isheap) or name of fields
                 else if (isHeap(params(i))) { //its a "mem[x]

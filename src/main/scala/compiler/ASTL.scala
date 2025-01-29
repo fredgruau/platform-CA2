@@ -461,7 +461,8 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         a.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m).map(Array.fill(l2)(_))
       case Send(a) =>
         if (a.length != l2) throw new RuntimeException("incorrect number of arguments for send")
-        a.toArray.map(_.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m)).transpose
+        val res=a.toArray.map(_.asInstanceOf[ASTLt[_, _]].unfoldSimplic(m)).transpose
+        res
       case Transfer(a, _, _) =>
         val u = 0
         val res = m(des, s1, a.unfoldTransfer(m))

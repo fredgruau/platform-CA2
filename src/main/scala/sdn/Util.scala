@@ -52,21 +52,7 @@ class Root4naming() extends Named with BranchNamed{
   }
 }
 /** same as Compar, except that we compare apex neighbors instead of direct neighbors? */
-trait ComparApex{
-  self:UintV=>
-val ef=apexEui(f(this))
-  /** xor can be usefull for other things, so we keep a pointer to it */
-  val bordApex: UintE =Wrapper.border[F,E,UI](ef)
-  //val bord: UintE =Wrapper.border[V,E,UI](dEv) //a déja calculé dev.
-  /**  usefull both for lt, and for eq a single bit is on, iff operand on each edge side differ */
-  val segmentOf1Apex: UintE = segment1(bordApex) //unop(orScan, bord)
-  /** true if both values are different */
-  val diffApex= elt(0,segmentOf1Apex)
-  /** true if both values are equal */
-  val eqApex= not(diffApex);
-  val ltApex=Grad.ltApex(this,segmentOf1Apex)
-  val gtApex=symEf(ltApex)
-}
+
 
 
 trait Compar{
@@ -86,7 +72,25 @@ trait Compar{
   val gt=symEv(lt)
 }
 
-/** add a boolVf that computes lt with respect to the three neibors of the adjacent face, using an And transfer reduction redT*/
+trait ComparApex{
+  self:UintV=>
+  val ef=apexEui(f(this))
+  /** xor can be usefull for other things, so we keep a pointer to it */
+  val bordApex: UintE =Wrapper.border[F,E,UI](ef)
+  //val bord: UintE =Wrapper.border[V,E,UI](dEv) //a déja calculé dev.
+  /**  usefull both for lt, and for eq a single bit is on, iff operand on each edge side differ */
+  val segmentOf1Apex: UintE = segment1(bordApex) //unop(orScan, bord)
+  /** true if both values are different */
+  val diffApex= elt(0,segmentOf1Apex)
+  /** true if both values are equal */
+  val eqApex= not(diffApex);
+  val ltApex=Grad.ltApex(this,segmentOf1Apex)
+  val gtApex=symEf(ltApex)
+}
+
+
+
+/** add a boolVf lt3 which computes lt with respect to the three neibors of the adjacent face, using an And transfer reduction redT*/
 trait Compar3 {
   self: UintV with Compar =>
   val lt3:BoolVf=shrink(transfer(lt))

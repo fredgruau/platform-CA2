@@ -209,21 +209,20 @@ object Circuit {
       case V() => des match {
         case E() => /*Ve->Ev*/
           // val Array(e, ne, nw, w, sw, se) = t(0)
-          val Array(e, se, sw, w, nw, ne) = t(0)
+          val Array(e, se, sw, w, nw, ne) = t(0) //on utilise un seul tableau 1D pour vertex
           Array(Array(tm1(e), tm1(shiftL(w))), Array(tm1(se), nw), Array(tm1(sw), shiftR(ne))) //ici on pousse les tm1s vers la fin pour factoriser les tm1 dans transfer(broadcast) de V vers vE
         case F() => /*Vf->Fv*/
           val Array(se, s, sw, nw, n, ne) = t(0);
           Array(Array(n, tm1(shiftL(sw)), tm1(se)), Array(tm1(s), shiftR(ne), nw))
         //Array(Array(n, tm1(sw), tm1(se)), Array(tm1(shiftL(s)), ne, shiftL(nw)))
       }
-      case E() =>
+      case E() => //un seul tableau 2D pour Edge
+         val Array(Array(h1, h2), Array(d1, d2), Array(ad1, ad2)) = t; //todo consider renaming d and ad by o  and ao, 'o' for oblique
 
         des match {
           case V() => /*vE->eV*/
-            val Array(Array(h1, h2), Array(d1, d2), Array(ad1, ad2)) = t;
             Array(Array(h1, d1, ad1, shiftR(h2), tm1(d2), tm1(shiftL(ad2)))) //ici au contraire on met tm1 au début pour factoriser les tm1 dans reduce(broadcast de vE vers V
           case F() => /*Ef->Fe*/
-            val Array(Array(h1, h2), Array(d1, d2), Array(ad1, ad2)) = t; //todo consider renaming d and ad by o  and ao, 'o' for oblique
             Array(Array(tm1(h2), tm1(shiftL(ad2)), tm1(d1)), Array(shiftR(h1), tm1((ad1)), tm1(d2)))
         }
       case F() => des match {
