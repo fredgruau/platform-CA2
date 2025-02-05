@@ -555,11 +555,11 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         else {
           for ((k, v) <- r2.algn)
             r.algn += k -> dupliqueOrTriplique(v)  //pour passer d'un align de edge a un align de Ev, on duplique
-          newArgs=newArg::newArgs
+          newArgs=newArg::newArgs //aprés faut faire reverse, tudieu
         }
       }
 
-        e.copy(args = newArgs)(lpart(e.mym), rpart(e.mym))
+        e.copy(args = newArgs.reverse)(lpart(e.mym), rpart(e.mym))
 
       case e@Binop(_, arg1, arg2, _, _) => //c'est la qu'on bosse!
         val r2=Result()

@@ -112,8 +112,11 @@ object DataProg {
     val notNullNamed2=dag.visitedL.filter((s:AST[_])=>s match{case t:Named=> t.name!=null case _ => false})
     //we check that each layers is reached by the naming algo
     for(l<-layers) {
-      if(l.name==null)
-      throw new Exception("one of the layers has not been reached by the naming algorithm")
+      if(l.name==null) {
+        if(l.isInstanceOf[ConstLayer[_,_]])
+          l.setName(l.init + l.asInstanceOf[ConstLayer[_,_]].locName)
+        else throw new Exception("one of the layers has not been reached by the naming algorithm")
+      }
     }
     val stillNullNamed=dag.visitedL.filter((s:AST[_])=>s match{case t:Named=> t.name==null case _ => false})
     val notNullNamed=dag.visitedL.filter((s:AST[_])=>s match{case t:Named=> t.name!=null case _ => false})

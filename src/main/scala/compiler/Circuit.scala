@@ -60,28 +60,28 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
   def compile(m: Machine):CAloops2 = {
     body = computeRoot //we pretend that the circuit is a function which returns compute Root
     val prog1: DataProg[InfoType[_]] = DataProg(this,root4naming,nameCAlowerCase);
-    //print(prog1)
+    print(prog1)
 
     val prog2 = prog1.treeIfy();
-    // print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
+    //    print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
 
     val prog3: DataProg[InfoType[_]] = prog2.procedurIfy();
-    //  print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
+    //   print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
     val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
-    // print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
+    //   print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
     val prog5: DataProg[InfoNbit[_]] = prog4.macroify();
-   //println("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
+    //  println("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
-    //  print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
+     print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
 
     val prog5ter: DataProg[InfoNbit[_]] = prog5bis.radiusify3
-    //print("radiusify555555555555555555555555555555\n" + prog5ter)
+   print("radiusify555555555555555555555555555555\n" + prog5ter)
 
     val prog6 = prog5ter.unfoldSpace(m); //ajouter les tm1s!!
-    //  print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
+      print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
 
     val prog7 = prog6.treeIfy(); //spatiall unfolding generates reused expression that need to be affected again
     // print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
@@ -143,7 +143,7 @@ object Circuit {
      /** rootAST contains all the code, its location depends on the program category, wether we have a single layer, a single  agent,  or a system of agent */
      val rootAst:ASTLt[V, B]=rootObject match {  //
           case ast:BoolV
-             => ast  //if we have a single layer CA, by convention it is a boolV, and also  the root Ast
+             =>   ast  //if we have a single layer CA, by convention it is a boolV, and also  the root Ast
           case ag:MovableAg[V] with MovableAgentV
              =>ag.is //if we have a single agent,  the update of its chi layer is the rootAST, therefore, it has to need  all the other layers.
       }

@@ -31,20 +31,21 @@ class   Testsextex() extends ConstLayer[V, B](1, "global")  with BranchNamed{
  val southlt=lt2(eastmin, westmin)
  val southmin=cond(southlt,eastmin,westmin)
  val allLt=lt2(southmin,northmin)
- //val firstStage=Array(~eastlt,eastlt,~westlt,westlt,~northlt,northlt)
-val f:BoolV=false
- val firstStage: Array[ASTLt[V, B]]=Array(f,f,f,f,northlt,~northlt)
+ val f:BoolV=false
+ val firstStage=Array(eastlt,~eastlt,westlt,~westlt,northlt,~northlt)
+
+ //val firstStage: Array[ASTLt[V, B]]=Array(f,f,f,f,northlt,~northlt)
  val secondStage: Array[ASTLt[V, B]] =Array(southlt,~southlt)
  val thirdStage=Array(allLt,~allLt)
  val sextexInt=(0 to 5).map((i:Int)=>{ //on traite pas encore correctement les cas d'égalité, ca va venir, un peu de patience
   val stage1=firstStage(i)
   val stage2=if(i>3)stage1 else stage1 & secondStage(i/2)
   val stage3=stage2 & thirdStage(i/4)
-  stage1 //represente un uint sur 6 bit qui est le code unaire d'un nombre compris entre 0 et 5, y en a 6, on peut "l'envoyer" avec send
+  stage3 //represente un uint sur 6 bit qui est le code unaire d'un nombre compris entre 0 et 5, y en a 6, on peut "l'envoyer" avec send
  }).toList
- val sextex:BoolVe = send(firstStage.toList)
+ //val sextex:BoolVe = send(firstStage.toList)
 
- // val sextex:BoolVe = send(sextexInt)
+  val sextex:BoolVe = send(sextexInt)
 
 
 

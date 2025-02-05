@@ -40,7 +40,7 @@ class Dist(val source: Layer[(V, B)]/*should be a strate here*/,val bitSize:Int)
 trait DistT {
   self: Layer[(V, B)] => //adds a distance to a LayerV todo, it should also limit its movement
   val d = new Dist(self,5);
-  show(d);
+  //show(d); les show doivent etre fait dans le main
 }
 
 
@@ -48,7 +48,7 @@ trait DistT {
 trait DistSimplerT {
   self: Layer[(V, B)] => //adds a distance to a LayerV todo, it should also limit its movement
   val dist = new DistSimpler(self);
-  show(dist);
+ // show(dist); les show doivent etre fait dans le main
 
 }
 
