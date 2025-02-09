@@ -385,7 +385,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
    * @param progs map of programms, whose layers have been entered in tabSymb of the main entry point dataProg
    * @return all the layers.
    */
-  def layers(progs: List[DataProgLoop[U]]): Map[String, U] = progs.flatMap(
+  def layers(progs: List[DataProgLoop[U]]): Map[String, U] =
+    progs.flatMap(
     _.tSymbVar.filter(x =>
     {val isll=     Named.isLayer(x._1)  //name should start with "ll"
     val typeLayer= x._2.k.isLayerField  //we check the type for it can happen that paramR start with ll

@@ -3,16 +3,16 @@
         <Layer>
           testdist
         </Layer><Layer>
-          testdistD
+          testdistSrc
         </Layer><Layer>
-          testdistDB
+          testdistSrcD
         </Layer>
       </expandedLayer>
         <colorOfField>
-          <layer color="0x00FF80">
-            testdist
-          </layer><layer color="0xFF0000">
-            testdistD
+          <layer color="0x00FF00">
+            testdistSrc
+          </layer><layer color="0x00FF80">
+            testdistSrcD
           </layer>
         </colorOfField>
       </displayParam>

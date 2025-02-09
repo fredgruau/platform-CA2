@@ -39,7 +39,7 @@ object DataProg {
   val nameDirProgLoops = "src/main/scala/progOfmacros/" //where the source of macro will be stored
   /** set to false after first construct, identifies the mainRoot */
   var isRootMainVar = true
-/** all the constant layeres to be used in macros */
+/** all the constant layers to be used in macros */
   val constLayers:HashMap[String,ConstLayer[_,_]]=new HashMap()+
     ("defVe" -> (new ConstLayer[T[V, E], B](1, "def"))) +
     ("defVf"->(new ConstLayer[T[V, F], B](1, "def")))

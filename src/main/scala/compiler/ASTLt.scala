@@ -321,7 +321,8 @@ object ASTLt {
   //private[ASTLt]
   class ConstLayer[L <: Locus, R <: Ring](nbit: Int, init: String)
                                          (implicit m: repr[L], n: repr[R]) extends Layer[(L, R)](nbit, init) with ASTLt[L, R] {
-    //this.setName(init + m.name.asInstanceOf[Locus].shortName)//on rajoute un suffix qui indique le type spatial (le locus)
+    if(init=="def")//si c'est pas des def, elles sont nomée automatique, sinon faut leur donner un nom comme par exemple, defVe
+     this.setName(init + m.name.asInstanceOf[Locus].shortName)//on rajoute un suffix qui indique le type spatial (le locus)
     val locName=m.name.asInstanceOf[Locus].shortName
     val next: ASTLt[L, R] = delayedL(this) //yes
   }
