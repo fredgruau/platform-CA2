@@ -518,7 +518,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
    *         Call AST nodes are replaced by   callProc instructions
    *         x<-Heead y<-Taail are replaced by directly passing x to the call Proc , written as an affectation of x,y
    *         instructions  of the form: id<-tail  id<-head, return   becomes useless. They are filtered out
-   *         variable for effective parameter(resp. result parameter are created with VarKind "StoredField" (resp. ParamR)
+   *         variable for effective parameter(resp. result) parameter are created with VarKind "StoredField" (resp. ParamR)
    */
   def procedurIfy(): DataProg[InfoType[_]] = {
     val p = this.asInstanceOf[DataProg[InfoType[_]]]
@@ -719,9 +719,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       /** @param i an instruction
        * @return true if instruction $i produces a result that needs to be stored in a CA layer   */
       def resultNeedStored(i: Instr) = i.names.filter(needStored).nonEmpty || i.tobeProcessedInMacro //(either instruction is a call to a memo, a layer next's value, a paramR, a StoredField,
-      //for(i<-finstrs)
-     //   if(i.names.head=="auxL00") println("ici")
-
       /** transforms memo system calls into affectation */
       val pureAffect: Iterable[Instr] = finstrs.map(_.callProcToAffect)
       /** contains instructions with potentially produce variable needing to be stored */
@@ -824,7 +821,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       if (!NeedBuiltFun(g))
         return g.toList
       val name = newFunName()
-    //  if(name == "_fun19")     println("ici")
       newFuns.addOne(name -> builtFun(g))
       List(CallProc(name, newFuns(name))) //replaces the list of instruction by a CallProc to the new created function
     }
@@ -834,7 +830,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
 
 
-    //we sort the instructions of dagis, in order to obtain a deterministic labeling of automaticaly defined macro, turn out it is necessary to sort
+    //we sort the instructions of dagis, in order to obtain a deterministic labeling of automaticaly defined macro,
+    // turn out it is necessary to sort
     // but later: we sort the components when macroifying
     //System.out.println(sortedDagis)
     val newDagis: Dag[Instr] = dagis.quotient2(proximity,processCyclePairs, transform)
@@ -1033,8 +1030,6 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     }
     val p = this.asInstanceOf[DataProg[InfoNbit[_]]]
     /** tabAlign((i1,i2) stores alignement of i1's result with respect to i2's result, i2's name must be used by i1 */
-    if(p.keys(0)=="slopeEv")
-      println("ici")
     val tabAlign: mutable.Map[(String, String), Array[Int]] = mutable.HashMap.empty
     /** used to collect econstraint  generated when aligning */
     val cycleConstraints: TabSymb[Constraint] = mutable.HashMap.empty
@@ -1097,7 +1092,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     computedConstraint++= binopEdgeConstraints//au lieu de sendConstraints qu'on jette
     val (z2: Dag[Zone], myRoot: Map[String, Instr], align2root: Map[String, Array[Int]]) = p2.zones2(computedConstraint, tabAlign) //send Constraint will endup in the right zone.
 
-    println(z2) //displays zone,
+    //println(z2) //displays zone,
     val tZone2: Map[String, Zone] = defby(z2.visitedL) //associe une root a une zone.
     val defI2: Map[String, Instr] = p2.dagis.defby
 
@@ -1114,7 +1109,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     val muI10: Map[String, List[Instr]] = muInstr(m, p2.dagis)
 
     z2.visitedL.reverse.map(_.pick()) //pick one schedule for each zone, starting from the first instruction
-    println(z2)
+    //println(z2)
 
     var (muI12: Map[String, List[Instr]], tSymbScalar2, coalesc2) = permuteAndFixScheduledMu(muI10, p2.dagis, tZone2, defI2, myRoot, align2root) // revisit muI 's'reduce when reduced exression is folded
     //we separate the reduction in two parts: one that can do at tm1 and the rest that is done now.

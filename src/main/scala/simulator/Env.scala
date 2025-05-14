@@ -125,8 +125,6 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
       /** 1D array of  integers reprensenting the fields */
       val bitPlane: Array[Array[Int]] = memFields(layerName).toArray
       val density = locus.density * bitSize
-      if(density>8)
-        println("ici")
       var colorAjusted: Color = if (bitSize > 1) halve(color) else color //if we print int, we have to make a sum of colors, so we first take halve
       assert(density == bitPlane.size, "the number of bit plane should be equal to the field's density")
       for (i <- (0 until bitSize).reverse) { //loops over the bits of integers reverse so that bit 0 gets smallest color

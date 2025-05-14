@@ -398,11 +398,20 @@ object ASTBfun {
     case UI() => orScanRightUI
   }).asInstanceOf[Fundef1[R, R]]
 
-  /** equality between two unsigned integers, */
+  /** non equality between two unsigned integers, */
   val eqUI2: Fundef2[UI, UI, B] = {
     val (xui, yui) = (p[UI]("xminUI"), p[UI]("yminUI")); //a t-on x < y
     val difference = xui ^ yui //true for bits which differs betwen xui and yu
-    Fundef2("eqUI", new Call1[UI, B](eqUI, difference) with ASTBt[B], xui, yui) //todo ecrire des xor et des and pour les ui
+    Fundef2("neqUI", new Call1[UI, B](neqUI, difference) with ASTBt[B], xui, yui) //todo ecrire des xor et des and pour les ui
+  } //TODO a faire correct en utilisant ltUI.
+
+
+
+  /** non equality between two unsigned integers, */
+  val neqUI2: Fundef2[UI, UI, B] = {
+    val (xui, yui) = (p[UI]("xminUI"), p[UI]("yminUI")); //a t-on x < y
+    val difference = xui ^ yui //true for bits which differs betwen xui and yu
+    Fundef2("neqUI", new Call1[UI, B](neqUI, difference) with ASTBt[B], xui, yui) //todo ecrire des xor et des and pour les ui
   } //TODO a faire correct en utilisant ltUI.
 
   val firstOfTwoUI: Fundef2[UI,UI,UI] ={

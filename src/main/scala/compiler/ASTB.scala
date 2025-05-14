@@ -329,6 +329,8 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
       val l = arg.unfoldInt(t)
       List(l(nb)) //we read the nbth element of the boolean list
     case Concat2(arg1, arg2) => arg1.unfoldInt(t) ::: arg2.unfoldInt(t)
+    case True()=>List(True())
+    case False()=>List( False())
   }
 
 }

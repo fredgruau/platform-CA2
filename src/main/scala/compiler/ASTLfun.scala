@@ -8,6 +8,7 @@ import compiler.ASTBfun._
 import compiler.SpatialType._
 import compiler.ASTLfun.carryV
 import progOfmacros.Wrapper._
+import sdn.Globals.root4naming
 
 /** contains generic building block manipulating ASTLs, without direct access to the constructors
  * they are not implemented in macro, because they are used by macro.
@@ -114,6 +115,20 @@ object ASTLfun {
       assert(false)
     binop(ASTBfun.ltUI2.asInstanceOf[Fundef2[R, R, B]], arg1, arg2)
     }
+
+ /** workl for signed or unsigned int */
+  def neq2[L <: Locus, R <: Ring](arg1: ASTLt[L, R], arg2: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = {
+    binop(ASTBfun.neqUI2.asInstanceOf[Fundef2[R, R, B]], arg1, arg2)
+  }
+
+
+
+  /** when finalized, shoud return true if arg1 < arg2 or arg1= arg2 and  randbit*/
+  def le2Rand[R <: Ring](arg1: ASTLt[V, R], arg2: ASTLt[V, R])(implicit  n: repr[R]): BoolV = {
+    if (!n.name.isInstanceOf[UI]) //we never have to compare signed int, what we do is  take the sign.
+      assert(false)
+    lt2(arg1,arg2) //| (~neq2(arg1,arg2)) // & root4naming.addRandBit().asInstanceOf[BoolV])
+  }
 
 
   /** gt2 is simply lt2 inverting the argument order */

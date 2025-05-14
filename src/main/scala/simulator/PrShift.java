@@ -8,7 +8,7 @@ import compiler.Locus;
 public interface PrShift {
 
     /**
-     * bit level communication within the CA memory, so that << and >>> need only a shift instead of a rotation
+     * preprocessin bit level communication within the CA memory, so that << and >>> need only a shift instead of a rotation
      *
      * @param h int32 CA memory
      */

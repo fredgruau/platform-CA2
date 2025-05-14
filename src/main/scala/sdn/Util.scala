@@ -4,6 +4,7 @@ import compiler.ASTBfun.{derivative, orScan}
 import compiler.SpatialType.{UintV, _}
 import compiler.ASTL._
 import compiler.ASTLfun._
+import compiler.ASTLt.ConstLayer
 import compiler.Circuit.hexagon
 import compiler._
 import compiler.SpatialType._
@@ -33,36 +34,41 @@ object Globals{
  *  Also contains stuff that needs to get a name such as the rand bits which are layers (layers should get a name)
  *  more generally, root4naming will contains system wide method and data, accessible everywhere, through the object Global.
  *  */
-class Root4naming() extends Named with BranchNamed{
+class Root4naming() extends Named with BranchNamed {
   setRoot4naming(this)
-  /** setting of encapsulated muStruct  is delayed, otherwise dependency cycle is still holding , so we use a var for n.*/
-  var n:Named=null
+  /** setting of encapsulated muStruct  is delayed, otherwise dependency cycle is still holding , so we use a var for n. */
+  var n: Named = null
+
   /** set encapsulated muStruct */
-  def setRootMustruct(n2:Named)={
-    n=n2
+  def setRootMustruct(n2: Named) = {
+    n = n2
     n.setName("") //this will artificially remove a level "N" in the hierarchy of printed fields
   }
-  /** random bits  are stored in a mutable hashmap*/
-  val rands=new mutable.HashMap[Int,UintV]() with Named{}
+
+  /** random bits  are stored in a mutable hashmap */
+  val rands = new mutable.HashMap[Int, UintV]() with Named {}
+
   /** adds a random boolean bit, which will be named */
-  def addRand(): UintV ={
-    val res=new Rand().asInstanceOf[UintV]
-    rands(rands.size)=res //add a new random bits to the already existing, its index is just the hashmap size
+  def addRandBit(): UintV = {
+    val res = new Rand().asInstanceOf[UintV]
+    rands(rands.size) = res //add a new random bits to the already existing, its index is just the hashmap size
+    res //random bit is returned
+  }
+
+  def addConstRandBit(): BoolV = {
+    val res = new ConstLayer[V, B](1, "random")
+    rands(rands.size) = res.asInstanceOf[UintV] //add a new random bits to the already existing, its index is just the hashmap size
     res //random bit is returned
   }
 }
-/** same as Compar, except that we compare apex neighbors instead of direct neighbors? */
-
-
 
 trait Compar{
   self:UintV=>
   //var delay: ASTLt[V, UI] =delayedL(this)"3"
-
   /** xor can be usefull for other things, so we keep a pointer to it, it is an UintE which stores the difference */
   val bord: UintE =Wrapper.borderS[V,E,UI](this)
   //val bord: UintE =Wrapper.border[V,E,UI](dEv) //a déja calculé dev.
-  /**  usefull both for lt, and for eq a single bit is on, iff operand on each edge side differ */
+  /**  usefull both for lt, and for eq. a single bit is on, iff operand on each edge side differ */
   val segmentOf1: UintE = segment1(bord) //unop(orScan, bord)
   /** true if both values are different */
   val diff= elt(0,segmentOf1)
@@ -71,7 +77,7 @@ trait Compar{
   val lt: BoolEv =Grad.lt(this,segmentOf1)
   val gt=symEv(lt)
 }
-
+/** same as Compar, except that we compare apex neighbors instead of direct neighbors? */
 trait ComparApex{
   self:UintV=>
   val ef=apexEui(f(this))
@@ -99,6 +105,8 @@ trait Compar3 {
 trait Sym extends BoolVe {
   val sym=neighborsSym(this)
 }
+
+/** permet de récupérer les voisin V, intUI */
 trait SymUI extends UintVe {
   val symUI=neighborsSymUI(this)
 }
@@ -107,8 +115,23 @@ trait SymUI extends UintVe {
 object Util {
   /** return an unsigned vertex random integer of $n$ bits */
   def randUintV(nbits: Int): UintV = {//pb: quand nbits=1 ya un seul bit, ya pas de concat, et ca renvoie un boolV
-    val tmp: Array[UintV] =Array.fill(nbits)(root4naming.addRand())
-      tmp.reduce(_ :: _)  //all the random bits get concatenated.
+    val tmp: Array[UintV] =Array.fill(nbits)(root4naming.addRandBit())
+    tmp.reduce(_ :: _)  //all the random bits get concatenated.
+  }
+
+  /**
+   *
+   * @return first boolV is a randombit, which is true with proba 1/3 , but it may fail.
+   *         second boolV indicates success
+   */
+  def oneThirdRandBit():(BoolV,BoolV)={
+    val ri=randUintV(4)
+    (ri<10,neq(ri))  //neq ri is true if ri is not null which happens with 7/8
+  }
+  /** return an unsigned vertex random integer of $n$ bits */
+  def randConstUintV(nbits: Int): UintV = {//pb: quand nbits=1 ya un seul bit, ya pas de concat, et ca renvoie un boolV
+    val tmp: Array[UintV] =Array.fill(nbits)(root4naming.addConstRandBit().asInstanceOf[UintV])
+    tmp.reduce(_ :: _)  //all the random bits get concatenated.
   }
 
   /** we directly re use Delayed reaction, in order to be able to add  COmparison operators,

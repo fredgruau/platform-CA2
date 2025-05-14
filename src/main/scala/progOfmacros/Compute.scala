@@ -9,17 +9,22 @@ import compiler.ASTLfun._
 import compiler.ASTB._
 import compiler.ASTBfun.{Fundef3R, addRedop, inc, redop}
 import compiler._
-
-
 /** Contains the code of spatial macro used as a layer of  building blocks of small bits of spatial operators, compiled with optimal perf. */
 object Compute {
+  val concat3VDef: Fundef3[(V, B), (V, B),(V, B), (V, UI)]={
+    val a = pL[V, B]("a")
+    val b = pL[V, B]("b")
+    val c = pL[V, B]("c")
+    Fundef3("compute.concat3V", a.asInstanceOf[UintV]::b::c,a,b,c)
+  }
+  def concat3V(b0: BoolV, b1: BoolV, b2: BoolV):UintV = new Call3(concat3VDef, b0, b1,b2)(repr.nomLR(repr.nomV, repr.nomUI)) with UintV
+
   val impliqueDef: Fundef2[(V, B), (V, B), (V, B)] = {
     val a = pL[V, B]("a")
     val b = pL[V, B]("b")
     Fundef2("compute.implique", ~a | b, a, b)
   }
   def implique(b0: BoolV, b1: BoolV): BoolV = new Call2(impliqueDef, b0, b1)(repr.nomLR(repr.nomV, repr.nomB)) with BoolV
-
   /*
 
     /** Does only one or, which appear ridiciulously small for a macro, but that May avoid generating too many CaLoops */

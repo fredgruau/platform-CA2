@@ -162,44 +162,56 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
    *
    * @param testCycle true if we want to avoid cycles
    * @param p   predicate which defines adjacence beetween DagNodes
-   * @param myWrap    mapping associating an element to its wrapping. itcan be provided by the calling environment, it it needs it
+   * @param myWrap    mapping associating an element to its wrapping. it can be provided by the calling environment,
+   *                  it it needs it
    * @result map associating a root to its component
    *         TODO redefinir a partir de indexed paquet
    */
   def indexedComponents(p: (T, T) => Boolean, testCycle: Boolean,
         myWrap: Map[T, Wrap] = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))): (Predef.Map[T, List[T]], Set[(T, T)]) = {
-    /** stores input neighbors which are roots, and stores in for roots, so a T which is no longeur root is not a key for inputneighbor root. */
+    /** stores input neighbors which are roots, and stores it for roots,
+     * so a T which is no longer root is not a key for inputneighbor root. */
     var intputNeighborRoots: Map[T, Set[T]] = null;
     if (testCycle) //we initialise the input roots to all input neighbors, because at the beginning, all the elements are roots.
       intputNeighborRoots = immutable.HashMap.empty ++ visitedL.map(x => x -> x.inputNeighbors.toSet)
 
-    /** this has no good complexity if inputneibors are shared  */
+    /** Computes the transitive closure of input neighbor roots.
+     * it has not a good complexity if inputneibors are shared  */
     def inputNeihborRootsClosure(t: T): Set[T] = {
-     // t match{ case a:Affect[_]=> if(a.name=="auxL08")  println("ici")    case _ =>   }
-      val firstStage=if(intputNeighborRoots.contains(t))
-        intputNeighborRoots(t)
-      else
-        intputNeighborRoots(myWrap(t).root.elt)
-      var result: Set[T] = firstStage//intputNeighborRoots(t)
-      for (input <-  firstStage//intputNeighborRoots(t)
-         )
+      /** calcule les voisins directs */
+      val firstStage=
+          if(intputNeighborRoots.contains(t))
+                          intputNeighborRoots(t) //si t est  une root, on suppose que on a déja calculé les input root.
+          else      //sinon faut chercher la racine, myWrap(t).root.elt
+                  { val w=myWrap(t)
+                    val r: Wrap =w.root
+                    val e: T =r.elt
+                    intputNeighborRoots(e)
+                  }
+      var result: Set[T] = firstStage  //intputNeighborRoots(t)
+      for (input <-  firstStage  )       //intputNeighborRoots(t)
         result = result.union(inputNeihborRootsClosure(input))
       result
     }
     /** @return  computes  a union of  closures */
-    def inputNeihborRootsClosures(ts: Set[T]): Set[T] = if (ts.isEmpty) HashSet.empty else
+    def inputNeihborRootsClosuresSet(ts: Set[T]): Set[T] = if (ts.isEmpty) HashSet.empty else
       ts.map(inputNeihborRootsClosure(_)).reduce((x, y) => x.union(y))
 
     /** a cycle is created if src contains trueInputNeighborsClosure from input neighbors other than target, which contains target */
     var pairCausingCycles:Set[(T,T)]=new HashSet[(T, T)]()
     def cycleCreation(src: T, target: T) = { //todo a faire que si on cause un cycle.
       /** true if one far away input contains the output */
-      val r = inputNeihborRootsClosures(src.inputNeighbors.toSet - target).contains(target)
-      if (r) //look if there exists another path from target ot src, in which case unioning the two would create a cycle
-       { println("making the union of " + src + "   to  " + target + "   was about to creating a cycle")
+      val inrcimt=inputNeihborRootsClosuresSet(src.inputNeighbors.toSet - target)
+      val inrcit=inputNeihborRootsClosuresSet(HashSet( target))
+      //val r = inrcimt.contains(target) //first trial not sufficient, faut aussi faire jouer la fermeture transitive des inputs.
+      val inrcit2=inrcit.union(HashSet(target)) //faut considérer l'element lui même, quand meme.
+      val cycleDetected=inrcimt.intersect(inrcit2).nonEmpty
+      if (cycleDetected) //look if there exists another path from target ot src, in which case unioning the two would create a cycle
+       {
+         println("making the union of " + src + "   to  " + target + "   was about to creating a cycle")
          pairCausingCycles =  pairCausingCycles + ((src,target))
        }
-      r
+      cycleDetected
     }
 
     for (src: T <- visitedL)
@@ -212,7 +224,6 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
             rootoRemove match {
               case None => //the two merged nodes already add the same root, so nothing needs to be done.
               case Some(r) => //root r, is removed
-                //r.elt match{ case a:Affect[_]=> if(a.name=="auxL08")      println("ici")         case _ => }
                 intputNeighborRoots = intputNeighborRoots + (newCommonRoot -> //la nouvelle racine issue de la fusion
                   (intputNeighborRoots(newCommonRoot) - r.elt).union(intputNeighborRoots(r.elt))) //a pour racine input, la réunion des ancien input, moin r.elt qui n'est plus une racine.
                 intputNeighborRoots = intputNeighborRoots - r.elt
@@ -233,7 +244,7 @@ class Dag[T <: DagNode[T]](generators: List[T]) {
   def components2(p: (T, T) => Boolean, all: Map[T, Wrap] = immutable.HashMap.empty[T, Wrap] ++ visitedL.map(x => x -> Wrap(x))): (Iterable[List[T]], Set[(T, T)]) =
   { //on test si test cycle magically solve the cycle problem
     val (componentMap, cyclePair)=indexedComponents(p, true, all)
-    (componentMap .values, cyclePair)
+    (componentMap.values, cyclePair)
   }
 
 }

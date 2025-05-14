@@ -58,7 +58,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
    /** initial value of flip cause by movements, or inherited */
   def flipCreatedByMoves: BoolV
 
-  val flipOfMove=delayedL(flipCreatedByMoves)
+  val flipOfMove:BoolV =delayedL(flipCreatedByMoves)
    val flipAfterLocalConstr={
      def flipLocallyConstrained(flip:BoolV):BoolV = {
        if(displayConstr) for ((name, c) <- constrs) {

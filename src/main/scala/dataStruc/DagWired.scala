@@ -23,7 +23,8 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
    * @param trans a partir d'une composante connexe, calcule un ou plusieurs neoud du output Dag cible
    * @return new dag produced by computing the connected components, and then transforming them
    */
-  def quotient2[T2 <: DagNode[T2] with WiredInOut[T2]](p: (T, T) => Boolean,  processCyclePairs: Set[String]=>Unit, trans: Iterable[T] => List[T2]): Dag[T2] = {
+  def quotient2[T2 <: DagNode[T2] with WiredInOut[T2]](p: (T, T) => Boolean,
+         processCyclePairs: Set[String]=>Unit, trans: Iterable[T] => List[T2]): Dag[T2] = {
     val (unsorted: Iterable[List[T]] ,cyclePairs)= components2(p)
     var becomeStored:Set[String]=HashSet()
     for((src,target)<- cyclePairs)
@@ -508,7 +509,7 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
 
 
   /**
-   * @param p         proximity predicate
+   * @param p         proximity predicate, true if both operands belongs to same component
    * @param alignPerm alignement table for transfer variables v1 computed as exp where v2 apears in exp, a((v1,v2) indicates how to align v1 on v2
    * @return Iterable of instructions  with common root,  alignement on root for each instructions,
    */

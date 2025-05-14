@@ -2,7 +2,7 @@ package progOfmacros
 
 import compiler.{AST, ASTLt, AntiClock, B, E, F, Locus, Ring, S, SI, T, UI, V, chip, repr}
 import compiler.AST._
-import compiler.ASTBfun.{Fundef2RP, andRedop, concatRedop, minRedop, minUI, neg, orRedop, orScan, redop, xorRedop}
+import compiler.ASTBfun.{Fundef2RP, andRedop, concatRedop, ltUI2, minRedop, minUI, neg, neqUI2, orRedop, orScan, redop, xorRedop}
 import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.Circuit.iTabSymb
@@ -11,12 +11,24 @@ import compiler.repr.{nomB, nomCons, nomV}
 import progOfmacros.RedS.{getRedSFun, redsDirect}
 import progOfmacros.RedD.getRedFun
 import progOfmacros.Bino.getBinFun
+import progOfmacros.Cmp.getCmpFun
+import progOfmacros.Cond.getCondFun
 import progOfmacros.Unop.Unop.getUnopFun
 
 
 
 /** wrapper to a function built on the fly*/
 object Wrapper {
+  /** Wrappers for comparison macro defined from binary comparators */
+    def condL[L<:Locus,R<:Ring](arg0: ASTLt[L, B], arg1: ASTLt[L, R],arg2: ASTLt[L, R])(implicit m:repr[L],ri: repr[R])={
+      val f=getCondFun[L,R]( arg1.locus)(m,ri)
+      new Call3(f,arg0,arg1,arg2)(repr.nomLR(m, ri)) with ASTLt[L, R] {}  }
+  def ltUI2L[L<:Locus](arg1: ASTLt[L, UI],arg2: ASTLt[L, UI])(implicit m:repr[L],ri: repr[UI])={
+    val f=getCmpFun[L,UI](ltUI2 , arg1.locus)(m,ri)
+    new Call2(f,arg1,arg2)(repr.nomLR(m, compiler.repr.nomB)) with ASTLt[L, B] {}  }
+  def neqUI2L[L<:Locus](arg1: ASTLt[L, UI],arg2: ASTLt[L, UI])(implicit m:repr[L],ri: repr[UI])={
+    val f=getCmpFun[L,UI](neqUI2 , arg1.locus)(m,ri)
+    new Call2(f,arg1,arg2)(repr.nomLR(m, compiler.repr.nomB)) with ASTLt[L, B] {}  }
 
   /** Wrappers for Unop macro, defined from just an unary operators  */
   def segment1[L<:Locus](arg: ASTLt[L, UI])(implicit m:repr[L],ri: repr[UI])={

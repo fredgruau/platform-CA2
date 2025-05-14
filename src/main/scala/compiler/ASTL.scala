@@ -84,6 +84,7 @@ object ASTL {
              op: Fundef2[R1, R2, R3], arg: ASTLt[L, R1], arg2: ASTLt[L, R2], m: repr[L], n: repr[R3])
     extends ASTL[L, R3]()(repr.nomLR(m, n)) with Doubleton[AST[_]]
 
+  /** factory binop */
   def binop[L <: Locus, R1 <: Ring, R2 <: Ring, R3 <: Ring](op: Fundef2[R1, R2, R3], arg: ASTLt[L, R1], arg2: ASTLt[L, R2])
                                                            (implicit m: repr[L], n3: repr[R3]): ASTLt[L, R3]
   = new Binop[L, R1, R2, R3](op, arg, arg2, m, n3)

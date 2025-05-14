@@ -397,6 +397,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
       //on rajoute les layers si y en a
       val paramsR: List[String] = call.names;
       val params = paramsD ::: paramsR;
+
       var callCode = call.procName + "(" //we always put the called procedure name. we now need to add the params
       var i = 0 //counter of scalar parameter
       var paramCode: List[String] = List() //code of the param for the current considered call
@@ -431,10 +432,27 @@ trait ProduceJava[U <: InfoNbit[_]] {
           paramCode = List(nameBug, "llbug" + locusBug, "\"" + nameBug + "\"", "bugs").reverse
         case _ => //we now consider the interesting case: a call to a real CAloop
           paramCode = List("p") //this is a method PrShift that does a preliminary shift if radius is >0yyy
+
           //we can reconstruct spatial types, and bit numbers directly from the effective parameters:
           // call names and expressions, no need for reflection, at the end!:
           val dataParam = call.exps.map((x) => x.asInstanceOf[Read[_]].which)
           val resultParam = call.names
+
+          def concatCallCode:List[String]={
+            radicalOfVar(resultParam(0))::dataParam.map(radicalOfVarIntComp)
+          }
+          if (call.procName.startsWith("compute.concat")) {
+
+            //check that data anr result are all with #
+             paramCode=concatCallCode ++ paramCode
+            System.out.println("concat") //c'est standard
+          }
+
+
+
+          else{
+
+
           val spatialParam = shortenedSig(dataParam ::: resultParam)
           val bitSigSafe = spatialParam.map(tSymbVarSafe(_).nb)
           val spatialSigSafe = spatialParam.map(tSymbVarSafe(_).t.asInstanceOf[(Locus, Ring)])
@@ -454,6 +472,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
                 spatialType._2 != B() && //we take components of either UI or SI
                 densityDirect * nbit == densityParamPossiblyWrong //density possibly wrong is density of parameter before taking a component.
             }
+
+
             if (isComponent) {
               val rad = radicalOfVar(params(i))
               Util.checkSingleComponentNumber(params.filter(radicalOfVar(_)==rad))
@@ -501,7 +521,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
                   i += densityParamPossiblyWrong
                 }
               }
-            }}
+            }}}
           /** fundef if recompiled */
           val progCalled: DataProgLoop[U] = subDataProgs.getOrElse(call.procName, null) //gets the called dataProg, we won't be able to do that, when doing modular compilation.
           // CA loops can  contain layers.

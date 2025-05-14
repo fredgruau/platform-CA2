@@ -208,8 +208,10 @@ trait encodeLt extends encodeByInt {
     }
 
     override def mirror(mem: Array[Int], l: Locus): Unit = if (l.equals(Locus.locusV)) mirrorCopy(mem)
+    //else    throw new Exception("miror on non V")
 
     override def mirror(mem: Array[Array[Int]], l: Locus): Unit = if (l.equals(Locus.locusV)) mem.map(mirrorCopy(_))
+    //else   throw new Exception("miror on non V")
 
     /** do the copying part of mirroring */
     def mirrorCopy(mem: Array[Int]) = {
