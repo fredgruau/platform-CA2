@@ -60,7 +60,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
   def compile(m: Machine):CAloops2 = {
     body = computeRoot //we pretend that the circuit is a function which returns compute Root
     val prog1: DataProg[InfoType[_]] = DataProg(this,root4naming,nameCAlowerCase);
-    print(prog1)
+    //print(prog1)
 
     val prog2 = prog1.treeIfy();
     //    print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
@@ -75,7 +75,7 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //  println("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
-     print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
+     //print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
 
     val prog5ter: DataProg[InfoNbit[_]] = prog5bis.radiusify3
    print("radiusify555555555555555555555555555555\n" + prog5ter)
