@@ -11,7 +11,9 @@
         </Layer>
       </expandedLayer>
         <colorOfField>
-          <layer color="0x00FF00">
+          <layer color="0xFFFF00">
+            testdistSrcDSloplt
+          </layer><layer color="0x00FF00">
             testdistSrc
           </layer><layer color="0xFF0000">
             testdistSrcDBMeete

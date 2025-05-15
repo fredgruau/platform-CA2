@@ -15,9 +15,10 @@ object Compute {
     val a = pL[V, B]("a")
     val b = pL[V, B]("b")
     val c = pL[V, B]("c")
-    Fundef3("compute.concat3V", a.asInstanceOf[UintV]::b::c,a,b,c)
+    Fundef3("compute.concat3V", c.asInstanceOf[UintV]::b::a,a,b,c) //biarement on doit les concaténer dans cet ordre, je ne sait pas trop pourquoi
   }
-  def concat3V(b0: BoolV, b1: BoolV, b2: BoolV):UintV = new Call3(concat3VDef, b0, b1,b2)(repr.nomLR(repr.nomV, repr.nomUI)) with UintV
+  def concat3V(b0: BoolV, b1: BoolV, b2: BoolV):UintV =
+    new Call3(concat3VDef, b0, b1,b2)(repr.nomLR(repr.nomV, repr.nomUI)) with UintV
 
   val impliqueDef: Fundef2[(V, B), (V, B), (V, B)] = {
     val a = pL[V, B]("a")
