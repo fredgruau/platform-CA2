@@ -429,8 +429,9 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
         /** creates a binary tree of several call to opred       */
         def reduceEncapsulated(as: Array[ASTBt[R]], opred: redop[R]) =
           as.toList.tail.foldLeft(as(0))(new Call2(opred._1, _, _)(r) with ASTBt[R])
-        a.unfoldTransfer(m).map((x: ArrAst) =>
+        val result=a.unfoldTransfer(m).map((x: ArrAst) =>
           reduceEncapsulated(x.asInstanceOf[Array[ASTBt[R]]], op.asInstanceOf[redop[R]])).asInstanceOf[ArrAst]
+        result
       case BinopEdge(op, a, _, _, _) =>
         /** creates three binary tree of op     */
        val t=a.unfoldTransfer(m)

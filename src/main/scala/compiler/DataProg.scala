@@ -1019,7 +1019,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
   def redopConcats = dagis.visitedL.flatMap({ //identifies which are the concat
     case Affect(name, x) =>
-      if (x.toString.startsWith("redconcat2")) Some(name) else None //name of a reduction is red+name of operator concat2
+      if (x.toString.startsWith("redconcat2")||x.toString.startsWith("redconcaat2")) Some(name) else None //name of a reduction is red+name of operator concat2
     case _ => None
   })
   def unfoldSpace(m: Machine): DataProg[InfoNbit[_]] = {
@@ -1117,7 +1117,9 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
     // simplifConcat will replace toto_4 <- concat(toto_3,exp) par toto#4 <-exp
 
-    for (name <- redopConcats) {
+
+    val redconc=redopConcats
+    for (name <- redconc) {
       val i = defI2(name)
       assert(tSymbVar(name).locus == V(), "for the moment we concatenate only on vertice") //
       if (i.inputNeighbors.nonEmpty) {
