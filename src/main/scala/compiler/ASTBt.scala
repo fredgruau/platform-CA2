@@ -157,7 +157,7 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
         val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBg].deCallify(env))
         op.arg.asInstanceOf[ASTBg].deCallify(newEnv)
       case Call2(op, x, y) => //il se peut quon rajute un affect et augmente la tsymb
-        if (!op.name.equals("concat2")) {
+        if (!op.name.equals("concat2")&& !op.name.equals("concaat2")) {
           checkUISI(x, op.p1); checkUISI(y, op.p2)
         } //for concat2 param can be V or UI or UISI;
 

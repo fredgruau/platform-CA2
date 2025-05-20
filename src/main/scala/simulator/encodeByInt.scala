@@ -58,12 +58,10 @@ trait encodeGt extends encodeByInt {
           UtilBitJava.propagateBit1and30(mem, 1 + j, 1 + (j + nbLineCAp1) % (nbIntPerLine * nbLineCAp1))
 
     override def mirror(mem: Array[Int], l: Locus): Unit = if (l.equals(Locus.locusV)) mirrorCopy(mem)
-
     override def mirror(mem: Array[Array[Int]], l: Locus): Unit = if (l.equals(Locus.locusV)) mem.map(mirrorCopy(_))
 
     /** do the copying part of mirroring */
     def mirrorCopy(mem: Array[Int]) = {
-
       def copyLine(src: Int, dest: Int) = copyEntireLine(mem, src + 1, dest + 1, nbIntPerLine, nbLineCAp1)
       def rotateLineRight(i: Int) = rotateEntireLineRigt(mem, i + 1, nbIntPerLine, nbLineCAp1)
       def rotateLineLeft(i: Int) = rotateEntireLineLeft(mem, i + 1, nbIntPerLine, nbLineCAp1)
@@ -120,6 +118,11 @@ trait encodeGt extends encodeByInt {
         for (mv <- moves) applyMove(mv, (i - 2), mem)
       }
     }
+
+    /** does a torus on the border */
+    override def torusify(h: Array[Array[Int]], l: Locus): Unit = ???
+
+    override def torusify(h: Array[Int], l: Locus): Unit = ???
   }
   /**
    * encode from boolean to ints 32 bits
@@ -161,7 +164,7 @@ trait encodeLt extends encodeByInt {
   assert((nbCol == 6 || nbCol == 8 || nbCol == 14) && (nbLine % nbLignePerInt32) == 0, "nbCol must be  6, 8 or 14, all the int32 are used completely")
   /** number of ints needed storing the booleans of one bit plane of the CA memory */
   val nbInt32: Int = nbLine / nbLignePerInt32 //for each lines, we need two separating bits
-  assert(nbInt32 % 2 == 0) //we need an event number of integers, so that each int will regroupe line with identical parity
+  assert(nbInt32 % 2 == 0||nbInt32==1) //we need an even number of integers, so that each int will regroupe line with identical parity
   // which will result in a simpler scheme for implementing  the axial symmetry of vertical axis.
   /** number of Int32 needed for one bit plan of the CA memory * */
   def nbInt32total: Int = 4 + nbInt32 //we need two extra int32 before and two extra int32 after.
@@ -212,6 +215,55 @@ trait encodeLt extends encodeByInt {
 
     override def mirror(mem: Array[Array[Int]], l: Locus): Unit = if (l.equals(Locus.locusV)) mem.map(mirrorCopy(_))
     //else   throw new Exception("miror on non V")
+    override def torusify(mem: Array[Int], l: Locus): Unit = if (l.equals(Locus.locusV)) torusifyCopy(mem)
+    //else    throw new Exception("miror on non V")
+
+    override def torusify(mem: Array[Array[Int]], l: Locus): Unit = if (l.equals(Locus.locusV)) mem.map(torusifyCopy(_))
+    //else   throw new Exception("miror on non V")
+
+    def torusifyCopy(mem: Array[Int]) = {
+
+      def shift(h: Map[Int, Int], shiftRange: Int): Map[Int, Int] = {
+        /** due to rotation, we must add a supplementary shift to the moves even and odd */
+        def shift(i: Int, shiftRange: Int): Int = {
+          val offset = i - i % (nbCol + 2)
+          val iroot = i - offset - 1 //iroot is in the right interval 0..nbCol-1 so as to do a modulo addition
+          val ishifted = addMod(iroot, shiftRange)
+          val res = ishifted + offset + 1
+          if (shiftRange == 0 && res != i) throw new Exception("shift Error")
+          res
+        }
+
+        h.map({ case (k, v) => (shift(k, shiftRange), shift(v, shiftRange)) })
+      }
+      /** applies a precomputed list of move, (distinct for even or odd int32. */
+      def applyMove(v: Int, moves: Map[Int, Int], mask: Int): Int = {
+        var res = v
+        for (move <- moves)
+          res = moveBitxtoy(res, move._1, move._2, mask)
+        res
+      }
+      //process top line
+      val bout = 32 % (nbCol + 2)
+      val maskFirst = maskCompact(nbCol) >> bout //cover the first line. we pass over the first two bits, for nbCol+2=10
+      val line2 = if (nbInt32 > 2) mem(4) else mem(first) << nbCol + 2 //faut aussi rotationner les bits eux meme
+      val line2Trunc = line2 & maskFirst
+      val line2rotated = (line2Trunc >>> 1 | (line2Trunc << (nbCol - 1))) & maskFirst
+      mem(first) = writeInt32(mem(first), line2rotated, maskFirst) //copy line 2, to line 0
+      //process bottom line
+      val maskOffset = (nbLignePerInt32 - 1) * (nbCol + 2)
+      val maskLast = maskFirst >>> maskOffset
+      val linem2 = if (nbInt32 > 2) mem(last - 2) else mem(last) >>> (nbCol + 2)
+      val linem2Trunc = linem2 & maskLast //faut aussi rotationner les bits eux meme
+      val linem2Rotated = (linem2Trunc << 1 | (linem2Trunc >>> (nbCol - 1))) & maskLast //& 0x00000002
+      mem(last) = writeInt32(mem(last), linem2Rotated, maskLast) //copy line last-2, to last line
+      //process right and left column using precomputed  moves in movesEven and movesOdd
+      val maskSlim = 1 //we will now have to move bit by bit, because the moves are not uniform across a given integers
+      for (i <- first - 1 until last + 1) {
+        val mv = shift(if (i % 2 == 0) movesEven else movesOdd, i / 2 - 1) //adds a shift i/2-1 to the move computed for the first line
+        mem(i) = applyMove(mem(i), mv, maskSlim)
+      }
+    }
 
     /** do the copying part of mirroring */
     def mirrorCopy(mem: Array[Int]) = {

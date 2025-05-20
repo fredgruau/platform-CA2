@@ -13,7 +13,7 @@ import sdn.{BlobE, BlobV, BlobVe, HasBrdE, HasBrdVe, MuStruct}
 import progOfmacros.Comm._
 import progOfmacros.Topo.brdin
 import progOfmacros.{Grad, Wrapper}
-import progOfmacros.Util.{randE2, randN12, randNext}
+import progOfmacros.Util.{randE2, randN12, randNext, torusify}
 import progOfmacros.Wrapper.{borderS, existS, not, segment1, shrink}
 import sdn.Globals.{root4naming, setRoot4naming}
 
@@ -198,7 +198,9 @@ object Util {
 
 /** Layer implementing a random bit */
 class Rand() extends Layer[(V, B)](1, "random") with ASTLt[V, B]         {
-  val next: BoolV = randNext(this) //randDef is used only here, no need for a wrapper!
+  val miroredNext = randNext(this) //by default it'll get mirored because of its radius 1.
+  val next: BoolV = torusify(miroredNext) //will apply the identity, plus torusify.
+//  val next: BoolV = randNext(this) //randDef is used only here, no need for a wrapper!
   lazy val randDir: BoolVe = randN12(this) //lazy because probably not used
   lazy val randSide: BoolEv = randE2(this) //only qpointRand uses this
 }

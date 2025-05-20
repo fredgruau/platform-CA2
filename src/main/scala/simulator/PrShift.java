@@ -21,6 +21,10 @@ public interface PrShift {
 
     public void mirror(int[] h, Locus l);
 
+    /** does a torus on the border */
+    public void torusify(int[][] h, Locus l);
+
+    public void torusify(int[] h, Locus l);
 
 }
 

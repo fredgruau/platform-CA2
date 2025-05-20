@@ -12,6 +12,13 @@ import progOfmacros.Wrapper.{borderS, border}
 import progOfmacros.Topo.nbccDef
 
 object Util {
+  private val torusifyDef: Fundef1[(V, B), (V, B)] = {
+    val b = pL[V, B]("randmiror")
+    Fundef1("util.torusify", b, b) //identity function, we will add the torusify code directly in the java.
+    }
+  def torusify(b: BoolV): BoolV = new Call1[(V, B), (V, B)](torusifyDef, b) with BoolV
+
+
   /** compute the next value of a random bit, using the neighbors and a tested combination of ors, and xors
    * which does not have short 256 cycle */
   private val randDef: Fundef1[(V, B), (V, B)] = {

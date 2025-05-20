@@ -1,11 +1,33 @@
 package simulator
 
 import org.scalatest.{BeforeAndAfter, FunSuite}
+import simulator.Medium.christal
 import triangulation.Utility._
 
 import scala.util.Random
 
+object TestEncodeDecode{
+  /** arrays cannot be directly compared for equality, because their adress will
+   * be compared. That is why we need to turn them into lists */
+  def list[A](input: Array[Array[A]]) =
+    input.map(_.toList).toList
+
+  def randomFill(lCAinput: Array[Boolean]): Unit = {
+    val r: Random.type = scala.util.Random
+    for (i <- 0 until lCAinput.size)
+      lCAinput(i) = r.nextBoolean()
+  }
+
+  def randomFill(lCAinput: Array[Array[Boolean]]): Unit = {
+    val r: Random.type = scala.util.Random
+    for (l <- lCAinput)
+      randomFill(l)
+  }
+
+}
+//val medium= christal(6, 8, 200)
 class TestEncodeDecode extends FunSuite with BeforeAndAfter {
+  import TestEncodeDecode._
   /** push and pop a single boolean into an int representing a stack */
   test("push1pop1") {
     val input = 141 //not to big int
@@ -41,22 +63,6 @@ class TestEncodeDecode extends FunSuite with BeforeAndAfter {
     assert(input.toList == output.toList)
   }
 
-  /** arrays cannot be directly compared for equality, because their adress will
-   * be compared. That is why we need to turn them into lists */
-  def list[A](input: Array[Array[A]]) =
-    input.map(_.toList).toList
-
-  def randomFill(lCAinput: Array[Boolean]): Unit = {
-    val r: Random.type = scala.util.Random
-    for (i <- 0 until lCAinput.size)
-      lCAinput(i) = r.nextBoolean()
-  }
-
-  def randomFill(lCAinput: Array[Array[Boolean]]): Unit = {
-    val r: Random.type = scala.util.Random
-    for (l <- lCAinput)
-      randomFill(l)
-  }
 
 
   test("InterleaveSpace") {

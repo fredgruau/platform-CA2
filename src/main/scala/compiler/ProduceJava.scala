@@ -154,9 +154,10 @@ trait ProduceJava[U <: InfoNbit[_]] {
       },
       "PROPAGATEFIRSTBIT" -> {
         val callsToPropagate: Seq[String] = paramD.map((s: String) => "p.prepareBit(" + s + ")") //for the moment we do the propagation on all data parameters
-        val callsToPropagate2 = shortSigIn.map((s: String) => "p.prepareBit(" + s + ")")
+        val radius1Out=shortSigOut.filter(tSymbVarSafe(_).k.isRadius1)
 
-        val callsToMirror = shortSigIn.map((s: String) => {
+        val callsToPropagate2 = radius1Out.map((s: String) => "p.prepareBit(" + s + ")")
+        val callsToMirror = radius1Out.map((s: String) => {
           val l = tSymbVar(s).t.asInstanceOf[(Locus, Ring)]._1
           "p.mirror(" + s + ",compiler.Locus." + l.javaName + ")"
         })

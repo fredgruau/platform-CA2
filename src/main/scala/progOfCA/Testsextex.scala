@@ -93,6 +93,8 @@ show(success) //neccesary to avoid cycles
  //d'abord le résultat des comparaisons
 
 //show(northmin);
+
+ show(root4naming.rands(6),root4naming.rands(7))
  show(voisins,nasI,prioRand,east,se,sw,west,nw,ne)
  show(eastltSharp,sextex, southmin)//,eqeSe)
  //shoow(sloplt,level,twoLt,dopp,se,grad3,grad6)th
