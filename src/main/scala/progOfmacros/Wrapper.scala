@@ -9,6 +9,7 @@ import compiler.Circuit.iTabSymb
 import compiler.SpatialType.UintE
 import compiler.repr.{nomB, nomCons, nomV}
 import progOfmacros.RedS.{getRedSFun, redsDirect}
+import progOfmacros.TransferToTransfer.getttFun
 import progOfmacros.RedD.getRedFun
 import progOfmacros.Bino.getBinFun
 import progOfmacros.Cmp.getCmpFun
@@ -58,6 +59,12 @@ object Wrapper {
     new Call1[(S1, B), (S2, B)](f, arg)(repr.nomLR(n, compiler.repr.nomB)) with ASTLt[S2, B] {}
   }
 
+  def transferMacro[S1 <: S, S2 <: S, R<:Ring](arg: ASTLt[T[S1,S2], R])
+             (implicit m: repr[S1], n: repr[S2], r:repr[R], d: chip[S2, S1]): ASTLt[T[S2,S1], R]= {
+    val f: Fundef1[(T[S1,S2], R), (T[S2,S1], R)] = getttFun(arg.locus)(m,n,r,d)
+    new Call1[(T[S1,S2], R), (T[S2,S1], R)](f, arg)
+      /*(repr.nomLR(n, compiler.repr.nomB))*/ with ASTLt[T[S2,S1], R] {}
+  }
   def orR[S1 <: S, S2 <: S, R <: Ring](arg: ASTLt[T[S1, S2], R])
          (implicit m: repr[S1], m2: repr[S2], n: repr[R], d: chip[S1, S2]): ASTLt[S1, R] = {
     reduce(orRedop[R], arg)

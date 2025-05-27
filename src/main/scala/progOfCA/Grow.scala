@@ -2,11 +2,12 @@ package progOfCA //contains variation of grow, illustgrate redS sytematic comput
  //contains lots of different way of growing, and in particular, growing to voronoi cells
 import compiler.ASTLfun.{neighbors, v}
 import compiler.AST.{Layer, delayed, pL}
+import compiler.ASTBfun.orRedop
 import compiler.SpatialType.{BoolE, _}
 import compiler.ASTL._
 import compiler.Circuit.hexagon
-import compiler.{AST, ASTBfun, ASTLt, B, Circuit, E, F, T, UI, V}
-import progOfmacros.Wrapper.{borderS, existS, insideS}
+import compiler.{AST, ASTBfun, ASTLt, B, Circuit, E, F, T, UI, V, repr}
+import progOfmacros.Wrapper.{borderS, existS, insideS, transferMacro}
 import compiler.ASTLfun._
 import compiler.ASTLt.ConstLayer
 import compiler.repr.nomE
@@ -23,7 +24,39 @@ class GrowVorTest()  extends ConstLayer[V, B](1, "global")  with BranchNamed{
   show(g,g.edge.meetE,g.edge.meetV) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
   //val g=new GrowVorVeTest();show(g,g.ve.meetE,g.ve.meetV) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
 }
+/** test growVorV/E/Ve by wrapping in a useless constant layer */
+class GrowTest()  extends ConstLayer[V, B](1, "global")  with BranchNamed{
+  //  val g=new GrowVorVTest();show(g,g.meetE,g.meetV)
+  val g=new Growtt(); // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
+  //val g=new GrowVorVeTest();show(g,g.ve.meetE,g.ve.meetV) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
 
+  show(g, g.next, g.n, g.brd)
+}
+
+/** Simple growth from V to E to V; test of in, and border.we believe that at least for border, and neighbor, it will be reused */
+class Growtt extends Layer[(V, B)](1, "global") with ASTLt[V, B] with BranchNamed{
+
+  val broadcasted:BoolVe = broadcast(this )//step 1 is broadcast
+  val transfered :BoolEv= transferMacro(broadcasted) //step 2 is transfer
+  val n2 = reduce(orRedop[B], transfered) //(n,m,d) yzeté implicit killerest
+
+
+  val n: BoolE = existS(this);
+  // val in: BoolE = inside(this);
+  val brd: BoolE = borderS(this);
+  override val next: BoolV = existS(n2) //   uses  defVe implicitely, the override keyword is mandatory
+
+  // he name of root to arg(0).lowercase
+}
+/** Simple growth from V to E to V; test of in, and border.we believe that at least for border, and neighbor, it will be reused */
+class Grow extends Layer[(V, B)](1, "global") with ASTLt[V, B] with BranchNamed{
+  val n: BoolE = existS(this);
+  // val in: BoolE = inside(this);
+  val brd: BoolE = borderS(this);
+  override val next: BoolV = existS(n) //   uses  defVe implicitely, the override keyword is mandatory
+
+  // he name of root to arg(0).lowercase
+}
 
 /** uses plain  blobV computation to grow seed into Voronoi region, just by stoping the growth just before merge happens */
 class GrowVorVTest() extends Layer[(V, B)](1, "global") with BoolV with BlobV with BranchNamed {
@@ -50,16 +83,6 @@ class GrowVorVeTest() extends Layer[(V, B)](1, "global") with BoolV  with Branch
 
 
 /*
-/** Simple growth from V to E to V; test of in, and border.we believe that at least for border, and neighbor, it will be reused */
-class Grow extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
-  val n: BoolE = existS(this);
-  // val in: BoolE = inside(this);
-  val brd: BoolE = borderS(this);
-  override val next: BoolV = existS(n) //   uses  defVe implicitely, the override keyword is mandatory
-  show(this, next, n, brd)
-  // he name of root to arg(0).lowercase
-}
-
 /** Simple growth using directly the neighbor vertice,  that is a bit cheaper */
 class GrowN extends Layer[(V, B)](1, "global") with ASTLt[V, B] {
   override val next: BoolV = orR(neighbors(this)) //  make use of defVe brough to us implicitely,
