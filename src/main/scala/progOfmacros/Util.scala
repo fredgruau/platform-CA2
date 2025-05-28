@@ -12,6 +12,7 @@ import progOfmacros.Wrapper.{borderS, border}
 import progOfmacros.Topo.nbccDef
 
 object Util {
+  /** This macro computes the identity, exept that we will modify the generated java code, so as to add a wrap instead of a miror */
   private val torusifyDef: Fundef1[(V, B), (V, B)] = {
     val b = pL[V, B]("randmiror")
     Fundef1("util.torusify", b, b) //identity function, we will add the torusify code directly in the java.

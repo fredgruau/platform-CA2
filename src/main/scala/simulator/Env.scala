@@ -65,8 +65,22 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
         controller.locusOfDisplayedOrDirectInitField(layerName), // locus is passed. It is used in def/center/yaxis
         controller.bitSizeDisplayedOrDirectInitField.getOrElse(layerName, 1)) // bitsize  is passed.
       initMethod.init(memFields2Init.toArray)
+
     }
   }
+  /** applies a miror on the initialed layers */
+  def initMiror(): Unit = {
+    for (layerName: String <- controller.progCA.init().keys) {
+      val memFields2Init: Seq[Array[Int]] = memFields(layerName)
+      for (memoryPlane<-memFields2Init) {
+        val p=medium.propagate4Shift
+        p.mirror(memoryPlane, controller.locusOfDisplayedOrDirectInitField(layerName))
+        p.prepareBit(memoryPlane)
+      }
+
+
+    }
+    }
 
   def init(): Unit = {
     medium.initRandom(controller.randomRoot) //we reinitialize the random number in order to reproduce exactly the same random sequence
@@ -76,6 +90,7 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
       medium.voronoise(controller.displayedLocus, controller.currentProximityLocus) //we have to compute the voronoi upon medium's creation
     initMemCA() //invariant stipulates that memory should be filled so we fill it already right when we create it
 // System.out.println( medium.pointSet(V()).size)
+    initMiror()
     t=0
     forward() //we do one forward, so as to be able to show the fields.
     for (_ <- 1 until t0) //forward till to

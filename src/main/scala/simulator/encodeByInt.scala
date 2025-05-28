@@ -14,7 +14,8 @@ trait encodeByInt extends Rectangle {
   def nbInt32total: Int
 
   /** Implements communication needed to propagete bits so that shifting can be implemented with just << or >>
-   * and miroring line and columns, so that Gabriel centers will appear on border */
+   * and miroring line and columns, so that Gabriel centers will appear on border
+   * and also torusifying for random numbers. */
   def propagate4Shift: PrShift
 
   /**
@@ -46,16 +47,18 @@ trait encodeGt extends encodeByInt {
   val nbInt32total: Int = nbLineCAp1 * nbIntPerLine + 3
   val first = 2; //index of first integer of first line really used
   val last = nbLine + 1 //index of first integer of  last line really used
-
+  /** instancie une interface java. */
   override val propagate4Shift: PrShift = new PrShift() {
     def prepareBit(mem: Array[Int]): Unit = propage4Shift(mem)
 
     def prepareBit(mem: Array[Array[Int]]): Unit = mem.map(propage4Shift(_))
 
-    def propage4Shift(mem: Array[Int]): Unit =
-      for (i <- 0 until nbIntPerLine) //i index of a macro columns
-        for (j <- i * nbLineCAp1 until (i + 1) * nbLineCAp1) //j traverse macro coloni
-          UtilBitJava.propagateBit1and30(mem, 1 + j, 1 + (j + nbLineCAp1) % (nbIntPerLine * nbLineCAp1))
+    def propage4Shift(mem: Array[Int]): Unit = {
+      if(nbIntPerLine>1) //rajoue pour faire le propagate si vraiment c'est necessaire
+        for (i <- 0 until nbIntPerLine) //i index of a macro columns faut probablement faire une iération de moins
+          for (j <- i * nbLineCAp1 until (i + 1) * nbLineCAp1) //j traverse macro coloni
+            UtilBitJava.propagateBit1and30(mem, 1 + j, 1 + (j + nbLineCAp1) % (nbIntPerLine * nbLineCAp1))
+    }
 
     override def mirror(mem: Array[Int], l: Locus): Unit = if (l.equals(Locus.locusV)) mirrorCopy(mem)
     override def mirror(mem: Array[Array[Int]], l: Locus): Unit = if (l.equals(Locus.locusV)) mem.map(mirrorCopy(_))
@@ -198,12 +201,16 @@ trait encodeLt extends encodeByInt {
     }
 
 
-    def prepareBit(mem: Array[Int]): Unit = propagate4Shift(mem)
+    //def prepareBit(mem: Array[Int]): Unit = propagate4Shift(mem)
 
-    def prepareBit(mem: Array[Array[Int]]): Unit = mem.map(propagate4Shift(_))
+    def prepareBit(mem: Array[Array[Int]]): Unit = mem.map(prepareBit(_))
 
-
-    def propagate4Shift(mem: Array[Int]): Unit = {
+//for the small gird,  propagate for shift is not necessary, so it just do nothing
+def prepareBit(mem: Array[Int]): Unit = {
+  propagate4Wrap(mem)
+}
+    /** on a réalisé récemment que le propagate bit qu'on faisait dans le small grid case, etait un wrap. */
+def propagate4Wrap(mem: Array[Int]): Unit = {
       mem(first - 1) = mem(last) >>> (nbCol + 2) //we start by computing  the very first integer t[first-1]
       mem(last + 1) = mem(first) << (nbCol + 2) //and then the very last integer t[last+1]
       for (i <- 1 until last + 1)

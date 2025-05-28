@@ -11,6 +11,7 @@ object TestEncodeDecode{
    * be compared. That is why we need to turn them into lists */
   def list[A](input: Array[Array[A]]) =
     input.map(_.toList).toList
+  def equals[A](a: Array[Array[A]],b:Array[Array[A]])={list(a)==list(b)}
 
   def randomFill(lCAinput: Array[Boolean]): Unit = {
     val r: Random.type = scala.util.Random

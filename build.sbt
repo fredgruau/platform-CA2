@@ -8,11 +8,12 @@ scalaVersion := "2.13.12"
 
 //githubTokenSource := TokenSource.GitConfig("github.token")
 //resolvers += Resolver.githubPackages("TortueSandwich")
+libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "3.0.0"
+
 libraryDependencies += "org.scala-lang" % "scala-library" % "2.13.12" // Remplacez la version par celle utilisée dans votre projet
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.8" % "test"
 
-libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "3.0.0"
 
 //libraryDependencies += "com.github.benhutchison" % "scalaswingcontrib" % "1.8"
 

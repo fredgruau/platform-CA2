@@ -33,8 +33,9 @@ class   Testsextex() extends ConstLayer[V, B](1, "global")  with BranchNamed{
   *
   * @param arg1 first unsigned int
   * @param arg2 second unsigned int
-  * @param r random bit used to decide in case of equality
-  * @return sharplt decide between arg1 and arg2, min is the minimum
+  * @param r random bit used to decide who wins in case of equality arg1=arg2
+  * @return ltsharp returns 1 if arg1< 0 if arg1 >arg2, r if arg1=arg2
+  *         min is the minimum
   */
  def sharpCmp(arg1: UintV, arg2:UintV, r:BoolV): (ASTLt[V, UI], ASTLt[V, B]) ={
   val lt=ltUI2L(arg1,arg2)

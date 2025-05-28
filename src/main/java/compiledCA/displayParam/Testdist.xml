@@ -1,24 +1,30 @@
 <displayParam>
         <expandedLayer>
         <Layer>
-          testdist
-        </Layer><Layer>
           testdistSrc
         </Layer><Layer>
           testdistSrcD
         </Layer><Layer>
           testdistSrcDB
+        </Layer><Layer>
+          testdist
         </Layer>
       </expandedLayer>
         <colorOfField>
-          <layer color="0xFFFF00">
-            testdistSrcDSloplt
-          </layer><layer color="0x00FF00">
+          <layer color="0x00FF00">
             testdistSrc
-          </layer><layer color="0xFF0000">
-            testdistSrcDBMeete
+          </layer><layer color="0x80FF00">
+            testdistSrcDGap
+          </layer><layer color="0x0080FF">
+            testdistSrcDBMeetv
+          </layer><layer color="0x00FFFF">
+            testdistSrcDDelta
           </layer><layer color="0x00FF80">
             testdistSrcD
+          </layer><layer color="0xFF0000">
+            testdistSrcDBMeete
+          </layer><layer color="0xFFC800">
+            testdistSrcDLevel
           </layer>
         </colorOfField>
       </displayParam>

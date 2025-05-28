@@ -28,6 +28,6 @@ for (int i = 1; i < prandNeigh.length -1; i++) {
  r5= neighborasInt$0 ;utilrand[i-1]=((((( r5  |  r0 ) |  r4 ) ^  r2 ) ^  r1 ) ^  r3 );
   }
   p.mirror(utilrand,compiler.Locus.locusV());
-p.prepareBit(utilrand)
+  p.prepareBit(utilrand)
  ;
   }}
