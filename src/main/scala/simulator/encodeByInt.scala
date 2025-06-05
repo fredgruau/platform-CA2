@@ -1,7 +1,7 @@
 package simulator
 
 import compiler.{Locus, copyEntireLine, getBitx, putBitx, rotateEntireLineLeft, rotateEntireLineRigt, rotateLeft, rotateRight}
-import dataStruc.Util.{Rectangle, copyArray}
+import dataStruc.Util.{Rectangle, copyArray, isMiror, miror}
 import simulator.UtilBitJava.{moveBitxtoy, propagateBitxand1}
 import triangulation.Utility.{interleaveSpace, intsToLine, lineToInts, maskCompact, maskSparse, pop, push, unInterleaveSpace, writeInt32}
 
@@ -34,6 +34,12 @@ trait encodeByInt extends Rectangle {
    * */
   def decode(memCAint32: Array[Int], memCAbool: Array[Array[Boolean]]): Unit
 
+  /** return true if it is in mirrored form. It is a slow but easy and safe implementation, used for debug*/
+  def isMirorSafe(memCAint32: Array[Int]):Boolean={
+    val lCAoutput = Array.ofDim[Boolean](nbLine, nbCol)
+    decode(memCAint32, lCAoutput)
+    isMiror(lCAoutput)
+  }
 }
 
 trait encodeGt extends encodeByInt {
@@ -47,24 +53,35 @@ trait encodeGt extends encodeByInt {
   val nbInt32total: Int = nbLineCAp1 * nbIntPerLine + 3
   val first = 2; //index of first integer of first line really used
   val last = nbLine + 1 //index of first integer of  last line really used
-  /** instancie une interface java. */
+
+
+  /** instancie une classe abstraite java. */
   override val propagate4Shift: PrShift = new PrShift() {
-    def prepareBit(mem: Array[Int]): Unit = propage4Shift(mem)
-
-    def prepareBit(mem: Array[Array[Int]]): Unit = mem.map(propage4Shift(_))
-
-    def propage4Shift(mem: Array[Int]): Unit = {
+    /** is miror is defined in Prshift, so that it can be called back  during the execution of  the CA loops */
+    override def isMirrorSafe(h: Array[Int]): Boolean = encodeGt.super.isMirorSafe(h)
+    def prepareBit(mem: Array[Int]): Unit =  {
       if(nbIntPerLine>1) //rajoue pour faire le propagate si vraiment c'est necessaire
         for (i <- 0 until nbIntPerLine) //i index of a macro columns faut probablement faire une iération de moins
           for (j <- i * nbLineCAp1 until (i + 1) * nbLineCAp1) //j traverse macro coloni
             UtilBitJava.propagateBit1and30(mem, 1 + j, 1 + (j + nbLineCAp1) % (nbIntPerLine * nbLineCAp1))
     }
 
-    override def mirror(mem: Array[Int], l: Locus): Unit = if (l.equals(Locus.locusV)) mirrorCopy(mem)
-    override def mirror(mem: Array[Array[Int]], l: Locus): Unit = if (l.equals(Locus.locusV)) mem.map(mirrorCopy(_))
+    def mirror(mem: Array[Int]): Unit =
+      {
+        mirrorCopyFast(mem)
+        assert(isMirrorSafe(mem))
+      }
 
-    /** do the copying part of mirroring */
-    def mirrorCopy(mem: Array[Int]) = {
+    /** do the copying part of mirroring in a safe but time expensive way. Used for punctual testing in case of problem */
+    def mirrorCopySafe(mem: Array[Int]) = {
+      val matBool=Array.ofDim[Boolean](nbLine,nbCol)
+      decode(mem,matBool)
+      miror(matBool)
+      encode(matBool,mem)
+    }
+
+    /**  mirroring in complex effficient form */
+    def mirrorCopyFast(mem: Array[Int]) = {  //insert one boolean false!
       def copyLine(src: Int, dest: Int) = copyEntireLine(mem, src + 1, dest + 1, nbIntPerLine, nbLineCAp1)
       def rotateLineRight(i: Int) = rotateEntireLineRigt(mem, i + 1, nbIntPerLine, nbLineCAp1)
       def rotateLineLeft(i: Int) = rotateEntireLineLeft(mem, i + 1, nbIntPerLine, nbLineCAp1)
@@ -126,6 +143,7 @@ trait encodeGt extends encodeByInt {
     override def torusify(h: Array[Array[Int]], l: Locus): Unit = ???
 
     override def torusify(h: Array[Int], l: Locus): Unit = ???
+
   }
   /**
    * encode from boolean to ints 32 bits
@@ -172,6 +190,7 @@ trait encodeLt extends encodeByInt {
   /** number of Int32 needed for one bit plan of the CA memory * */
   def nbInt32total: Int = 4 + nbInt32 //we need two extra int32 before and two extra int32 after.
 
+
   override val propagate4Shift: PrShift = new PrShift() {
     def addMod(i: Int, j: Int) = (i + j + nbCol) % nbCol
     val first = 2;
@@ -201,28 +220,19 @@ trait encodeLt extends encodeByInt {
     }
 
 
-    //def prepareBit(mem: Array[Int]): Unit = propagate4Shift(mem)
 
-    def prepareBit(mem: Array[Array[Int]]): Unit = mem.map(prepareBit(_))
+  def prepareBit(mem: Array[Int]): Unit = {
 
-//for the small gird,  propagate for shift is not necessary, so it just do nothing
-def prepareBit(mem: Array[Int]): Unit = {
-  propagate4Wrap(mem)
-}
-    /** on a réalisé récemment que le propagate bit qu'on faisait dans le small grid case, etait un wrap. */
-def propagate4Wrap(mem: Array[Int]): Unit = {
       mem(first - 1) = mem(last) >>> (nbCol + 2) //we start by computing  the very first integer t[first-1]
       mem(last + 1) = mem(first) << (nbCol + 2) //and then the very last integer t[last+1]
-      for (i <- 1 until last + 1)
-        mem(i) = propagateBitxand1(mem(i), nbCol, maskS)
+       for (i <- first - 1 until last + 1)   mem(i) = propagateBitxand1(mem(i), nbCol, maskS)
     }
-
-    override def mirror(mem: Array[Int], l: Locus): Unit = if (l.equals(Locus.locusV)) mirrorCopy(mem)
+    override def isMirrorSafe(h: Array[Int]): Boolean = encodeLt.super.isMirorSafe(h)
+    override def mirror(mem: Array[Int]): Unit =
+        mirrorCopy2(mem)
     //else    throw new Exception("miror on non V")
 
-    override def mirror(mem: Array[Array[Int]], l: Locus): Unit = if (l.equals(Locus.locusV)) mem.map(mirrorCopy(_))
-    //else   throw new Exception("miror on non V")
-    override def torusify(mem: Array[Int], l: Locus): Unit = if (l.equals(Locus.locusV)) torusifyCopy(mem)
+        override def torusify(mem: Array[Int], l: Locus): Unit = if (l.equals(Locus.locusV)) torusifyCopy(mem)
     //else    throw new Exception("miror on non V")
 
     override def torusify(mem: Array[Array[Int]], l: Locus): Unit = if (l.equals(Locus.locusV)) mem.map(torusifyCopy(_))
@@ -273,6 +283,14 @@ def propagate4Wrap(mem: Array[Int]): Unit = {
     }
 
     /** do the copying part of mirroring */
+    def mirrorCopy2(mem: Array[Int]) = {
+      val matBool=Array.ofDim[Boolean](nbLine,nbCol)
+      decode(mem,matBool)
+      miror(matBool)
+      encode(matBool,mem)
+    }
+    /** does the same as mirrorCopy2, in a faster way, but much more complex way,  */
+
     def mirrorCopy(mem: Array[Int]) = {
 
       def shift(h: Map[Int, Int], shiftRange: Int): Map[Int, Int] = {
@@ -317,6 +335,8 @@ def propagate4Wrap(mem: Array[Int]): Unit = {
         mem(i) = applyMove(mem(i), mv, maskSlim)
       }
     }
+
+
   }
   //PrepareShift.prepareShiftGte30
 
@@ -341,7 +361,6 @@ def propagate4Wrap(mem: Array[Int]): Unit = {
     }
     interleaveSpace(memCAint32, 1, nbInt32) //insert the necessary spaces
   }
-
   /**
    * decodes, from Int 32 bits to booleans
    *

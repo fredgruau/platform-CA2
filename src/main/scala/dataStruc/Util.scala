@@ -22,6 +22,7 @@ import java.util
 import javax.tools.{JavaCompiler, StandardJavaFileManager, ToolProvider}
 import scala.::
 import scala.math.cos
+import scala.util.Random
 //import de.alsclo.voronoi.graph.Voronoi
 import simulator.CAtype.pointLines
 import simulator.UtilBitJava.{moveBitxtoy, propagateBit14and1, propagateBit6and1, propagateBitxand1}
@@ -43,8 +44,50 @@ import java.net.URLClassLoader
 
 object Util {
 
-   //def orderDisplayed(displayed:List[String])
 
+  /** arrays cannot be directly compared for equality, because their adress will
+   * be compared. That is why we need to turn them into lists */
+  def list[A](input: Array[Array[A]]) =
+    input.map(_.toList).toList
+  def isEqualto[A](a: Array[Array[A]],b:Array[Array[A]])={list(a)==list(b)}
+
+  def randomFill(lCAinput: Array[Boolean]): Unit = {
+    val r: Random.type = scala.util.Random
+    for (i <- 0 until lCAinput.size)
+      lCAinput(i) = r.nextBoolean()
+  }
+
+  def randomFill(lCAinput: Array[Array[Boolean]]): Unit = {
+    val r: Random.type = scala.util.Random
+    for (l <- lCAinput)
+      randomFill(l)
+  }
+  def randomFill(lCAmem: Array[Int]): Unit = {
+    val r: Random.type = scala.util.Random
+    for (i<-0 until  lCAmem.length)
+      lCAmem(i)=r.nextInt()
+  }
+
+
+  def isMiror(lCA: Array[Array[Boolean]]):Boolean={
+    val nbligne= lCA.length; val nbCol=lCA(0).length
+    val isMirorUp={ lCA(0).toList==lCA(2).toList}
+    val isMirorDown={lCA(nbligne-1).toList==lCA(nbligne-3).toList}
+    val isMirorLeft={var i=0;var res=true; for(l<-lCA){res = res && (l(0) == (if(i%2==0) l(2) else l(1)));i+=1  }
+      res}
+    val isMirorRight={var i=0 ;var res=true;
+      for(l<-lCA){res = res &&  (l(nbCol-1)==(if(i%2==0) l(nbCol-2) else l(nbCol-3)));i+=1 }
+      res}
+    isMirorUp && isMirorDown && isMirorRight && isMirorLeft
+  }
+  def miror(lCA: Array[Array[Boolean]])={
+    val nbligne= lCA.length; val nbCol=lCA(0).length
+    def mirorUp={ lCA(0)=lCA(2).clone()}
+    def mirorDown={lCA(nbligne-1)=lCA(nbligne-3).clone()}
+    def mirorLeft={var i=0; for(l<-lCA){l(0)=if(i%2==0) l(2) else l(1);i+=1  } }
+    def mirorRight={var i=0 ; for(l<-lCA){ l(nbCol-1)=if(i%2==0) l(nbCol-2) else l(nbCol-3);i+=1 } }
+    mirorUp;mirorDown;mirorRight;mirorLeft
+  }
 
 
   /** returns name of already defined macro of type macrosType.

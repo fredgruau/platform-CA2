@@ -1,5 +1,6 @@
-package progOfCA //contains variation of grow, illustgrate redS sytematic computation
- //contains lots of different way of growing, and in particular, growing to voronoi cells
+package progOfCA //contains variation of grow starting with basic growth,
+// and then growth to voronoi cells , illustrate redS sytematic computation
+
 import compiler.ASTLfun.{neighbors, v}
 import compiler.AST.{Layer, delayed, pL}
 import compiler.ASTBfun.orRedop
@@ -14,33 +15,23 @@ import compiler.repr.nomE
 import dataStruc.{BranchNamed, Named}
 import progOfmacros.Topo.brdin
 import sdn.Util.{addBlobE, addBlobVe, safeGrow}
-import sdn.{BlobE, BlobV, Compar, Compar3, ComparApex}
+import sdn.{Blob, BlobE, BlobV, Compar, Compar3, ComparApex}
 
-
-/** test growVorV/E/Ve by wrapping in a useless constant layer */
-class GrowVorTest()  extends ConstLayer[V, B](1, "global")  with BranchNamed{
-  //  val g=new GrowVorVTest();show(g,g.meetE,g.meetV)
-  val g=new GrowVorETest();
-  show(g,g.edge.meetE,g.edge.meetV) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
-  //val g=new GrowVorVeTest();show(g,g.ve.meetE,g.ve.meetV) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
-}
 /** test growVorV/E/Ve by wrapping in a useless constant layer */
 class GrowTest()  extends ConstLayer[V, B](1, "global")  with BranchNamed{
   //  val g=new GrowVorVTest();show(g,g.meetE,g.meetV)
   val g=new Growtt(); // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
   //val g=new GrowVorVeTest();show(g,g.ve.meetE,g.ve.meetV) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
-
   show(g, g.next, g.n, g.brd)
 }
 
-/** Simple growth from V to E to V; test of in, and border.we believe that at least for border, and neighbor, it will be reused */
+/** Simple growth from V to E to V; test of in, and bordern
+ * it uses transfer as a macro.
+ * we believe that at least for border, and neighbor, it will be reused */
 class Growtt extends Layer[(V, B)](1, "global") with ASTLt[V, B] with BranchNamed{
-
   val broadcasted:BoolVe = broadcast(this )//step 1 is broadcast
   val transfered :BoolEv= transferMacro(broadcasted) //step 2 is transfer
   val n2 = reduce(orRedop[B], transfered) //(n,m,d) yzeté implicit killerest
-
-
   val n: BoolE = existS(this);
   // val in: BoolE = inside(this);
   val brd: BoolE = borderS(this);
@@ -58,6 +49,14 @@ class Grow extends Layer[(V, B)](1, "global") with ASTLt[V, B] with BranchNamed{
   // he name of root to arg(0).lowercase
 }
 
+/** test growVorV/E/Ve by wrapping in a useless constant layer */
+class GrowVorTest()  extends ConstLayer[V, B](1, "global")  with BranchNamed{
+  //  val g=new GrowVorVTest();show(g,g.meetE,g.meetV)
+  //val g=new GrowVorETest();
+  val g=new GrowVorVeTest();
+  show(g,g.blb.meetE,g.blb.meetV) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
+  //val g=new GrowVorVeTest();show(g,g.ve.meetE,g.ve.meetV) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
+}
 /** uses plain  blobV computation to grow seed into Voronoi region, just by stoping the growth just before merge happens */
 class GrowVorVTest() extends Layer[(V, B)](1, "global") with BoolV with BlobV with BranchNamed {
   override val next: AST[(V, B)] = this | safeGrow(this) //we extend the blob around the border brdV, except for meeting meeting points
@@ -67,17 +66,18 @@ class GrowVorVTest() extends Layer[(V, B)](1, "global") with BoolV with BlobV wi
 /** same as GrowVorV but based on a boolE support  */
 class GrowVorETest() extends Layer[(V, B)](1, "global") with BoolV  with BranchNamed {
   val is:BoolV=delayedL(this)
-  val edge=addBlobE(borderS(is))  //for a correct testing, edge should be an arbitrary line, and not the border of a boolV
+  val blb: Blob =addBlobE(borderS(is))  //for a correct testing, edge should be an arbitrary line,
+                                          // and not the border of a boolV
   /** we directly build an instance of HasBrdE from the edge, */
-  override val next: AST[(V, B)] = this | safeGrow(edge) //we extend the blob around the border brdV, except for meeting meeting points
+  override val next: AST[(V, B)] = this | safeGrow(blb) //we extend the blob around the border brdV, except for meeting meeting points
 }
 
 /** same as GrowVorV but based on a boolVe support  */
 class GrowVorVeTest() extends Layer[(V, B)](1, "global") with BoolV  with BranchNamed {
   val is:BoolV=delayedL(this)
   val edge: ASTLt[E, B] =borderS(is)
-  val ve=addBlobVe( brdin(edge,is))
-   override val next: AST[(V, B)] = this | safeGrow(ve)  //we extend the blob around the border brdV, except for meeting meeting points
+  val blb=addBlobVe( brdin(edge,is))
+   override val next: AST[(V, B)] = this | safeGrow(blb)  //we extend the blob around the border brdV, except for meeting meeting points
 }
 
 

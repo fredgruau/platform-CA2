@@ -68,12 +68,26 @@ package object compiler {
       mem(1 + dest + j * nbLineCAp1) = mem(1 + src + j * nbLineCAp1)
   }
 
+  val maskReset0and32:Int= ~(1 | 1<<31)
+  /** bit 0 and 31 are null at the start, but, as computation proceeds, they get values, and when rotate rignt or left is
+   * aplied, before doing the shift << or >> followed by the 'OR' we must remove them */
+  def reset0and31(i:Int):Int=i&maskReset0and32
   /**
    *
    * @param mem  memory of the CA
    * @param line index of line which should be rotated.
    */
   def rotateEntireLineRigt(mem: Array[Int], line: Int, nbIntPerLine: Int, nbLineCAp1: Int) = {
+    val lastIndex = 1 + line + (nbIntPerLine - 1) * nbLineCAp1
+    var previousFirstBit = mem(lastIndex) & 2 //the inital value of previousFirst can be random, the miror still work because of double miror on the corners.ppppppppp
+    for (j <- 0 until nbIntPerLine) {
+      val indexCur = 1 + line + j * nbLineCAp1
+      val nextFirstbit = mem(indexCur) & 2 //save for the next iteration before mem(indexCur) is written
+      mem(indexCur) = reset0and31(mem(indexCur) )>>> 1 | previousFirstBit << 29
+      previousFirstBit = nextFirstbit
+    }
+  }
+  def rotateEntireLineRigtOld(mem: Array[Int], line: Int, nbIntPerLine: Int, nbLineCAp1: Int) = {
     val lastIndex = 1 + line + (nbIntPerLine - 1) * nbLineCAp1 - 1
     var previousFirstBit = mem(lastIndex) & 2 //initial value
     for (j <- 0 until nbIntPerLine) {
@@ -88,8 +102,20 @@ package object compiler {
    *
    * @param mem  memory of the CA
    * @param line index of line which should be rotated.
+   *  y a un bug la dedans
    */
   def rotateEntireLineLeft(mem: Array[Int], line: Int, nbIntPerLine: Int, nbLineCAp1: Int) = {
+    val lastIndex = 1 + line //corresponds here ot the first considered index, because one because we go in other direction
+    var previousLastBit = mem(lastIndex) & 1 << 30 //we take the bit before the strongest
+    for (j <- (0 until nbIntPerLine).reverse) { //we start by the last
+      val indexCur = 1 + line + j * nbLineCAp1
+      val nextLastBit = mem(indexCur) & 1 << 30 //save for the next iteration before mem(indexCur) is written
+      mem(indexCur) = reset0and31( mem(indexCur) )<< 1 | previousLastBit >>> 29
+      previousLastBit = nextLastBit
+    }
+  }
+
+  def rotateEntireLineLeftOld(mem: Array[Int], line: Int, nbIntPerLine: Int, nbLineCAp1: Int) = {
     val lastIndex = 1 + line //first one because we go in other direction
     var previousLastBit = mem(lastIndex) & 1 << 30 //we take the bit before the strongest
     for (j <- (0 until nbIntPerLine).reverse) { //we start by the last

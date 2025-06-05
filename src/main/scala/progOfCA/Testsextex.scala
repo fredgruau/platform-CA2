@@ -24,9 +24,7 @@ class   Testsextex() extends ConstLayer[V, B](1, "global")  with BranchNamed{
  val (n0, n1, n2, n3, n4, n5) = (elt(0, nasI), elt(1, nasI), elt(2, nasI), elt(3, nasI), elt(4, nasI), elt(5, nasI)) // aprés on les numérote
  val (n6, n7, n8, n9, n10, n11) =(elt(6, nasI),elt(7, nasI),elt(8, nasI),elt(9, nasI),elt(10, nasI),elt(11, nasI))  //aprés on les numérote
  val(n12, n13, n14, n15, n16, n17)=(elt(12, nasI),elt(13, nasI),elt(14, nasI),elt(15, nasI),elt(16, nasI),elt(17, nasI)) // aprés on les numérote
- //val (east,se,sw)=(n0.asInstanceOf[UintV]::n1::n2, n3.asInstanceOf[UintV]::n4::n5,n6.asInstanceOf[UintV]::n7::n8) //puis on fait les paquets de 3bits
- // val (west,nw,ne)=(n9.asInstanceOf[UintV]::n10::n11, n12.asInstanceOf[UintV]::n13::n14,n15.asInstanceOf[UintV]::n16::n17) //puis on fait les paquets de 3bits
- val (east,se,sw)=(concat3V(n0, n1, n2),concat3V(n3, n4, n5),concat3V(n6, n7, n8))
+  val (east,se,sw)=(concat3V(n0, n1, n2),concat3V(n3, n4, n5),concat3V(n6, n7, n8))
  val (west,nw,ne)=(concat3V(n9,n10,n11),concat3V(n12,n13,n14),concat3V(n15,n16,n17))
 
  /**

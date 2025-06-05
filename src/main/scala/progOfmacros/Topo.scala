@@ -43,7 +43,8 @@ object Topo {
 
   /** macro used specifically to compute the blob predicate */
 
-  /** produces a boolVe border that takes into account what happens on the frontier of the chip: if there is a blob on the border, it says that there is a border */
+  /** produces a boolVe border that takes into account what happens on the frontier of the chip:
+   *  if there is a blob on the border, it says that there is a border */
   val brdInDef: Fundef2[(E, B), (V, B), (T[V, E], B)] = {
     val brd = pL[E, B]("brd");
     val is = pL[V, B]("is")

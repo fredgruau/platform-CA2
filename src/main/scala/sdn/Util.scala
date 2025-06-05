@@ -20,7 +20,7 @@ import sdn.Globals.{root4naming, setRoot4naming}
 import scala.::
 import scala.collection.mutable
 
-/** contains method and data  system wide,relevant  */
+/** contains method and data for programming self development,  relevant system wide,  */
 object Globals{
   /**fields in root4naming is garante to get a name from the reflection naming algo */
   var root4naming:Root4naming=null

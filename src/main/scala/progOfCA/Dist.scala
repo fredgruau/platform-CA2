@@ -14,6 +14,7 @@ import progOfmacros.Grad
 import progOfmacros.Wrapper.borderS
 import progOfmacros.RedT.cacOld
 import sdn.BlobOld
+import sdn.Util.addBlobVe
 
 
 class Dist(val source: Layer[(V, B)]/*should be a strate here*/,val bitSize:Int) extends Layer[(V, SI)](bitSize, "0") with ASTLt[V, SI] with BranchNamed{
@@ -21,7 +22,10 @@ class Dist(val source: Layer[(V, B)]/*should be a strate here*/,val bitSize:Int)
   val (sloplt: BoolVe, delta, level, gap) = Grad.slopDelta(this) //faudrait que je récupére la date du fichier ou se trouve slopeDelta
   //gabriel centers can be directly obtain simply by taking meeting point of the blob, using sloplt
   //however, when computing E meeting point there is a difficulty due to the fact that the orientation matters.
-  val b = new BlobOld(orR(transfer(sloplt)), sloplt, orR2(sloplt)) //when computing brdE, we need it to be either true or false on the border
+  //val b = new BlobOld(orR(transfer(sloplt)), sloplt, orR2(sloplt))
+  val b = addBlobVe(sloplt)
+
+  //when computing brdE, we need it to be either true or false on the border
   // we can decide to set it to true only if there is a blob, or allways, in which case there will be a center all around the chip,
   // which may be appropriate if we want ports all around the chip. If we want this last behavoir
   // we need to use OR2 instead of OR, where neutral will

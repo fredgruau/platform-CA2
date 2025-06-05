@@ -1,5 +1,6 @@
 package simulator
 
+import dataStruc.Util.{list, randomFill}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 import simulator.Medium.christal
 import triangulation.Utility._
@@ -7,23 +8,6 @@ import triangulation.Utility._
 import scala.util.Random
 
 object TestEncodeDecode{
-  /** arrays cannot be directly compared for equality, because their adress will
-   * be compared. That is why we need to turn them into lists */
-  def list[A](input: Array[Array[A]]) =
-    input.map(_.toList).toList
-  def equals[A](a: Array[Array[A]],b:Array[Array[A]])={list(a)==list(b)}
-
-  def randomFill(lCAinput: Array[Boolean]): Unit = {
-    val r: Random.type = scala.util.Random
-    for (i <- 0 until lCAinput.size)
-      lCAinput(i) = r.nextBoolean()
-  }
-
-  def randomFill(lCAinput: Array[Array[Boolean]]): Unit = {
-    val r: Random.type = scala.util.Random
-    for (l <- lCAinput)
-      randomFill(l)
-  }
 
 }
 //val medium= christal(6, 8, 200)
@@ -103,8 +87,8 @@ class TestEncodeDecode extends FunSuite with BeforeAndAfter {
 
   test("miror<=32") {
     val lCAinput = Array.ofDim[Boolean](16, 6)
-    lCAinput(2)(2) = true //we but something into the next next  firstligne
-    lCAinput(13)(2) = true //we but something into the avant avant dernier ligne
+    lCAinput(2)(2) = true //we put something into the next next  firstligne
+    lCAinput(13)(2) = true //we put something into the avant avant dernier ligne
     val lCAoutput = Array.ofDim[Boolean](16, 6)
     val lCAmem = Array.ofDim[Int](10)
     val m = Medium.christal(16, 6, 30)

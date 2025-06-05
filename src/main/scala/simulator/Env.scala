@@ -1,7 +1,9 @@
 package simulator
 
 import compiler.ASTB.False
+import compiler.Locus.locusV
 import compiler.{Locus, V}
+import dataStruc.Util.{isEqualto, isMiror}
 import simulator.Medium.christal
 import triangulation.Utility.halve
 
@@ -68,20 +70,26 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
 
     }
   }
-  /** applies a miror on the initialed layers */
+  /** applies a miror on the initial values of layers */
   def initMiror(): Unit = {
     for (layerName: String <- controller.progCA.init().keys) {
       val memFields2Init: Seq[Array[Int]] = memFields(layerName)
-      for (memoryPlane<-memFields2Init) {
-        val p=medium.propagate4Shift
-        p.mirror(memoryPlane, controller.locusOfDisplayedOrDirectInitField(layerName))
-        p.prepareBit(memoryPlane)
+      for (memoryPlane <- memFields2Init) {
+        val p = medium.propagate4Shift
+
+        val locus = controller.locusOfDisplayedOrDirectInitField(layerName)
+        p.mirror(memoryPlane, locus) //miror comes before preparebit
+        p.prepareBit(memoryPlane,locus)
+        val testMiror = false //set to true if you want to test miror
+        if (locus == locusV && testMiror) {
+          val matBool = Array.ofDim[Boolean](nbLine, nbCol)
+          medium.decode(memoryPlane, matBool)
+          if (!isMiror(matBool)) throw new Exception("pas is miror dans init env")
+        }
+
       }
-
-
     }
-    }
-
+  }
   def init(): Unit = {
     medium.initRandom(controller.randomRoot) //we reinitialize the random number in order to reproduce exactly the same random sequence
    // medium.middleClosure(controller.currentProximityLocus)  //alternative way of building quickly voronoi.

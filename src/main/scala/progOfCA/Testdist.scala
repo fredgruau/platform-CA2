@@ -13,7 +13,9 @@ import sdn.Util.{addBlobE, safeGrow}
 import java.util
 import scala.collection.immutable.HashMap
 
-/** a single layer works as a program to be simulated */
+/** a single layer works as a program to be simulated
+ * This CA tests the computation of distances, but also uses blob on Ev lines, in order to compute gabriel centers.
+ * */
 class   Testdist() extends ConstLayer[V, B](1, "global") with BranchNamed  with Named{
   val src=new Testdist2()
   show(src.d);

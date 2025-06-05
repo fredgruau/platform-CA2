@@ -101,12 +101,12 @@ trait BlobVe extends HasBrdVe with BorderEofVe with BorderV with Blob {
   val meetE: BoolE =  ~nonEmptyRhomb & twoAdjBlob //two conditions that needs to be met, for meeting edges: empty rhombus and two adjacent blobs.*/
 }
 
-
-
-
 /**
- *
- * @param brdE   frontier,
+ *  This class is not necessary anymore using the function addBlobVe we can compute the blob relevant
+ *  information for a BoolVe
+ * We keep it because it used intelligence to really workout what is needed to be done on the chip border,
+ * in the initial case we considered, which was not including mirors.
+ * @param brdE  frontier,
  * @param brdIn oriented contour, brd is computed from brdIn
  * @param brdV  on the frontier, brdV is computed from brd.
  *              computes  V-meeting points and E-meeting points, plus
