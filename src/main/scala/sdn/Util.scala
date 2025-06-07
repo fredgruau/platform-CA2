@@ -198,10 +198,15 @@ object Util {
 
 /** Layer implementing a random bit */
 class Rand() extends Layer[(V, B)](1, "random") with ASTLt[V, B]         {
-  val miroredNext = randNext(this) //by default it'll get mirored because of its radius 1.
-  val next: BoolV = torusify(miroredNext) //will apply the identity, plus torusify.
-//  val next: BoolV = randNext(this) //randDef is used only here, no need for a wrapper!
-  lazy val randDir: BoolVe = randN12(this) //lazy because probably not used
+
+  //val miroredNext = randNext(this) //by default it'll get mirored because of its radius 1.
+  //val next: BoolV = torusify(miroredNext) //will apply the identity, plus torusify.
+
+
+  val next: BoolV = randNext(this) //randDef is used only here, no need for a wrapper!
+  lazy val randDir: BoolVe = {
+    randN12(this)
+  } //lazy because probably not used
   lazy val randSide: BoolEv = randE2(this) //only qpointRand uses this
 }
 

@@ -1,5 +1,5 @@
-package progOfCA //contains variation of grow starting with basic growth,
-// and then growth to voronoi cells , illustrate redS sytematic computation
+package progOfCA /** contains variation of grow starting with basic growth,
+  and then growth to voronoi cells , illustrate redS sytematic computation*/
 
 import compiler.ASTLfun.{neighbors, v}
 import compiler.AST.{Layer, delayed, pL}

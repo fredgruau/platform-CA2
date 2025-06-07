@@ -4,12 +4,13 @@ import compiler.ASTLfun.e
 import compiler.SpatialType._
 import compiler.AST._
 import compiler.ASTBfun.rotUI
-import compiler.ASTL._
+import compiler.ASTL.{transfer, _}
 import compiler.ASTLfun._
 import compiler.Circuit.hexagon
 import compiler._
-import progOfmacros.Wrapper.{borderS, border}
+import progOfmacros.Wrapper.{border, borderS}
 import progOfmacros.Topo.nbccDef
+import sdn.Util.{addSym, addSymUI}
 
 object Util {
   /** This macro computes the identity, exept that we will modify the generated java code, so as to add a wrap instead of a miror */
@@ -35,11 +36,16 @@ object Util {
 
   def randNext(b: BoolV): BoolV = new Call1[(V, B), (V, B)](randDef, b) with BoolV
 
-  /** from a BoolV randBit, produces a BoolVe randBit, allowing to select among 12 directions */
+  /** from a BoolV randBit, produces a BoolVe randBit, allowing to select among 12 directions
+   * which select among 6 main directions, and a rotation of those*/
   private val randN12def: Fundef1[(V, B), (T[V, E], B)] = { //yavait un bug, on a suivi la méthode de deboggage
     // conssitant a nommer les variables contenant les résultats intermediiares, afin de dechifrer le code compilé.
     val b = pL[V, B]("randNeigh")
-    val nasI: UintV = concatR(neighbors(b)).asInstanceOf[UintV]
+  //  val voisins: UintVe =addSymUI(e(b)).symUI
+  // val voisins: BoolVe =addSym(e(b)).sym  //on peut pas faire référence a une macro depuis une macro.
+  val voisins: BoolVe =transfer(sym(transfer(e(b))))
+    val nasI: UintV = concatR(voisins).asInstanceOf[UintV]
+  //  val nasI: UintV = concatR(neighbors(b)).asInstanceOf[UintV]
     nasI.setName("neighborasInt");
     val (r0, r1, r2, r3, r4, r5) = (elt(0, nasI), elt(1, nasI), elt(2, nasI), elt(3, nasI), elt(4, nasI), elt(5, nasI))
     //use the two first bits to select among 3 directions.

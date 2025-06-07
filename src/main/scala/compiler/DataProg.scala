@@ -506,7 +506,9 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
       updateTsymbNbit(layerFields, StoredField())
     }
 
-
+    //we check that macros do not contain level 2, macros.
+    if(!isRootMain)
+        assert(funs.isEmpty)
     // paramD varkind  could  be replaced by Affect , but this should not happen because of the added letter 'p' for the parameter.
     // if a parameter is used two times, the generated affectation will generate a read without the 'p'
     new DataProg(dagis2, funs.map { case (k, v) ⇒ k -> v.treeIfy() }, tSymbVar, paramD, paramR, coalesc)
@@ -1368,7 +1370,7 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         for (j <- 0 to 5) { //for folding of input  to work, the reduction must accumulate
           val iInputMuInst: Affect[_] = a(iInputMuInstOrdered(j)) //muInst read
           val numI = l.proj(inputShedule(j)) //numI select the target component of the simplicial vector produced by redop
-          if (tm1Sum(numI) < 2 || op._1.name.equals("concat2")) //it is not worth/not possible to be doing a delayed sum,or it is risky because concat cannot be reordered
+          if (tm1Sum(numI) < 2 || op._1.name.equals("concat2")|| op._1.name.equals("concaat2")) //it is not worth/not possible to be doing a delayed sum,or it is risky because concat cannot be reordered
           {
             val nameOfAffectedPrevious = names(numI) + "_" + cpt(numI)
             cpt(numI) += 1;

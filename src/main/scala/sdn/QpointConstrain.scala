@@ -31,10 +31,9 @@ trait QPointFields {
   /** true for the face inside a qpt consiting exactly of three adjacent  vertices */
   val tripleton: BoolF = insideS[V, F](isV)
   val tripletonV: BoolV = existS[F, V](tripleton)
-
 }
 
-/** defines all the constraint that should be met by a quasipoint, exept for blobs which might not be necessary if Gabriel centers are computed. */
+/** defines all the constraint that should be met by a quasipoint, except for blobs which might not be necessary if Gabriel centers are computed. */
 trait  QpointConstrain extends QPointFields with rando{
 self: MovableAgentV => //a quasi point  is a movableAgentV
 /** if ring, fix one direction  todo to be replaced by sextex*/
