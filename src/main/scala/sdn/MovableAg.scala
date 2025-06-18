@@ -34,7 +34,7 @@ trait UtilVagent extends BranchNamed{
   lazy   val brdE:BoolE=borderS(isV) //push everywhere possible.
   lazy val isVe:BoolVe=e(isV)
   lazy val notVe= ~isVe
-  /** Ve edges leaving the support , we know we my take a sym so we prepare for it, to get a meaningfull name brdVe.sym*/
+  /** Ve edges leaving the support , we know we may take a sym so we prepare for it, to get a meaningfull name brdVe.sym*/
   lazy val brdVe=addSym( transfer(v(brdE)) & isVe)
 }
 
@@ -66,7 +66,7 @@ abstract class BoundAg[L <: Locus](implicit m: repr[L]) extends  Agent[L]{
 }
 /**  code  common to Movable agents*/
 abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] with vef[L] with EmptyBag[sdn.MuStruct[_<: Locus,_<:Ring]]  {
-  override val prioRand= addLt(randUintV(5)).asInstanceOf[UintVx] //si on met pas asInstance il gueule non compatibilité de override entre addLt e UintVx
+  override val prioRand= addLt(randUintV(3)).asInstanceOf[UintVx] //si on met pas asInstance il gueule non compatibilité de override entre addLt e UintVx
   /** for the moment, priority is pure random.  formulation  casse gueule, car une variable a deux noms de reflection possible: prio et prioRand*/
   override val prio =prioRand //pour le moment on n'a pas encore plusieurs move possible, dans pas longtemps on va programmer prio et initalflip
 

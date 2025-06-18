@@ -17,11 +17,12 @@ import scala.collection.immutable.HashMap
  * This CA tests the computation of distances, but also uses blob on Ev lines, in order to compute gabriel centers.
  * */
 class   Testdist() extends ConstLayer[V, B](1, "global") with BranchNamed  with Named{
-  val src=new Testdist2()
-  show(src.d);
+  val src=new Testdistt()
+  //show(src.d);
 } //root classe compilable
-/** a single layer works as a program to be simulated */
-class   Testdist2() extends ConstLayer[V, B](1, "global") with BranchNamed with Named with DistT {
+/** same, but avoioding the wrapping of a constlayer */
+class   Testdistt() extends ConstLayer[V, B](1, "global") with BranchNamed with Named with DistT {
+  show(d,this)
 } //root classe compilable
 
 

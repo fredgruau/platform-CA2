@@ -221,8 +221,8 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
 
 
     //drawdebug(green)
-     if(env.controller.showMore)
-        {drawCrossedFaces();drawFaces()}
+     if(env.controller.showMore) {drawCrossedFaces();drawFaces()}
+
    // drawTriangles(blue,env.medium.triangleSoupDelaunay)
   //   drawTrianglesVEv(blue,env.medium.triangleSoupDelaunay)
     // drawOutsideFace() plante si y ajuste V()

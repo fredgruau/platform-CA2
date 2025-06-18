@@ -43,20 +43,25 @@ import java.net.URLClassLoader
 
 
 object Util {
+  import scala.reflect.ClassTag
 
+  def deepCopyArray[T: ClassTag](arr: Array[Array[T]]): Array[Array[T]] = {
+    arr.map(_.clone())
+  }
 
   /** arrays cannot be directly compared for equality, because their adress will
    * be compared. That is why we need to turn them into lists */
   def list[A](input: Array[Array[A]]) =
     input.map(_.toList).toList
   def isEqualto[A](a: Array[Array[A]],b:Array[Array[A]])={list(a)==list(b)}
+  def isEqualto[A](a: Array[A],b:Array[A])={a.toList==b.toList}
 
   def randomFill(lCAinput: Array[Boolean]): Unit = {
     val r: Random.type = scala.util.Random
     for (i <- 0 until lCAinput.size)
-      lCAinput(i) = r.nextBoolean()
+      lCAinput(i) = rand.nextBoolean()
   }
-
+  val rand=new Random(0)
   def randomFill(lCAinput: Array[Array[Boolean]]): Unit = {
     val r: Random.type = scala.util.Random
     for (l <- lCAinput)
@@ -65,7 +70,7 @@ object Util {
   def randomFill(lCAmem: Array[Int]): Unit = {
     val r: Random.type = scala.util.Random
     for (i<-0 until  lCAmem.length)
-      lCAmem(i)=r.nextInt()
+      lCAmem(i)=rand.nextInt()
   }
 
 
@@ -80,6 +85,17 @@ object Util {
       res}
     isMirorUp && isMirorDown && isMirorRight && isMirorLeft
   }
+  def isTorus(lCA: Array[Array[Boolean]]):Boolean={
+    val nbligne= lCA.length; val nbCol=lCA(0).length
+    val isTorusUp={ lCA(0).toList==lCA(nbligne-2).toList}
+    val isTorusDown={lCA(nbligne-1).toList==lCA(1).toList}
+    val isTorusLeft={var res=true; for(l<-lCA) res = res && (l(0) == l(nbCol-2)  )
+      res }
+    val isTorusRight={var res=true;
+      for(l<-lCA){res = res &&  (l(nbCol-1)==l(1)) }
+      res}
+    isTorusUp && isTorusDown && isTorusRight && isTorusLeft
+  }
   def miror(lCA: Array[Array[Boolean]])={
     val nbligne= lCA.length; val nbCol=lCA(0).length
     def mirorUp={ lCA(0)=lCA(2).clone()}
@@ -87,6 +103,15 @@ object Util {
     def mirorLeft={var i=0; for(l<-lCA){l(0)=if(i%2==0) l(2) else l(1);i+=1  } }
     def mirorRight={var i=0 ; for(l<-lCA){ l(nbCol-1)=if(i%2==0) l(nbCol-2) else l(nbCol-3);i+=1 } }
     mirorUp;mirorDown;mirorRight;mirorLeft
+  }
+
+  def torusify(lCA: Array[Array[Boolean]])={
+    val nbligne= lCA.length; val nbCol=lCA(0).length
+    def torusifyUp={ lCA(0)=lCA(nbligne-2).clone()}
+    def torusifyDown={lCA(nbligne-1)=lCA(1).clone()}
+    def torusifyLeft={for(l<-lCA){l(0)=l(nbCol-2)  } }
+    def torusifyRight={for(l<-lCA){l(nbCol-1)=l(1)  } }
+    torusifyUp;torusifyDown;torusifyRight;torusifyLeft
   }
 
 

@@ -42,7 +42,7 @@ class Root4naming() extends Named with BranchNamed {
   /** set encapsulated muStruct */
   def setRootMustruct(n2: Named) = {
     n = n2
-    n.setName("") //this will artificially remove a level "N" in the hierarchy of printed fields
+    //n.setName("") //this will artificially remove a level "N" in the hierarchy of printed fields
   }
 
   /** random bits  are stored in a mutable hashmap */
@@ -80,7 +80,7 @@ trait Compar{
 /** same as Compar, except that we compare apex neighbors instead of direct neighbors? */
 trait ComparApex{
   self:UintV=>
-  val ef=apexEui(f(this))
+  val ef: UintEf =apexEui(f(this))
   /** xor can be usefull for other things, so we keep a pointer to it */
   val bordApex: UintE =Wrapper.border[F,E,UI](ef)
   //val bord: UintE =Wrapper.border[V,E,UI](dEv) //a déja calculé dev.
@@ -90,7 +90,7 @@ trait ComparApex{
   val diffApex= elt(0,segmentOf1Apex)
   /** true if both values are equal */
   val eqApex= not(diffApex);
-  val ltApex=Grad.ltApex(this,segmentOf1Apex)
+  val ltApex: BoolEf =Grad.ltApex(this,segmentOf1Apex)
   val gtApex=symEf(ltApex)
 }
 
@@ -102,6 +102,7 @@ trait Compar3 {
   val lt3:BoolVf=shrink(transfer(lt))
 }
 
+/** add a functionnality to a boolVe: returns the symetric with respect to edge.  */
 trait Sym extends BoolVe {
   val sym=neighborsSym(this)
 }
@@ -184,16 +185,6 @@ object Util {
     b.brdV & ~meet
   }
 
-
-
-
-
-
-
-    {}
-
-
-
 }
 
 /** Layer implementing a random bit */
@@ -201,9 +192,7 @@ class Rand() extends Layer[(V, B)](1, "random") with ASTLt[V, B]         {
 
   //val miroredNext = randNext(this) //by default it'll get mirored because of its radius 1.
   //val next: BoolV = torusify(miroredNext) //will apply the identity, plus torusify.
-
-
-  val next: BoolV = randNext(this) //randDef is used only here, no need for a wrapper!
+  val next: BoolV = randNext(torusify(this))//randDef is used only here, no need for a wrapper! torusify secures avoiding cycles in Rand
   lazy val randDir: BoolVe = {
     randN12(this)
   } //lazy because probably not used

@@ -19,7 +19,7 @@ import scala.::
 import scala.collection.convert.ImplicitConversions.`map AsJavaMap`
 import scala.collection.mutable.HashMap
 import scala.collection.mutable
-/** makes precise where the constraint applies*/
+/** makes precise where a constraint applies*/
 sealed trait Impact
 /** constraint is applied whether it is empty or not */
 case class Both() extends Impact
@@ -30,15 +30,11 @@ case class One(noFill: Boolean) extends Impact //on veut pouvoir calculer le com
 /** agents are boolean muStruct */
 abstract class Agent[L <: Locus] extends MuStruct[L, B]
  {
-   def displayConstr:Boolean=false
+   def displayConstr:Boolean=true
    /** break symetry in case of tournament with equal priority */
   val prioRand:UintVx
    /** used for mutex tournament */
  val prio:UintVx
-
-
-
-
 
 
    val constrs= new scala.collection.mutable.LinkedHashMap[String,Constr]()
@@ -64,7 +60,10 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
        if(displayConstr) for ((name, c) <- constrs) {
          flipCancel(name)= ~c.where & flip //where also takes into account flipOfMove
           shoow (flipCancel(name)) //mettre un prédicat sur agent si on veut afficher
+         // shoow(c.where)
        }
+       val focusConstr=constrs("appearDouble").asInstanceOf[MutApexKeepFlipIf]
+       //shoow(focusConstr.mutrig)//,focusConstr.tmp)
        import scala.collection.IterableOnceOps
        val allConstr:  Array[UintV]=  constrs.values.toArray.map(_.where.asInstanceOf[UintV])
        val allConstrUI:UintV=allConstr.reduce(_ :: _)
@@ -149,10 +148,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
     */
    class MutApexKeepFlipIf(i: Impact,val mutex:BoolE,flip:BoolV) extends Constr(Array(this), i,flip) {
      /** mutex is triggered if there is indeed two flips on each side of the mutex, and in the right state. */
-     //var mutrigv:BoolE=null technique pour afficher mutrig
-
-     def mutrig:BoolE ={
-       //mutrigv=
+       val mutrig:BoolE ={
        mutex &  (impact  match {
          case Both() => inside(apexE(f(flip)))
          case One(v) =>  inside(apexE(f(flip & (if (v) isV else (NisV)))))// result also depend on impact
@@ -160,9 +156,9 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
        // mutrigv.name="fliesMutrigv";      mutrigv
      }
 
-     /** flip is ok if prio is minimum with respect to the other side */
-     def tmp=imply(f(mutrig),prio.ltApex)
-     val where=inside(apexV(tmp))
+     /** flip is ok if prio is smaller with respect to the other side */
+     val chekLtIfMutrig=imply(f(mutrig),prio.ltApex)
+     val where=inside(apexV(chekLtIfMutrig))
    }
    /**
     *
@@ -180,6 +176,8 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
      /** flip is preserved if no neighbor edge present a problem */
      val where=inside(tmp)
    }
+
+
 
 
  }

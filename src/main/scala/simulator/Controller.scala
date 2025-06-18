@@ -21,7 +21,7 @@ import scala.collection.JavaConverters._
 import scala.collection.immutable
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.swing._
-import scala.swing.event.{ButtonClicked, EditDone, Key, KeyReleased, SelectionChanged}
+import scala.swing.event.{ButtonClicked, EditDone, Key, KeyReleased, SelectionChanged, ValueChanged}
 import scala.xml.{Attribute, Elem, Node, NodeSeq, Null, XML}
 
 /**
@@ -173,15 +173,34 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   class SimpleButton(ic: javax.swing.Icon) extends Button() {
     icon = ic
     contents += this
-    Controller.this.listenTo(this) //Controller.this refer to the enclsing controller
+    Controller.this.listenTo(this) //Controller.this refer to the enclosing controller
   }
 
 
-
+  val InitButton = new SimpleButton(initIcon)
   val ForwardButton = new SimpleButton(forwardIcon) //myButton(forwardIcon, this)
-   val InitButton = new SimpleButton(initIcon)
+  val BackwardButton = new SimpleButton(backwardIcon) //myButton(forwardIcon, this)
+  val FastForwardButton = new SimpleButton(fastForwardIcon) //myButton(forwardIcon, this)
+  val FastBackwardButton = new SimpleButton(fastBackwardIcon) //myButton(forwardIcon, this)
    val PlayPauseButton = new SimpleButton(if (isPlaying) pauseNormalIcon  else playNormalIcon)
   val ShowCrossButton = new SimpleButton(closeBoxIcon)
+
+
+  val speedSlider = new Slider {
+    min = 0
+    max = 18
+    value = 0
+    majorTickSpacing = 6
+    minorTickSpacing = 2
+    paintTicks = true
+    paintLabels = true
+    contents += this
+    Controller.this.listenTo(this)
+  }
+
+  val speed = new Label("Speed : 0")
+  contents += speed
+  Controller.this.listenTo(this)
 
   //val globalInit: Array[String] = Array("center", "border", "yaxis","random")  //"onCircle", "random", "poisson", "blakHole"
 
@@ -262,20 +281,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
       layerTree.hideRoot
       layerTree.repaint()
       repaintEnv()
-
-    case ButtonClicked(PlayPauseButton) | KeyReleased(_, Key.Space, _, _) =>
-      isPlaying = !isPlaying
-      togglePlayPauseIcon()
-      if (isPlaying)
-        playEnv() //lauch the threads
-    case ButtonClicked(ForwardButton) | KeyReleased(_, Key.Right, _, _) =>
-      forwardEnv()
-      repaintEnv()
-      requestFocus()
-    case ButtonClicked(ShowCrossButton) =>
-      showMore= !showMore
-      repaintEnv()
-    case ButtonClicked(InitButton) | KeyReleased(_, Key.A, _, _) =>
+    case ButtonClicked(InitButton)  =>//| KeyReleased(_, Key.A, _, _)
       val wasPlaying = isPlaying
       if (isPlaying) {
         PlayPauseButton.doClick()
@@ -284,18 +290,46 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
       repaintEnv()
       requestFocus() //necessary to enable listening to the keys again.
       if (wasPlaying) PlayPauseButton.doClick()
-    case SelectionChanged(`globalInitList`) =>
+
+    case ButtonClicked(PlayPauseButton) =>//| KeyReleased(_, Key.Space, _, _) =>
+      isPlaying = !isPlaying
+      togglePlayPauseIcon()
+      if (isPlaying)
+        playEnv() //lauch the threads
+    case ButtonClicked(ForwardButton)=> //| KeyReleased(_, Key.Right, _, _)
+      forwardEnv()
+      repaintEnv()
+     // requestFocus()
+    case ButtonClicked(FastForwardButton)  =>
+      fastForwardEnv()
+      repaintEnv()
+     // requestFocus()}
+    case ButtonClicked(BackwardButton)  =>
+      backwardEnv()
+      repaintEnv()
+    // requestFocus()
+    case ButtonClicked(FastBackwardButton)  =>
+      fastBackwardEnv()
+      repaintEnv()
+    case ButtonClicked(ShowCrossButton)  =>
+      showMore= !showMore
+      repaintEnv()
+      //requestFocus()
+
+      repaintEnv()
+ case SelectionChanged(`globalInitList`) =>
       initButtonClick()//InitButton.doClick()
       updateAndSaveXMLGlobalInit()
     case SelectionChanged(`randomInitList`) =>
       randomRoot = randomInitList.selection.item
       initButtonClick()//InitButton.doClick()
       updateAndSaveXMLSimulParam()
-
+    case ValueChanged(`speedSlider`) =>
+      speed.text = s"Speed : ${speedSlider.value}"
   }
+
   /** ca bug si je fait initButton.doClick(), je ne sais pas pourquoi peut etre parceque
-   * j'ai bricolé des changement de sdk et de version de
-   * donc j'ai ecrit le code séparément, la ca a l'ai d'aller*/
+   * j'ai bricolé des changement de sdk et de version de  donc j'ai ecrit le code séparément, la ca a l'ai d'aller*/
   def initButtonClick(): Unit = {
     val wasPlaying = isPlaying
     if (isPlaying) {
@@ -318,9 +352,23 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
     for (env <- envList)
       env.play()
 
+
+  //2^speedSlider.value
+
+
   private def forwardEnv(): Unit =
     for (env <- envList)
       env.forward()
+  private def backwardEnv(): Unit =
+    for (env <- envList)
+      env.backward(1)
+
+  private def fastForwardEnv(): Unit =
+    for (env <- envList)
+      env.fastForward(Math.pow(2,speedSlider.value).toInt)
+  private def fastBackwardEnv(): Unit =
+    for (env <- envList)
+      env.backward(Math.pow(2,speedSlider.value).toInt)
 
   private def initEnv(): Unit =
     for (env <- envList)

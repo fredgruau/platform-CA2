@@ -96,7 +96,7 @@ public class Util {
      * @param src  source array
      * @param dest destination array toward which we duplicate
      */
-    public static void copyOld(int[][] src, int[][] dest) {
+    public static void copyBasic(int[][] src, int[][] dest) {
         assert (src.length == dest.length);
         for (int i = 0; i < src.length; i++)
             copy(src[i], dest[i]);

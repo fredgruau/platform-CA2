@@ -3,8 +3,9 @@ package simulator
 import compiler.ASTB.False
 import compiler.Locus.locusV
 import compiler.{Locus, V}
-import dataStruc.Util.{isEqualto, isMiror}
+import dataStruc.Util.{deepCopyArray, isEqualto, isMiror}
 import simulator.Medium.christal
+import simulator.Util.copyBasic
 import triangulation.Utility.halve
 
 import scala.collection.JavaConverters._
@@ -38,7 +39,8 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
    * we add 1 to the column size  medium.nbInt32CAmem +1 so as to avoid catching ArrayIndexOutOfBoundsException
    * when  we write at i+1 instead of i, (we do that in order to avoid memorizing register introduced for tm1s, and save local memory */
   val mem: Array[Array[Int]] = Array.ofDim[Int](controller.progCA.CAmemWidth(), medium.nbInt32total)
-
+  /** for now we cache only memory config */
+  val cache=new dataStruc.Cache[Array[Array[Int]]]
   /** associated pannel */
   var caPannel: CApannel = null //to be set latter due to mutual recursive definition
   val iterationLabel=new Label(""+t)
@@ -78,9 +80,13 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
         val p = medium.propagate4Shift
 
         val locus = controller.locusOfDisplayedOrDirectInitField(layerName)
-        p.mirror(memoryPlane, locus) //miror comes before preparebit
-        p.prepareBit(memoryPlane,locus)
-        val testMiror = false //set to true if you want to test miror
+        if(locus == compiler.Locus.locusV)
+        {
+           p.mirror(memoryPlane)
+           p.prepareBit(memoryPlane)}
+          //miror comes before preparebit
+
+        val testMiror = false //to be set to true if you want to test miror
         if (locus == locusV && testMiror) {
           val matBool = Array.ofDim[Boolean](nbLine, nbCol)
           medium.decode(memoryPlane, matBool)
@@ -99,7 +105,8 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
     initMemCA() //invariant stipulates that memory should be filled so we fill it already right when we create it
 // System.out.println( medium.pointSet(V()).size)
     initMiror()
-    t=0
+    t= -1
+    cache.reset()
     forward() //we do one forward, so as to be able to show the fields.
     for (_ <- 1 until t0) //forward till to
       forward()
@@ -164,12 +171,18 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
     val thread = new Thread {
       override def run(): Unit = {
         while (controller.isPlaying) //no pause asked by the user, no bugs detected
-        {
-          forward()
-          if (bugs.size > 0) controller.isPlaying = false
-          repaint()
-          sleep(50) // slows down the loop  a bit
+        { var nbIter = 0;
+          val nbLoops=math.pow(2,controller.speedSlider.value)
+          while (controller.isPlaying && nbIter < nbLoops )
+          {forward();
+            nbIter+=1
+            if (bugs.size > 0)
+              controller.isPlaying = false;
+          }
+          repaint(); sleep(50);
+          // // slows down the loop  a bit
         }
+
       }
     }
     thread.start()
@@ -184,7 +197,33 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
     bugs = controller.progCA.theLoops(medium.propagate4Shift, mem).asScala //we retrieve wether there was a bug
     t += 1
     iterationLabel.text="" + t
+    cache.push(deepCopyArray( mem))
   }
+
+  /** @param nbIter number of iteration steps
+   * does backward steps using the cache */
+  def backward(nbIter:Int): Unit = {
+    // bugs = controller.progCA.theLoops(medium.propagate4Shift, mem).asScala //we retrieve wether there was a bug
+    if(cache.top==null) return; //on backward pas sur la config initiale
+    val timeTarget=t-nbIter
+    copyBasic(cache.pop(nbIter),mem)
+    t = cache.nextIndex-1
+    while(t<timeTarget) //forward till to
+      forward()
+  }
+
+  /** permet d'aller plus vite en arriére presque le meme code que backward, car "cache" peut prendre en parametre,
+   *  le nombre d'itération que l'on souhaite reculer*/
+  def fastBackward(nbIter:Int): Unit ={
+    if(cache.top==null) return;
+     copyBasic(cache.pop(nbIter),mem)
+    t = cache.nextIndex
+    iterationLabel.text="" + t
+  }
+
+  /** permet d'aller plus vite au résultat sans se taper de voir un tas d'image */
+  def fastForward(nbIter:Int)=
+    for(i<- 0 until nbIter) forward()
 
   def repaint(): Unit = {
     computeVoronoirColors()

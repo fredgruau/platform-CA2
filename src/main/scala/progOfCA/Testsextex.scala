@@ -1,7 +1,7 @@
 package progOfCA
 
 import compiler.ASTB.{False, True}
-import compiler.ASTBfun.{andRedop, eqUI2}
+import compiler.ASTBfun.{andRedop, eqUI2, neq}
 import compiler.ASTL.send
 import compiler.ASTLfun.{concatR, cond, e, elt, lt2, reduce}
 import compiler.ASTLt.ConstLayer
@@ -10,7 +10,7 @@ import compiler.{AST, ASTLt, B, E, UI, V}
 import dataStruc.BranchNamed
 import sdn.Util.{addLt, addSym, addSymUI, oneThirdRandBit, randConstUintV, randUintV}
 import compiler.ASTLfun._
-import progOfmacros.Compute.{ concat3V}
+import progOfmacros.Compute.concat3V
 import progOfmacros.Wrapper.{condL, ltUI2L, neqUI2L, not}
 import sdn.Globals.root4naming
 /** tests the lt macro, containts a bugif */
@@ -20,6 +20,7 @@ class   Testsextex() extends ConstLayer[V, B](1, "global")  with BranchNamed{
   val prioRand = randConstUintV(3) //rand1::rand2
   //val toto=addLt(prioRand) //pourquoi c'était la ca?
   val voisins: UintVe =addSymUI(e(prioRand)).symUI  // symUI est un boolVe qui  va contenir les voisins
+ val voisinNull:BoolVe= eq0(voisins)
  val nasI: UintV =  concatR(voisins) //on récupére 18 bits a la suite pour 6 voisins, chacun 3 bits,
  val (n0, n1, n2, n3, n4, n5) = (elt(0, nasI), elt(1, nasI), elt(2, nasI), elt(3, nasI), elt(4, nasI), elt(5, nasI)) // aprés on les numérote
  val (n6, n7, n8, n9, n10, n11) =(elt(6, nasI),elt(7, nasI),elt(8, nasI),elt(9, nasI),elt(10, nasI),elt(11, nasI))  //aprés on les numérote
@@ -95,7 +96,7 @@ show(success) //neccesary to avoid cycles
 
  show(root4naming.rands(6),root4naming.rands(7))
  show(voisins,nasI,prioRand,east,se,sw,west,nw,ne)
- show(eastltSharp,sextex, southmin)//,eqeSe)
+ show(eastltSharp,sextex, southmin,voisinNull)//,eqeSe)
  //shoow(sloplt,level,twoLt,dopp,se,grad3,grad6)th
  //val (lt,eq)= Grad.slopeLt(prioRand)
 //,toto.eq,toto.lt,toto.gt);

@@ -143,10 +143,13 @@ object Circuit {
      /** rootAST contains all the code, its location depends on the program category, wether we have a single layer, a single  agent,  or a system of agent */
      val rootAst:ASTLt[V, B]=rootObject match {  //
           case ast:BoolV
-             =>   ast  //if we have a single layer CA, by convention it is a boolV, and also  the root Ast
+             => //rootObject.setName("");
+            ast  //if we have a single layer CA, by convention it is a boolV, and also  the root Ast
           case ag:MovableAg[V] with MovableAgentV
-             =>ag.is //if we have a single agent,  the update of its chi layer is the rootAST, therefore, it has to need  all the other layers.
+             =>rootObject.setName("");
+            ag.is //if we have a single agent,  the update of its chi layer is the rootAST, therefore, it has to need  all the other layers.
       }
+     val z=0
       def computeRoot = rootAst
     }
     var notCompiled=true; var limit=0 //evite la boucle trop grosse

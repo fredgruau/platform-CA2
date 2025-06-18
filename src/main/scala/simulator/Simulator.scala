@@ -176,9 +176,14 @@ object ExampleData {
   val playNormalIcon: ImageIcon = Icon("src/ressources/play_black.gif")
   val pauseNormalIcon: ImageIcon = Icon("src/ressources/pause_black.gif")
   val forwardIcon: ImageIcon = Icon("src/ressources/skip_forward_black.gif")
-  val backwarddIcon: ImageIcon = Icon("src/ressources/skip_backward_black.gif")
+  // val fastForwardIcon: ImageIcon = Icon("src/ressources/fastForwardSkip.png")
+  //val fastForwardIcon: ImageIcon = Icon("src/ressources/skip-fast-forward-black.gif")
+  val fastForwardIcon: ImageIcon = Icon("src/ressources/FFF.jpg")
+ // val backwardIcon: ImageIcon = Icon("src/ressources/skip_forward_black.gif")
+  val fastBackwardIcon:ImageIcon=Icon("src/ressources/RWW.jpg")
+  val backwardIcon: ImageIcon = Icon("src/ressources/skip_backward_black.gif")
   val initIcon: ImageIcon = Icon("src/ressources/rewind_black.gif")
-  val closeBoxIcon: ImageIcon = Icon("src/ressources/closebox.jpg")
+  val closeBoxIcon: ImageIcon = Icon("src/ressources/zoom_in_small.png")
 }
 
 object SimulatorUtil {

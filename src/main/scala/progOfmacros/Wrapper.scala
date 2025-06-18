@@ -18,7 +18,8 @@ import progOfmacros.Unop.Unop.getUnopFun
 
 
 
-/** wrapper to a function built on the fly*/
+/** wrapper to call  macro built on the fly, provides more explicit name and simpler syntax
+ * */
 object Wrapper {
   /** Wrappers for comparison macro defined from binary comparators */
     def condL[L<:Locus,R<:Ring](arg0: ASTLt[L, B], arg1: ASTLt[L, R],arg2: ASTLt[L, R])(implicit m:repr[L],ri: repr[R])={

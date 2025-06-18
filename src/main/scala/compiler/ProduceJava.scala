@@ -155,21 +155,22 @@ trait ProduceJava[U <: InfoNbit[_]] {
       "PROPAGATEFIRSTBIT" -> {
         val callsToPropagate: Seq[String] = paramD.map((s: String) => "p.prepareBit(" + s + ")") //for the moment we do the propagation on all data parameters
         val radius1Out=shortSigOut.filter(tSymbVarSafe(_).k.isRadius1)
-        val paramR=shortSigOut.filter(tSymbVarSafe(_).k.isParamR).filter(tSymbVarSafe(_).locus==Locus.locusV)
+        val paramR=shortSigOut.filter(tSymbVarSafe(_).k.isParamR)
+        val paramRbooV=paramR.filter(tSymbVarSafe(_).locus==Locus.locusV)
         val callsToPropagate2 = radius1Out.map((s: String) => {
           val l = tSymbVar(s).t.asInstanceOf[(Locus, Ring)]._1
           "p.prepareBit(" + s + ",compiler.Locus." + l.javaName + ")"
         })
-        val callsToMirror = radius1Out.map((s: String) => {
+        val callsToMirror = paramRbooV.map((s: String) => {
           val l = tSymbVar(s).t.asInstanceOf[(Locus, Ring)]._1
-          "p.mirror(" + s + ",compiler.Locus." + l.javaName + ")"
+          "p.mirror(" + s  + ")"
         })
-        val callsToBorder = paramR.map((s: String) => {
+        val callsToPrepareBit = paramR.map((s: String) => {
           val l = tSymbVar(s).t.asInstanceOf[(Locus, Ring)]._1
-          "p.border(" + s + ")"
+          "p.prepareBit(" + s + ")"
         })
-        callsToBorder.mkString(";") + ";\n"
-        //callsToMirror.mkString(";") + ";\n" + callsToPropagate2.mkString(";") + "\n"
+        //callsToMirror.mkString(";") + ";\n"
+       callsToMirror.mkString(";") + ";\n" + callsToPrepareBit.mkString(";") + "\n" //on rajoute systematique des preparebit sur les field produit
       },
       "CALINENUMBER" -> (paramD ::: paramR)(0), //There must be at least one param,we need to read it so as to know the length which is the number of CA lines.
       "DECLINITPARAM" -> {

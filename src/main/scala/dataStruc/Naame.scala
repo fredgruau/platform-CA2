@@ -36,8 +36,13 @@ trait BranchNamed
         spatialFieldToBeNamed.name == null ||
         spatialFieldToBeNamed.name == "" ||
         spatialFieldToBeNamed.name != null &&
-          nbCap(spatialFieldToBeNamed.name) > nbCap(fieldName) &&
-          !((spatialFieldToBeNamed.isInstanceOf[AST.Fundef[_]]))
+          !(spatialFieldToBeNamed.isInstanceOf[AST.Fundef[_]]) &&
+          (nbCap(spatialFieldToBeNamed.name) > nbCap(fieldName) ||
+            nbCap(spatialFieldToBeNamed.name) == nbCap(fieldName) &&
+              fieldName.compareTo(spatialFieldToBeNamed.name)<0
+            )
+
+
     /**
      * for hashtable, name = connteneur name + hashtablename + "yyy*+ the key name.
      *
@@ -84,7 +89,7 @@ trait BranchNamed
             val fieldHasMap=fields.filter(_._2.isInstanceOf[HashMap[_,_]])
 
             fieldsWithName.foreach { case (name, value) =>
-              //println(s"$name: $value")
+              println(s"$name: $value")
               value match {
                 case t: Named =>
                   val nameOublieN=
@@ -94,7 +99,6 @@ trait BranchNamed
                   setAllName(t, newName + removeDot( capitalizeFirst(nameOublieN)))
                 case _ =>
               }
-
             }
           }
         }

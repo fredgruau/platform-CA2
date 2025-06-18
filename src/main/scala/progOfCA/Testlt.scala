@@ -1,13 +1,11 @@
 package progOfCA
 
 import compiler.ASTBfun.andRedop
-import compiler.ASTLfun.{b2SIL, reduce}
+import compiler.ASTLfun.reduce
 import compiler.ASTLt.ConstLayer
-import compiler.SpatialType.{BoolE, BoolEv, UintV}
-import compiler.{ASTLt, B, E, SI, V}
+import compiler.SpatialType.BoolE
+import compiler.{B, E, V}
 import dataStruc.BranchNamed
-import progOfmacros.Grad
-import sdn.Rand
 import sdn.Util.{addLt, randUintV}
 /** tests the lt macro, containts a bugif */
 class   Testlt() extends ConstLayer[V, B](1, "global")  with BranchNamed{
@@ -22,6 +20,6 @@ class   Testlt() extends ConstLayer[V, B](1, "global")  with BranchNamed{
  //shoow(sloplt,level,twoLt,dopp,se,grad3,grad6)
  bugif(twoLt&deefE) //marche
  //val (lt,eq)= Grad.slopeLt(prioRand)
- show(prioRand);//,toto.eq,toto.lt,toto.gt);
+ show(prioRand,toto.eq,toto.lt,toto.gt);
 } //root classe compilable
 

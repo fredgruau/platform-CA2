@@ -29,7 +29,7 @@ object Util {
     nasI.setName("neighborasInt");
     val (n0, n1, n2, n3, n4, n5) = (elt(0, nasI), elt(1, nasI), elt(2, nasI), elt(3, nasI), elt(4, nasI), elt(5, nasI))
     //val randBit=xorn(orn(n0,n1,n2),n3,n4,n5)
-    val randBit: ASTLt[V, B] = (n0 | n1 | n2) ^ n3 ^ n4 ^ n5
+    val randBit: ASTLt[V, B] = (n0 & n1 | n2) ^ n3 ^ n4 ^ n5
     randBit.setName("randBit");
     Fundef1("util.rand", randBit, b)
   }

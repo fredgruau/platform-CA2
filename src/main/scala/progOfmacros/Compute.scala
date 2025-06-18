@@ -26,6 +26,13 @@ object Compute {
     Fundef2("compute.implique", ~a | b, a, b)
   }
   def implique(b0: BoolV, b1: BoolV): BoolV = new Call2(impliqueDef, b0, b1)(repr.nomLR(repr.nomV, repr.nomB)) with BoolV
+
+  def impluqDef[L<:Locus](implicit n:repr[L]): Fundef2[(L, B), (L, B), (L, B)] = {
+    val a = pL[L, B]("a")
+    val b = pL[L, B]("b")
+    Fundef2("compute.impluq", ~a | b, a, b)
+  }
+  def impluq[L<:Locus](b0: ASTLt[L,B], b1: ASTLt[L,B])(implicit n:repr[L]): ASTLt[L,B]= new Call2(impluqDef, b0, b1) with ASTLt[L,B]
   /*
 
     /** Does only one or, which appear ridiciulously small for a macro, but that May avoid generating too many CaLoops */

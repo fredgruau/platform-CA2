@@ -55,6 +55,9 @@ object Utility {
   /** allume le nombre de bits correponsdants en début d'entier. faut faire +2 par exemple pour 8 ca allume 10 bits.
    * used to move entire lines */
   val maskCompact: Map[Int, Int] = HashMap(6 -> 0xFF000000, 8 -> 0xFFC00000, 14 -> 0xFFFF0000, 30 -> 0xFFFFFFFF)
+  /** allume le nombre de bits correponsdants en début d'entier. faut faire +2 par exemple pour 8 ca allume 10 bits.
+   * used to move entire lines */
+  val maskCompactTighter: Map[Int, Int] = maskCompact.map{ case (k, v) => k -> (v & (v<<1)& (v>>>1)) }
   /** used to move bits within each line. */
   val maskSparse: Map[Int, Int] = HashMap(6 -> 0x01010101, 8 -> (1 | 1 << 10 | 1 << 20), 14 -> 0x00010001, 30 -> 0x00000001)
 
