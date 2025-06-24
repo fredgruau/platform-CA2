@@ -14,7 +14,7 @@ import progOfmacros.Comm._
 import progOfmacros.Topo.brdin
 import progOfmacros.{Grad, Wrapper}
 import progOfmacros.Util.{randE2, randN12, randNext, torusify}
-import progOfmacros.Wrapper.{borderS, existS, not, segment1, shrink}
+import progOfmacros.Wrapper.{borderS, enlarge, existS, not, segment1, shrink}
 import sdn.Globals.{root4naming, setRoot4naming}
 
 import scala.::
@@ -99,7 +99,7 @@ trait ComparApex{
 /** add a boolVf lt3 which computes lt with respect to the three neibors of the adjacent face, using an And transfer reduction redT*/
 trait Compar3 {
   self: UintV with Compar =>
-  val lt3:BoolVf=shrink(transfer(lt))
+  val lt3:BoolVf=enlarge(transfer(lt))
 }
 
 /** add a functionnality to a boolVe: returns the symetric with respect to edge.  */

@@ -99,6 +99,11 @@ object Wrapper {
   }
 
 
+  def enlarge[S1 <: S, S2 <: S, S3<:S, R<:Ring](arg: ASTLt[T[S1,S2], R])
+                                              (implicit m: repr[S1], n: repr[S2], o: repr[S3], r: repr[R], a: AntiClock[S1, S2, S3]): ASTLt[T[S1, S3], R]={
+    val f: Fundef1[(T[S1,S2], R), (T[S1,S3], R)] = RedT.getRedTFun(orRedop[R]._1.asInstanceOf[Fundef2RP[R, R]], m,n,o)( r,r, a)
+    new Call1[(T[S1,S2], R), (T[S1,S3], R)](f, arg) with ASTLt[T[S1,S3], R] {}
+  }
   def shrink[S1 <: S, S2 <: S, S3<:S, R<:Ring](arg: ASTLt[T[S1,S2], R])
        (implicit m: repr[S1], n: repr[S2], o: repr[S3], r: repr[R], a: AntiClock[S1, S2, S3]): ASTLt[T[S1, S3], R]={
   val f: Fundef1[(T[S1,S2], R), (T[S1,S3], R)] = RedT.getRedTFun(andRedop[R]._1.asInstanceOf[Fundef2RP[R, R]], m,n,o)( r,r, a)

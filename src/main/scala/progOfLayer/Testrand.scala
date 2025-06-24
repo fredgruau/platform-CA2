@@ -1,9 +1,8 @@
-package progOfCA
+package progOfLayer
 
 import compiler.AST.Layer
-import compiler.ASTLt.ConstLayer
 import compiler.SpatialType.BoolV
-import compiler.{AST, ASTLt, B, V}
+import compiler.{ASTLt, B, V}
 import dataStruc.{BranchNamed, Named}
 import progOfmacros.Util.{randNext, torusify}
 

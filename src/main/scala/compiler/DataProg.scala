@@ -32,9 +32,9 @@ import scala.Predef._
 import scala.util.Try
 
 object DataProg {
-  val nameDirCompilCA = "src/main/java/compiledCA/" //where the compiled loops will be stored
-  val nameDirProgCA = "src/main/scala/progOfCA/" //where the compiled loops will be stored
-  var nameCA3:String=null
+  //val nameDirCompilCA = "src/main/java/compiledCA/" //where the compiled loops will be stored
+ // val nameDirProgCA = "src/main/scala/progOfCA/" //where the compiled loops will be stored
+  //var nameCA3:String=null
   val nameDirCompilLoops = "src/main/java/compiledMacro/" //where the compiled loops will be stored
   val nameDirProgLoops = "src/main/scala/progOfmacros/" //where the source of macro will be stored
   /** set to false after first construct, identifies the mainRoot */
@@ -84,8 +84,7 @@ object DataProg {
     var instrsCur = List(main)
     /** contains the current instructions to be explored for retrieving new DagNodes */
     var layers: List[Layer[_]] = List()
-    if(isRootMainVar)
-       nameCA3=nameCA2
+    //if(isRootMainVar) nameCA3=nameCA2
     do try {
       val newElts=dag.addGreaterOf(instrsCur.flatMap(_.exps))
       val l: List[Layer[_]] = getLayers(newElts)

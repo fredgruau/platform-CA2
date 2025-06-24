@@ -1,4 +1,4 @@
-package compiledCA;
+package {{NAMEPACKAGE}} ;
 
 import compiledMacro.*;
 import compiler.Locus;

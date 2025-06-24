@@ -2,8 +2,8 @@ package compiler
 
 import compiler.AST.Read
 import compiler.ASTB.{False, True, nbitExpAndParam}
-import compiler.Circuit.{TabSymb, compiledCA, iTabSymb}
-import compiler.DataProg.{allLayerFromCompiledMacro, nameCA3, nameDirCompilCA, nameDirCompilLoops, nameDirProgLoops}
+import compiler.Circuit.{TabSymb, compiledCA, iTabSymb, naameCA, pkgCA}
+import compiler.DataProg.{allLayerFromCompiledMacro,  nameDirCompilLoops}
 import compiler.Instr.deployInt2
 import compiler.Locus.{all2DLocus, allLocus}
 import compiler.ProduceJava.totalGateCount
@@ -69,16 +69,27 @@ trait ProduceJava[U <: InfoNbit[_]] {
       }
     }
     val codeMain: String = javaCodeMain(codeLoopsAnonymous.values.mkString("\n")).replace('#', '$'); //'#' is not a valid char for id in java file
-    val nameCA = nameCA3.capitalize + "CA" // radicalOfVar(paramR(0)) + "CA" //name of the produced java file is equal to the name of the layer wrapping around all the compiled prog
-
+    val nameCA = naameCA.capitalize + "CA" // radicalOfVar(paramR(0)) + "CA" //name of the produced java file is equal to the name of the layer wrapping around all the compiled prog
+    //val pkgCAcompiled=pkgCA.replace("progOf","compiled")
     val nameCAjava = nameCA + ".java"
-    writeFile(nameDirCompilCA + nameCAjava, codeMain + "\n") //stores the code of the main (with anonmymous loop)
-    val sourceFiles = List(nameDirCompilCA + nameCAjava)
+    val targeJavaFileName="src/main/java/"+pkgCA+"/"+nameCAjava
+   // writeFile(nameDirCompilCA + nameCAjava, codeMain + "\n") //stores the code of the main (with anonmymous loop)
+    writeFile(targeJavaFileName, codeMain + "\n") //stores the code of the main (with anonmymous loop)
+    val sourceFiles = List(targeJavaFileName)
+    //val sourceFiles = List(nameDirCompilCA + nameCAjava)
     val compilationSuccess = compileJavaFiles(sourceFiles)
-    assert(compilationSuccess, "compilation of main CA:" + nameDirCompilCA + nameCAjava + " a planté, poil au nez")
-    System.out.println("compilation of main CA:" + nameDirCompilCA + nameCAjava + " a réussi")
-    val classCA: Class[_] = customLoader.findClass("compiledCA." + nameCA.capitalize) //we reload the just compiled class, so that it points to the recompiled macro
-    val progCA = loadClassAndInstantiate("compiledCA." + nameCA.capitalize, customLoader)
+    assert(compilationSuccess, "compilation of main CA:" + targeJavaFileName + " a planté, poil au nez")
+    System.out.println("compilation of main CA:" + targeJavaFileName + " a réussi")
+    val toto="compiledCA." + nameCA.capitalize
+    val tata = pkgCA+"." + nameCA.capitalize
+   // val classCA: Class[_] = customLoader.findClass("compiledCA." + nameCA.capitalize) //we reload the just compiled class, so that it points to the recompiled macro
+    val classCA: Class[_] = customLoader.findClass(tata) //we reload the just compiled class, so that it points to the recompiled macro
+    val progCA = loadClassAndInstantiate(tata, customLoader)
+
+    //val classCA: Class[_] = customLoader.findClass(pkgCA+"." + nameCA.capitalize) //we reload the just compiled class, so that it points to the recompiled macro
+    //val progCA = loadClassAndInstantiate(pkgCA+"." + nameCA.capitalize, customLoader)
+
+
     progCA.asInstanceOf[CAloops2]
   }
 
@@ -256,9 +267,14 @@ trait ProduceJava[U <: InfoNbit[_]] {
     }
 
     //we use the same template technique as the one used for CAloops
-    replaceAll("src/main/java/compiledCA/template/templateCA.txt", Map(
+    val res=replaceAll("src/main/java/compiledCA/template/templateCA.txt", Map(
       "GATECOUNT" -> totalGateCount.toString, //totalOp.toString,
-      "NAMECA" -> (nameCA3.capitalize), //radicalOfVar(paramR(0)).capitalize,
+      "NAMEPACKAGE" -> {
+        val i=0
+        val newpkg=pkgCA
+        pkgCA
+      }   ,
+      "NAMECA" -> (naameCA.capitalize), //radicalOfVar(paramR(0)).capitalize,
       "MEMWIDTH" -> ("" + mainHeapSize), //TODO on calcule pas bien la memwidth)
       "DECLNAMED" -> {
         /** code that declares all the named arrays 1D and 2D */
@@ -388,6 +404,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
         codeLoopAnonymous
       }
     ))
+    res
   }
 
   /** the sequence of calls of macros realizing the desired CA computation,

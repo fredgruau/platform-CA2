@@ -167,7 +167,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
     */
    class TriKeepFlipIf(i: Impact,val tritex: BoolF,flip:BoolV) extends Constr(Array(this), i,flip) {
      /** mutex is triggered if there is indeed two flips on each side of the mutex, and in the right state. */
-     def tritrig:BoolF =tritex &  (impact  match {  //y a moyen d'écrire un trigger générique pour mut,tri, et loc
+     val tritrig:BoolF =tritex &  (impact  match {  //y a moyen d'écrire un trigger générique pour mut,tri, et loc
        case Both() => insideS(flip)
        case One(v) =>  insideS(flip& (if (v) isV else (NisV))) // result also depend on impact
      })

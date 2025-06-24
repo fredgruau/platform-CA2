@@ -284,6 +284,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
       allCoalesc = HashMap() ++
         allAdresses.toList.map((e: (String, Int)) => (e._1, "mem[" + (e._2).toString + "]".toString)) //      It can be used to coalesc
     }
+
+    val fun2=funs
     new DataProgLoop[U](newDagis, funs.map { case (k, v) ⇒ k -> v.coaalesc() }, tSymbVar, paramD,
       paramR, allCoalesc, loops) with ProduceJava[U]
   }

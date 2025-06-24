@@ -5,7 +5,7 @@ import compiler.ASTLfun.{andR, apex, e, f, imply, neighbors, orR, v}
 import compiler.SpatialType.{BoolE, BoolEf, BoolF, BoolV, BoolVe}
 import compiler.{AST, ASTLt, B, E, F, Locus, T, V}
 import dataStruc.{BranchNamed, Named}
-import progOfCA.Sextexrect.chooseMinOf
+import progOfLayer.Sextexrect.chooseMinOf
 import sdn.rando
 import sdn.{MovableAg, MovableAgentV}
 import progOfmacros.Comm.{apexV, neighborsSym}

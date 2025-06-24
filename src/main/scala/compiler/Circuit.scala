@@ -109,28 +109,69 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
 
 
 object Circuit {
+  /** global variable storing the scala file of the CA, without the extension*/
+  var naameCA:String=null
+  /** global variable storing the package name whe the CA is stored*/
+  var pkgCA:String=null
+
   final case class NbOfBitIntoAccountException(private val message: String = "",
        private val cause: Throwable = None.orNull)
     extends Exception(message, cause)
   /**updated during first pass with names of fun such as gradslope, which which  need to be compiled during a second pass because of a  new bitsize*/
   var takeNbOfBitIntoAccount:Set[String]=immutable.HashSet()
   /** we restrict ourself to circuit returning a boolV, for the moment */
-  def main(args: Array[String])= {
-    compiledCA(args(0))
-    ()
+
+
+  def main(args: Array[String]): Unit = {
+    if (args.length != 1) {
+      println("Usage: circuit <nomFichier>")
+      System.exit(1)
+    }
+
+    val racine = new File("src/main/scala").getCanonicalFile
+    val nomFichier = args(0)+".scala"
+
+    if (!racine.exists() || !racine.isDirectory) {
+      println(s"Erreur: le dossier racine '${racine.getPath}' n'existe pas ou n'est pas un dossier.")
+      System.exit(1)
+    }
+
+    val maybePackage = findPackage(racine, nomFichier)
+
+    maybePackage match {
+      case Some(pkg) => println(s"Fichier trouvé dans le package: $pkg");naameCA=args(0);
+        pkgCA=pkg;
+        compiledCA(args(0),pkg)
+      case None => println(s"Fichier '$nomFichier' non trouvé sous '${racine.getPath}'")
+    }
+  }
+
+  def findPackage(racine: File, nomFichier: String): Option[String] = {
+    val subdirs = racine.listFiles().filter(_.isDirectory)
+
+    subdirs.collectFirst {
+      case dir if new File(dir, nomFichier).exists() =>
+        val relativePath = racine.toURI.relativize(dir.toURI).getPath
+        relativePath.stripSuffix("/").replace('/', '.').replace('\\', '.')
+    }
   }
 
   /**
    *
    * @param nameCA name of the CA program
-   *               returns an instance of CAloops2 that does he convolution, ready for simulation
+   *  @param namePkg name of package where scala is stored.
+   *   @return an instance of CAloops2 that does he convolution, ready for simulation
    *               It is called either for a static compilation, or dynamically from the simulator
    */
-  def compiledCA(nameCA:String):CAloops2={
-   val myCircuit = new Circuit[V, B]() {
-     /** from the AST given, we are able to reconstruct all the layer, plus system instructions.  */
-     /** class name specified for compilation*/
-     val rootClass=Class.forName("progOfCA." + nameCA)
+  def compiledCA(nameCA:String,namePkg:String):CAloops2={
+    pkgCA=namePkg
+    Circuit.naameCA =nameCA
+    val myCircuit = new Circuit[V, B]() {
+     /** from the AST given, we are able to reconstruct all the layer, plus system instructions.
+      *  class name specified for compilation */
+
+
+     val rootClass= Class.forName(namePkg + "." + nameCA)
      /**  creates an instance object*/
      /** The root4naming is wrapping the agent, so as to enable its declaration sooner and break a dependency cycle */
      val wrappe4naming=new Root4naming()
@@ -138,7 +179,7 @@ object Circuit {
       val rootObject: Named= rootClass.getDeclaredConstructor().newInstance().asInstanceOf[Named]
      wrappe4naming.setRootMustruct(rootObject) //now we can
 
-     /** rootObject which will be the root for naming. Everything that we want to display must be accessibe from the root objec*/
+     /** the name of the CA scala prog, will be the root for naming. Everything that we want to display must be accessibe from the root objec*/
      override val nameCAlowerCase=nameCA.toLowerCase
      /** rootAST contains all the code, its location depends on the program category, wether we have a single layer, a single  agent,  or a system of agent */
      val rootAst:ASTLt[V, B]=rootObject match {  //
@@ -154,12 +195,13 @@ object Circuit {
     }
     var notCompiled=true; var limit=0 //evite la boucle trop grosse
     var result:CAloops2=null
-   while(notCompiled&&limit<10)
-       try { notCompiled=false;result=myCircuit.compile(hexagon)} //autre tour de manége, avec plus de fun a compiler
+   while(notCompiled&&limit<20) //idealement faudrait pas mettre de limite ici, si on veut pouvoir générer toutes les macros.
+       try { notCompiled=false;
+         result=myCircuit.compile(hexagon)} //autre tour de manége, avec plus de fun a compiler
     catch{
       case e: NbOfBitIntoAccountException=>
         notCompiled=true;limit+=1
-        assert(limit<10,"y a eu plus de 10 fonctions a recompiler avec une différente bit size, ca commence a faire beaucoup, faut regarde de plus prés ckiskispasse")
+        assert(limit<10,"y a eu plus de 20 fonctions a recompiler avec une différente bit size, ca commence a faire beaucoup, faut regarde de plus prés ckiskispasse")
         isRootMainVar=true  //on refait un tour de manége, this boolean is initially true for the first fun which is the main, and then flipped to false
            //the second time it will more likely work because compilation of slopeDelta will be enforced due to seeting of takeNbOfBitIntoAccount
     }

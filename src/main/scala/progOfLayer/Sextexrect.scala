@@ -1,4 +1,4 @@
-package progOfCA
+package progOfLayer
 
 import compiler.ASTL.send
 import compiler.ASTLfun._
@@ -6,7 +6,8 @@ import compiler.ASTLt.ConstLayer
 import compiler.SpatialType.{BoolV, BoolVe, UintV, UintVe, UintVx}
 import compiler.{ASTLt, B, UI, V}
 import dataStruc.BranchNamed
-import progOfCA.Sextexrect.{chooseMinOf, sharpCmpNoMin, weakCmpProdZero, weakCmpProdtwo}
+import progOfLayer.Sextexrect.{chooseMinOf, sharpCmpNoMin, weakCmpProdZero, weakCmpProdtwo}
+import progOfLayer.Sextexrect.chooseMinOf
 import progOfmacros.Compute.concat3V
 import progOfmacros.Wrapper.{condL, ltUI2L, neqUI2L, not}
 import sdn.Globals.root4naming

@@ -40,6 +40,9 @@ trait InitSelect {
       case "xaxis" => xaxisInit
       case "yaxis" => yaxisInit
       case "dottedBorder" => dottedBorderInit
+      case "sym" => symInit
+
+      case "grid" => gridInit
       case "border" => borderInit
       case "random" => randomInit
       case "false" => zeroInit
@@ -98,6 +101,15 @@ trait InitSelect {
     for (i <- 0 until nbCol) {
       setBoolVField(0, i); setBoolVField(nbLine - 1, i)
     }
+  }
+  private lazy val symInit: InitMaald = new InitMaald(1) {
+    setBoolVField(nbLine/2, 1); setBoolVField(nbLine/2, nbCol - 2)
+    setBoolVField(1, nbCol/2); setBoolVField(nbLine - 2 , nbCol/2)
+  }
+  private lazy val gridInit: InitMaald = new InitMaald(1) {
+    for (i <- 0 to (nbLine-1)/3)
+      for (j <- 0 to (nbCol-1)/3)
+         setBoolVField(i*3,j*3)
   }
   private lazy val randomInit: InitMold = new InitMold(V(), 1) {
     override def init(CAmemFields: Array[Array[Int]]): Unit = { // init is redefined becase instead of encode, we directly write into the CA

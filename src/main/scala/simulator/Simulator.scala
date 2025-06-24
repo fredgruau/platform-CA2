@@ -1,9 +1,11 @@
 package simulator
 
 import compiler.Circuit
-import compiler.Circuit.compiledCA
-import compiler.DataProg.{nameDirCompilCA, nameDirCompilLoops, nameDirProgCA, nameDirProgLoops}
+import compiler.Circuit.{compiledCA, findPackage, naameCA, pkgCA}
+import compiler.DataProg.{nameDirCompilLoops, nameDirProgLoops}
 import dataStruc.Util.{CustomClassLoader, existInJava, getProg, hasBeenReprogrammed, loadClass}
+
+import java.io.File
 //import simulator.Simulator.SimulatorUtil.envs
 import simulator.SimulatorUtil._
 import simulator.XMLutilities._
@@ -32,6 +34,7 @@ object Simulator extends SimpleSwingApplication {
 
   /** name of Cellular automaton being simulated, to be set by method startUp, and then used by method top */
   var nameCA: String = " "
+  var pkgCA:String = " "
   var nameSimulParam: String = " "
   /** parameters defining sizes, t0, isPlaying, common to all simulations */
   var simulParam: Node = null
@@ -49,12 +52,35 @@ object Simulator extends SimpleSwingApplication {
    */
   override def startup(args: Array[String]): Unit = {
     nameCA = args(0) //name of the CA program
+
+
+
+
+    val racine = new File("src/main/java").getCanonicalFile
+    val nomFichier = args(0)+"CA.java"
+
+    if (!racine.exists() || !racine.isDirectory) {
+      println(s"Erreur: le dossier racine '${racine.getPath}' n'existe pas ou n'est pas un dossier.")
+      System.exit(1)
+    }
+
+    val maybePackage = findPackage(racine, nomFichier)
+
+    maybePackage match {
+      case Some(pkg) => println(s"Fichier trouvé dans le package: $pkg");
+        pkgCA=pkg;
+        //compiledCA(args(0),pkg)
+      case None => println(s"Fichier '$nomFichier' non trouvé sous '${racine.getPath}'")
+    }
+
     nameGlobalInit = args(1)
     globalInit = readXML("src/main/java/compiledCA/globalInit/" + nameGlobalInit)
      nameSimulParam = args(2)
     simulParam = readXML("src/main/java/compiledCA/simulParam/" + nameSimulParam)
+    val pathDisplayParam="src/main/java/"+pkgCA+"/displayParam/"+ nameCA + ".xml"
     displayParam = try {
-      readXML("src/main/java/compiledCA/displayParam/" + nameCA + ".xml")
+      readXML(pathDisplayParam)
+     // readXML("src/main/java/compiledCA/displayParam/" + nameCA + ".xml")
     }
     catch {
       case _: FileNotFoundException => readXML("src/main/java/compiledCA/displayParam/default.xml")
@@ -71,14 +97,15 @@ object Simulator extends SimpleSwingApplication {
   /** hierarchy of swing Jcomponents */
   def top: MainFrame = new MainFrame {
     /** possible directories where CA can be found */
-    val directories = List("compiledCA") //, "compHandCA")
-    //find  the right directory
+  /*  val directories = List("compiledCA") //, "compHandCA")
     val nameCACA=nameCA+"CA"
-    val possibleDir = directories.filter((s: String) => loadClass(s + "." + nameCACA) != null)
+    val possibleDir = directories.filter((s: String) => loadClass(s + "." + nameCACA) != null)  //find  the right directory
     assert(possibleDir.size > 0, nameCA + " could not be found in any of the directories " + directories)
     assert(possibleDir.size < 2, nameCA + "could  be found two times in the directories " + directories)
     val chosenDir: String = possibleDir.head //we may later have several directories for compiled CA, chosen dir will select the one containing our class
-
+*/
+    val nameDirProgCA="src/main/scala/"+pkgCA+"/"
+    val nameDirCompilCA="src/main/java/"+pkgCA+"/"
     /** true if scala CA has been reprogrammed */
     val reprogrammed=hasBeenReprogrammed(nameDirProgCA+nameCA.capitalize+".scala",nameDirCompilCA+nameCA+"CA.java")
     /** true if java CA has been deleted */
@@ -86,10 +113,13 @@ object Simulator extends SimpleSwingApplication {
     /** contains the loops but also many other parameters */
     val progCA: CAloops2 =
       if(options.contains("-c")||(options.contains("-b")&&(reprogrammed||deletedJava)))  //we recompile with -c or with -b  if CA code has been deleted or reprogrammeed
-        Circuit.compiledCA(nameCA)  //force  compilation
+      { Circuit.pkgCA=pkgCA
+        Circuit.compiledCA(nameCA,pkgCA)  //force  compilation
+      }
       else{ //no recompilation, we directly load the CA
-          val classCA: Class[CAloops2] = loadClass(chosenDir + "." + nameCACA)
-          getProg(classCA)  //récupére le CA déja compilé et rangé
+        val classCA: Class[CAloops2] = loadClass(pkgCA+"."+ nameCA +"CA")
+        //val classCA: Class[CAloops2] = loadClass(chosenDir + "." + nameCACA)
+        getProg(classCA)  //récupére le CA déja compilé et rangé
         }
        //will be used to create the controller, but also the browsable treeLayers.
      /*if (options.contains("-c")||(options.contains("-b")&&(reprogrammed||deletedJava)))
@@ -106,7 +136,7 @@ object Simulator extends SimpleSwingApplication {
     title = "spatial computation " + nameCA + " gateCount=" + progCA.gateCount() + " memory Width=" + progCA.CAmemWidth()
 
     /** process the signal we create controller first in order to instanciate state variable used by layerTree */
-    val controller = new Controller(nameCA, globalInit, nameGlobalInit, simulParam,nameSimulParam, displayParam, progCA, chosenDir, this)
+    val controller = new Controller(nameCA, globalInit, nameGlobalInit, simulParam,nameSimulParam, displayParam, progCA, pkgCA, this)
     /** Tree for browsing the hierarchy of layers and which field to display */
     val xmlLayerTree: Elem = readXmlTree(progCA.displayableLayerHierarchy())
     System.out.println("the displayable layers are\n" + xmlLayerTree)
