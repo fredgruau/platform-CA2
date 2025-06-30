@@ -3,11 +3,12 @@ package sdn
 import compiler.AST.{Layer, Strate}
 import compiler.SpatialType.BoolV
 import compiler.repr.{nomB, nomV}
-import compiler.{AST, ASTBt, ASTL, ASTLfun, ASTLt, B, CallProc, Locus, Ring, V, repr}
+import compiler.{AST, ASTBt, ASTL, ASTLfun, ASTLt, B, CallProc, Circuit, Locus, Ring, V, repr}
 import dataStruc.{BranchNamed, DagNode, Named}
 import dataStruc.DagNode.EmptyBag
 import sdn.Agent
 
+import scala.Predef.->
 import scala.collection.immutable.HashMap
 /** allow to use system instruction (show, debug...) by adding them to selected AST, so that the compiler can retrieve them
  * previously only layers could use system instructions, but it turns out to be not sufficient*/
@@ -40,6 +41,16 @@ val is: Strate[(L,R)] with ASTLt[L,R] with carrySysInstr
     for (f <- v)
       is.syysInstr ::= CallProc("show", List(), List(f))
   }
+  protected def shoowText(v: AST[_],ls:String*)={
+    is.syysInstr ::= CallProc("show", List(), List(v))
+    Circuit.labelsOfFieldsBeforeName=Circuit.labelsOfFieldsBeforeName + ((v , ls.toList))
+  }
+  protected def shoowText(v: AST[_],ls:List[String])={
+    is.syysInstr ::= CallProc("show", List(), List(v))
+    Circuit.labelsOfFieldsBeforeName=Circuit.labelsOfFieldsBeforeName + ((v , ls))
+  }
+
+
   /** we add the possibility  to declare invariant */
   protected def buugif(v: AST[_]) = {
       is.syysInstr ::= CallProc("bug", List(), List(v))

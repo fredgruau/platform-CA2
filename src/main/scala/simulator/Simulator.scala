@@ -5,6 +5,7 @@ import compiler.Circuit.{compiledCA, findPackage, naameCA, pkgCA}
 import compiler.DataProg.{nameDirCompilLoops, nameDirProgLoops}
 import dataStruc.Util.{CustomClassLoader, existInJava, getProg, hasBeenReprogrammed, loadClass}
 
+import java.awt.{Font, FontMetrics}
 import java.io.File
 //import simulator.Simulator.SimulatorUtil.envs
 import simulator.SimulatorUtil._
@@ -295,6 +296,12 @@ object SimulatorUtil {
       def drawPolygon(p: Polygon): Unit
 
       def drawText(s: String, i: Int, j: Int): Unit
+      def drawTextPoly(s: String,p: Polygon)
+      /** returns a font size adapted to hexagon dimensions */
+      def getFittedFontOpt: Option[Font]
+
+
+
 
     }
 

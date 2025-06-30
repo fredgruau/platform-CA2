@@ -18,7 +18,24 @@ class Voroonoi(val center: Vector2D) {
   var trianglesOK=true
   def addColor(c: Color) = color = Utility.addColor(color, c)
   var color: Color = Color.black;
-  def resetColor() = color = Color.black;
+  /** text to be displayed */
+  var text:String = null
+  def addText(letter:String)={text=if(text==null) letter else text+letter}
+  var int32Code:Int=0
+  def addBit(bit:Boolean)={
+    val newbit=if(bit) 1 else 0
+      int32Code=int32Code<<1 | newbit}
+  def textifyBits(ls:List[String])=
+   {
+
+     for(s<-ls) {
+      if ((int32Code & 1) == 1) addText(s)
+      int32Code=int32Code>>>1
+    }
+   assert(int32Code==0) //on devrait avoir utilisé tout les bits.
+   }
+  /** remet a zero pour pouvoir ensuite accumuler */
+  def resetColorText() = {color = Color.black; text=null; int32Code=0}
 
 
   var discontinuousTriangle = false

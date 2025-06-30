@@ -44,6 +44,11 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   val bitSizeDisplayedOrDirectInitField: Map[String, Int] = progCA.fieldBitSize().asScala.mapValues(_.toInt).toMap
   /** the method used to initialize the direct init fields. */
   val initName: util.HashMap[String, String] = progCA.init() //fromXMLasHashMap(displayParam, "inits", "@init")
+  /** labels used to show fields which need text, such as  constraint, moves, or instructions */
+  val textOfFields: Map[String, List[String]] = progCA.textOfFields().asScala.toMap
+  /**  fields displayed as text*/
+  val displayedAsText: Set[String]=textOfFields.keySet
+
   /** memory offset of the bit planes  representing  field, the size of the list corresponds to the density of the field */
   val memFieldsOffset: Map[String, List[Integer]] = progCA.fieldOffset().asScala.toMap
   /** this is for the display, this is not the number of lines and columns. */
@@ -96,7 +101,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   /** Colors of displayed layers */
   private var colorCode: Map[String, String] = fromXMLasHashMap(displayParam, "colorOfField", "@color")
   val shown = progCA.displayableLayerHierarchy()
-  colorCode = colorCode.filter((t) => shown.contains(t._1))
+  colorCode = colorCode.filter((t) => shown.contains(t._1)) //
   //((s:(String,String)=>shown.contains(s._1))
 
   /** associate a color to each displayed field , fiedls names are the keys, colors are the values which need ot be decoded from hexadecimal */
@@ -269,13 +274,17 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
               env.medium.voronoise(displayedLocus,currentProximityLocus)
           }
           val mainColorLeft = mainColors.toSet.diff(colorDisplayedField.values.toSet)
-          if (mainColorLeft.nonEmpty) {
-            var naturalChoice = Math.abs(s.hashCode) % mainColors.length
+          if (displayedAsText.contains(s)) colorDisplayedField + (s -> Color.black) //text field are in black
+          //looks for a color
+          else if (mainColorLeft.nonEmpty) {
+            var naturalChoice = Math.abs(s.hashCode) % mainColors.length //the hashcode of the field name is used to associate a color to the field
             while (!mainColorLeft.contains(mainColors(naturalChoice)))
               naturalChoice = (naturalChoice + 1) % mainColors.length //look for the first main color not used yet
             colorDisplayedField + (s -> mainColors(naturalChoice))
           }
-          else colorDisplayedField //we could not find a new color, nothing will change
+          else {throw new Exception("non color left amongst the main colors")
+            colorDisplayedField
+          } //we could not find a new color, the new field does not get a color! this won't happen supoesedly
         }
       updateAndSaveXMLparamCA()
       layerTree.hideRoot
@@ -315,8 +324,6 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
       showMore= !showMore
       repaintEnv()
       //requestFocus()
-
-      repaintEnv()
  case SelectionChanged(`globalInitList`) =>
       initButtonClick()//InitButton.doClick()
       updateAndSaveXMLGlobalInit()

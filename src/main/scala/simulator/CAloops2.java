@@ -1,7 +1,6 @@
 package simulator;
 
 import compiler.Locus;
-import dataStruc.Named;
 import scala.collection.immutable.$colon$colon;
 import scala.collection.immutable.List;
 import scala.collection.immutable.List$;
@@ -39,6 +38,9 @@ public interface CAloops2 {
     //public void anchorFieldInMem(int[][] m);
 
     public HashMap<String, List<Integer>> fieldOffset();
+
+    public HashMap<String, List<String>> textOfFields();
+
 
     /**
      * @return locus of fields, used for displaying or initializing

@@ -20,7 +20,8 @@ public int CAmemWidth() {return {{MEMWIDTH}};}
 {{LISTCALL}} return bugs;}
 
 
-
+@Override public HashMap<String, List<String>> textOfFields() {HashMap<String, List<String>> map = new HashMap<>();
+{{FIELDLABEL}}  return (map); }
 @Override public HashMap<String, List<Integer>> fieldOffset() {HashMap<String, List<Integer>> map = new HashMap<>(); //for layer's initialization and update, as well as displayed fields.
 {{FIELDOFFSET}} return (map);}
 @Override public HashMap<String, Locus> fieldLocus() {HashMap<String, Locus> map = new HashMap<>();

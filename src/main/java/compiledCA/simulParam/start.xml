@@ -1,7 +1,7 @@
 <fixed>
     <machine nbCol="14" nbLine="12" arch="christal"/>
     //default CA size and architecture
-    <display nbCol="2" CAwidth="850" iter="CAsize"/>
+    <display nbCol="2" CAwidth="820" iter="CAsize"/>
     <simul randomRoot="6" isPlaying="false"/>
     <sizes>
         <size nbLine="6" nbCol="8" t0="0"/>

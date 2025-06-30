@@ -60,10 +60,10 @@ trait  BlobConstrain extends Blob  {
   self: MovableAgentV =>
   /** meetV points cannot flip */
   val vmeet = new CancelFlipIf(Both(),meetV,flipOfMove)
-  constrain("vmeet",vmeet)
+  constrain("vmeet",'_',vmeet)
   /**a doubleton cannot flip both vertices*/
   val emeet = new MutKeepFlipIf(Both(),meetE,flipOfMove) with BranchNamed {}
-  constrain("emeet",emeet)
+  constrain("emeet",'=',emeet)
 
 
 }

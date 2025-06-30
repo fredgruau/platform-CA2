@@ -49,26 +49,26 @@ self: MovableAgentV => //a quasi point  is a movableAgentV
      * defined has a method, in order allow definition prior to intanciation of needed field, such as flip.  */
     override val where: BoolV = inside(neighborsSym(whereto))
   }
-  constrain("growToTwo",sexKeepFlipIf)
+  constrain("growToTwo",'x',sexKeepFlipIf)
   /** true for neighbors of non singleton*/
 //  val next2NonSingleton = exist(neighborsSym(e(doubletonV | tripletonV)))
   val next2NonSingleton = exist(neighborsSym(e(nonsingleton)))
   /**  cancel growth for non singleton, exept for doubleton, on appex, this needs a tournament*/
   val leqQuatre: Constr ={
    new KeepFlipIf(One(false),implique(next2NonSingleton, isApexV),flipOfMove) with Named with BranchNamed {}}
-  constrain("leqQuatre",leqQuatre)
+  constrain("leqQuatre",'q',leqQuatre)
   /** singleton cannot flip */
   val diseaperSingle = new CancelFlipIf(One(true),singleton,flipOfMove)
-  constrain("diseaperSingle",diseaperSingle)
+  constrain("diseaperSingle",'s',diseaperSingle)
   /**a doubleton cannot flip both vertices*/
   val diseaperDouble = new MutKeepFlipIf(One(true),doubleton,flipOfMove) with BranchNamed {}
-  constrain("diseaperDouble",diseaperDouble)
+  constrain("diseaperDouble",'d',diseaperDouble)
   /** cannot grow from two, to four on both apex */
   val appearDouble = new MutApexKeepFlipIf(One(false),doubleton,flipOfMove) with Named with BranchNamed {}
-  constrain("appearDouble",appearDouble)
+  constrain("appearDouble",'a',appearDouble)
   /**  a tripleton cannot flip its three vertices*/
   val diseaperTriple=new TriKeepFlipIf(One(true),tripleton,flipOfMove) with BranchNamed {}
-  constrain("diseaperTriple",diseaperTriple)
+  constrain("diseaperTriple",'t',diseaperTriple)
 
   //val extend2side: BoolVe = clock2(transfer(sym(v(doubleton) & rand.randSide)))
 

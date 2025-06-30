@@ -466,16 +466,16 @@ abstract class Medium(val nbLine: Int, val nbCol: Int, val boundingBox: Dimensio
   /**
    *
    * @param L currently displayed locus
-   *          resets the colors of the voronois
+   *          resets the colors and texts of the voronois
    */
-  def resetColorVoronoi(L: Set[Locus]): Unit =
+  def resetColorTextVoronoi(L: Set[Locus]): Unit =
     for (l <- L)
       for (points2D: pointLines <- locusPlane(l))
         for (i <- 0 until nbLine)
           for (j <- 0 until nbCol) {
             val point: Option[Vector2D] = points2D(i)(j) //corresponding point in 2D space
             if (point.isDefined)
-              theVoronois(Coord2D(point.get.x,point.get.y)).resetColor() //updating voronoi's polygon color
+              theVoronois(Coord2D(point.get.x,point.get.y)).resetColorText() //updating voronoi's polygon color
           }
 
 
@@ -483,7 +483,7 @@ abstract class Medium(val nbLine: Int, val nbCol: Int, val boundingBox: Dimensio
    * sum to the colors of locus l, the contribution of bitplanes
    * which can represent a boolean field
    *
-   *
+ *
    * @param color     color to be summed
    * @param bitPlane whether or not it should be summed
    * @param points where it should be summed
@@ -498,6 +498,31 @@ abstract class Medium(val nbLine: Int, val nbCol: Int, val boundingBox: Dimensio
             if (point.isDefined)
               theVoronois(Coord2D(point.get.x,point.get.y)).addColor(color) //updating voronoi's polygon color
           }
+    }
+  /**
+   * sum to the colors of locus l, the contribution of bitplanes
+   * which can represent a boolean field
+   * @param text    text to be displayed
+   * @param bitPlane whether or not it should be summed
+   * @param points where it should be summed
+   */
+  def sumBitVoronoi( bitPlane:Array[Array[Boolean]], points:pointLines): Unit = {
+    assert (points.size == nbLine, "pointlines should match CA")
+    assert (bitPlane.size == nbLine, "number of  lines should match CA")
+    for (i <- 0 until nbLine)  for (j <- 0 until nbCol) {
+      val point = points(i)(j) //corresponding point in 2D space
+      // assert(point!=None,"we should have defined the color of non existing points")
+      if (point.isDefined)
+        theVoronois(Coord2D(point.get.x, point.get.y)).addBit(bitPlane(i)(j)) //updating voronoi's polygon color
+    }
+  }
+
+  def textify(  points:pointLines,ls:List[String]): Unit =
+     for (i <- 0 until nbLine)  for (j <- 0 until nbCol) {
+      val point = points(i)(j) //corresponding point in 2D space
+      // assert(point!=None,"we should have defined the color of non existing points")
+      if (point.isDefined)
+        theVoronois(Coord2D(point.get.x, point.get.y)).textifyBits(ls) //updating voronoi's polygon color
     }
 
 

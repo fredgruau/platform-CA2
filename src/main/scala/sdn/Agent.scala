@@ -3,7 +3,7 @@ package sdn
 import compiler.ASTB.Uint
 import compiler.ASTBfun.{addRedop, orRedop, redop}
 import compiler.ASTL.{delayedL, send, transfer}
-import compiler.ASTLfun.{allOne, b2SIL, f, imply, ltSI, reduce, uI2SIL, v}
+import compiler.ASTLfun.{allOne, b2SIL, eq0, f, imply, ltSI, reduce, uI2SIL, v}
 import compiler.SpatialType.{BoolE, BoolEv, BoolF, BoolV, BoolVe, BoolVf, IntE, IntEv, IntV, IntVe, UintV, UintVx}
 import compiler.repr.nomE
 import compiler.{ASTLfun, ASTLt, B, E, F, Locus, SI, T, UI, V}
@@ -30,46 +30,52 @@ case class One(noFill: Boolean) extends Impact //on veut pouvoir calculer le com
 /** agents are boolean muStruct */
 abstract class Agent[L <: Locus] extends MuStruct[L, B]
  {
-   def displayConstr:Boolean=true
+
    /** break symetry in case of tournament with equal priority */
   val prioRand:UintVx
    /** used for mutex tournament */
  val prio:UintVx
 
-
+/** the agent's list of consrtrain. Constraints have a name, and the list is also ordered */
    val constrs= new scala.collection.mutable.LinkedHashMap[String,Constr]()
 
-   /** add c to the list of constraint */
- def constrain(name:String,c: Constr) = {
-   if(constrs.contains(name))
+   /**
+    *
+    * @param name more explicit name
+    * @param shortName used for display in CApannel
+    * @param c constraint
+    */
+
+ def constrain(name:String, shortName:Char, c: Constr) = {
+   if(constrs.contains(shortName+name))
      throw new Exception("une contrainte du nom "+name+" exite déja, changez le nom siou plait")
-   constrs(name)=c
+   constrs(shortName+name)=c
  }
 
   /** PEs where movements trigger changes in Agent's support. Either by filling, or by emptying
      flip is eith computed from the move for movableAgent, or  computed from the parent for bounded agent
    registers where the constraints had a canceling effect*/
-  val flipCancel= new mutable.HashMap[String,BoolV]() with Named {}
+  val flipCancel=  new scala.collection.mutable.LinkedHashMap[String,BoolV]() with Named {}
 
-   /** initial value of flip cause by movements, or inherited */
+   /** initial value of flip cause by movements for movable agents, or inherited for bound agents*/
   def flipCreatedByMoves: BoolV
-
   val flipOfMove:BoolV =delayedL(flipCreatedByMoves)
-   val flipAfterLocalConstr={
-     def flipLocallyConstrained(flip:BoolV):BoolV = {
-       if(displayConstr) for ((name, c) <- constrs) {
-         flipCancel(name)= ~c.where & flip //where also takes into account flipOfMove
-          shoow (flipCancel(name)) //mettre un prédicat sur agent si on veut afficher
-         // shoow(c.where)
+
+   /** applies all the constraints on the move */
+   val  allFlipCancel={
+     /** computes an IntVUI  whose individual bits are cancel Flips  */
+     def allFlipCancel(flip: BoolV): UintV = {
+       for ((name, c) <- constrs) {
+         flipCancel(name) = ~c.where & flip //where also takes into account flipOfMove
        }
-       val focusConstr=constrs("appearDouble").asInstanceOf[MutApexKeepFlipIf]
-       //shoow(focusConstr.mutrig)//,focusConstr.tmp)
-       import scala.collection.IterableOnceOps
-       val allConstr:  Array[UintV]=  constrs.values.toArray.map(_.where.asInstanceOf[UintV])
-       val allConstrUI:UintV=allConstr.reduce(_ :: _)
-       allOne(allConstrUI) & flip
+       val allFlipCancel: Array[UintV] = flipCancel.values.toArray.map(_.asInstanceOf[UintV])
+       allFlipCancel.reduce(_ :: _)
      }
-     delayedL( flipLocallyConstrained(flipOfMove))}
+     delayedL( allFlipCancel(flipOfMove))
+   }
+
+     val flipAfterLocalConstr=eq0(allFlipCancel) & flipOfMove
+     //delayedL( flipLocallyConstrained(flipOfMove))}
 
 
 

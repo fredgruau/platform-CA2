@@ -4,12 +4,13 @@ import AST._
 import ASTB.{Tminus1, shiftL, shiftR}
 import ASTBfun.ASTBg
 import Circuit._
+import compiler.ASTL.ASTLg
 import compiler.ASTLt.ConstLayer
 import compiler.DataProg.{isRootMainVar, nameDirCompilLoops}
 import compiler.SpatialType.BoolV
 import dataStruc.{Named, Util}
 import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp, prefixDash}
-import sdn.{ MovableAg, MovableAgentV}
+import sdn.{MovableAg, MovableAgentV}
 import sdn.Root4naming
 import simulator.CAloops2
 
@@ -62,6 +63,11 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     val prog1: DataProg[InfoType[_]] = DataProg(this,root4naming,nameCAlowerCase);
    // print(prog1)
 
+    //Now that fields have received a name, we can compute labelsOfFields
+    labelsOfFields=labelsOfFieldsBeforeName.map{ case (key, value) => (key.name, value) }.toMap
+    print(labelsOfFields)
+
+
     val prog2 = prog1.treeIfy();
        print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
 
@@ -109,6 +115,12 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
 
 
 object Circuit {
+
+  /** global variable which gather labels of Int field, for printing text */
+  var labelsOfFields:Map[String,List[String]] = immutable.HashMap()
+  var labelsOfFieldsBeforeName:Map[AST[_],List[String]] = immutable.HashMap()
+
+
   /** global variable storing the scala file of the CA, without the extension*/
   var naameCA:String=null
   /** global variable storing the package name whe the CA is stored*/

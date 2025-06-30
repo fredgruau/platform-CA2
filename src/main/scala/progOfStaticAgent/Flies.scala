@@ -19,7 +19,9 @@ class Flies() extends  MovableAgentV with BlobVouE with QpointConstrain with Blo
  shoow(flipOfMove,flipAfterLocalConstr)
 //  for (v<-realFlipCancel.values) shoow(v) //display intermediate, decreasing  flip value
  shoow(meetE,meetV,nbCc,lateBrdE)
- shoow(prioRand.eq,prioRand,prio.lt)
+ shoow(prioRand.eq,prio.lt)
+ shoowText(prioRand,"0","1","2")
+
 shoow(doubleton,singleton,tripleton)
  shoow(next2NonSingleton,leqQuatre.where, isApexV)
  shoow(choose)
@@ -31,7 +33,8 @@ val mutrig=appearDouble.mutrig;
  val chekLtIfMutrig=appearDouble.chekLtIfMutrig
  shoow(appearDouble.chekLtIfMutrig,appearDouble.mutrig)
  shoow(prioRand.lt3)
-
+ val codeConstraint: Iterable[String] =constrs.keys.toList.map(_.charAt(0).toString)
+ shoowText(allFlipCancel,codeConstraint.toList)
  //shoow(toto4,toto3)
   //shoow(bugE)
 }

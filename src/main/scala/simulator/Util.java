@@ -302,4 +302,7 @@ public class Util {
     public static List<Integer> li(int... ts) {
         return list(toInts(ts));
     }
+    public static List<String> ls(String... ts) {
+        return list(ts);
+    }
 }

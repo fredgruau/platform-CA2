@@ -2,8 +2,8 @@ package compiler
 
 import compiler.AST.Read
 import compiler.ASTB.{False, True, nbitExpAndParam}
-import compiler.Circuit.{TabSymb, compiledCA, iTabSymb, naameCA, pkgCA}
-import compiler.DataProg.{allLayerFromCompiledMacro,  nameDirCompilLoops}
+import compiler.Circuit.{TabSymb, compiledCA, iTabSymb, labelsOfFields, naameCA, pkgCA}
+import compiler.DataProg.{allLayerFromCompiledMacro, nameDirCompilLoops}
 import compiler.Instr.deployInt2
 import compiler.Locus.{all2DLocus, allLocus}
 import compiler.ProduceJava.totalGateCount
@@ -338,13 +338,26 @@ trait ProduceJava[U <: InfoNbit[_]] {
             res = "map.put(\"" + oneVar._1 + "\", li(" + res + "));";
             res
           }
-
           offset.map(offsetOneVar(_)).mkString("\n")
         }
-
         val spatialOfffsetsInt2 = spatialOfffsetsInt.filter(x => !x._1.startsWith("def"))
         fieldOffset(spatialOfffsetsInt2)
       },
+
+      "FIELDLABEL" -> {
+        def fieldLabel(labels: Map[String, List[String]]): String = {
+          def labelsOneVar(oneVar: (String, List[String])) = {
+            val labels = oneVar._2
+            var res = labels.map("\"" + _ + "\"" ).mkString(",")
+            res = "map.put(\"" + oneVar._1 + "\", ls(" + res + "));";
+            res
+          }
+          labels.map(labelsOneVar(_)).mkString("\n")
+        }
+        //val labelsOfFields2 = spatialOfffsetsInt.filter(x => !x._1.startsWith("def"))
+        fieldLabel(labelsOfFields)
+      },
+
       "FIELDLOCUS" -> {
         /**
          *

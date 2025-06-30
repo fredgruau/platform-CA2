@@ -16,15 +16,59 @@ import triangulation.Utility._
 import Color._
 import compiler.{E, Locus}
 import dataStruc.Coord2D
+import simulator.CApannel.fitTextInPolygon
 
 import scala.collection.immutable
 import scala.collection.immutable.HashSet
 import scala.swing.MenuBar.NoMenuBar.font
 import scala.util.Random
+import java.awt.{Font, FontMetrics, Graphics2D, Polygon, Rectangle}
+object CApannel{
 
+
+    def fitTextInPolygon(
+                          g: Graphics2D,
+                          text: String,
+                          polygon: Polygon,
+                          fontName: String = "SansSerif",
+                          fontStyle: Int = java.awt.Font.PLAIN,
+                          maxFontSize: Int = 28,
+                          minFontSize: Int = 6
+                        ): Option[(Font, Int, Int)] = {
+
+      val bounds: Rectangle = polygon.getBounds
+      val maxWidth = bounds.width
+      val maxHeight = bounds.height
+
+      // Iterate from large to small font size
+      val fittedFontOpt = (maxFontSize to minFontSize by -1).collectFirst {
+        case size =>
+          val font = new Font(fontName, fontStyle, size)
+          val fm: FontMetrics = g.getFontMetrics(font)
+          val textWidth = fm.stringWidth(text)
+          val textHeight = fm.getHeight
+
+          if (textWidth/2 <= maxWidth && textHeight/2 <= maxHeight)
+            Some((font, textWidth, textHeight))
+          else None
+      }.flatten
+
+      fittedFontOpt.map { case (font, textWidth, textHeight) =>
+        val margin = 1 // marge à gauche (modifiable)
+        val x = bounds.x + margin
+        //val x = bounds.x + (bounds.width - textWidth) / 2
+        val y = bounds.y + (bounds.height - textHeight) / 2 + font.getSize // approx baseline
+        (font, x, y)
+      }
+    }
+
+
+
+}
 /**
  * pannel for drawing one CA , together with relevant information
  * @param env contains all what's needed to draw
+ * @param width with of the cellular automaton
  */
 class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Panel {
   background = Color.black
@@ -48,11 +92,39 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
 
       override def drawPolygon(p: Polygon): Unit = g.drawPolygon(p)
       import java.awt.{Font}
+
       override def drawText(s: String, i: Int, j: Int) = {
         val font = new Font("Serif", Font.PLAIN, 24); // Remplace "Serif" par le nom de la police souhaitée et 24 par la taille de police désirée
         g.setFont(font);
-        g.drawString(s, i, j)
+        g.drawString(s, i, j)}
+
+
+      // Iterate from large to small font size
+      def getFittedFontOpt: Option[Font] = (38 to 6 by -1).collectFirst {
+        case size =>
+          val font = new Font("SansSerif",java.awt.Font.PLAIN, size)
+          val fm: FontMetrics = g.getFontMetrics(font)
+          val textWidth = fm.stringWidth("zz")
+          val textHeight = fm.getHeight
+          if (textWidth <= width/env.medium.nbCol && textHeight  <= height/env.medium.nbLine)
+            Some((font))
+          else None
+      }.flatten
+
+
+
+
+      /** compute the font size, according to the englobing polygon, and also where to print  */
+      override def drawTextPoly(s: String,p: Polygon) = {
+        val maybeFontPos: Option[(Font, Int, Int)] = fitTextInPolygon(g, s, p)
+         maybeFontPos.foreach { case (font, x, y) =>  //if not enough space , will not print anything
+          g.setFont(font)
+          g.drawString(s, x, y)
+        }
+
+
       }
+
       override def drawPoint(x: Int, y: Int, size:Int): Unit = {
         g.setStroke(new BasicStroke(size))
         g.drawLine(x, y, x, y)
@@ -98,8 +170,6 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
       g.setColor(c);
       val targetLoci: Set[Locus]=HashSet(locusV,locusEv)
       val locusOfPoint:immutable.HashMap[Vector2D,Locus]=immutable.HashMap.empty++allLocus.map((l:Locus) => env.medium.pointSet(l).toList.map((v:Vector2D)=>(v->l))).flatten
-
-
       for (t <- triangleSoup) {
         val lociSummit: Set[Locus] =HashSet(t.a,t.b,t.c).map (locusOfPoint(_))
         if(  targetLoci.subsetOf(lociSummit))
@@ -140,22 +210,18 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
             g.drawPoint(p.src.x.toInt,p.src.y.toInt,6)
         }
     }
-
     def drawCrossedFaces(): Unit = {
       g.setColor(gray)
       for(f<-env.medium.planarGraph.faces)
         if(f.isCrossing && f.border.size<31 && rand.nextBoolean()&& rand.nextBoolean() )  //we do not fill the outer border which is allowed to have crossing, due to two pending edges
           g.fillPolygon(f.toPolygon)
     }
-
-
     def drawCAinsideContour(c: Color) = {
       g.setColor(c);
       for ((_, v) <- env.medium.theVoronois)
         if (v.sides.isEmpty)
           g.drawPolygon(v.polygon)
     }
-
     def drawCA1DborderContour(c: Color) = {
       g.setColor(c);
       for ((_, v) <- env.medium.theVoronois)
@@ -172,9 +238,8 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
       }
     }
 
-
+   /** remplis tout les points au centre des polygones du voronoi dont les seeds correspondent au displayed loci */
     def drawPoints() = {
-
       for (p <- env.medium.displayedPoint) {
         val v2=env.medium.theVoronois(Coord2D(p.x,p.y))
         if(v2.trianglesOK) {
@@ -188,11 +253,12 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
 
       }
     }
+    /** remplis tout les  polygones du voronoi dont les seeds correspondent au displayed loci */
     def drawCAcolorVoronoi() = {
       //env.computeVoronoirColors() //painting allways need to recompute the colors, it would seem
       //for (v: Voroonoi <- env.medium.voronoi.values) {
         for(p<-env.medium.displayedPoint){
-          val v2=env.medium.theVoronois(Coord2D(p.x,p.y))
+          val v2: Voroonoi =env.medium.theVoronois(Coord2D(p.x,p.y))
         if (v2.polygon.npoints==0){ //we could not build the voronoi, we just draw a point.
           g.setColor(v2.color)
           g.drawPoint(p.x.toInt, p.y.toInt,10)
@@ -206,8 +272,25 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
         }
     }
 
+    /** remplis tout les  polygones du voronoi avec les textes qui correspondent au displayed loci */
+    def drawCATextVoronoi() = {
+      val f=g.getFittedFontOpt
+      //env.computeVoronoirColors() //painting allways need to recompute the colors, it would seem
+      //for (v: Voroonoi <- env.medium.voronoi.values) {
+      for(p<-env.medium.displayedPoint){
+        val v2: Voroonoi =env.medium.theVoronois(Coord2D(p.x,p.y))
+        if (v2.polygon.npoints>0 && v2.text!=null) {
+          g.setColor(Color.gray) //calculer la couleur du texte blanc ou noir pour que cela se voit bien
+          g.drawTextPoly(v2.text,v2.polygon)
+        }
+         // g.drawText(v2.text, 100, /*height -*/ 100) //fitte le texte dans le polygone.
+        }
+      }
+
+
     //drawCAtestInit(env.medium.defInit(E()),red)
     drawCAcolorVoronoi()
+    drawCATextVoronoi()
    // drawCAinsideContour(gray)
    // drawCA1DborderContour(white)
 

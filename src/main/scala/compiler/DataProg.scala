@@ -39,12 +39,17 @@ object DataProg {
   val nameDirProgLoops = "src/main/scala/progOfmacros/" //where the source of macro will be stored
   /** set to false after first construct, identifies the mainRoot */
   var isRootMainVar = true
+
 /** all the constant layers to be used in macros */
   val constLayers:HashMap[String,ConstLayer[_,_]]=new HashMap()+
     ("defVe" -> (new ConstLayer[T[V, E], B](1, "def"))) +
     ("defVf"->(new ConstLayer[T[V, F], B](1, "def")))
   /** print a map on several small lines, instead of one big line */
   private def string[T](t: TabSymb[T], s: String): String = t.toList.grouped(4).map(_.mkString(s)).mkString("\n") + "\n"
+
+
+
+
 
   /**
    * @param f function to be compiled
