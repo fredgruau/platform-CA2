@@ -270,7 +270,7 @@ object AST {
   }
 
   /** Strate are field defined at t and t+1 */
-  trait Strate[T] {
+  trait OldStrate[T] {
     self: AST[T] => //a strate is an AST
     /** the value at t, is the strate itself, it represent the value at time t , not sure about that! I think this hold only for layers*/
     val pred: AST[T]
@@ -287,9 +287,12 @@ object AST {
    * Layer is an AST constructor, because it is used both in ASTL and ASTB
    * it stores system instructions. it is a strate, the pred value is itelsf.
    **/
-  abstract class Layer[T](val nbit: Int, val init: String)(implicit m: repr[T]) extends AST[T]() with EmptyBag[AST[_]] with Strate[T] {
+  abstract class Layer[T](val nbit: Int, val init: String)(implicit m: repr[T]) extends AST[T]()
+    with EmptyBag[AST[_]] //with Strate[T]
+    {
     /** avoid a scala bug */
-    val pred/*: AST[T] */= this;
+    val predd/*: AST[T] */= this;
+      val next:AST[T]
     val v2 = 1
     assert(nbit == 1 || !this.asInstanceOf[ASTLg].ring.isInstanceOf[B], "a boolean is on one bit") //we check that if it is boolean, nbit=1
 

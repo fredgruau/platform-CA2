@@ -209,7 +209,7 @@ abstract class Instr extends DagNode[Instr] with WiredInOut[Instr] {
         t += arg.name -> new InfoType(arg.mym, StoredField())
       }
     }
-
+    assert(hd.keySet.size==tl.keySet.size,"on utilise pas tout les résultat de ")
     this match {
       case Affect(s, exp) => exp match {
         case c: Call[_] =>

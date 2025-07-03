@@ -9,6 +9,7 @@ import compiler.{AST, B, V}
 import dataStruc.{BranchNamed, Named}
 import sdntool.DistT
 import progOfmacros.Wrapper.borderS
+import sdn.Stratify
 import sdn.Util.{addBlobE, safeGrow}
 
 import java.util
@@ -21,9 +22,13 @@ class   Testdistt() extends ConstLayer[V, B](1, "global") with BranchNamed  with
   val src=new Testdistt()
   //show(src.d);
 } //root classe compilable
+
 /** same, but avoioding the wrapping of a constlayer */
-class   Testdist() extends ConstLayer[V, B](1, "global") with BranchNamed with Named with DistT {
+/*
+class   Testdist() extends ConstLayer[V, B](1, "global")
+  with Stratify[V,B] with BranchNamed with Named with DistT {
   show(d,this)
 } //root classe compilable
 
+*/
 

@@ -35,6 +35,10 @@ object ASTL {
     lazy val delayed = _arg;
     new Delayed[(L, R)](() => delayed) with ASTLt[L, R]
   }
+
+
+
+
   private[ASTL] case class Coonst[L <: Locus, R <: Ring](cte: ASTBt[R], m: repr[L], n: repr[R]) extends ASTL[L, R]()(repr.nomLR(m, n)) with EmptyBag[AST[_]]
 
   def const[L <: Locus, R <: Ring](cte: ASTBt[R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = Coonst(cte, m, n)
@@ -148,7 +152,7 @@ object ASTL {
   /** Fields which have a value both  at time t, and t+1 ,todo layers should implement it */
   trait Strate[L <: Locus, R <: Ring] {
     val pred: ASTLt[L, R];
-    val next: ASTLt[L, R]
+    val munext: ASTLt[L, R]
   }
 
   type ASTLg = ASTLt[_ <: Locus, _ <: Ring]

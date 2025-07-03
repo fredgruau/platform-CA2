@@ -45,6 +45,12 @@ import java.net.URLClassLoader
 object Util {
   import scala.reflect.ClassTag
 
+  def findDuplicates[T](list: List[T]): List[T] = {
+    list.groupBy(identity)
+      .collect { case (elem, occ) if occ.size > 1 => elem }
+      .toList
+  }
+
   def deepCopyArray[T: ClassTag](arr: Array[Array[T]]): Array[Array[T]] = {
     arr.map(_.clone())
   }

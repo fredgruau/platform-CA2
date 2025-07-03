@@ -10,8 +10,7 @@ import compiler.DataProg.{isRootMainVar, nameDirCompilLoops}
 import compiler.SpatialType.BoolV
 import dataStruc.{Named, Util}
 import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp, prefixDash}
-import sdn.{MovableAg, MovableAgentV}
-import sdn.Root4naming
+import sdn.{LDAG, MovableAg, MovableAgentV, Root4naming}
 import simulator.CAloops2
 
 import java.io.File
@@ -65,14 +64,14 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
 
     //Now that fields have received a name, we can compute labelsOfFields
     labelsOfFields=labelsOfFieldsBeforeName.map{ case (key, value) => (key.name, value) }.toMap
-    print(labelsOfFields)
+   // print(labelsOfFields)
 
 
     val prog2 = prog1.treeIfy();
-       print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
+      print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
 
     val prog3: DataProg[InfoType[_]] = prog2.procedurIfy();
-    //   print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
+      // print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
     val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
     //   print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
@@ -193,15 +192,16 @@ object Circuit {
 
      /** the name of the CA scala prog, will be the root for naming. Everything that we want to display must be accessibe from the root objec*/
      override val nameCAlowerCase=nameCA.toLowerCase
-     /** rootAST contains all the code, its location depends on the program category, wether we have a single layer, a single  agent,  or a system of agent */
+     /** rootAST allows to retrieve all the code, its location depends on the program category, wether we have a single layer, a single  agent,  or a system of agent */
      val rootAst:ASTLt[V, B]=rootObject match {  //
           case ast:BoolV
              => //rootObject.setName("");
             ast  //if we have a single layer CA, by convention it is a boolV, and also  the root Ast
           case ag:MovableAg[V] with MovableAgentV
-             =>rootObject.setName("");
-            ag.is //if we have a single agent,  the update of its chi layer is the rootAST, therefore, it has to need  all the other layers.
-      }
+             =>rootObject.setName(""); //evite de se trimballer un "N" partout
+            ag.muis //if we have a single agent,  the update of its chi layer is the rootAST, therefore, it has to need  all the other layers.
+          case ldag:LDAG =>rootObject.setName("");ldag.particle.asInstanceOf[MovableAg[V] with MovableAgentV].muis
+     }
      val z=0
       def computeRoot = rootAst
     }

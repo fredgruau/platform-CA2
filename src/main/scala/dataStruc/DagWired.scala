@@ -3,6 +3,7 @@ package dataStruc
 import compiler.{ASTB, Instr}
 import compiler.ASTB.{Both, InputStored, OutputStored}
 import compiler.Circuit.{TabSymb, iTabSymb}
+import dataStruc.Util.findDuplicates
 
 import scala.collection.{Iterable, Map, Set, immutable}
 import scala.collection.immutable.{HashMap, HashSet}
@@ -468,8 +469,10 @@ trait DagWired[T <: WiredInOut[T]] extends Dag[T] {
    */
 
   private def checkGenerators = {
-    val inter = visitedL.toSet.intersect(allGenerators.toSet)
-    assert(inter.size == allGenerators.size, "there are some generators not in the dag, may be a field is printed two times" + allGenerators.toSet.diff(inter) + "\n" + visitedL)
+    val inter: Predef.Set[T] = visitedL.toSet.intersect(allGenerators.toSet)
+    assert(allGenerators.toSet.size==allGenerators.size,"there are some generators present two times, may be a field is printed two times"+ findDuplicates (allGenerators)+ "\n" )
+    assert(inter.size == allGenerators.size,
+      "there are some generators not in the dag, may be a field is printed two times" + findDuplicates (allGenerators)+ "\n" )//+ visitedL)
 
   }
   /**

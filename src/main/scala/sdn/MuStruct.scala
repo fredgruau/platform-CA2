@@ -1,15 +1,18 @@
 package sdn
 
-import compiler.AST.{Layer, Strate}
+import compiler.AST.{Layer,  delayed}
+import compiler.ASTL.delayedL
 import compiler.SpatialType.BoolV
 import compiler.repr.{nomB, nomV}
 import compiler.{AST, ASTBt, ASTL, ASTLfun, ASTLt, B, CallProc, Circuit, Locus, Ring, V, repr}
 import dataStruc.{BranchNamed, DagNode, Named}
 import dataStruc.DagNode.EmptyBag
 import sdn.Agent
+import sdn.MuStruct.allMuStruct
 
 import scala.Predef.->
-import scala.collection.immutable.HashMap
+import scala.collection.immutable.{HashMap, HashSet}
+import scala.collection.mutable
 /** allow to use system instruction (show, debug...) by adding them to selected AST, so that the compiler can retrieve them
  * previously only layers could use system instructions, but it turns out to be not sufficient*/
 trait carrySysInstr{
@@ -29,33 +32,43 @@ trait carrySysInstr{
 }*/
 
 
+ class LDAG{
+  /** this enalbes to deliver compute root, which is allways the first mustruc*/
+  def  particle=allMuStruct.head
+}
+
+/** transform a layer into strate, to fit in the mustruct hierarchy */
+trait Stratify[L<:Locus,R<:Ring] extends ASTL.Strate[L,R] {
+  self: Layer[(L, R)] =>
+  val pred=this.asInstanceOf[ASTLt[L,R]]
+  override val munext: ASTLt[L, R] =delayedL(this.next.asInstanceOf[ASTLt[L,R]])(self.mym) }
 /**
  un element du LDAG, sert a updater toutes les trucs dans l'ordre. */
 abstract class MuStruct[L<:Locus,R<:Ring] extends  DagNode[MuStruct[_<:Locus,_<:Ring]] with Named with BranchNamed {
   //self: AST[(L,B)] =>
-
+  allMuStruct.append( this)//insert new created muStruct on  last position
   /** support of agent */
-val is: Strate[(L,R)] with ASTLt[L,R] with carrySysInstr
+val muis: ASTL.Strate[L,R] with ASTLt[L,R] with carrySysInstr
   /** we add the possibility to display fields */
-  protected def shoow(v: AST[_]*) = {
+  def shoow(v: AST[_]*) = {
     for (f <- v)
-      is.syysInstr ::= CallProc("show", List(), List(f))
+      muis.syysInstr ::= CallProc("show", List(), List(f))
   }
-  protected def shoowText(v: AST[_],ls:String*)={
-    is.syysInstr ::= CallProc("show", List(), List(v))
+ def shoowText(v: AST[_],ls:String*)={
+    muis.syysInstr ::= CallProc("show", List(), List(v))
     Circuit.labelsOfFieldsBeforeName=Circuit.labelsOfFieldsBeforeName + ((v , ls.toList))
   }
-  protected def shoowText(v: AST[_],ls:List[String])={
-    is.syysInstr ::= CallProc("show", List(), List(v))
+   def shoowText(v: AST[_],ls:List[String])={
+    muis.syysInstr ::= CallProc("show", List(), List(v))
     Circuit.labelsOfFieldsBeforeName=Circuit.labelsOfFieldsBeforeName + ((v , ls))
   }
 
 
   /** we add the possibility  to declare invariant */
   protected def buugif(v: AST[_]) = {
-      is.syysInstr ::= CallProc("bug", List(), List(v))
+      muis.syysInstr ::= CallProc("bug", List(), List(v))
   }
-  def locus: Locus =is.locus//todo, on pourrait calculer cela directement
+  def locus: Locus =muis.locus//todo, on pourrait calculer cela directement
 
 }
 
@@ -65,7 +78,9 @@ val is: Strate[(L,R)] with ASTLt[L,R] with carrySysInstr
 /** movable agent stores their chi in a layer, in order to be able to modify it. */
 
 object MuStruct{
+   var allMuStruct:mutable.ArrayDeque[MuStruct[_<:Locus,_<:Ring]]=mutable.ArrayDeque()
 
+   //var sortedMuStruct:List[MuStruct[_<:Locus,_<:Ring]]=List()
 
   //def const[L <: Locus, R <: Ring](cte: ASTBt[R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = Coonst(cte, m, n)
 

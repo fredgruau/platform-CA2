@@ -15,7 +15,7 @@ import Named.{delify, newAuxTmp, noDollarNorHashtag}
 import compiler.ASTLt.ConstLayer
 import compiler.Constraint.{Aligned, H1beforeH2}
 import compiler.SpatialType.ASTLtG
-import dataStruc.Util.{existInJava, hasBeenReprogrammed, prefixDash, prefixDot, suffixDot}
+import dataStruc.Util.{existInJava, findDuplicates, hasBeenReprogrammed, prefixDash, prefixDot, suffixDot}
 import org.w3c.dom.events.MutationEvent
 import sdn.carrySysInstr
 
@@ -75,7 +75,8 @@ object DataProg {
       val l1= getLayers(l).flatMap(_.systInstr)
       val l2: List[CallProc] =l.collect{case  instrs:carrySysInstr=>instrs.syysInstr}.flatten
       val res=l1++l2
-      assert(res.toSet.size==res.size, "probably the same field is printed two times")
+      if(res.toSet.size!=res.size)
+        throw new Exception("probably the same field is printed two times " + findDuplicates(res) )
       res
     }
     //def getHierarchyDisplay:HashMap[Layer[_],ASTL[_ <: Locus,_ <: Ring]]=new HashMap()++
@@ -542,6 +543,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     val hd: TabSymb[String] = mutable.HashMap.empty;
     val tl: TabSymb[String] = mutable.HashMap.empty
     for (i <- dagis2.visitedL) i.buildhdtl(hd, tl)
+    //def called=dagis2.visitedL.filter(case c: Call[_] =>)
+    assert(hd.keySet.size==tl.keySet.size,"on utilise pas tout les résultat de "+hd.values + tl.values)
     /** "return CallProc instruction" containing the body of the function */
     val main = dagis2.allGenerators.find(_.isReturn).get.asInstanceOf[CallProc]
     /** names of variable storing the result parameters ,
