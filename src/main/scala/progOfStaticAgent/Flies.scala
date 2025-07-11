@@ -6,7 +6,7 @@ import compiler.ASTLt.ConstLayer
 import compiler.SpatialType.BoolE
 import compiler.{B, E}
 import sdn._
-import sdntool.{DistT, Distmu}
+import sdntool.{DistT}
 
 
 /** flies is constrained
@@ -16,23 +16,14 @@ class Flies() extends  MovableAgentV with BlobVouE with QpointConstrain with Blo
 {  // override def displayConstr:Boolean=true
  //
  move(Force.total) //specific forces applied to Flies
-
  shoow(muis)
  shoow(flipOfMove,flipAfterLocalConstr)
 //  for (v<-realFlipCancel.values) shoow(v) //display intermediate, decreasing  flip value
  shoow(meetE,meetV,nbCc,lateBrdE)
- shoow(prioRand.eq,prio.lt)
-shoow(doubleton,singleton,tripleton)
- shoow(next2NonSingleton,leqQuatre.where, isApexV)
- shoow(choose)
+ //shoow(prioRand.eq,prio.lt)
+//shoow(doubleton,singleton,tripleton)
+/** contient les premiers caractéres de chaque nom de contraintes */
 
-// val twoLt: BoolE =reduce(andRedop[B], prio.lt); val defE=new ConstLayer[E, B](1, "def"); buugif(twoLt&defE) //marche verifie que y a au max un seul des deux coté plus petit
-val mutrig=appearDouble.mutrig;
-
- val codeConstraint: Iterable[String] =constrs.keys.toList.map(_.charAt(0).toString)
- shoowText(allFlipCancel,codeConstraint.toList)
- //shoow(toto4,toto3)
-  //shoow(bugE)
 }
 
 

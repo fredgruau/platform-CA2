@@ -37,6 +37,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   extends ToolBar() { //the controller inherits the toolBar, so that it can easily identifies which button was ckicqued, using the button's variable  name
   /** sometimes we try different random root, so as to explore different possible runs. */
   var randomRoot: Int = xInt(simulParam, "simul", "@randomRoot")
+  var density: Int = xInt(simulParam, "simul", "@density")
   //var t:Int=xInt(simulParam, "simul", "@t0")
   /** we need to know the locus of fields which are either displayed or initialized */
   val locusOfDisplayedOrDirectInitField: Map[String, Locus] = progCA.fieldLocus.asScala.toMap
@@ -57,6 +58,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   val globalInitNames: Array[String] = fromXMLasList((globalInit \\ "inits").head).toArray
   val selectedGlobalInit: Int = xInt(globalInit, "selected", "@rank") //which is the starting value for global init
   val randomInitNames: Array[Int] = (0 to 9).toArray
+  val densityInitNames: Array[Int] = (0 to 9).toArray
 
   /** check that global variables (layer and shown) do not share offset. */
   def invariantFieldOffset = {
@@ -217,10 +219,13 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   val randomInitList = new ComboBox[Int](randomInitNames) {
     selection.item = randomRoot
   }
+  val densityInitList = new ComboBox[Int](densityInitNames) {
+    selection.item = density
+  }
 
   //val randomRootField = new TextField("" + randomRoot, 2)
-  contents += (globalInitList, randomInitList) //, randomRootField)
-  listenTo(globalInitList.selection, randomInitList.selection)
+  contents += (globalInitList, randomInitList,densityInitList) //, randomRootField)
+  listenTo(globalInitList.selection, randomInitList.selection,densityInitList.selection)
   //todo add a jcombo to select a number between 0 and 9
   /** When we switch mode between pause and play, the icon of the PlayPause button toggles */
   private def togglePlayPauseIcon(): Unit = {
@@ -228,11 +233,23 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
       if (isPlaying) pauseNormalIcon
       else playNormalIcon
   }
+  def checkNewLocus(loci:Set[Locus]) {
+    val newLocus=loci.diff(displayedLocus)
+    if (newLocus.nonEmpty) //we have a new locus to display
+    {
+      displayedLocus ++= newLocus
+      updateProximity
+      for (env <- envList)
+        env.medium.voronoise(displayedLocus, currentProximityLocus)
+    }
+  }
 
-  peer.setRollover(true)
+    peer.setRollover(true)
   disableBinding(peer) //we want to use spacebar and left/right for other purpose than switching buttons in the toolbar
   listenTo(this.keys)
   //listenTo(mouse.clicks)
+
+
   reactions += {
     /*case EditDone(_) =>
       randomRoot = Integer.parseInt(randomRootField.text)
@@ -259,150 +276,155 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
         {
           colorDisplayedField -= s
           displayedLocus = colorDisplayedField.keys.map(locusOfDisplayedOrDirectInitField(_)).toSet + V()
+          //checkNewLocus(HashSet(l)) c'est pas adapté en fait.
           if (!displayedLocus.contains(l)) {  //there is one locus minus
             updateProximity
-            for (env <- envList)
-              env.medium.voronoise(displayedLocus,currentProximityLocus)
+            for (env <- envList)     env.medium.voronoise(displayedLocus,currentProximityLocus)
           }
           colorDisplayedField - s
         }
         else { //we add a color
-          if (!displayedLocus.contains(l)) //we have a new locus to display
+          //checkNewLocus(HashSet(l))c'est pas adapté en fait.
+        if (!displayedLocus.contains(l)) //we have a new locus to display
           {displayedLocus += l
-            updateProximity
-            for (env <- envList)
-              env.medium.voronoise(displayedLocus,currentProximityLocus)
-          }
-          val mainColorLeft = mainColors.toSet.diff(colorDisplayedField.values.toSet)
-          if (displayedAsText.contains(s)) colorDisplayedField + (s -> Color.black) //text field are in black
-          //looks for a color
-          else if (mainColorLeft.nonEmpty) {
-            var naturalChoice = Math.abs(s.hashCode) % mainColors.length //the hashcode of the field name is used to associate a color to the field
-            while (!mainColorLeft.contains(mainColors(naturalChoice)))
-              naturalChoice = (naturalChoice + 1) % mainColors.length //look for the first main color not used yet
-            colorDisplayedField + (s -> mainColors(naturalChoice))
-          }
-          else {throw new Exception("non color left amongst the main colors")
-            colorDisplayedField
-          } //we could not find a new color, the new field does not get a color! this won't happen supoesedly
-        }
-      updateAndSaveXMLparamCA()
-      layerTree.hideRoot
-      layerTree.repaint()
-      repaintEnv()
-    case ButtonClicked(InitButton)  =>//| KeyReleased(_, Key.A, _, _)
-      val wasPlaying = isPlaying
-      if (isPlaying) {
-        PlayPauseButton.doClick()
-      } //we need a temporary pause of the computing thread, so as to avoid having two threads run simultaneously
-      initEnv()
-      repaintEnv()
-      requestFocus() //necessary to enable listening to the keys again.
-      if (wasPlaying) PlayPauseButton.doClick()
+           updateProximity
+           for (env <- envList)
+             env.medium.voronoise(displayedLocus,currentProximityLocus)
+         }
+         val mainColorLeft = mainColors.toSet.diff(colorDisplayedField.values.toSet)
+         if (displayedAsText.contains(s)) colorDisplayedField + (s -> Color.black) //text field are in black
+         //looks for a color
+         else if (mainColorLeft.nonEmpty) {
+           var naturalChoice = Math.abs(s.hashCode) % mainColors.length //the hashcode of the field name is used to associate a color to the field
+           while (!mainColorLeft.contains(mainColors(naturalChoice)))
+             naturalChoice = (naturalChoice + 1) % mainColors.length //look for the first main color not used yet
+           colorDisplayedField + (s -> mainColors(naturalChoice))
+         }
+         else {throw new Exception("non color left amongst the main colors")
+           colorDisplayedField
+         } //we could not find a new color, the new field does not get a color! this won't happen supoesedly
+       }
+     updateAndSaveXMLparamCA()
+     layerTree.hideRoot
+     layerTree.repaint()
+     repaintEnv()
+   case ButtonClicked(InitButton)  =>//| KeyReleased(_, Key.A, _, _)
+     val wasPlaying = isPlaying
+     if (isPlaying) {
+       PlayPauseButton.doClick()
+     } //we need a temporary pause of the computing thread, so as to avoid having two threads run simultaneously
+     initEnv()
+     repaintEnv()
+     requestFocus() //necessary to enable listening to the keys again.
+     if (wasPlaying) PlayPauseButton.doClick()
 
-    case ButtonClicked(PlayPauseButton) =>//| KeyReleased(_, Key.Space, _, _) =>
-      isPlaying = !isPlaying
-      togglePlayPauseIcon()
-      if (isPlaying)
-        playEnv() //lauch the threads
-    case ButtonClicked(ForwardButton)=> //| KeyReleased(_, Key.Right, _, _)
-      forwardEnv()
-      repaintEnv()
-     // requestFocus()
-    case ButtonClicked(FastForwardButton)  =>
-      fastForwardEnv()
-      repaintEnv()
-     // requestFocus()}
-    case ButtonClicked(BackwardButton)  =>
-      backwardEnv()
-      repaintEnv()
+   case ButtonClicked(PlayPauseButton) =>//| KeyReleased(_, Key.Space, _, _) =>
+     isPlaying = !isPlaying
+     togglePlayPauseIcon()
+     if (isPlaying)
+       playEnv() //lauch the threads
+   case ButtonClicked(ForwardButton)=> //| KeyReleased(_, Key.Right, _, _)
+     forwardEnv()
+     repaintEnv()
     // requestFocus()
-    case ButtonClicked(FastBackwardButton)  =>
-      fastBackwardEnv()
-      repaintEnv()
-    case ButtonClicked(ShowCrossButton)  =>
-      showMore= !showMore
-      repaintEnv()
-      //requestFocus()
- case SelectionChanged(`globalInitList`) =>
+   case ButtonClicked(FastForwardButton)  =>
+     fastForwardEnv()
+     repaintEnv()
+    // requestFocus()}
+   case ButtonClicked(BackwardButton)  =>
+     backwardEnv()
+     repaintEnv()
+   // requestFocus()
+   case ButtonClicked(FastBackwardButton)  =>
+     fastBackwardEnv()
+     repaintEnv()
+   case ButtonClicked(ShowCrossButton)  =>
+     showMore= !showMore
+     repaintEnv()
+     //requestFocus()
+case SelectionChanged(`globalInitList`) =>
+     initButtonClick()//InitButton.doClick()
+     updateAndSaveXMLGlobalInit()
+   case SelectionChanged(`randomInitList`) =>
+     randomRoot = randomInitList.selection.item
+     initButtonClick()//InitButton.doClick()
+     updateAndSaveXMLSimulParam()
+    case SelectionChanged(`densityInitList`) =>
+      density = densityInitList.selection.item
       initButtonClick()//InitButton.doClick()
-      updateAndSaveXMLGlobalInit()
-    case SelectionChanged(`randomInitList`) =>
-      randomRoot = randomInitList.selection.item
-      initButtonClick()//InitButton.doClick()
-      updateAndSaveXMLSimulParam()
-    case ValueChanged(`speedSlider`) =>
-      speed.text = s"Speed : ${speedSlider.value}"
-  }
+      //updateAndSaveXMLSimulParam()
+   case ValueChanged(`speedSlider`) =>
+     speed.text = s"Speed : ${speedSlider.value}"
+ }
 
-  /** ca bug si je fait initButton.doClick(), je ne sais pas pourquoi peut etre parceque
-   * j'ai bricolé des changement de sdk et de version de  donc j'ai ecrit le code séparément, la ca a l'ai d'aller*/
-  def initButtonClick(): Unit = {
-    val wasPlaying = isPlaying
-    if (isPlaying) {
-      PlayPauseButton.doClick()
-    } //we need a temporary pause of the computing thread, so as to avoid having two threads run simultaneously
-    initEnv()
-    repaintEnv()
-    requestFocus() //necessary to enable listening to the keys again.
-    if (wasPlaying) PlayPauseButton.doClick()
-  }
-  focusable = true
-  requestFocus
+ /** ca bug si je fait initButton.doClick(), je ne sais pas pourquoi peut etre parceque
+  * j'ai bricolé des changement de sdk et de version de  donc j'ai ecrit le code séparément, la ca a l'ai d'aller*/
+ def initButtonClick(): Unit = {
+   val wasPlaying = isPlaying
+   if (isPlaying) {
+     PlayPauseButton.doClick()
+   } //we need a temporary pause of the computing thread, so as to avoid having two threads run simultaneously
+   initEnv()
+   repaintEnv()
+   requestFocus() //necessary to enable listening to the keys again.
+   if (wasPlaying) PlayPauseButton.doClick()
+ }
+ focusable = true
+ requestFocus
 
-  private def repaintEnv(): Unit = {
-    for (env <- envList)
-      env.repaint()
-  }
+ private def repaintEnv(): Unit = {
+   for (env <- envList)
+     env.repaint()
+ }
 
-  private def playEnv(): Unit =
-    for (env <- envList)
-      env.play()
+ private def playEnv(): Unit =
+   for (env <- envList)
+     env.play()
 
 
-  //2^speedSlider.value
+ //2^speedSlider.value
 
 
-  private def forwardEnv(): Unit =
-    for (env <- envList)
-      env.forward()
-  private def backwardEnv(): Unit =
-    for (env <- envList)
-      env.backward(1)
+ private def forwardEnv(): Unit =
+   for (env <- envList)
+     env.forward()
+ private def backwardEnv(): Unit =
+   for (env <- envList)
+     env.backward(1)
 
-  private def fastForwardEnv(): Unit =
-    for (env <- envList)
-      env.fastForward(Math.pow(2,speedSlider.value).toInt)
-  private def fastBackwardEnv(): Unit =
-    for (env <- envList)
-      env.backward(Math.pow(2,speedSlider.value).toInt)
+ private def fastForwardEnv(): Unit =
+   for (env <- envList)
+     env.fastForward(Math.pow(2,speedSlider.value).toInt)
+ private def fastBackwardEnv(): Unit =
+   for (env <- envList)
+     env.backward(Math.pow(2,speedSlider.value).toInt)
 
-  private def initEnv(): Unit =
-    for (env <- envList)
-      env.init()
+ private def initEnv(): Unit =
+   for (env <- envList)
+     env.init()
 }
 
 import java.awt.Color._
 import java.lang.Integer.decode
 
 object Controller {
-  /** space and arrows where binded to toolBar browsing, this method let them become available keys for replacing  button clicking */
-  def disableBinding(c: JComponent): Unit = {
-    val im: InputMap = c.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
-    for (key <- List("RIGHT", "LEFT", "SPACE")) //keys to be disabled so as to be used for own purpose
-      im.put(KeyStroke.getKeyStroke(key), "none")
-  }
+ /** space and arrows where binded to toolBar browsing, this method let them become available keys for replacing  button clicking */
+ def disableBinding(c: JComponent): Unit = {
+   val im: InputMap = c.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
+   for (key <- List("RIGHT", "LEFT", "SPACE")) //keys to be disabled so as to be used for own purpose
+     im.put(KeyStroke.getKeyStroke(key), "none")
+ }
 
 }
 
 private object colors {
-  //primary, secondary and tertiary colors aranged on a "color wheel" which exhibits a toroidal metric.
-  private val chartreuseGreen = new Color(decode("0x80FF00"))
-  private val springGreen = new Color(decode("0x00FF80"))
-  private val azure = new Color(decode("0x0080FF"))
-  private val violet = new Color(decode("0x8000FF"))
-  private val rose = new Color(decode("0xFF0080"))
-  val mainColors: Array[Color] = Array(red, orange, yellow, chartreuseGreen, green, springGreen, cyan, azure, blue, violet, magenta, rose)
-  //gray tones are used for fixed system layers such as debug, liveIf,
-  val grays: Array[Color] = Array(darkGray, gray, lightGray, white)
+ //primary, secondary and tertiary colors aranged on a "color wheel" which exhibits a toroidal metric.
+ private val chartreuseGreen = new Color(decode("0x80FF00"))
+ private val springGreen = new Color(decode("0x00FF80"))
+ private val azure = new Color(decode("0x0080FF"))
+ private val violet = new Color(decode("0x8000FF"))
+ private val rose = new Color(decode("0xFF0080"))
+ val mainColors: Array[Color] = Array(red, orange, yellow, chartreuseGreen, green, springGreen, cyan, azure, blue, violet, magenta, rose)
+ //gray tones are used for fixed system layers such as debug, liveIf,
+ val grays: Array[Color] = Array(darkGray, gray, lightGray, white)
 }

@@ -25,7 +25,7 @@ public class Util {
      */
     public static void bug(int[] shouldBeZero, int[] bugV, String bugName, ArrayList<String> bugs) {
         boolean bug = false;
-        for (int i = 0; i < shouldBeZero.length; i++) {
+        for (int i = 1; i < shouldBeZero.length-1; i++) {//on zappe les deux premieres et la derniére ligne,elle sont des copies
             bug = bug || shouldBeZero[i] != 0;
             bugV[i] |= shouldBeZero[i];
         }
@@ -33,18 +33,18 @@ public class Util {
     }
 
     /**
-     * @param test    2D arrays, should allways be false, otherwise there is a bug
+     * @param shouldbeZero    2D arrays, should allways be false, otherwise there is a bug
      * @param bugE    accumulates edge or face or transfer bug, 2D arrays
      * @param bugName identifies the bug
      * @param bugs    stores detected bug
      */
-    public static boolean bug(int[][] test, int[][] bugE, String bugName, ArrayList<String> bugs) {
+    public static boolean bug(int[][] shouldbeZero, int[][] bugE, String bugName, ArrayList<String> bugs) {
         boolean bug = false;
-        for (int i = 2; i < test.length-1; i++) //on zappe les deux premieres et la derniére ligne, car il arrive que y ais des "reste de miroir brisés " la dessus.
-            for (int j = 0; j < test[0].length; j++) {
+        for (int i = 0; i < shouldbeZero.length; i++) //on zappe les deux premieres et la derniére ligne, car il arrive que y ais des "reste de miroir brisés " la dessus.
+            for (int j = 1; j < shouldbeZero[0].length-1; j++) {
                 //todo we have to do a more precise test, to eliminate border effect on first and last line, first and last column.
-                bug = bug || test[i][j] != 0;
-                bugE[i][j] |= test[i][j];
+                bug = bug || shouldbeZero[i][j] != 0;
+                bugE[i][j] = shouldbeZero[i][j]; //m
             }
         if (bug)
             bugs.add(bugName);

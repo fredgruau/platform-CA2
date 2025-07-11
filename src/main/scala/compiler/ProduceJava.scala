@@ -469,8 +469,9 @@ trait ProduceJava[U <: InfoNbit[_]] {
         case "memo" => val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet() ++ params.map(radicalOfVar(_)) //copy and memo have the same effect
           callCode += l.toList.mkString(",")
         case "bug" => val nameBug = radicalOfVar(call.exps.head.asInstanceOf[Read[_]].which) //on apelle bug avec un read, c'est obligé
-          val locusBug = tSymbVar(nameBug).locus.toString.dropRight(2) //dropRight enleve les deux parenthéses
+          val locusBug = tSymbVar(nameBug).locus.toString.dropRight(2) //on regard le locus de la variable surveillée. dropRight enleve les deux parenthéses
           paramCode = List(nameBug, "llbug" + locusBug, "\"" + nameBug + "\"", "bugs").reverse
+        //faudrait enregistrer la liste des locus de bug?
         case _ => //we now consider the interesting case: a call to a real CAloop
           paramCode = List("p") //this is a method PrShift that does a preliminary shift if radius is >0yyy
 

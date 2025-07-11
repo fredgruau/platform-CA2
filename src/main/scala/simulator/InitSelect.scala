@@ -24,15 +24,16 @@ trait InitSelect {
    *
    * @param initMethodName name of the init chosen
    * @param l              Locus of the layer to be initalized we do not need to pass a bit size, since integer field are usually initialized to zero
+   * @param density how many point populate initial config
    * @return an  "Init" which can initialize a layer, because of lazy, this init is created once and then reused
    *         this is the only public method provided by the initSelect trait,
    */
-  def initSelect(initMethodName: String, l: Locus, nbit: Int): Init = {
+  def initSelect(initMethodName: String, l: Locus, nbit: Int,density:Int): Init = {
     initMethodName match {
       case "0" => zeroInit
       case "true" => unInit
       case "center" => centerInit
-      case "points" => pointsInit
+      case "points" => pointsInit(density)
       case "debug" => zeroInit
       case "sparse" => sparseInitInside(l, nbit)
       case "randinside" => randInitInside(l, nbit)
@@ -229,9 +230,11 @@ trait InitSelect {
   private lazy val centerInit: InitMaald = new InitMaald(1) {
     setBoolVField(center)
   }
-  private lazy val pointsInit: InitMaald = new InitMaald(1) {
-    setBoolVField(center)
-    setBoolVField(center.add(new Vector2D(1, 3)))
-    setBoolVField(center.add(new Vector2D(0, -4)))
+  private def pointsInit(density:Int): InitMaald = new InitMaald(1) {
+
+    //print("tototototo"+)
+    setBoolVField(center.add(new Vector2D(0, -3)))
+    setBoolVField(center.add(new Vector2D(density%2, density/2)))
+   // if(density>2)    setBoolVField(center)
   }
 }

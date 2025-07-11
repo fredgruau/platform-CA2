@@ -5,7 +5,7 @@ import simulator.Medium.christal
 import TestEncodeDecode._
 import compiler.Locus.locusV
 import dataStruc.Util
-import dataStruc.Util.{deepCopyArray, isEqualto, isMiror, list, miror, randomFill}
+import dataStruc.Util.{deepCopyArray, isEqualto, isMiror, list, miror, printMat, randomFill}
 import triangulation.Utility._
 
 import scala.util.Random
@@ -19,18 +19,49 @@ class TestMiror extends FunSuite with BeforeAndAfter {
     miror(lCAinput)
     assert(isMiror(lCAinput))
   }
+  /** takes a random grid of bits, encodes it, miror it, decodes it, checks its been mirored */
   test("smallMiror") {
     val m = christal(12, 14, 30)
     val lCAinput = Array.ofDim[Boolean](12, 14)
-    randomFill(lCAinput)
-    val lCAoutput = Array.ofDim[Boolean](12, 14)
-    val lCAmem = Array.ofDim[Int](10)
-    m.encode(lCAinput, lCAmem)
-    m.propagate4Shift.mirror(lCAmem)
-    m.decode(lCAmem, lCAoutput)
-    assert(isMiror(lCAoutput))
+    for(i<- 1 to 100) {
+      randomFill(lCAinput)
+      val lCAoutput = Array.ofDim[Boolean](12, 14)
+      val lCAmem = Array.ofDim[Int](10)
+      m.encode(lCAinput, lCAmem)
+      m.propagate4Shift.mirror(lCAmem)
+      m.decode(lCAmem, lCAoutput)
+      assert(isMiror(lCAoutput))
+    }
   }
-  test("smallMirorPropagate") {
+
+  test("smallerMiror") {
+    val m = christal(6, 8, 30)
+    val lCAinput = Array.ofDim[Boolean](6, 8)
+    for(i<- 1 to 100) {
+      randomFill(lCAinput)
+      val lCAoutput = Array.ofDim[Boolean](6,8)
+      val lCAmem = Array.ofDim[Int](6)
+      m.encode(lCAinput, lCAmem)
+      m.propagate4Shift.mirror(lCAmem)
+      m.decode(lCAmem, lCAoutput)
+      printMat(lCAoutput)
+      assert(isMiror(lCAoutput))
+    }
+  }
+
+
+  /** takes a random memory,apply fast miror, check ismirored safe. the propagated bits should not interfere.  */
+  test("smallMirorPropagated") {
+    val m = christal(12, 14, 30)
+    for(i<- 1 to 100) {
+      val lCAmem = Array.ofDim[Int](10)
+      randomFill( lCAmem)
+      m.propagate4Shift.mirror(lCAmem)
+      assert(m.isMirorSafe(lCAmem))
+    }
+  }
+  /** check that prepare bits does not modify grid content */
+  test("Propagate") {
     val m = christal(12, 14, 30)
     val lCAinput = Array.ofDim[Boolean](12, 14)
     randomFill(lCAinput)
@@ -42,7 +73,7 @@ class TestMiror extends FunSuite with BeforeAndAfter {
     assert(isEqualto(lCAoutput,lCAinput))
   }
 
-  /** propagate4shift should be idempotent */
+  /** check that  propagate4shift is idempotent */
   test("smallMirorPropagate2") {
     val m = christal(12, 14, 30)
     val lCAinput = Array.ofDim[Boolean](12, 14)

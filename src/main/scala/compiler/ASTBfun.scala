@@ -26,6 +26,11 @@ object ASTBfun {
   def p[R <: Ring](name: String)(implicit n: repr[R]) = new Param[R](name) with ASTBt[R]
 
   //---------------------------------------------Logical operation--------------------------//
+  /** for rapid production of orB,xorB, andB */
+  def fundef2Bop2(op2: Op2, s: String): Fundef2[B, B, B] = {
+    val (xb, yb) = (p[B]("x" + s), p[B]("y" + s));
+    Fundef2(s, op2(xb, yb), xb, yb)
+  }
 
     /** Used for debug */
     val identityB: Fundef1R[B] = {
@@ -61,18 +66,25 @@ object ASTBfun {
     case UI() => negUI
   }).asInstanceOf[Fundef1R[R]]
 
-  /** for rapid production of orB,xorB, andB */
-  def fundef2Bop2(op2: Op2, s: String): Fundef2[B, B, B] = {
-    val (xb, yb) = (p[B]("x" + s), p[B]("y" + s));
-    Fundef2(s, op2(xb, yb), xb, yb)
-  }
 
   /** used with cac */
   val delta: Fundef2R[B] = {
     val (xb, yb) = (p[B]("deltax"), p[B]("deltay"));
     Fundef2("delta", xb & ~yb, xb, yb)
   }
-
+  val deltaInv: Fundef2R[B] = {
+    val (xb, yb) = (p[B]("deltax"), p[B]("deltay"));
+    Fundef2("delta", yb & ~xb, xb, yb)
+  }
+  val andB: Fundef2R[B] = fundef2Bop2(And(_, _), "andb")
+  private val (andSI, andUI) = {
+    def andI[R <: I](implicit m: repr[R]) = fundef2Imapp2(andB, "andI"); (andI[SI], andI[UI])
+  }
+  def and[R <: Ring](implicit n: repr[R]): Fundef2R[R] = (n.name match {
+    case B() => andB
+    case SI() => andSI
+    case UI() => andUI
+  }).asInstanceOf[Fundef2R[R]]
   /** for rapid production of orI,xorI, andI I=SI/UI */
   def fundef2Imapp2[R <: I](op2: Fundef2R[B], s: String)(implicit m: repr[R]): Fundef2R[R] = {
     val (x, y) = (p[R]("x" + s), p[R]("y" + s));
@@ -119,15 +131,7 @@ object ASTBfun {
     case UI() => xorUI
   }).asInstanceOf[Fundef2R[R]]
 
-  private val andB: Fundef2R[B] = fundef2Bop2(And(_, _), "andb")
-  private val (andSI, andUI) = {
-    def andI[R <: I](implicit m: repr[R]) = fundef2Imapp2(andB, "andI"); (andI[SI], andI[UI])
-  }
-  def and[R <: Ring](implicit n: repr[R]): Fundef2R[R] = (n.name match {
-    case B() => andB
-    case SI() => andSI
-    case UI() => andUI
-  }).asInstanceOf[Fundef2R[R]]
+
 
   /** applies a logical and of a boolean on all the integer, preserve the argument's type: SI or UI */
 
@@ -316,6 +320,11 @@ object ASTBfun {
     val x = p[SI]("xsign");
     Fundef1("sign", Concat2[B, B, SI](new Call1[SI, B](neqSI, x) with ASTBt[B], Elt(-1, x)), x)
   } //TODO remplacer 2 par size.
+
+  val isneg: Fundef1[SI,B]={
+    val x = p[SI]("xxsign");
+    Fundef1("isneg",  Elt(-1, x), x)
+  }
 
   /** return the minimum of two signs, which is easier to compute than the minimum of two 2 bits integers, due to the fact that only three values are possible */
   val minSign: Fundef2R[SI] = {

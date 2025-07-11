@@ -18,7 +18,8 @@ class   Testlt() extends ConstLayer[V, B](1, "global")  with BranchNamed{
 
  // shoow(touchedByRandDir,)
  //shoow(sloplt,level,twoLt,dopp,se,grad3,grad6)
- bugif(twoLt&deefE) //marche
+bugif(twoLt&deefE) //marche
+ //bugif(deefE) //marche
  //val (lt,eq)= Grad.slopeLt(prioRand)
  show(prioRand,toto.eq,toto.lt,toto.gt);
 } //root classe compilable

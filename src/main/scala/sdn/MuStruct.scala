@@ -1,10 +1,10 @@
 package sdn
 
-import compiler.AST.{Layer,  delayed}
+import compiler.AST.{Layer, delayed}
 import compiler.ASTL.delayedL
 import compiler.SpatialType.BoolV
 import compiler.repr.{nomB, nomV}
-import compiler.{AST, ASTBt, ASTL, ASTLfun, ASTLt, B, CallProc, Circuit, Locus, Ring, V, repr}
+import compiler.{AST, ASTBt, ASTL, ASTLfun, ASTLt, B, CallProc, Circuit, Locus, Ring, SI, V, repr}
 import dataStruc.{BranchNamed, DagNode, Named}
 import dataStruc.DagNode.EmptyBag
 import sdn.Agent
@@ -36,20 +36,33 @@ trait carrySysInstr{
   /** this enalbes to deliver compute root, which is allways the first mustruc*/
   def  particle=allMuStruct.head
 }
-
 /** transform a layer into strate, to fit in the mustruct hierarchy */
 trait Stratify[L<:Locus,R<:Ring] extends ASTL.Strate[L,R] {
   self: Layer[(L, R)] =>
   val pred=this.asInstanceOf[ASTLt[L,R]]
+  //todo faire a l'envers: on defini munext, et on dit que next = delayed munext
   override val munext: ASTLt[L, R] =delayedL(this.next.asInstanceOf[ASTLt[L,R]])(self.mym) }
-/**
- un element du LDAG, sert a updater toutes les trucs dans l'ordre. */
+
+/** we add trait to layers so as to fit mustruct logic of using layers as strates, and to store system instructions  */
+abstract class LayerS[L<:Locus,R<:Ring](override val nbit: Int, override val init: String)(implicit m: repr[L],n:repr[R])
+  extends Layer[(L,R )](nbit,init)with Stratify[L,R] with ASTLt[L,R] with carrySysInstr ()
+
+/** si mixé avec, transforme une layer en mustruct */
+//trait LayerToStrate[L<:Locus,R<:Ring] extends  Stratify[L,R] with ASTLt[L,R] with carrySysInstr  { this: AST.Layer[(L,R)] =>}
+
+/** un element du LDAG, sert a updater toutes les trucs dans l'ordre,
+ * le path de nommage passe par les mustruct, et plus par les layers.
+ * pour cela on mix les trait branchname et name */
 abstract class MuStruct[L<:Locus,R<:Ring] extends  DagNode[MuStruct[_<:Locus,_<:Ring]] with Named with BranchNamed {
   //self: AST[(L,B)] =>
-  allMuStruct.append( this)//insert new created muStruct on  last position
+  allMuStruct.append( this) //insert new created muStruct on  last position
   /** support of agent */
 val muis: ASTL.Strate[L,R] with ASTLt[L,R] with carrySysInstr
   /** we add the possibility to display fields */
+  def bugif(v: AST[_]) = {
+    muis.syysInstr ::= CallProc("bug", List(), List(v))
+  }
+
   def shoow(v: AST[_]*) = {
     for (f <- v)
       muis.syysInstr ::= CallProc("show", List(), List(f))

@@ -30,6 +30,10 @@ object RedT {
                                                           (implicit m1: repr[S2], m2: repr[S1], m3: repr[S3], n: repr[R], p: repr[P], a: AntiClock[S1, S2, S3]): ASTLt[T[S1, S3], P] = {
     binop[T[S1, S3], R, R, P](op2, clock(arg), anticlock(arg))
   }
+  def cac2[S1 <: S, S2 <: S, S3 <: S, R <: Ring, P <: Ring](op2: Fundef2RP[R, P], arg: ASTLt[T[S1, S2], R], arg2: ASTLt[T[S1, S2], R])
+                                                          (implicit m1: repr[S2], m2: repr[S1], m3: repr[S3], n: repr[R], p: repr[P], a: AntiClock[S1, S2, S3]): ASTLt[T[S1, S3], P] = {
+    binop[T[S1, S3], R, R, P](op2, clock(arg), anticlock(arg2))
+  }
 
   /** memoizes all the already used Boolean reduction */
   private var redTmem: iTabSymb[Fundef1[(TT, Ring), (TT, Ring)]] = HashMap()
@@ -73,7 +77,8 @@ object RedT {
 
 
   /** enlarge around V, from Ve to Vf or vice versa */
-  def enlargeOld[S1 <: S, S2 <: S](arg: ASTLt[T[V, S1], B])(implicit m1: repr[S2], m2: repr[S1], a: AntiClock[V, S1, S2]): ASTLt[T[V, S2], B] = cacOld[V, S1, S2, B](orB, arg)
+  def enlargeOld[S1 <: S, S2 <: S](arg: ASTLt[T[V, S1], B])(implicit m1: repr[S2], m2: repr[S1], a: AntiClock[V, S1, S2]): ASTLt[T[V, S2], B] =
+    cacOld[V, S1, S2, B](orB, arg)
 
   val enlargeFEDef: Fundef1[(T[V, F], B), (T[V, E], B)] = {
     val arg = pL[T[V, F], B]("enlarge")

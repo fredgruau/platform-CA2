@@ -100,6 +100,8 @@ object ASTLfun {
 
   /** return true if arg1 is zero, */
   def eq0[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = unop(ASTBfun.eq, arg1);
+  /** return true if arg1 is zero, */
+  def isneg[L <: Locus](arg1: ASTLt[L, SI])(implicit m: repr[L], n: repr[SI]): ASTLt[L, B] = unop(ASTBfun.isneg, arg1);
 
 /** returns true if argument is not zero, it makes an or reduction on the bits. */
   def neq[L <: Locus, R <: I](arg1: ASTLt[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, B] = unop(ASTBfun.neq, arg1);

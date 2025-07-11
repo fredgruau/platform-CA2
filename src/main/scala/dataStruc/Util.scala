@@ -102,6 +102,12 @@ object Util {
       res}
     isTorusUp && isTorusDown && isTorusRight && isTorusLeft
   }
+  def printMat(lCA: Array[Array[Boolean]])={
+    for(l<-lCA){
+      println(l.toList)
+    }
+    println()
+  }
   def miror(lCA: Array[Array[Boolean]])={
     val nbligne= lCA.length; val nbCol=lCA(0).length
     def mirorUp={ lCA(0)=lCA(2).clone()}

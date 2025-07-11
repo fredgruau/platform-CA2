@@ -24,6 +24,8 @@ public abstract class PrShift {
     /** does a miror on all the bit plane, we plan to abandon passing the locus */
     public void mirror(int[][] h){for(int i=0; i<h.length; i++){mirror(h[i]);}   };
     /** does a miror on the border */
+
+
     public abstract void mirror(int[] h);
 
 
@@ -36,9 +38,6 @@ public abstract class PrShift {
     /** does a torus on the border */
     public abstract void torusify(int[] h);
     public void torusify(int[][] h) { for(int i=0; i<h.length; i++){torusify(h[i]);}  };
-
-
-
 }
 
 

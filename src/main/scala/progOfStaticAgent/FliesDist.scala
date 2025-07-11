@@ -2,29 +2,21 @@ package progOfStaticAgent
 
 import compiler.AST.Delayed
 import compiler.ASTBfun.andRedop
-import compiler.ASTLfun.reduce
+import compiler.ASTL.{delayedL, transfer}
+import compiler.ASTLfun.{f, reduce}
 import compiler.ASTLt.ConstLayer
-import compiler.SpatialType.BoolE
-import compiler.{B, E}
+import compiler.SpatialType.{BoolE, BoolF}
+import compiler.{ASTLt, B, E, F, V}
 import dataStruc.{BranchNamed, Named}
+import progOfmacros.Wrapper.exist
 import sdn._
-import sdntool.{DistT, Distmu}
+import sdntool.DistT
 import sdn.MuStruct.allMuStruct
 
-/**
- * contains just a flies plus a mustruct distance to it
+/**combines flies with the computation of distance, adds a constraints of slowliness
   */
 class FliesDist() extends LDAG with Named with BranchNamed
-{  val part=new Flies() with DistT;
-  //val d=new Distmu(part,3)
-  val s=compiler.ASTL.delayedL(part.d.muis.pred)
-  part.shoow(s,part.d.delta,part.d.gap, part.d.sloplt, part.d.level)
-
-
-   // on bosse sur le LDAG
-/*   val nongenerators=allMuStruct.map(_.inputNeighbors.toSet).reduce(_ union _)
-   val generators=allMuStruct -- nongenerators
-   print(generators)*/
-
-   //on peut construire le DAG si on veut.
+{ val part=new Flies() with DistT;
+  part.shoow(part.d.muis) //necessaire pour la reachabilité
+  part.showConstraint
 }

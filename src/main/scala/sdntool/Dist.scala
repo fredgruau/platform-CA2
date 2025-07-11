@@ -3,52 +3,39 @@ package sdntool
 
 import compiler.AST.{Layer, _}
 import compiler.SpatialType.{BoolVe, _}
-import compiler.ASTBfun.{addRedop, andRedop, minSignRedop, orRedop, p, redop, xorRedop}
+import compiler.ASTBfun.{addRedop, andRedop, isneg, minSignRedop, orRedop, p, redop, xorRedop}
 import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.ASTLt._
 import compiler.Circuit.hexagon
 import compiler.{ASTLt, _}
 import compiler.SpatialType._
-import dataStruc.BranchNamed
+import dataStruc.{BranchNamed, Named}
+import progOfmacros.Comm.neighborsSym
 import progOfmacros.Grad
-import progOfmacros.Wrapper.borderS
+import progOfmacros.Wrapper.{borderS, inside}
 import progOfmacros.RedT.cacOld
-import sdn.{BlobOld, MuStruct, Stratify, carrySysInstr}
+import sdn.{Blob, BlobOld, BlobVe, LayerS, MuStruct, One, Stratify, carrySysInstr}
 import sdn.Util.addBlobVe
 
-/** dist implemented as a mustruc in order to start having the LDAG */
-class Distmu(val source: MuStruct[V, B],val bitSize:Int) extends MuStruct [V,SI] {
-  override def inputNeighbors: List[MuStruct[_ <: Locus, _ <: Ring]] = List(source)
-  /** support of agent or mustruct */
-  override val muis= new Dist(source.muis,3) with Stratify[V,SI] with carrySysInstr {}
-/*  override val is = new AST.Layer[(V, SI)](bitSize,"0") with ASTLt[V, SI] with carrySysInstr{
-    override val next: AST[(V, SI)] = this + cond(source.is.next.asInstanceOf[BoolV], sign(opp), delta)
-  }
-  val opp: ASTLt[V, SI] = - is
-  val (sloplt: BoolVe, delta, level, gap) = Grad.slopDelta(is)
-  shoow(is,level,delta)*/
-}
 
 
 class MuDist(val source: MuStruct[V, B],val bitSize:Int)extends MuStruct [V,SI] {
   override def inputNeighbors: List[MuStruct[_ <: Locus, _ <: Ring]] = List(source)
-  override val muis: Strate[V, SI] with ASTLt[V, SI] with carrySysInstr with BranchNamed = new Layer[(V, SI)](bitSize, "0")
-    with Stratify[V,SI]
-    with ASTLt[V, SI]
-    with carrySysInstr
-    with BranchNamed {
-    override val next: AST[(V, SI)] =delayedL(this.pred + incr)(this.mym)
-  }
+  override val muis:LayerS[V, SI]  = new LayerS[V, SI](bitSize, "0")
+     { override val next: AST[(V, SI)] =delayedL(this.pred + incr)(this.mym) }
   val opp = - (muis.pred)
   val (sloplt: BoolVe, delta, level, gap) = Grad.slopDelta(muis.pred)
-  val incr = cond(source.muis.munext, sign(opp), delta)
+  val b: BlobVe = addBlobVe(sloplt)
+  val incr = cond(delayedL(source.muis.munext), sign(opp), delta)
   val vortex: BoolF = andR(transfer(cacOld(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
-
+  shoow(delta,gap, sloplt, level) // necessary so as to use all parameters returned by slopeDelta
+  shoow(vortex,b.meetV,b.meetE,b.meetE2,b.brdE,b.brdV,b.nbCc,b.emptyRhomb,b.twoAdjBlob,b.upwardSelle,b.downwardSelle)
+  val deefF=new ConstLayer[F, B](1, "def")
+  bugif(vortex)
 }
 
 /*
-
 class DistStrate(val source: AST.Strate[(V,B)]/*should be a strate here*/,val bitSize:Int)
   extends Layer[(V, SI)](bitSize, "0") with ASTLt[V, SI] with BranchNamed with carrySysInstr {
   val opp = -this
@@ -93,7 +80,7 @@ class Dist(val source: ASTL.Strate[V, B]/*should be a strate here*/,val bitSize:
   // which may be appropriate if we want ports all around the chip. If we want this last behavoir
   // we need to use OR2 instead of OR, where neutral will
   // true instead of false.
-  show(b.meetE, b.meetV)
+  show(b.meetE, b.meetE2, b.meetV)
   //the idea here is to compute all what is neccessary from the gradient, so that we do not need to store the gradient which would be heavey
   //val topoligne: BoolE = border(elt(2, this)); //allows to visualize the field by coloring edges instead of  vertices
   val vortex: BoolF = andR(transfer(cacOld(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
@@ -107,6 +94,14 @@ class Dist(val source: ASTL.Strate[V, B]/*should be a strate here*/,val bitSize:
 trait DistT {
   self: MuStruct[V, B] => //adds a distance to a LayerV todo, it should also limit its movement
   val d = new MuDist(self,3);
+  this match{
+    case ag: sdn.Agent[V]=>
+      val forbidden:BoolV= ASTLfun.isneg(d.muis.pred)
+      val  slow=new ag.CancelFlipIf(One(false),forbidden, ag.flipOfMove ) // agent should not invade cells where distance is negative
+      ag.constrain("slow",'w',slow)
+      val i=0
+    case _ =>
+  }
   //show(d); les show doivent etre fait dans le main
 }
 

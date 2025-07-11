@@ -5,11 +5,12 @@ import compiler.ASTL._
 import compiler.ASTLfun.orR
 import compiler.ASTLt.ConstLayer
 import compiler.SpatialType.BoolV
-import compiler.{AST, B, V}
+import compiler.{AST, ASTLt, B, Locus, Ring, V}
+import dataStruc.DagNode.EmptyBag
 import dataStruc.{BranchNamed, Named}
 import sdntool.DistT
 import progOfmacros.Wrapper.borderS
-import sdn.Stratify
+import sdn.{LDAG, MuStruct, Stratify, carrySysInstr}
 import sdn.Util.{addBlobE, safeGrow}
 
 import java.util
@@ -24,11 +25,12 @@ class   Testdistt() extends ConstLayer[V, B](1, "global") with BranchNamed  with
 } //root classe compilable
 
 /** same, but avoioding the wrapping of a constlayer */
-/*
-class   Testdist() extends ConstLayer[V, B](1, "global")
-  with Stratify[V,B] with BranchNamed with Named with DistT {
-  show(d,this)
-} //root classe compilable
+class Testdist() extends LDAG with Named with BranchNamed {
+  val constPart = new MuStruct[V, B] with EmptyBag[MuStruct[_ <: Locus, _ <: Ring]] with BranchNamed with DistT {
+    /** support of agent */
+    override val muis = new ConstLayer[V, B](1, "global") with Stratify[V, B] with ASTLt[V, B] with carrySysInstr
+    shoow(muis,d.muis)
+  } //root classe compilable
 
-*/
+}
 

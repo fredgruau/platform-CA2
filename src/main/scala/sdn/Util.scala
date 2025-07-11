@@ -157,7 +157,7 @@ object Util {
   }
   /** we directly reuse Delayed creation, in order to be able to add  blob related computation on a BoolVe,
    * this naming will automatically define meetV,meetE, BrdV, BrdE*/
-  def addBlobVe(_arg: => BoolVe):Blob = {// with Compar with ComparApex with Compar3
+  def addBlobVe(_arg: => BoolVe):BlobVe = {// with Compar with ComparApex with Compar3
     lazy val delayed = _arg;
     new AST.Delayed[(T[V,E], B)](() => delayed) with BoolVe with BlobVe with Named with BranchNamed {override val brdVe: BoolVe = delayed}
   }

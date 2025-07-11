@@ -32,6 +32,8 @@ class Voroonoi(val center: Vector2D) {
       if ((int32Code & 1) == 1) addText(s)
       int32Code=int32Code>>>1
     }
+   if(int32Code !=0)
+     print(22)
    assert(int32Code==0) //on devrait avoir utilisé tout les bits.
    }
   /** remet a zero pour pouvoir ensuite accumuler */

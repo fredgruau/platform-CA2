@@ -42,7 +42,7 @@ self: MovableAgentV => //a quasi point  is a movableAgentV
   //val touchedByRandDir: BoolV = exist(neighborsSym(effRandDir))
 
   /** will choose neighbor with smallest flip priority  */
-  val  sexKeepFlipIf=new Constr(Array(this), null,flipOfMove)with Named with BranchNamed {
+  val  sexKeepFlipIf=new Constr(Array(this), null, flipOfMove) with Named with BranchNamed {
     //val whereto:BoolVe= ~ e(singleton) |choose
     val whereto:BoolVe= imply(e(singleton),choose)
     /** where = places where flips is still valid after the constraint newFlip<-olcFlip&where

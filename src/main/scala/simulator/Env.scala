@@ -12,8 +12,8 @@ import scala.collection.JavaConverters._
 import java.awt.Color
 import java.lang.Thread.sleep
 import scala.collection.convert.ImplicitConversions.`map AsScala`
-import scala.collection.immutable.HashMap
-import scala.collection.mutable
+import scala.collection.immutable.{HashMap, HashSet}
+import scala.collection.{immutable, mutable}
 import scala.swing._
 import scala.util.Random
 
@@ -67,7 +67,9 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
       else initNameFinal
       val initMethod: Init = medium.initSelect(finalInitMethodName,
         controller.locusOfDisplayedOrDirectInitField(layerName), // locus is passed. It is used in def/center/yaxis
-        controller.bitSizeDisplayedOrDirectInitField.getOrElse(layerName, 1)) // bitsize  is passed.
+        controller.bitSizeDisplayedOrDirectInitField.getOrElse(layerName, 1),
+        controller.density
+      ) // bitsize  is passed.
       initMethod.init(memFields2Init.toArray)
 
     }
@@ -164,6 +166,7 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
 
   /** iterate through all the layers to be displayed */
   private def computeVoronoirColors(): Unit = {
+
     medium.resetColorTextVoronoi(controller.displayedLocus) //hyper important, poil au dents
     for ((layerName, color) <- controller.colorDisplayedField) { //process fiedls to be displayed, one by one
       val locus: Locus = controller.locusOfDisplayedOrDirectInitField(layerName)
@@ -214,12 +217,23 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
 
 
   var bugs: mutable.Buffer[String] = mutable.Buffer.empty
-
+  /** contains locus of bug */
+  var lociBug:Set[Locus]=immutable.HashSet()
   /** does one CA iteration on the memory */
   def forward(): Unit = {
     //  controller.progCA.anchorFieldInMem(mem) //todo a refaire seulement si meme change (quand on display ou qu'on display plus)
     bugs = controller.progCA.theLoops(medium.propagate4Shift, mem).asScala //we retrieve wether there was a bug
     t += 1
+    if (bugs.nonEmpty) {  //we set the locus of bugs
+      for(bugName<-bugs) {
+       val  locusBug=controller.progCA.fieldLocus.asScala(bugName)
+       lociBug=lociBug+locusBug // pas sur qu'on doive pas plutot stoquer cela dans env
+        val BugFieldName = "llbug"+locusBug.toString.dropRight(2)
+        controller.colorDisplayedField+=(BugFieldName->Color.white)
+              }
+      controller.checkNewLocus(lociBug) //marche meme si y a plusieurs bug différent détecté en meme temps.
+      val i=0
+    }
     iterationLabel.text="" + t
     cache.push(deepCopyArray( mem))
   }

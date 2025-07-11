@@ -21,7 +21,18 @@ object Topo {
     val nbChanges: UintV = sum3V(n0 | n1, n2 | n3, n4 | n5)
     Fundef1("topo.nbcc", nbChanges, ve)
   }
- 
+
+  val nbccVeDef: Fundef1[(T[V, E], B), (V, UI)] = {
+    val ve = pL[T[V, E], B]("ringAroundV")
+    val vf: BoolVf = cac(ASTBfun.delta, ve)
+    val asInt: UintV = concatR(vf)
+    asInt.setName("asInt");
+    val (n0, n1, n2, n3, n4, n5) = (elt(0, asInt), elt(1, asInt), elt(2, asInt), elt(3, asInt), elt(4, asInt), elt(5, asInt))
+    val nbChanges: UintV = sum3V(n0 | n1, n2 | n3, n4 | n5)
+    Fundef1("topo.nbccVe", nbChanges, ve)
+  }
+
+
   /** wrapper to  Call nbcc */
   def nbcc(b: BoolVe): UintV = new Call1[(T[V, E], B), (V, UI)](nbccDef, b) with UintV
 
@@ -34,11 +45,12 @@ object Topo {
     asInt.setName("asInt");
     val (n0, n1, n2, n3, n4, n5) = (elt(0, asInt), elt(1, asInt), elt(2, asInt), elt(3, asInt), elt(4, asInt), elt(5, asInt))
     val nbChanges: UintV = sum3V(n0 | n1, n2 | n3, n4 | n5)
-    Fundef1("topo.nbcc", nbChanges, border)
+    Fundef1("topo.nbccV", nbChanges, border)
   }
 
   /** wrapper to  Call nbccVdef */
   def nbccV(b: BoolE): UintV = new Call1[(E, B), (V, UI)](nbccVDef, b) with UintV
+  def nbccVe(b: BoolVe): UintV = new Call1[(T[V, E], B), (V, UI)](nbccVeDef, b) with UintV
 
 
   /** macro used specifically to compute the blob predicate */

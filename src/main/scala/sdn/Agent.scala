@@ -1,6 +1,6 @@
 package sdn
 
-import compiler.ASTB.Uint
+import compiler.ASTB.{False, Uint}
 import compiler.ASTBfun.{addRedop, orRedop, redop}
 import compiler.ASTL.{delayedL, send, transfer}
 import compiler.ASTLfun.{allOne, b2SIL, eq0, f, imply, ltSI, reduce, uI2SIL, v}
@@ -38,6 +38,8 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
 
 /** the agent's list of consrtrain. Constraints have a name, and the list is also ordered */
    val constrs= new scala.collection.mutable.LinkedHashMap[String,Constr]()
+   def codeConstraint: Iterable[String] =constrs.keys.toList.map(_.charAt(0).toString)
+   def showConstraint={ shoowText(allFlipCancel,codeConstraint.toList)}
 
    /**
     *
@@ -73,8 +75,9 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
      }
      delayedL( allFlipCancel(flipOfMove))
    }
-
-     val flipAfterLocalConstr=eq0(allFlipCancel) & flipOfMove
+   // val f:BoolV=False()
+     val noFlipCancel=eq0(allFlipCancel)
+     val flipAfterLocalConstr: BoolV = noFlipCancel  & flipOfMove
      //delayedL( flipLocallyConstrained(flipOfMove))}
 
 

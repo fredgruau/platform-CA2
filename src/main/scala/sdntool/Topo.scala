@@ -14,12 +14,13 @@ import compiler.Circuit.hexagon
 import compiler._
 import compiler.ASTLt.ConstLayer
 import dataStruc.{BranchNamed, Named}
+import progOfmacros.Comm.apexE
 import sdn.MovableAgentV
 import progOfmacros.Topo
 import progOfmacros.Compute._
-import progOfmacros.Wrapper.{borderS, exist, existS, insideS}
-import progOfmacros.RedT.{enlargeEF, enlargeFE, enlargeOld}
-import progOfmacros.Topo.{brdin, nbcc, nbccV}
+import progOfmacros.Wrapper.{borderS, exist, existS, inside, insideS, shrink}
+import progOfmacros.RedT.{cac, cac2, enlargeEF, enlargeFE, enlargeOld}
+import progOfmacros.Topo.{brdin, nbcc, nbccV, nbccVe}
 
 
 /** mixing declaring  brdE so that we can compute brdV just by adding another mixin */
@@ -54,6 +55,10 @@ trait Blob {
   val brdV: BoolV
   val meetV: BoolV
   val meetE: BoolE
+  val nbCc:UintV
+   val emptyRhomb:BoolE
+  val twoAdjBlob:BoolE
+  val meetE2:BoolV=existS(delayedL(meetE))
 }
 
 trait  BlobConstrain extends Blob  {
@@ -72,10 +77,10 @@ trait  BlobConstrain extends Blob  {
 trait BlobVouE extends HasBrdE with BorderV with Blob{
   self:HasBrdE =>
   val nbCc: UintV = nbccV(lateBrdE)  //first use of brdE
-  val meetV: BoolV = nbCc > 1 //this makes an implicit conversion of nbCh from unsigned int to signed int. shoudl take into acount only nbch$1
+  val meetV: BoolV = nbCc > 1 //this makes an implicit conversion of nbCh from unsigned int to signed int. shoudl take into acount only nbch$
   val twoAdjBlob: BoolE = insideS[V, E](brdV) //third use of brdE, check that there is two adjacent blobs next to the empty rhombus
-  val nonEmptyRhomb: BoolE = rhombusExist(lateBrdE) // true if center of a NON-totally empty rhombus
-  val meetE: BoolE =  ~nonEmptyRhomb & twoAdjBlob //two conditions that needs to be met, for meeting edges: empty rhombus and two adjacent blobs.
+  val emptyRhomb: BoolE = ~rhombusExist(lateBrdE) // true if center of a NON-totally empty rhombus
+  val meetE: BoolE =  emptyRhomb & twoAdjBlob //two conditions that needs to be met, for meeting edges: empty rhombus and two adjacent blobs.
 }
 
 /** endows  a plain BoolV with  its  meeting points. */
@@ -85,15 +90,23 @@ trait BlobV extends BorderEofV  with BlobVouE {  self: BoolV => }
 /** endows  a  BoolE with  its  meeting points. computes first a borderV */
 trait BlobE extends HasBrdE with BlobVouE
 
-/** endows  a  BoolVe with  its  meeting points. using mixin,  computes first a borderE, and then a borderV*/
-trait BlobVe extends HasBrdVe with BorderEofVe with BorderV with Blob {
-  val nbCc: UintV = nbcc(lateBrdVe) //nbcc 's computation is refined compared to BlobV, and BlobE
+/** endows  a  BoolVe COMMING AS THE SLOPELT OF  A DISTANCE with  its  meeting points. using mixin,  computes first a borderE, and then a borderV */
+trait BlobVe extends HasBrdVe with BorderEofVe with BorderV with Blob with Named with BranchNamed {
+  val nbCc: UintV = nbccVe(lateBrdVe) //nbcc 's computation is refined compared to BlobV, and BlobE
   val meetV: BoolV = nbCc > 1 //makes an implicit conversion of nbCh from unsigned int to signed int. shoudl take into acount only nbch$1
-  val twoAdjBlob: BoolE = insideS[V, E](brdV) //third use of brdE, check that there is two adjacent blobs next to the empty rhombus
-  val nonEmptyRhomb: BoolE = rhombusExist(brdE) // true if center of a NON-totally empty rhombus
+  val upwardSelle:BoolE =inside(apexE(shrink(lateBrdVe))) //les deux vertex lointaint du losange sont strictement plus loin
+  val downwardSelle:BoolE= ~brdE //les deux vertex proches du losange sont a la meme distance
+  val twoAdjBlob: BoolE = insideS[V, E](brdV) //not used here
+   val emptyRhomb:BoolE= ~rhombusExist(lateBrdE) //il y a un gros plateau de distance sur tout le rhombus
+  val meetE=upwardSelle&downwardSelle | emptyRhomb
+
+
+//  val nonEmptyRhombOld: BoolE = rhombusExist(brdE) // true if center of a NON-totally empty rhombus
   /** this is also refined in comparison to BoolV, and BoolE, so as to be able to detect edge gabriel centers, which can also defined as meeting poins */
-  val nonEmptyRhomb2: BoolE = orR(transfer(enlargeFE(enlargeEF(lateBrdVe)))) //todo utiliser redT avec un wrapper a la place de enlargeFE, pour faire ca faut utiliser BlobVe POUR DE VRAI
-  val meetE: BoolE = ~nonEmptyRhomb2 & twoAdjBlob //two conditions that needs to be met, for edge meeting points
+  //val emptyRhombPrev: BoolE = ~orR(transfer(enlargeFE(enlargeEF(lateBrdVe)))) //todo utiliser redT avec un wrapper a la place de enlargeFE, pour faire ca faut utiliser BlobVe POUR DE VRAI
+
+
+ // val meetE: BoolE = emptyRhomb & twoAdjBlob //two conditions that needs to be met, for edge meeting points
   /*val nbCc: UintV = nbccV(lateBrdE)  //first use of brdE, we use delayedL because upon creation, brdE is not yet available
   val meetV: BoolV = nbCc > 1 //this makes an implicit conversion of nbCh from unsigned int to signed int. shoudl take into acount only nbch$1
   val twoAdjBlob: BoolE = insideS[V, E](brdV) //third use of brdE, check that there is two adjacent blobs next to the empty rhombus

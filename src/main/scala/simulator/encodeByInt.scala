@@ -69,7 +69,7 @@ trait encodeGt extends encodeByInt {
     def mirror(mem: Array[Int]): Unit =
       {
         mirrorCopyFast(mem)
-       // assert(isMirrorSafe(mem))
+       // assert(isMirrorSafe(mem)) //la verif coute cher en temps, on la remet en cas de pb
       }
 
     /** do the copying part of mirroring in a safe but time expensive way. Used for punctual testing in case of problem */
@@ -243,13 +243,15 @@ trait encodeLt extends encodeByInt {
 
       mem(first - 1) = mem(last) >>> (nbCol + 2) //we start by computing  the very first integer t[first-1]
       mem(last + 1) = mem(first) << (nbCol + 2) //and then the very last integer t[last+1]
+
        for (i <- first - 1 to last + 1)   mem(i) = propagateBitxand1(mem(i), nbCol, maskS) //avant on faisait pas le propagate sur la derniere ligne
     }
     override def isMirrorSafe(h: Array[Int]): Boolean = encodeLt.super.isMirorSafe(h)
-    override def mirror(mem: Array[Int]): Unit =
+    override def mirror(mem: Array[Int]): Unit = {
+      val matBool=Array.ofDim[Boolean](nbLine,nbCol)
         mirrorifyFast(mem)
-    //else    throw new Exception("miror on non V")
-
+     //if (! isMirrorSafe(mem))   throw new Exception("miror not working") //la verif coute cher en temps, on la remet en cas de pb
+  }
         override def torusify(mem: Array[Int]): Unit =  torusifyFast(mem)
     //else    throw new Exception("miror on non V")
 
@@ -258,7 +260,7 @@ trait encodeLt extends encodeByInt {
 
     //else   throw new Exception("miror on non V")
  /** do the copying part of mirroring in a simpe and safe but time expensive way*/
-    def mirrorSafe(mem: Array[Int]) = {
+    def mirrorifySafe(mem: Array[Int]) = {
       val matBool=Array.ofDim[Boolean](nbLine,nbCol)
       decode(mem,matBool)
       miror(matBool)
@@ -290,7 +292,7 @@ trait encodeLt extends encodeByInt {
     def mirrorifyFast(mem: Array[Int]) = {
       //mirror to top line
       val bout = 32 % (nbCol + 2)
-      val maskFirst = maskCompact(nbCol) >> bout //cover the first line. we pass over the first two bits, for nbCol+2=10
+      val maskFirst = maskCompact(nbCol) >>> bout //cover the first line. we pass over the first two bits, for nbCol+2=10
       val line2 = if (nbInt32 > 2) mem(4) else mem(first) << nbCol + 2 //faut aussi rotationner les bits eux meme
       val line2Trunc = line2 & maskFirst
       val line2rotated = (line2Trunc >>> 1 | (line2Trunc << (nbCol - 1))) & maskFirst
