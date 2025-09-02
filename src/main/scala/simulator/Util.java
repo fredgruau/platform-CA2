@@ -7,6 +7,9 @@ import scala.collection.immutable.List$;
 import java.util.ArrayList;
 import java.util.HashSet;
 
+
+import static java.lang.Integer.toBinaryString;
+
 /**
  * static methods of general utility plus
  * also static variablle such as defVE which are allways used, and allways the same
@@ -14,7 +17,18 @@ import java.util.HashSet;
 public class Util {
 
 
+    public static int mask1_30=~((1 << 31)|1);
+    public static String  myBin(int v){
+        return(String.format("%32s", Integer.toBinaryString(v)).replace(' ', '0'));
 
+    }
+
+    public static void printMat(int[] mat) {
+        for (int i = 0; i < mat.length; i++) {
+             if(mat[i]!=0)
+                System.out.println(i+"  "+myBin(mat[i]));
+        }
+    }
     /**
      * @param shouldBeZero should allways be false
      * @param bugV         accumulates vertic bug
@@ -25,12 +39,18 @@ public class Util {
      */
     public static void bug(int[] shouldBeZero, int[] bugV, String bugName, ArrayList<String> bugs) {
         boolean bug = false;
-        for (int i = 1; i < shouldBeZero.length-1; i++) {//on zappe les deux premieres et la derniére ligne,elle sont des copies
-            bug = bug || shouldBeZero[i] != 0;
+        for (int i = 2; i < shouldBeZero.length-2; i++) {//on zappe les deux premieres et la derniére ligne,elle sont des copies
+            bug = bug || (shouldBeZero[i] )!= 0;
             bugV[i] |= shouldBeZero[i];
         }
-        if (bug) bugs.add(bugName);
+
+        if (bug){
+            bugs.add(bugName);
+            printMat(shouldBeZero);
+        }
+
     }
+
 
     /**
      * @param shouldbeZero    2D arrays, should allways be false, otherwise there is a bug

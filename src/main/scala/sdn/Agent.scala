@@ -31,9 +31,9 @@ case class One(noFill: Boolean) extends Impact //on veut pouvoir calculer le com
 abstract class Agent[L <: Locus] extends MuStruct[L, B]
  {
 
-   /** break symetry in case of tournament with equal priority */
+   /** random integer used for breaking  symetry in case of tournament with equal priority */
   val prioRand:UintVx
-   /** used for mutex tournament */
+   /** used for mutex touernament, includes priorand */
  val prio:UintVx
 
 /** the agent's list of consrtrain. Constraints have a name, and the list is also ordered */
@@ -79,8 +79,6 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
      val noFlipCancel=eq0(allFlipCancel)
      val flipAfterLocalConstr: BoolV = noFlipCancel  & flipOfMove
      //delayedL( flipLocallyConstrained(flipOfMove))}
-
-
 
 
   /** moves are stored in centered form, so that we can restrict them */

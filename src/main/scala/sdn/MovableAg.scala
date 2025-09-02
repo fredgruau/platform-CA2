@@ -69,7 +69,7 @@ abstract class BoundAg[L <: Locus](implicit m: repr[L]) extends  Agent[L]{
 abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] with vef[L]
   with EmptyBag[sdn.MuStruct[_<: Locus,_<:Ring]]  {
   override val prioRand= addLt(randUintV(3)).asInstanceOf[UintVx] //si on met pas asInstance il gueule non compatibilité de override entre addLt e UintVx
-  /** for the moment, priority is pure random.  formulation  casse gueule, car une variable a deux noms de reflection possible: prio et prioRand*/
+  /** for the moprioment, priority is pure random.  formulation  casse gueule, car une variable a deux noms de reflection possible: prio et prioRand*/
   override val prio =prioRand //pour le moment on n'a pas encore plusieurs move possible, dans pas longtemps on va programmer prio et initalflip
 
   //method that depends on the spatial type of the support:

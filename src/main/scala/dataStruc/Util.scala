@@ -16,6 +16,7 @@ import compiler.Locus.allLocus
 import compiler.{T, _}
 import dataStruc.Util.{CustomClassLoader, customClassLoader, loadClassAndInstantiate, sameElements}
 import simulator.CAloops2
+import simulator.Util.myBin
 import triangulation.{DelaunayTriangulator, NotEnoughPointsException, Triangle2D, Vector2D, Voroonoi}
 
 import java.util
@@ -45,6 +46,12 @@ import java.net.URLClassLoader
 object Util {
   import scala.reflect.ClassTag
 
+  def printMatScala(mat: Array[Int]): Unit = {
+    for (i <- 0 until mat.length) {
+       System.out.println(i + "  " + myBin(mat(i)))
+    }
+  }
+
   def findDuplicates[T](list: List[T]): List[T] = {
     list.groupBy(identity)
       .collect { case (elem, occ) if occ.size > 1 => elem }
@@ -66,6 +73,12 @@ object Util {
     val r: Random.type = scala.util.Random
     for (i <- 0 until lCAinput.size)
       lCAinput(i) = rand.nextBoolean()
+  }
+  def allFill(lCAinput: Array[Array[Boolean]]): Unit = {
+
+    for (i <- 0 until lCAinput.size)
+      for (j <- 0 until lCAinput(0).size)
+      lCAinput(i)(j) = true
   }
   val rand=new Random(0)
   def randomFill(lCAinput: Array[Array[Boolean]]): Unit = {

@@ -46,6 +46,10 @@ trait HasBrdVe{ val brdVe: BoolVe
 
 /** mixin adding a brdE to a BrdVe */
 trait BorderEofVe extends HasBrdVe with HasBrdE {
+  //when computing brdE, we need it to be either true or false on the border
+  // we can decide to set it to true only if there is a blob, or allways, in which case there will be a center all around the chip,
+  // which may be appropriate if we want ports all around the chip. If we want this last behavoir
+  // we need to use OR2 instead of OR, where neutral will true instead of false.
   val brdE: BoolE = exist(transfer(lateBrdVe))
 }
 
@@ -58,7 +62,7 @@ trait Blob {
   val nbCc:UintV
    val emptyRhomb:BoolE
   val twoAdjBlob:BoolE
-  val meetE2:BoolV=existS(delayedL(meetE))
+  val meetE2:BoolV=existS(delayedL(meetE)) //we compute a boolV for ease of display
 }
 
 trait  BlobConstrain extends Blob  {

@@ -85,7 +85,7 @@ val muis: ASTL.Strate[L,R] with ASTLt[L,R] with carrySysInstr
 
 }
 
-
+trait muEmptyBag extends EmptyBag[MuStruct[_ <: Locus, _ <: Ring]]
 /** Bound agent need not layers */
 //abstract class BoundAg[L<:Locus] extends Agent[L]
 /** movable agent stores their chi in a layer, in order to be able to modify it. */

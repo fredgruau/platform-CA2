@@ -4,10 +4,12 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 import simulator.Medium.christal
 import TestEncodeDecode._
 import compiler.Locus.locusV
+import compiler.rotateLeft
 import dataStruc.Util
-import dataStruc.Util.{deepCopyArray, isEqualto, isMiror, list, miror, printMat, randomFill}
+import dataStruc.Util.{allFill, deepCopyArray, isEqualto, isMiror, list, miror, printMat, printMatScala, randomFill}
 import triangulation.Utility._
 
+import scala.math.min
 import scala.util.Random
 
 
@@ -101,16 +103,30 @@ class TestMiror extends FunSuite with BeforeAndAfter {
     m.decode(lCAmem, lCAoutput)
     assert(isMiror(lCAoutput))
   }
-
+  def encode2(memCAbool: Array[Array[Boolean]], memCAint32: Array[Int]): Unit = {
+    //symetric case: we need several ints, in order to store one line of the CA
+    val nbCol=90
+    val nbIntPerLine=3
+    val nbLine=12
+    for (i <- 0 until 12) { //we process line i whose length is nbColCA
+      /** how much do we need to rotate right */
+      val shift = (i / 2) % nbCol
+      lineToInts(rotateLeft(memCAbool(i), shift), memCAint32, i * nbIntPerLine, min((i + 1) * nbIntPerLine, nbCol), nbIntPerLine, nbLine) //rotation is done on the whole CA lines.
+    }
+    //interleaveSpace(memCAint32, nbIntPerLine, nbLine)
+  }
   test("largeMiror") {
     val m = christal(12, 90, 300)
     val lCAinput = Array.ofDim[Boolean](12, 90)
-
     val lCAoutput = Array.ofDim[Boolean](12, 90)
     val lCAmem = Array.ofDim[Int](48)
     for(i:Int<-0 to 100) {
-      randomFill(lCAinput);
-      m.encode(lCAinput, lCAmem)
+      allFill(lCAinput);
+      encode2(lCAinput, lCAmem)
+     // printMatScala(lCAmem)
+      interleaveSpace(lCAmem, 3, 12)
+      println
+      printMatScala(lCAmem)
      // randomFill(lCAmem)
       m.propagate4Shift.prepareBit(lCAmem)
       // m.propagate4Shift.mirror(lCAmem)

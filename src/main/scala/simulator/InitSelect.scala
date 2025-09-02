@@ -33,7 +33,8 @@ trait InitSelect {
       case "0" => zeroInit
       case "true" => unInit
       case "center" => centerInit
-      case "points" => pointsInit(density)
+      case "points" =>
+        pointsInit(density)
       case "debug" => zeroInit
       case "sparse" => sparseInitInside(l, nbit)
       case "randinside" => randInitInside(l, nbit)
@@ -75,7 +76,8 @@ trait InitSelect {
   private lazy val xaxisInit: InitMaald = new InitMaald(1) {
     for (j <- 0 until nbCol) setBoolVField(0, j)
   }
-  private lazy val zeroInit: InitMaald = new InitMaald(1) {} //nothing to do, the boolV field would be zero by default.
+  private lazy val
+  zeroInit: InitMaald = new InitMaald(1) {} //nothing to do, the boolV field would be zero by default.
   private lazy val unInit: InitMaald = new InitMaald(1) {
     for (i <- 2 until nbLine - 2) {
       val (j0, j1) = if (i % 2 == 0) (2, nbCol - 1) else (1, nbCol - 2)
@@ -231,10 +233,15 @@ trait InitSelect {
     setBoolVField(center)
   }
   private def pointsInit(density:Int): InitMaald = new InitMaald(1) {
-
-    //print("tototototo"+)
-    setBoolVField(center.add(new Vector2D(0, -3)))
-    setBoolVField(center.add(new Vector2D(density%2, density/2)))
-   // if(density>2)    setBoolVField(center)
+    val upperleft=new Vector2D(3, 3)
+    val deltaY=3//nbCol/3 -4
+    val deltaX=3// nbLine/3 -4
+    var k=0
+    for(i<-0 until 3)
+      for(j<-0 until 3) {
+        if (k <= density && 3+i * deltaX< nbLine && 3+j * deltaY<nbCol)
+          setBoolVField(upperleft.add(new Vector2D(i * deltaX, j * deltaY)))
+        k=k+1
+      }
   }
 }

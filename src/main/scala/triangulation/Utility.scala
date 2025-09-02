@@ -191,9 +191,12 @@ object Utility {
       t(i + j) = t(i1 + j)
 
   /** in a second step, we create  space between block so has to be able to shift only with << or >> */
-  def interleaveSpace(memCAint32: Array[Int], nbBlock: Int, blockSize: Int) =
+  def interleaveSpace(memCAint32: Array[Int], nbBlock: Int, blockSize: Int) = {
     for (i <- (0 until nbBlock).reverse)
       move(memCAint32, i * blockSize, 2 + i * (blockSize + 1), blockSize)
+    for (i <- (0 until nbBlock).reverse) //we explicitely enter zero in the spaces, otherwise it would trigger bug
+      memCAint32(2 + i * (blockSize + 1) -1)=0
+  }
 
   def unInterleaveSpace(memCAint32: Array[Int], nbBlock: Int, blockSize: Int) =
     for (i <- (0 until nbBlock))

@@ -3,7 +3,7 @@ package simulator
 import compiler.ASTB.False
 import compiler.Locus.locusV
 import compiler.{Locus, V}
-import dataStruc.Util.{deepCopyArray, isEqualto, isMiror}
+import dataStruc.Util.{deepCopyArray, isEqualto, isMiror, printMat}
 import simulator.Medium.christal
 import simulator.Util.copyBasic
 import triangulation.Utility.halve
@@ -82,12 +82,16 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
         val p = medium.propagate4Shift
 
         val locus = controller.locusOfDisplayedOrDirectInitField(layerName)
-        if(locus == compiler.Locus.locusV)
+        if(locus == compiler.Locus.locusV && ! layerName.startsWith("lldef")) //lldef are used to detect bugs, therefore they should not undergo preparebits.
         {
            p.mirror(memoryPlane)
            p.prepareBit(memoryPlane)}
           //miror comes before preparebit
-
+       /* if(locus == compiler.Locus.locusV && layerName.startsWith("lldef")){
+          val matBool = Array.ofDim[Boolean](nbLine, nbCol)
+          medium.decode(memoryPlane, matBool)
+          printMat(matBool)
+        }*/
         val testMiror = false //to be set to true if you want to test miror
         if (locus == locusV && testMiror) {
           val matBool = Array.ofDim[Boolean](nbLine, nbCol)
