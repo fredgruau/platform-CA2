@@ -15,7 +15,8 @@ import progOfmacros.Comm.neighborsSym
 import progOfmacros.Grad
 import progOfmacros.Wrapper.{borderS, inside, neqUI2L}
 import progOfmacros.RedT.cacOld
-import sdn.{Blob, BlobOld, BlobVe, LayerS, MuStruct, One, Stratify, carrySysInstr}
+import sdn.Force.TOTAL_PRIO
+import sdn.{Blob, BlobOld, BlobVe, Force, LayerS, MovableAgentV, MoveC, MoveC1, MuStruct, One, Stratify, carrySysInstr}
 import sdn.Util.addBlobVe
 
 /**
@@ -46,6 +47,7 @@ class MuDist(val source: MuStruct[V, B],val bitSize:Int)extends MuStruct [V,SI] 
   }
    shoow(delta,gap, sloplt, level) // necessary so as to use all parameters returned by slopeDelta
   shoow(vortex)
+
  // val deefF=new ConstLayer[F, B](1, "def")
 }
 
@@ -64,6 +66,11 @@ class MuDistGcenter(val gc:gCenter) extends MuStruct [V,SI]{
   bugif(vortex) //todo, mettre aussi un bug si y a un écart  sur la source plus grand K en valeur absolue, K reste a déterminer
   shoow(delta,gap, sloplt, level,gcenterEorV) // necessary so as to use all parameters returned by slopeDelta
   shoow(vortex)
+  val repulse:Force=new Force(){
+    val prio=TOTAL_PRIO-1
+    override def actionV(ag: MovableAgentV): MoveC = MoveC1(ag.isV,
+      neighborsSym(sloplt) & ag.brdVe)//extends towards increasing value of distances and empties everywhere possible.
+  }
   // val deefF=new ConstLayer[F, B](1, "def")
 }
 

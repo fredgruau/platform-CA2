@@ -4,9 +4,11 @@ import ASTB.toBinary
 import ASTB._
 import ASTBfun._
 import Circuit.{TabSymb, iTabSymb}
+import compiler.repr.nomUI  //leve un ambiguité sur concat
 import org.scalatest.FunSuite
 
-import scala.collection.immutable.HashMap
+import scala.Predef._
+import scala.collection.immutable.{HashMap, List}
 
 /** Test the correct implementation of integer operation, by evaluating them on samll integers */
 class ASTBfunTest extends FunSuite {
@@ -59,15 +61,23 @@ class ASTBfunTest extends FunSuite {
 
   import AST._
 
-  private def eval(exp: AST[_], env: HashMap[Param[_], List[Boolean]]): List[Boolean] = exp match {
+  /**
+   *
+   * @param exp integer expression to test
+   * @param env environement  storing intermediate results
+   * @return evaluation of the expression
+   */
+  private def eval(exp: AST[_], env: HashMap[String, List[Boolean]]): List[Boolean] = exp match {
+    case Read(name) => env(name)
     case Call1(op, x) =>
-      eval(op.arg, env + (op.p1 -> eval(x, env)))
+      eval(op.arg, env + (op.p1.nameP -> eval(x, env)))
     case Call2(op, x, y) =>
-      eval(op.arg, env + (op.p1 -> eval(x, env)) + (op.p2 -> eval(y, env)))
-    case Call3(op, x, y, z) => eval(op.arg, env + (op.p1 -> eval(x, env)) + (op.p2 -> eval(y, env)) + (op.p3 -> eval(z, env)))
-    case u@Param(_) => env(u)
-    case Mapp1(op, x) => eval(x.head, env).map(x1 => eval(op.arg, env + (op.p1 -> List(x1))).head)
-    case Mapp2(x, y, op) => (eval(x, env), eval(y, env)).zipped.map((x1, y1) => eval(op.arg, env + (op.p1 -> List(x1)) + (op.p2 -> List(y1))).head)
+      eval(op.arg, env + (op.p1.nameP -> eval(x, env)) + (op.p2.nameP -> eval(y, env)))
+    case Call3(op, x, y, z) => eval(op.arg, env + (op.p1.nameP -> eval(x, env)) + (op.p2.nameP -> eval(y, env)) + (op.p3.nameP -> eval(z, env)))
+    case u@Param(_) => env(u.nameP)
+    //case u@Read(_) => env(u)
+    case Mapp1(op, x) => eval(x.head, env).map(x1 => eval(op.arg, env + (op.p1.nameP -> List(x1))).head)
+    case Mapp2(x, y, op) => (eval(x, env), eval(y, env)).zipped.map((x1, y1) => eval(op.arg, env + (op.p1.nameP -> List(x1)) + (op.p2.nameP -> List(y1))).head)
     case Or(x, y) => List(eval(x, env).head | eval(y, env).head)
     case And(x, y) => List(eval(x, env).head & eval(y, env).head)
     case Xor(x, y) => List(eval(x, env).head ^ eval(y, env).head)
@@ -84,7 +94,7 @@ class ASTBfunTest extends FunSuite {
     case Scan1(x, op: Fundef2R[B], v, dir, init) => scan[Boolean, Boolean](
       eval(v, env).head,
       eval(x, env),
-      (u: Boolean, w: Boolean) => eval(op.arg, env + (op.p1 -> List(u)) + (op.p2 -> List(w))).head,
+      (u: Boolean, w: Boolean) => eval(op.arg, env + (op.p1.nameP -> List(u)) + (op.p2.nameP -> List(w))).head,
       dir, init)
     case Scan2(x, y, op, v, dir, init) => scan[Boolean, (Boolean, Boolean)](
       eval(v, env).head,
@@ -92,17 +102,76 @@ class ASTBfunTest extends FunSuite {
       (u: Boolean, v: (Boolean, Boolean)) => v match {
         case (v1, v2) => eval(
           op.arg,
-          env + (op.p1 -> List(u)) + (op.p2 -> List(v1)) + (op.p3 -> List(v2))).head
+          env + (op.p1.nameP -> List(u)) + (op.p2.nameP -> List(v1)) + (op.p3.nameP -> List(v2))).head
         case _ => throw new RuntimeException("operand of unequal number of bits");
       },
       dir, init)
 
   }
-
-  val env = HashMap.empty[Param[_], List[Boolean]]
-
+  /**   environment contains initial values we wish to test our new operators on*/
+  var env = HashMap.empty[String, List[Boolean]] + ("troisUI3bit"->List(true, true,false))
+  var emptyEnv = HashMap.empty[String, List[Boolean]]
   //test constantes
-  val trois = Intof[SI](3)
+  val trois = Intof[UI](3)
+  test("trois") { assert(eval(trois, env) == List(true, true)) }
+  val septUI = Intof[UI](7) //sur 3 bits
+  val extend3=  ASTBfun.extend[UI](3)
+  val troisUI3bit=new Call1[UI, UI](extend3, Intof[UI](3)) with ASTBt[UI]
+  val unUI3bit=new Call1[UI, UI](extend3, Intof[UI](1)) with ASTBt[UI]
+  val zeroUI3bit=new Call1[UI, UI](extend3, Intof[UI](0)) with ASTBt[UI]
+  assert(eval(unUI3bit, env) == List(true,false,false))
+
+/** rajoute autant de false qu'il y a besoin, pour arriver a n boolean */
+ private  def extendDirect(a:List[Boolean],n:Int): List[Boolean] = { assert(a.size<=n); a++List.fill(n-a.size)(false)  }
+  /** test partity of 1,2 et 3, codé en unaire trois bits, en construisant directement les codes binaires. */
+  test("parity2") {
+    for(i<-1 to 3){
+      val entree:List[Boolean]=extendDirect(List.fill(i)(true),3)  //des trues suvis par des falses, et 3 en tout
+      println(entree)
+      println(eval(new Call1[UI,B](parity, new Read[UI]("entree")with ASTBt[UI] {}),emptyEnv+("entree"->entree)))
+    }
+  }
+
+  /** allows to see the intermediate steps, created by the two primitive:
+   * doublePeriod, and clockGoingDown, when computing the binary code associated to an unary interger code */
+  test("clockGoingDownDoublePeriod") {
+    for(i<-1 to 9){
+      val entree:List[Boolean]=extendDirect(List.fill(i)(true),13)
+      val env2=emptyEnv+("entree"->entree)
+      val entreeAsExp:Uint =new Read[UI]("entree")with ASTBt[UI]
+      val alt=new Call1[UI,UI](doublePeriod,entreeAsExp) with ASTBt[UI] {}
+      val clockGoDo=new Call1[UI,UI](clockGoingDown,alt) with ASTBt[UI] {}
+      val altClockGoDo=new Call1[UI,UI](doublePeriod,clockGoDo) with ASTBt[UI] {}
+      val clockGoDoAltClockGoDo=new Call1[UI,UI](clockGoingDown,altClockGoDo) with ASTBt[UI] {}
+      val altClockGoDoAltClockGoDo=new Call1[UI,UI](doublePeriod,clockGoDoAltClockGoDo) with ASTBt[UI] {}
+      if(false){
+        println(entree); println(eval(alt,env2));   println(eval(clockGoDo, env2));println(eval(altClockGoDo, env2))
+         println(eval(clockGoDoAltClockGoDo, env2));   println(eval(altClockGoDoAltClockGoDo, env2));   println()}
+      val b0=Elt(-1,alt);   val b1=Elt(-1,altClockGoDo );   val b2=Elt(-1,altClockGoDoAltClockGoDo)
+      print(i + " "+ eval(b0::b1::b2  ,env2))
+    }
+  }
+
+  test("unaryTonBbinary2") {
+    for(i<-0 to 3){
+      val entree:List[Boolean]=extendDirect(List.fill(i)(true),3)
+      val env2=emptyEnv+("entree"->entree)
+      val entreeAsExp:Uint =new Read[UI]("entree")with ASTBt[UI]
+      print(i + ":  ")
+      println(eval(new Call1(unaryTonBbinary2,entreeAsExp)        ,env2))
+    }
+  }
+
+  test("unaryTonBbinary3") {
+    for(i<-0 to 7){
+      val entree:List[Boolean]=extendDirect(List.fill(i)(true),7)
+      val env2=emptyEnv+("entree"->entree)
+      val entreeAsExp:Uint =new Read[UI]("entree")with ASTBt[UI]
+      print(i + ":  ")
+      println(eval(new Call1(unaryTonBbinary3,entreeAsExp)        ,env2))
+    }
+  }
+
   val quatre = Intof[SI](4);
   test("quatre") {
     assert(eval(quatre, env) == List(false, false, true, false))
@@ -130,14 +199,13 @@ class ASTBfunTest extends FunSuite {
   }
 
   /*
-
     //test concat
     val zero = Intof[SI](0);  val mult8 =   trois :: zero :: zero :: zero
     test("ConcatMultiply"){assert(eval(mult8,env)==List(  false,false, false,true, true, false))}
   */
 
   //testLT
-  val quatrelt0 = new Call1(ltSI, quatre) with ASTBt[B]
+  val quatrelt0 = new Call1[SI, B](ltSI, quatre) with ASTBt[B]
   test("quatre<0") {
     assert(eval(quatrelt0, env) == List(false))
   }

@@ -46,8 +46,12 @@ trait MovableAgentV extends MovableAg[V] with vef[V] with UtilVagent {
   //override val NisV=  ~isV
   override def flip2next=  delayedL( xorBin(flipAfterLocalConstr,muis) )//delayed is necessary in order to get the very last update of flip
 
+  /** convert a move into a flip */
   override def move2flip(m:MoveC1):BoolV= {
-     val invade = exist(m.push.asInstanceOf[Sym].sym);  val empty = m.empty   //bugif empty & invade
+   // val invade = exist(m.push.asInstanceOf[Sym].sym);  val empty = m.empty   //bugif empty & invade
+    val invade = exist(neighborsSym(m.push));  val empty = m.empty   //bugif empty & invade
+
+
     //  val invade = exist(neighborsSym(m.push));  val empty = m.empty   //bugif empty & invade
     cond(isV,empty,invade)
   }
@@ -82,7 +86,7 @@ abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] wit
 
   /** a random priority is needed to help finalize tournament, in case of equality */
   // val prioRand = ASTLfun.concat2UI(new Rand(), new Rand()) //faudra tester
-  /** les moves des movable viennent directement d'une force, ceux des bounded ? faut voir, si ca se trouve aussi. */
+  /** les moves des movable viennent directement d'une force, et ceux des bounded ? faut voir, si ca se trouve aussi. */
   def move(force: Force) = addMoves(force.action(this), force.prio)
   /** convert centered move into one single BoolV flip */
 
@@ -93,7 +97,7 @@ abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] wit
    * */
   override def flipCreatedByMoves:BoolV={
     //we consider only a single move
-    move2flip(moves(10).asInstanceOf[MoveC1]) //on sait qu'on a mis 10 sur le mvTotal
+    move2flip(moves(10).asInstanceOf[MoveC1]) //on sait qu'on a mis 9 sur repulse, todo: mettre cela d'aplomb
   }
 
 

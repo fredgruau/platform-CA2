@@ -2,7 +2,7 @@ package compiler
 
 import AST.{Call1, Fundef2, _}
 import ASTB.{Elt, Scan1, _}
-import compiler.ASTBfun.{Fundef1R, Fundef2R, Fundef3R, fundef2Bop2, negB, p, redop}
+import compiler.ASTBfun.{Fundef1R, Fundef2R, Fundef3R, fundef2Bop2, halfSIsurUI, negB, p, redop}
 import compiler.ASTLfun.halve
 import compiler.SpatialType.BoolV
 import ASTLfun._
@@ -361,12 +361,20 @@ object ASTBfun {
 
   /** used together with scan */
 
+  val other: Fundef2R[B] = {
+    val (xb, yb) = (p[B]("xb"), p[B]("yb"));
+    Fundef2("other", yb, xb, yb)
+  }
+
+  /** does as if the argument was a signed integer, when halving. This means that the last bit which is the sign, is preserved */
+  val halfSIsurUI={
+    val xh = p[UI]("xh");
+    val last=Elt(-1,xh)
+    Fundef1("halfSIsurUI", Scan1(xh, other, last, Right(), initUsed = true), xh)
+  };
 
   private val (halveBSI, halveBUI) = {
-    val other: Fundef2R[B] = {
-      val (xb, yb) = (p[B]("xb"), p[B]("yb"));
-      Fundef2("other", yb, xb, yb)
-    }
+
 
     def halveBI[R <: I](implicit n: repr[R]): Fundef1R[R] = {
       val x = p[R]("xhalveB");
@@ -375,9 +383,22 @@ object ASTBfun {
     (halveBI[SI], halveBI[UI])
   }
 
+  /*private val (dropMsbSI, dropMsbUI) = {
+    val other2: Fundef2R[B] = {
+      val (xb, yb) = (p[B]("xb"), p[B]("yb"));
+      Fundef2("other2", xb, xb, yb)
+    }
+
+    def dropMsb[R <: I](implicit n: repr[R]): Fundef1R[R] = {
+      val x = p[R]("xdropB");
+      Fundef1("dropMsb", Scan1(x, other2, False(), Right(), initUsed = true), x)
+    };
+    (dropMsb[SI], dropMsb[UI])
+  }
+*/
 
   /** result in shifting bits towards the tail, entering a zero at the end of the list,
-   * it would divide by two an unsigned integers */
+   * it would divide by two an unsigned integers. The bit size does not change*/
   def halveB[R <: I](implicit n: repr[R]) = (n.name match {
     case SI() => halveBSI
     case UI() => halveBUI
@@ -428,7 +449,8 @@ object ASTBfun {
     Fundef2("firstOfTwoUI", xui, xui, yui)
   }
 
-  /** optimal implementation of comparison between two unsigned integers, using orscanright like operators, */
+
+
   val ltUI2: Fundef2[UI, UI, B] = {
     val (xui, yui) = (p[UI]("xminUI"), p[UI]("yminUI")); //a t-on x < y
     val difference = xui ^ yui //true for bits which differs betwen xui and yui
@@ -438,6 +460,7 @@ object ASTBfun {
     // true if yui is true for i being the index of the  with most significant bit of difference, that is a strict lower than
     Fundef2("ltUI", new Call1[UI, B](neqUI, first1 & yui) with ASTBt[B], xui, yui) //todo ecrire des xor et des and pour les ui
   } //TODO a faire correct en utilisant ltUI.
+
 
   /** optimal implementation of comparison between two unsigned integers, using orscanright like operators, missing just the first and final xor, so as to reuse first¯1, */
   val orScan: Fundef1[UI, UI] = {
@@ -527,7 +550,7 @@ object ASTBfun {
     /** returns the biggest signed constant on n bits, where n is adjusted at run time, when the constant is combined
      * to some other integer, using a binop. The bitifying stage   is able to extends, adding  the correct  number of bits
      */
-    def maxSI = (new Call1[SI, SI](halveBSI, ASTB.Intof[SI](-1)(repr.nomSI)) with ASTBt[SI])
+    //def maxSI = (new Call1[SI, SI](halveBSI, ASTB.Intof[SI](-1)(repr.nomSI)) with ASTBt[SI]) //halveBSI should enter a 1.
     if (n.name.isInstanceOf[UI])
       (minUI.asInstanceOf[Fundef2[R, R, R]],
         ~(ASTB.Intof[UI](0)(repr.nomUI)).asInstanceOf[ASTBt[R]])
@@ -540,8 +563,6 @@ object ASTBfun {
       null
     }
   }
-
-
   /** 1 is the greatest value for sign, which can only be -1, 0, 1 */
   val minSignRedop: redop[SI] = (minSign, Intof[SI](1))
   //todo definir un addRedop,
@@ -551,6 +572,63 @@ object ASTBfun {
   def addRedop[R <: Ring](implicit n: repr[R]) = n.name match {
     case SI() => addRedopSI
     case UI() => addRedopUI
+  }
+
+  /** by applying a xor, the period 010101 is doubled to OO11OO11 (and then to 000011110000....
+   *  for some integer $p$, the input is of the form a sequence of bloc alternation 0^(2^p) 1^(2^p),
+   * * alternation stops at some points either on zeroes or one ones.
+   * * the output is of the same form, but with $p$ incremented
+   * * the idea is that the output will change when the input goes from 1 to zero, and this happens twices less often
+   * it  scans starting left, i.e from the least significant bits
+   */
+  val doublePeriod: Fundef1[UI,UI] = {
+    val bcode = p[UI]("alt")
+    Fundef1("doublePeriod",Scan1(bcode, xorB, False(), Left(), initUsed = false), bcode)
+  }
+
+  /** assuming the input if of the form 1* 0*, (a sequence of 1, followed by zeroes,
+   * compute the parity of the number of ones.
+   * It is simply the last bit of doublePeriod*/
+  val parity: Fundef1[UI,B] = {
+    val (bcode) = p[UI]("bcode")
+    Fundef1("parity",Elt(-1,new Call1[UI,UI](doublePeriod,bcode)with ASTBt[UI] {}), bcode)
+  }
+
+ /** computes a 1 if and only if preceding bit is one, and current bit is zero
+  * it uses a tailored function half called halfSIsurUI which behaves as if it would preserve the sign of a signed integer*/
+  val clockGoingDown: Fundef1[UI,UI] = {
+    val segmentsOf1 = p[UI]("segmentsOf1")
+    val result: Uint = ~new Call1[UI, UI]( halfSIsurUI, segmentsOf1) with ASTBt[UI] & segmentsOf1 //only the rightmost msb bits remains. halveBui must comes first otherwise it bugs
+  Fundef1("clockGoingDown",result, segmentsOf1)
+  }
+
+/** input is an unary sequence of up to 3 boolean.
+ * It is a sequence of true followed by a sequence of false.
+ * output is the binary code 100->10, 110->01, 111-> 11 */
+  val unaryTonBbinary2: Fundef1R[UI] = {
+    val (ucode) = p[UI]("ucode")
+    val alt=new Call1[UI,UI](doublePeriod,ucode) with ASTBt[UI] {}
+    val clockGoDo=new Call1[UI,UI](clockGoingDown,alt) with ASTBt[UI] {}
+    val altClockGoDo=new Call1[UI,UI](doublePeriod,clockGoDo) with ASTBt[UI] {}
+    val b0=Elt(-1,alt)
+    val b1=Elt(-1,altClockGoDo )
+    Fundef1("unaryCode2", b0::b1,ucode)
+  }
+  /** input is an unary sequence of up to seven boolean,
+   * It is a sequence of true followed by a sequence of false.
+   * output is the binary code 1000000->100, .... 1111111-> 111 */
+  val unaryTonBbinary3: Fundef1R[UI] = {
+    val (ucode) = p[UI]("ucode")
+    val alt=new Call1[UI,UI](doublePeriod,ucode) with ASTBt[UI] {}
+    val clockGoDo=new Call1[UI,UI](clockGoingDown,alt) with ASTBt[UI] {}
+    val altClockGoDo=new Call1[UI,UI](doublePeriod,clockGoDo) with ASTBt[UI] {}
+    val clockGoDoAltClockGoDo=new Call1[UI,UI](clockGoingDown,altClockGoDo) with ASTBt[UI] {}
+    val altClockGoDoAltClockGoDo=new Call1[UI,UI](doublePeriod,clockGoDoAltClockGoDo) with ASTBt[UI] {}
+    val b0=Elt(-1,alt)
+    val b1=Elt(-1,altClockGoDo )
+    val b2=Elt(-1,altClockGoDoAltClockGoDo)
+    import compiler.repr.nomUI //ca favorise UI sur les autres et resoud une ambiguité
+    Fundef1("unaryCode3", b0::b1::b2,ucode)
   }
 
 }

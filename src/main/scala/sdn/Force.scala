@@ -75,6 +75,7 @@ object Force{
     val prio=TOTAL_PRIO
     override def actionV(ag: MovableAgentV): MoveC = MoveC1(ag.isV,ag.brdVe)//extends and empties everywhere possible.
   }
+
   /** we designed a random move that does not break the quasipoint property,
    * eliminating the need for checking gate-expensive mutex
    * However, we must still check for directionnality using

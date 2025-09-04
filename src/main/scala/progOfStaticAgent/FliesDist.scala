@@ -13,7 +13,8 @@ import sdn._
 import sdntool.{DistGcenter, DistT, gCenter}
 import sdn.MuStruct.allMuStruct
 
-/**combines flies with the computation of distance, adds a constraints of slowliness
+/**combines flies with the computation of distance to gabriel centers, it needs 5 bits to be continuous,
+ * todo: see if adding a constraints of slowliness could shift from having 5 bits to 4 bits
   */
 class FliesDist() extends LDAG with Named with BranchNamed
 { val part=new Flies() with DistT with gCenter with DistGcenter;

@@ -64,7 +64,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
   val flipOfMove:BoolV =delayedL(flipCreatedByMoves)
 
    /** applies all the constraints on the move */
-   val  allFlipCancel={
+   val  allFlipCancel: ASTLt[V, UI] ={
      /** computes an IntVUI  whose individual bits are cancel Flips  */
      def allFlipCancel(flip: BoolV): UintV = {
        for ((name, c) <- constrs) {
@@ -83,7 +83,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
 
   /** moves are stored in centered form, so that we can restrict them */
   var moves: HashMap[Int, MoveC] = HashMap()
-
+   val moves2= new scala.collection.mutable.LinkedHashMap[String,Constr]()
   /** if move of same priority exists, signal an error */
   protected def addMoves(m: MoveC, prio: Int) = { //we may have to store set of moves, if we need add move of same priority.
     assert(!(moves.contains(prio)), "each force must have a distinct priority")

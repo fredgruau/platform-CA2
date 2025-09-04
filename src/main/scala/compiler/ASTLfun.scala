@@ -173,7 +173,8 @@ object ASTLfun {
    */
   def mstb[L <: Locus, R <: I](arg1: ASTL[L, R])(implicit m: repr[L], n: repr[R]): ASTLt[L, R] = {
     val y: ASTLt[L, R] = orScanRight[L, R](arg1);
-    ~halve(y) ^ y //it may bug because embrouille avec deux scan.
+    ~halve(y) ^ y //it may bug because embrouille avec deux scan,
+    // l'ordre des appels est crucial, halve(y) est appelé avant y. y ^ ~halve(y) plante
   }
 
   def unary(b0: BoolV, b1: BoolV): List[BoolV] = List(b0 & b1, ~b0 & b1, b0 & ~b1, ~b0 & ~b1)
