@@ -15,7 +15,8 @@ import sdntool.{DistT}
 class Flies() extends  MovableAgentV with BlobVouE with QpointConstrain with BlobConstrain
 {  // override def displayConstr:Boolean=true
  //
- move(Force.total) //specific forces applied to Flies
+ final val explore=introduceNewPriority()
+ force(explore, "explore",'x', Force.total) //specific forces applied to Flies
  shoow(muis)
  shoow(flipOfMove,flipAfterLocalConstr)
 //  for (v<-realFlipCancel.values) shoow(v) //display intermediate, decreasing  flip value

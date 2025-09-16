@@ -58,6 +58,7 @@ object VarKind {
     case ParamRR(1) => 4
     case ParamRR(2) => 5
     case ParamRR(3) => 6
+    case ParamRR(-1000) => 7
     case MacroField() => 9
     case StoredField() => 10
     case LayerField(nbit, _) => nbit + 10

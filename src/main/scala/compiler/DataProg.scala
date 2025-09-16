@@ -513,7 +513,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
     //we check that macros do not contain level 2, macros.
     if(!isRootMain)
-        assert(funs.isEmpty)
+        if(funs.size>0)
+      assert(funs.isEmpty)
     // paramD varkind  could  be replaced by Affect , but this should not happen because of the added letter 'p' for the parameter.
     // if a parameter is used two times, the generated affectation will generate a read without the 'p'
     new DataProg(dagis2, funs.map { case (k, v) ⇒ k -> v.treeIfy() }, tSymbVar, paramD, paramR, coalesc)
@@ -1079,8 +1080,15 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     if(binopEdgeInstrs.nonEmpty) {
       for(i<-binopEdgeInstrs) if(i.inputNeighbors.size>0) {  //it can be the case that the dev field is used twice and stored, in which case there is no more cosntraints to register        val dev=i.inputNeighbors(0).asInstanceOf[Affect[_]]
         val dev=i.inputNeighbors(0).asInstanceOf[Affect[_]]
-        assert(dev.locus.get==T(E(),V())) //inputedge operates on a TEv
-        binopEdgeConstraints(dev.name)= H1beforeH2 (dev.locus.get) //send is used in combination with binop, and should be
+        if(dev.locus.get ==T(E(),V()))
+          binopEdgeConstraints(dev.name)= H1beforeH2 (dev.locus.get) //send is used in combination with binop, and should be
+        else
+        {
+          print(dev.locus.get)
+          //on tente le meme truc
+          binopEdgeConstraints(dev.name)= H1beforeH2 (dev.locus.get) //send is used in combination with binop, and should be
+        }
+
         //constrained h1 before h2, d1 before d2, ad1 before ad2, because of      }
       }}
 
@@ -1261,7 +1269,8 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     def  foldBinopEdge(i: Affect[_]): List[Instr]={
 
       val isFolded = i.isFolded2(tZ, myRoot)
-      if (!isFolded) return oldmuI(i.name)
+      if (!isFolded | i.inputNeighbors.size==0) //abracadabra
+        return oldmuI(i.name)
          //todo faut vérifier l'ordre en regardant le schedule des zones.
          val input: Instr =i.inputNeighbors(0)
       val schedulei=i.mySchedule2(tZ, myRoot, align2root) //1,0,2,3,4,5

@@ -80,8 +80,8 @@ object Simulator extends SimpleSwingApplication {
     simulParam = readXML("src/main/java/compiledCA/simulParam/" + nameSimulParam)
     val pathDisplayParam="src/main/java/"+pkgCA+"/displayParam/"+ nameCA + ".xml"
     displayParam = try {
-      readXML(pathDisplayParam)
-     // readXML("src/main/java/compiledCA/displayParam/" + nameCA + ".xml")
+      // readXML(pathDisplayParam)
+      readXML("src/main/java/compiledCA/displayParam/" + nameCA + ".xml")
     }
     catch {
       case _: FileNotFoundException => readXML("src/main/java/compiledCA/displayParam/default.xml")

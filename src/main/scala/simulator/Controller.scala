@@ -58,7 +58,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   val globalInitNames: Array[String] = fromXMLasList((globalInit \\ "inits").head).toArray
   val selectedGlobalInit: Int = xInt(globalInit, "selected", "@rank") //which is the starting value for global init
   val randomInitNames: Array[Int] = (0 to 9).toArray
-  val densityInitNames: Array[Int] = (0 to 9).toArray
+  val densityInitNames: Array[Int] = (0 to 99).toArray
 
   /** check that global variables (layer and shown) do not share offset. */
   def invariantFieldOffset = {
@@ -154,7 +154,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
         })}
         </colorOfField>
       </displayParam>
-    XML.save("src/main/java/" + chosenDir + "/displayParam/" + nameCA + ".xml", displayParam)
+    XML.save("src/main/java/compiledCA/displayParam/" + nameCA + ".xml", displayParam)
   }
 
 
@@ -163,16 +163,22 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
       <initMethod>
         {globalInit \\ "inits"}<selected rank={"" + globalInitNames.indexOf(globalInitList.selection.item)} seed={"" + randomRoot }/>
       </initMethod>
-    XML.save("src/main/java/" + chosenDir + "/globalInit/" + nameGlobalInit, newGlobalInit)
+    XML.save("src/main/java/compiledCA/globalInit/" + nameGlobalInit, newGlobalInit)
   }
 
+  /** must update randomRoot, but also density */
   private def updateAndSaveXMLSimulParam(): Unit = {
     val newSimulparam = simulParam.asInstanceOf[Elem].copy(child = simulParam.child.map {
       case simul @ <simul>{_*}</simul> =>
         simul.asInstanceOf[Elem] % Attribute(null, "randomRoot", randomRoot.toString, Null)
       case other => other
     })
-    XML.save("src/main/java/" + chosenDir + "/simulParam/" + nameSimulParam, newSimulparam)
+    val newnewSimulparam = newSimulparam.asInstanceOf[Elem].copy(child = newSimulparam.child.map {
+      case simul @ <simul>{_*}</simul> =>
+        simul.asInstanceOf[Elem] % Attribute(null, "density", density.toString, Null)
+      case other => other
+    })
+    XML.save("src/main/java/compiledCA/simulParam/" + nameSimulParam, newnewSimulparam)
   }
 
 
@@ -352,7 +358,7 @@ case SelectionChanged(`globalInitList`) =>
     case SelectionChanged(`densityInitList`) =>
       density = densityInitList.selection.item
       initButtonClick()//InitButton.doClick()
-      //updateAndSaveXMLSimulParam()
+      updateAndSaveXMLSimulParam()
    case ValueChanged(`speedSlider`) =>
      speed.text = s"Speed : ${speedSlider.value}"
  }

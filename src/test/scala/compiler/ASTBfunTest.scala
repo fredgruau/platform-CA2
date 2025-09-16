@@ -95,7 +95,7 @@ class ASTBfunTest extends FunSuite {
       eval(v, env).head,
       eval(x, env),
       (u: Boolean, w: Boolean) => eval(op.arg, env + (op.p1.nameP -> List(u)) + (op.p2.nameP -> List(w))).head,
-      dir, init)
+      dir, init) //tototo
     case Scan2(x, y, op, v, dir, init) => scan[Boolean, (Boolean, Boolean)](
       eval(v, env).head,
       (eval(x, env), eval(y, env)).zipped.map((x, y) => (x, y)),
@@ -135,8 +135,8 @@ class ASTBfunTest extends FunSuite {
   /** allows to see the intermediate steps, created by the two primitive:
    * doublePeriod, and clockGoingDown, when computing the binary code associated to an unary interger code */
   test("clockGoingDownDoublePeriod") {
-    for(i<-1 to 9){
-      val entree:List[Boolean]=extendDirect(List.fill(i)(true),13)
+    for(i<-0 to 7){
+      val entree:List[Boolean]=extendDirect(List.fill(i)(true),8)
       val env2=emptyEnv+("entree"->entree)
       val entreeAsExp:Uint =new Read[UI]("entree")with ASTBt[UI]
       val alt=new Call1[UI,UI](doublePeriod,entreeAsExp) with ASTBt[UI] {}
@@ -144,11 +144,12 @@ class ASTBfunTest extends FunSuite {
       val altClockGoDo=new Call1[UI,UI](doublePeriod,clockGoDo) with ASTBt[UI] {}
       val clockGoDoAltClockGoDo=new Call1[UI,UI](clockGoingDown,altClockGoDo) with ASTBt[UI] {}
       val altClockGoDoAltClockGoDo=new Call1[UI,UI](doublePeriod,clockGoDoAltClockGoDo) with ASTBt[UI] {}
-      if(false){
+      val b0=Elt(-1,alt);   val b1=Elt(-1,altClockGoDo );   val b2=Elt(-1,altClockGoDoAltClockGoDo)
+      println(i + " "+ eval(b0::b1::b2  ,env2))
+      if(true){
         println(entree); println(eval(alt,env2));   println(eval(clockGoDo, env2));println(eval(altClockGoDo, env2))
          println(eval(clockGoDoAltClockGoDo, env2));   println(eval(altClockGoDoAltClockGoDo, env2));   println()}
-      val b0=Elt(-1,alt);   val b1=Elt(-1,altClockGoDo );   val b2=Elt(-1,altClockGoDoAltClockGoDo)
-      print(i + " "+ eval(b0::b1::b2  ,env2))
+
     }
   }
 
@@ -158,7 +159,7 @@ class ASTBfunTest extends FunSuite {
       val env2=emptyEnv+("entree"->entree)
       val entreeAsExp:Uint =new Read[UI]("entree")with ASTBt[UI]
       print(i + ":  ")
-      println(eval(new Call1(unaryTonBbinary2,entreeAsExp)        ,env2))
+      println(eval(new Call1(unaryToBinary2,entreeAsExp)        ,env2))
     }
   }
 

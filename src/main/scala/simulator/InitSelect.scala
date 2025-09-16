@@ -33,8 +33,8 @@ trait InitSelect {
       case "0" => zeroInit
       case "true" => unInit
       case "center" => centerInit
-      case "points" =>
-        pointsInit(density)
+      case "blackHole" =>
+        blackHoleInit(density)
       case "debug" => zeroInit
       case "sparse" => sparseInitInside(l, nbit)
       case "randinside" => randInitInside(l, nbit)
@@ -232,14 +232,37 @@ trait InitSelect {
   private lazy val centerInit: InitMaald = new InitMaald(1) {
     setBoolVField(center)
   }
-  private def pointsInit(density:Int): InitMaald = new InitMaald(1) {
-    val upperleft=new Vector2D(3, 3)
+
+  /**
+   *
+   * @param density nombre de point crées
+   * @return creates a blackhole, i.e a rectangle of nearby points
+   */
+  private def blackHoleInit(density:Int): InitMaald = new InitMaald(1) {
+    val upperleft=new Vector2D(2, 2)
     val deltaY=3//nbCol/3 -4
     val deltaX=3// nbLine/3 -4
+    /** nombre de point par ligne */
+    val numColUsable=(nbCol-3)/3  //faudra faire fois 3  + 3
+    val numLineUsable=(nbLine-3)/3  //faudra faire fois 3  +3
+
+/*
+    var nbPointPerLine:Int=Math.ceil(Math.sqrt(density)).toInt
+    var nbPointPerCol:Int=Math.ceil( density/nbPointPerLine.toDouble).toInt
+    if(3+3*nbPointPerCol>nbLine){
+      nbPointPerCol=(nbLine-3)/3   //le max possible
+      nbPointPerLine  = density/nbPointPerCol
+      if(3+3*nbPointPerLine>nbCol)
+        nbPointPerLine=(nbCol-3)/3 //le max possible
+    }*/
+
     var k=0
-    for(i<-0 until 3)
-      for(j<-0 until 3) {
-        if (k <= density && 3+i * deltaX< nbLine && 3+j * deltaY<nbCol)
+    var numColUsed=numColUsable
+     while (numColUsed*numLineUsable>density)
+       { numColUsed -=1 }
+    for(i<-0 to numLineUsable)
+      for(j<-0 to numColUsed) {
+        if (k < density )
           setBoolVField(upperleft.add(new Vector2D(i * deltaX, j * deltaY)))
         k=k+1
       }

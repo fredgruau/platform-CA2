@@ -3,11 +3,12 @@ package sdn
 
 import compiler.AST.{Call2, Fundef2}
 import compiler.ASTL.{sym, transfer}
-import compiler.ASTLfun.{e, v}
+import compiler.ASTLfun.{cond, e, v}
 import compiler.{AST, ASTB, ASTBfun, ASTBt, ASTLfun, B, E, Locus, Ring, T, V, repr}
 import compiler.SpatialType.{BoolE, BoolEv, BoolV, BoolVe}
 import dataStruc.Named
-import progOfmacros.Wrapper.borderS
+import progOfmacros.Comm.neighborsSym
+import progOfmacros.Wrapper.{borderS, exist}
 import progOfmacros.RedT.clock2
 import sdn.Rand
 import sdn.Util.addSym
@@ -24,15 +25,24 @@ trait rando {
  * to move everywhere possible the agent..
  */
 abstract class MoveC extends Named {
-  val push: BoolVe
-  val empty: BoolV
+  val triggered:BoolV
+  /** when computing push, we selected maxprio only among the yes, we do not consider the no */
+  val triggeredYes:BoolV
+  def move2flip(is:BoolV):BoolV
 }
 
 /** @param empty where to withdraw at
  * @param push  where to extends towards
+ * centered move with only yes
  */
 case class MoveC1 (val empty: BoolV, val push: BoolVe) extends MoveC{
   def | (that: MoveC1) = MoveC1(empty|that.empty,push|that.push)
+  /* convert push to a boolV */
+  val invade=exist(neighborsSym(push))
+  /** true if the force has an effect*/
+  val triggered=empty|invade
+  override val triggeredYes: BoolV = triggered
+  def move2flip(isV:BoolV):BoolV=cond(isV,empty,invade)
 }
 
 /**
@@ -41,8 +51,10 @@ case class MoveC1 (val empty: BoolV, val push: BoolVe) extends MoveC{
  * @param no for specifying absence of flip ,  using either no.push or no.Empty
  */
 case class MoveC2(val yes:MoveC1,val no:MoveC1) extends MoveC{
-  override val push=yes.push
-  override val empty=yes.empty
+  override val triggered=yes.triggered^no.triggered
+  override val triggeredYes: BoolV = yes.triggered
+  /** bugif for a given priority, one move specifies flip, and another move spécifies not flip */
+  def move2flip(isV:BoolV):BoolV=yes.move2flip(isV) & ~ no.move2flip(isV)
 }
 
 
@@ -65,14 +77,11 @@ abstract class Force extends  Named {
     case V() => actionV(ag.asInstanceOf[MovableAgentV])
    // case T(V(),E()) => actionVe(ag.asInstanceOf[MovAgVe])
   }
-  val prio:Int
 }
 object Force{
-  val TOTAL_PRIO=10 //ordre décroissant
   import MoveC._
   /** produce maximum possible move, rely on priority to obtain random movement */
   val total:Force=new Force(){
-    val prio=TOTAL_PRIO
     override def actionV(ag: MovableAgentV): MoveC = MoveC1(ag.isV,ag.brdVe)//extends and empties everywhere possible.
   }
 

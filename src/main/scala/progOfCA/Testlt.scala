@@ -10,7 +10,7 @@ import sdn.Util.{addLt, randUintV}
 /** tests the lt macro, containts a bugif */
 class   Testlt() extends ConstLayer[V, B](1, "global")  with BranchNamed{
  // val rand1 = new Rand();  val rand2 = new Rand()
-  val prioRand = randUintV(6) //rand1::rand2
+  val prioRand = randUintV(2) //rand1::rand2
   val toto=addLt(prioRand)
  val deefE=new ConstLayer[E, B](1, "def") //forced to be named defE
 
@@ -21,6 +21,7 @@ class   Testlt() extends ConstLayer[V, B](1, "global")  with BranchNamed{
 bugif(twoLt&deefE) //marche
  //bugif(deefE) //marche
  //val (lt,eq)= Grad.slopeLt(prioRand)
- show(prioRand,toto.eq,toto.lt,toto.gt);
+ show(prioRand,toto.eq,toto.lt,toto.gt,toto.ltApex);
+ show(toto.segmentOf1Apex,toto.bordApex,toto.diffApex)
 } //root classe compilable
 

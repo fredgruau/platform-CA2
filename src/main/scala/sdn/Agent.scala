@@ -1,9 +1,9 @@
 package sdn
 
 import compiler.ASTB.{False, Uint}
-import compiler.ASTBfun.{addRedop, orRedop, redop}
-import compiler.ASTL.{delayedL, send, transfer}
-import compiler.ASTLfun.{allOne, b2SIL, eq0, f, imply, ltSI, reduce, uI2SIL, v}
+import compiler.ASTBfun.{addRedop, derivative, ltUI2, orRedop, redop}
+import compiler.ASTL.{delayedL, send, transfer, unop}
+import compiler.ASTLfun.{allOne, andLB2R, b2SIL, eq0, f, imply, lt2, ltSI, neq, orScanRight, reduce, uI2SIL, v}
 import compiler.SpatialType.{BoolE, BoolEv, BoolF, BoolV, BoolVe, BoolVf, IntE, IntEv, IntV, IntVe, UintV, UintVx}
 import compiler.repr.nomE
 import compiler.{ASTLfun, ASTLt, B, E, F, Locus, SI, T, UI, V}
@@ -12,12 +12,14 @@ import progOfCA._
 import progOfmacros.Comm.{apexE, apexV}
 import progOfmacros.{Compute, Grad}
 import progOfmacros.Compute.implique
-import progOfmacros.Wrapper.{exist, inside, insideS, not}
+import progOfmacros.Wrapper.{exist, inside, insideS, not, unary2Bin}
 import sdn.Globals.root4naming
+import sdn.Util.addLt
 
 import scala.::
+import scala.Predef._
 import scala.collection.convert.ImplicitConversions.`map AsJavaMap`
-import scala.collection.mutable.HashMap
+import scala.collection.mutable.{ArrayBuffer, HashMap}
 import scala.collection.mutable
 /** makes precise where a constraint applies*/
 sealed trait Impact
@@ -31,15 +33,13 @@ case class One(noFill: Boolean) extends Impact //on veut pouvoir calculer le com
 abstract class Agent[L <: Locus] extends MuStruct[L, B]
  {
 
-   /** random integer used for breaking  symetry in case of tournament with equal priority */
-  val prioRand:UintVx
-   /** used for mutex touernament, includes priorand */
- val prio:UintVx
-
 /** the agent's list of consrtrain. Constraints have a name, and the list is also ordered */
    val constrs= new scala.collection.mutable.LinkedHashMap[String,Constr]()
    def codeConstraint: Iterable[String] =constrs.keys.toList.map(_.charAt(0).toString)
    def showConstraint={ shoowText(allFlipCancel,codeConstraint.toList)}
+   def codeMove:Iterable[String] =moves.map(_.keys.head.charAt(0).toString)
+   def showMoves={ shoowText(highestTriggered,codeMove.toList)}
+   def showPositiveMoves={ shoowText(highestTriggeredYes,codeMove.toList)}
 
    /**
     *
@@ -54,15 +54,58 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
    constrs(shortName+name)=c
  }
 
-  /** PEs where movements trigger changes in Agent's support. Either by filling, or by emptying
-     flip is eith computed from the move for movableAgent, or  computed from the parent for bounded agent
-   registers where the constraints had a canceling effect*/
-  val flipCancel=  new scala.collection.mutable.LinkedHashMap[String,BoolV]() with Named {}
 
-   /** initial value of flip cause by movements for movable agents, or inherited for bound agents*/
-  def flipCreatedByMoves: BoolV
-  val flipOfMove:BoolV =delayedL(flipCreatedByMoves)
+   /** moves are stored in centered form, so that we can restrict them we store one hashmap for each priority. It two moves with identical names are added, we'd have to merge those */
+   val moves:ArrayBuffer[mutable.LinkedHashMap[String,MoveC]] = ArrayBuffer() //empty at the beginning
+   /** we introdued a new priority use to qualify a new range of move, creating a new functionnality such  as explore, homogeneize, stabilize*/
+   def introduceNewPriority():Int={ moves+= mutable.LinkedHashMap[String,MoveC]();  moves.size-1 }
+   /** if move of same priority exists, signal an error */
+   protected def addMoves(priority:Int, name:String, shortName:Char, m: MoveC ) = { //we may have to store set of moves, if we need add move of same priority.
+     val ht=moves(priority)
+     assert(!(ht.contains(name)), "each force must have a distinct priority");
+     moves(priority)(shortName+name)=m
+   }
 
+   def allTriggered:UintV
+   def allTriggeredYes:UintV
+   val filledTriggered=orScanRight(delayedL(allTriggered))
+   val filledTriggeredYes=orScanRight(delayedL(allTriggeredYes))
+   /** all false except for highest priority move*/
+   val highestTriggered=unop(derivative, filledTriggered)
+   val highestTriggeredYes=unop(derivative, filledTriggeredYes)
+   /** flips for all priorities */
+   def allFlip:UintV
+    /** selectionne le flip parmis les flip des mouvement proposés */
+    val flipOfMove=neq(highestTriggered&delayedL( allFlip))
+   val prioDet=unary2Bin(filledTriggered )
+   val prioDetYes=unary2Bin(filledTriggeredYes )
+   /** selected positive move has lower priority than selected move, */
+   val isQuiescent:BoolV =lt2(prioDetYes,prioDet)
+
+   /** random integer used for breaking  symetry in case of tournament with equal priority */
+   val prioRand:UintV
+    val prio: UintVx =addLt(prioRand::prioDet)
+   val prioYes: UintVx =addLt(prioRand::prioDetYes)
+   /** nullify prio if quiescent */
+   val prioYesNotQuiescent=andLB2R(~ isQuiescent, prioYes)
+
+
+
+   /*
+      /** initial value of flip cause by movements for movable agents, or inherited for bound agents*/
+     def flipAndPrioCreatedByMoves: (UintV,BoolV,UintV)
+      /** used for mutex tournament, includes priorand */
+      val prio=addLt(delayedL(prioRand::flipAndPrioCreatedByMoves._1))
+      /** flipAndPrioCreatedByMoves stores its results in order not to be called two times */
+      val flipOfMove:BoolV=delayedL(flipAndPrioCreatedByMoves._2)
+      val highestTriggered:UintV=delayedL(flipAndPrioCreatedByMoves._3)
+
+   */
+
+   /** PEs where movements trigger changes in Agent's support. Either by filling, or by emptying
+    flip is eith computed from the move for movableAgent, or  computed from the parent for bounded agent
+    registers where the constraints had a canceling effect*/
+   val flipCancel=  new scala.collection.mutable.LinkedHashMap[String,BoolV]() with Named {}
    /** applies all the constraints on the move */
    val  allFlipCancel: ASTLt[V, UI] ={
      /** computes an IntVUI  whose individual bits are cancel Flips  */
@@ -78,17 +121,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
    // val f:BoolV=False()
      val noFlipCancel=eq0(allFlipCancel)
      val flipAfterLocalConstr: BoolV = noFlipCancel  & flipOfMove
-     //delayedL( flipLocallyConstrained(flipOfMove))}
 
-
-  /** moves are stored in centered form, so that we can restrict them */
-  var moves: HashMap[Int, MoveC] = HashMap()
-   val moves2= new scala.collection.mutable.LinkedHashMap[String,Constr]()
-  /** if move of same priority exists, signal an error */
-  protected def addMoves(m: MoveC, prio: Int) = { //we may have to store set of moves, if we need add move of same priority.
-    assert(!(moves.contains(prio)), "each force must have a distinct priority")
-    moves(prio)=m
-  }
 
 
   /** used for computing flip cancelation depending on impact */
@@ -102,7 +135,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
    /**
     *
     * @param ags one or two agents on which to apply constraint
-    *            constraints are inner classes of agents, so that they can access is.
+    *            Constr is an inner classes of agents, so that it can access its main agent's field.
     */
 
    abstract class Constr(val ags: Array[Agent[_ <: Locus]], val impact: Impact, flip:BoolV) {
@@ -134,7 +167,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
        case One(v) =>  insideS(flip & (if (v) isV else (NisV))) // result also depend on impact
      })
      /** flip is ok if prio is minimum with respect to the other side */
-     def tmp: ASTLt[T[E, V], B] =imply(v(mutrig),ags.head.prio.lt)
+     def tmp: ASTLt[T[E, V], B] =imply(v(mutrig),ags.head.prio.gt)
      /** flip is preserved if no neighbor edge present a problem */
      val where=inside(transfer(tmp))
    }
@@ -145,7 +178,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
        case One(v) =>  insideS(flip & (if (v) isV else (NisV))) // result also depend on impact
      })
      /** flip is ok if prio is minimum with respect to the other side */
-     def tmp=imply(v(mutrig),prio.lt)
+     def tmp=imply(v(mutrig),prio.gt)
      val where=inside(transfer(~tmp))
    }
    /**
@@ -179,7 +212,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
        case One(v) =>  insideS(flip& (if (v) isV else (NisV))) // result also depend on impact
      })
      /** flip is ok if prio is minimum with respect to the other side */
-     def tmp: BoolVf =imply(transfer(v(tritrig)),ags.head.prio.lt3)
+     def tmp: BoolVf =imply(transfer(v(tritrig)),ags.head.prio.gt3)
      /** flip is preserved if no neighbor edge present a problem */
      val where=inside(tmp)
    }

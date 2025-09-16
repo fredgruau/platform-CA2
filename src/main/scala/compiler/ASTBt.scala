@@ -33,7 +33,7 @@ object ASTBt {
   }
 
   def checkUISI(effectivPar: AST[_], opPar: AST[_]) =
-    if (effectivPar.mym.name != opPar.mym.name)
+    if (effectivPar.mym.name != opPar.mym.name && effectivPar.mym.name != B())
       throw new Exception("Faut preserver SI ou UI")
 }
 
@@ -196,7 +196,8 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
         case Call2(f, a, a2) => new Call2(f.asInstanceOf[Fundef2[Any, Any, R]],
           a.asInstanceOf[ASTBt[R]].coalesc(newName),
           a2.asInstanceOf[ASTBt[R]].coalesc(newName))(mym) with ASTBt[R]
-
+        case _ =>
+          throw new Exception("merdouille")
         // case _ => (this.propagate((d: AST[R]) => d.asInstanceOf[ASTBt[R]].coalesc(newName).asInstanceOf[AST[R]])).asInstanceOf[ASTBt[R]]
       }
     }

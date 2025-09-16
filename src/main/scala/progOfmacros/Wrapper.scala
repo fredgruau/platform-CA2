@@ -1,8 +1,8 @@
 package progOfmacros
 
-import compiler.{AST, ASTLt, AntiClock, B, E, F, Locus, Ring, S, SI, T, UI, V, chip, repr}
+import compiler.{AST, ASTBfun, ASTLt, AntiClock, B, E, F, I, Locus, Ring, S, SI, T, UI, V, chip, repr}
 import compiler.AST._
-import compiler.ASTBfun.{Fundef2RP, andRedop, concatRedop, ltUI2, minRedop, minUI, neg, neqUI2, orRedop, orScan, redop, xorRedop}
+import compiler.ASTBfun.{Fundef2RP, andRedop, concatRedop, ltUI2, minRedop, minUI, neg, neqUI2, orRedop, orScan, orScanSI, redop, unaryToBinary2, xorRedop}
 import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.Circuit.iTabSymb
@@ -21,7 +21,12 @@ import progOfmacros.Unop.Unop.getUnopFun
 /** wrapper to call  macro built on the fly, provides more explicit name and simpler syntax
  * */
 object Wrapper {
-  /** Wrappers for comparison macro defined from binary comparators */
+
+  /** Wrappers for Unop macro, defined from just an unary operators  works for UI and SI */
+  def segment1[L<:Locus,R<:compiler.I](arg: ASTLt[L, R])(implicit m:repr[L],ri: repr[R])={
+    val f=getUnopFun(ASTBfun.orScanRight(ri),arg.locus)(m,ri,ri)
+    new Call1(f,arg)(repr.nomLR(m, ri)) with ASTLt[L, R] {}  }
+  /** Wrappers for comparison macro defined from binary comparators  works for UI and SI*/
     def condL[L<:Locus,R<:Ring](arg0: ASTLt[L, B], arg1: ASTLt[L, R],arg2: ASTLt[L, R])(implicit m:repr[L],ri: repr[R])={
       val f=getCondFun[L,R]( arg1.locus)(m,ri)
       new Call3(f,arg0,arg1,arg2)(repr.nomLR(m, ri)) with ASTLt[L, R] {}  }
@@ -32,15 +37,15 @@ object Wrapper {
     val f=getCmpFun[L,UI](neqUI2 , arg1.locus)(m,ri)
     new Call2(f,arg1,arg2)(repr.nomLR(m, compiler.repr.nomB)) with ASTLt[L, B] {}  }
 
-  /** Wrappers for Unop macro, defined from just an unary operators  */
-  def segment1[L<:Locus](arg: ASTLt[L, UI])(implicit m:repr[L],ri: repr[UI])={
-    val f=getUnopFun(orScan, arg.locus)(m,ri,ri)
-    new Call1(f,arg)(repr.nomLR(m, compiler.repr.nomUI)) with ASTLt[L, UI] {}  }
 
   def not[L<:Locus,R<:Ring](arg: ASTLt[L, R])(implicit m:repr[L],r: repr[R])={
     val f:Fundef1[(L,R),(L,R)]=getUnopFun(neg[R], arg.locus)(m,r,r)
     new Call1[(L,R),(L,R)](f,arg)(repr.nomLR(m, r)) with ASTLt[L, R] {}
   }
+  def unary2Bin[L<:Locus](arg: ASTLt[L, UI])(implicit m:repr[L],ri: repr[UI])={
+    val f=getUnopFun(unaryToBinary2, arg.locus)(m,ri,ri)
+    new Call1(f,arg)(repr.nomLR(m, compiler.repr.nomUI)) with ASTLt[L, UI] {}  }
+
 
   /** binary operators */
   def xorBin[L<:Locus,R<:Ring](arg1:ASTLt[L, R],arg2:ASTLt[L,R])(implicit m:repr[L],q:repr[R]):ASTLt[L,R]={

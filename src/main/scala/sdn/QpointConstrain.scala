@@ -1,18 +1,19 @@
 package sdn
 
-import compiler.ASTL.{delayedL, sym, transfer}
-import compiler.ASTLfun.{andR, apex, e, f, imply, neighbors, orR, v}
-import compiler.SpatialType.{BoolE, BoolEf, BoolF, BoolV, BoolVe}
+import compiler.ASTL.{delayedL, send, sym, transfer}
+import compiler.ASTLfun.{andR, apex, concatR, e, elt, f, imply, neighbors, orR, v}
+import compiler.SpatialType.{BoolE, BoolEf, BoolF, BoolV, BoolVe, UintV, UintVe}
 import compiler.{AST, ASTLt, B, E, F, Locus, T, V}
 import dataStruc.{BranchNamed, Named}
-import progOfLayer.Sextexrect.chooseMinOf
+import progOfLayer.Sextexrect.{chooseMaxOf, weakCmpProdZero, weakCmpProdtwo}
 import sdn.rando
 import sdn.{MovableAg, MovableAgentV}
 import progOfmacros.Comm.{apexV, neighborsSym}
 import progOfmacros.Compute
-import progOfmacros.Compute.{implique, impluq}
+import progOfmacros.Compute.{concat3V, implique, impluq}
 import progOfmacros.Wrapper.{exist, existS, inside, insideS, not}
 import progOfmacros.RedT.clock2
+import sdn.Util.addSymUI
 /** field needed to compute the contstraint of  a quasipoint, and possibly elsewehere */
 trait QPointFields {
   self: MovableAgentV => //quasiPoints are blobs.
@@ -29,7 +30,14 @@ trait QPointFields {
   /** true for the face inside a qpt consiting exactly of three adjacent  vertices */
   val tripleton: BoolF = insideS[V, F](isV)
   val tripletonV: BoolV = existS[F, V](tripleton)
-  val choose=chooseMinOf(prio)
+  //val choose: BoolVe =chooseMinOf(prio)
+
+
+  val choose=chooseMaxOf(prioYesNotQuiescent)
+
+
+
+
 }
 
 /** defines all the constraint that should be met by a quasipoint, except for blobs which might not be necessary if Gabriel centers are computed. */

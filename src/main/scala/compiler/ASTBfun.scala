@@ -159,6 +159,10 @@ object ASTBfun {
     val (xb, yb, zb) = (p[B]("x"), p[B]("y"), p[B]("z"));
     Fundef3("carry", (xb & yb) | (zb & (xb | yb)), xb, yb, zb)
   }
+  val SI2UI: Fundef1[SI, UI] = { //to be coherent with the other fundef declared as val, we call it uitosi insted uitosidef
+    val xsi = p[SI]("xsiToui")
+    Fundef1("si2ui",  Concat2( xsi,False()), xsi) //on rajoute false pour pas qu'il gueule
+  }
   val uI2SI: Fundef1[UI, SI] = { //to be coherent with the other fundef declared as val, we call it uitosi insted uitosidef
     val xui = p[UI]("xuiToSi")
     Fundef1("uI2SI", Concat2( xui,False()), xui)
@@ -368,9 +372,10 @@ object ASTBfun {
 
   /** does as if the argument was a signed integer, when halving. This means that the last bit which is the sign, is preserved */
   val halfSIsurUI={
-    val xh = p[UI]("xh");
-    val last=Elt(-1,xh)
-    Fundef1("halfSIsurUI", Scan1(xh, other, last, Right(), initUsed = true), xh)
+    val xhhh = p[UI]("xhhh");
+    val last=Elt(-1,xhhh) //last ne passe pas dans le scan, j'ai l'habitude de mettre une valeur?
+    //Fundef1("halfSIsurUI", Scan1(xhhh, other, last, Right(), initUsed = true), xhhh) //j'arrive pas a compiler ca
+    Fundef1("halfSIsurUI", Scan1(xhhh, other, True(), Right(), initUsed = true), xhhh)//ca semble que ca marche avec cuila
   };
 
   private val (halveBSI, halveBUI) = {
@@ -414,7 +419,7 @@ object ASTBfun {
         with ASTBt[B]).asInstanceOf[ASTBt[UI]], x)
   }
 
-
+/** ici it is an example of how to corectly handle boolean function working identically on UI and SI */
   private val (orScanRightSI, orScanRightUI) = {
     def orScanRightI[R <: I](implicit n: repr[R]): Fundef1R[R] = {
       val x = p[R]("orScanRightB");
@@ -469,6 +474,11 @@ object ASTBfun {
     Fundef1("orScan",segmentOf1, difference ) //todo ecrire des xor et des and pour les ui
   } //TODO a faire correct en utilisant ltUI.
 
+  val orScanSI: Fundef1[SI, SI] = {
+    val difference = p[SI]("diff");
+    val segmentOf1: Sint = Scan1(difference, orB, False(), Right(), initUsed = false) //fills with one, starting from the rightmost 1 to the first leftmost least significant bit
+    Fundef1("orScan",segmentOf1, difference ) //todo ecrire des xor et des and pour les ui
+  } //
   /** applied after orscan so as to identify the first true bit, which will be marked as one. Return null otherwise */
   val derivative: Fundef1[UI, UI] = {
     val segmentOf1 = p[UI]("segment");
@@ -539,9 +549,12 @@ object ASTBfun {
   }
 
   def xorRedop[R <: Ring](implicit n: repr[R]): redop[R] = {
-    if (n.name.isInstanceOf[SI]) (xorSI.asInstanceOf[Fundef2[R, R, R]], Intof[SI](0).asInstanceOf[ASTB[R]])
-    if (n.name.isInstanceOf[UI]) (xorUI.asInstanceOf[Fundef2[R, R, R]], Intof[UI](0).asInstanceOf[ASTB[R]])
-    else (xorB.asInstanceOf[Fundef2[R, R, R]], False().asInstanceOf[ASTB[R]])
+    if (n.name.isInstanceOf[SI])
+      (xorSI.asInstanceOf[Fundef2[R, R, R]], Intof[SI](0).asInstanceOf[ASTB[R]])
+    else if (n.name.isInstanceOf[UI])
+      (xorUI.asInstanceOf[Fundef2[R, R, R]], Intof[UI](0).asInstanceOf[ASTB[R]])
+    else
+      (xorB.asInstanceOf[Fundef2[R, R, R]], False().asInstanceOf[ASTB[R]])
   }
 
 
@@ -605,7 +618,7 @@ object ASTBfun {
 /** input is an unary sequence of up to 3 boolean.
  * It is a sequence of true followed by a sequence of false.
  * output is the binary code 100->10, 110->01, 111-> 11 */
-  val unaryTonBbinary2: Fundef1R[UI] = {
+  val unaryToBinary2: Fundef1R[UI] = {
     val (ucode) = p[UI]("ucode")
     val alt=new Call1[UI,UI](doublePeriod,ucode) with ASTBt[UI] {}
     val clockGoDo=new Call1[UI,UI](clockGoingDown,alt) with ASTBt[UI] {}

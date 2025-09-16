@@ -18,7 +18,7 @@ import scala.collection.{mutable, _}
 import scala.reflect.ClassTag
 import scala.language.implicitConversions
 import dataStruc.Util.{composeAll2, dupliqueOrTriplique, rot, rotPerm, rotR}
-import sdn.{Compar, Compar3, ComparApex}
+import sdn.{Compar, Compar3, ComparApex, ComparApex2, ComparSI}
 /**
  * todo we must distinguish between the wrapper of the constructors, and the higher order function which can be defined in another object
  * At some point, we decided to store the type information for each distinct constructor, in order to have direct access to this info
@@ -185,8 +185,11 @@ object SpatialType {
   type IntEf = ASTLt[T[E, F], SI];
   type IntFe = ASTLt[T[F, E], SI]
   type UintV = ASTLt[V, UI];
+  type SintV = ASTLt[V, SI];
+  type SintE = ASTLt[E, SI];
   /** Unsigned int for which lt,gt,eq,le,ge are defined submembers */
-  type UintVx = UintV with Compar with ComparApex with Compar3;
+  type UintVx = UintV with Compar with ComparApex2 with Compar3;
+  type SintVx = SintV with ComparSI
   type UintE = ASTLt[E, UI];
   type UintF = ASTLt[F, UI]
   type UintEv = ASTLt[T[E, V], UI];
@@ -336,8 +339,13 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
             } //else if (op._1.body.mym.name==B())    1//we can reduce int an produce boolean, on Edges.
             else
               argBitSize()
-          case BinopEdge(op,arg,  _, _, _) =>if (op.body.mym.name==B()) 1 else
-           newtSymb(arg.name).nb //on pari que c'est la taille de l'operande.//throw new Exception("faut chercher le bitsize de l'op")
+          case BinopEdge(op,arg,  _, _, _) =>
+            var anew = arg.bitIfyAndExtend(cur, ASTbitSize, newtSymb);
+            if (op.body.mym.name==B()) 1 else
+             {
+               val name=if(arg.name==null) arg.asInstanceOf[Read[_]].which else arg.name
+               newtSymb(name).nb //abracadabra2
+             }  //on pari que c'est la taille de l'operande.//throw new Exception("faut chercher le bitsize de l'op")
           case Send(_) => ASTbitSize(newthis.asInstanceOf[Neton[AST[_]]].args.head)
           case RedopConcat(exp, _, _) =>
             this.locus.fanout   //for the concat redop, the number of bit must take into account the arity (2,3, or 6)

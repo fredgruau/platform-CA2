@@ -118,9 +118,15 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
           (op.p2.nameP -> y.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, env))
         op.arg.asInstanceOf[ASTBt[B]].boolifyForIndexI(i, l, null, newEnv)
       case sc@Scan1(x, op: Fundef2R[B], v, _, initUsed) =>
-        if (l.firstIter(i) && initUsed)
+        if (l.firstIter(i) && initUsed) {
           affBoolConst(sc.scanVar, v, l)
-        else {
+/*          v match {
+            case Elt(-1,_) => l.readWithConst(sc.scanVar) //grosse entourloupe pour dédoubler le dernier bit dans halfSIsurUI
+              //print(l.readWithConst(sc.scanVar))
+              //throw new Exception("here")
+            case _ => affBoolConst(sc.scanVar, v, l)
+          }*/
+        } else {
           val firstArg =
             if (l.firstIter(i)) v
             else l.readWithConst(sc.scanVar)
@@ -233,7 +239,7 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
       case Neg(x) => "~"
       case Mapp1(op, x) => "Mapp1" + op.name //+ mym.name
       case Mapp2(x, y, op) => "Mapp2" + op.name //+ mym.name
-      case Scan1(x, op, _, dir, _) => "Scan1" + op.name + dir //+ mym.name
+      case Scan1(x, op, init, dir, _) => "Scan1" + op.name + init + dir //+ mym.name
       case Scan2(x, y, op, _, dir, _) => "Scan2" + op.name + dir //+ mym.name
       case Reduce(x, op, _) => "Red" + op.name
       case Shift(x, right) => (if (right) ">>>" else "<<")
@@ -326,7 +332,10 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
 
   override def unfoldInt(t: TabSymb[InfoNbit[_]]): List[ASTBt[B]] = this.asInstanceOf[ASTB[_]] match {
     case Elt(nb, arg) =>
+
       val l = arg.unfoldInt(t)
+      if(nb >= l.size)
+        throw new Exception("bordelConcatChoose3bitdeprioRand")
       List(l(nb)) //we read the nbth element of the boolean list
     case Concat2(arg1, arg2) => arg1.unfoldInt(t) ::: arg2.unfoldInt(t)
     case True()=>List(True())

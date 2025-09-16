@@ -16,13 +16,14 @@ import dataStruc.{BranchNamed, Named}
 import progOfmacros.Topo.brdin
 import sdn.Util.{addBlobE, addBlobVe, safeGrow}
 import sdn.{Blob, BlobE, BlobV, Compar, Compar3, ComparApex}
-/** same as GrowVorV but based on a boolVe support  */
+/** same as GrowVorV but based on a boolVe support  MARCHE PAS*/
 class Grow() extends Layer[(V, B)](1, "global") with BoolV  with BranchNamed {
   val is:BoolV=delayedL(this)
   val edge: ASTLt[E, B] =borderS(is)
-  val blb=addBlobVe( brdin(edge,is))
-  override val next: AST[(V, B)] = this | safeGrow(blb)  //we extend the blob around the border brdV, except for meeting meeting points
-  show(is)
+  val brd=brdin(edge,is)
+  val blb=addBlobVe( brd,edge)
+  override val next: AST[(V, B)] = this | safeGrow(blb)  //we extend the blob around the border brdV, except for meeting points
+  show(is,blb.meetE,brd)
 }
 /** test growVorV/E/Ve by wrapping in a useless constant layer */
 class GrowTest()  extends ConstLayer[V, B](1, "global")  with BranchNamed{

@@ -4,7 +4,7 @@ import compiler.B
 import compiler.AST._
 import compiler.SpatialType.{BoolEv, BoolVe, _}
 import compiler.ASTBfun.{addRedop, andRedop, derivative, minSignRedop, orRedop, p, redop, uI2SI, xorRedop}
-import compiler.ASTL._
+import compiler.ASTL.{transfer, _}
 import compiler.ASTLfun._
 import compiler.ASTLt._
 import compiler.Circuit.hexagon
@@ -31,7 +31,8 @@ object Grad {
     val slopEv: BoolEv = ltSI(grad6) //when sending back the result to EV, we have to invert again towards the center
     val slopgt: BoolVe = cond(chip.borderVe.df, transfer(slopEv), false) //faut definir ckispasse au bord. we put zero if unedfined
     val level: BoolE = ~reduce(orRedop[B], slopEv) //its equal if it is neither lt nor gt
-    val delta: IntV = reduce(minSignRedop, sign(extend(4, transfer(grad6)) + 2)) //we need to add 2, using one more bit, in order to add modulo 16 and not 8
+    //val delta: IntV = reduce(minSignRedop, sign(extend(4, transfer(grad6)) + 2)) //we need to add 2, using one more bit, in order to add modulo 16 and not 8
+    val delta: IntV = reduce(minSignRedop, sign(extend(7, transfer(grad6)) + 2)) //we need to add 2, using one more bit, in order to add modulo 16 and not 8
     //show(opp) //breaks a cycle
     level.setName("level"); //vortex.setName("vortex")
     grad3.setName("grad");
@@ -114,7 +115,7 @@ object Grad {
     /** segment is used for computing eq, so we  compute it separately*/
     val segmentOf1 =pL[E, UI]("segment")
     /** this was already computed when xor was computed, but we save memory by recomputing it, and it is small */
-    val dEf: UintEf = apexEui(f(d))
+    val dEf: UintEf = /*apexEui(f(d))*/  transfer(sym(transfer(f(d)))) //on ne peut pas appeler une macro depuis une macro
     /** binop edge that forget the second component */
     val devLeft:UintE= firstEdge(dEf);
     /** true if both values are different */
@@ -122,8 +123,10 @@ object Grad {
     val lt1: BoolE =neq(unop(derivative, segmentOf1)&devLeft);
     /** strictly greater means not strictly smaller, and different */
     val gt1:BoolE= ~lt1 & diff;
-    val lt: BoolEf = send(List(lt1,gt1))
-    Fundef2("grad.lt", lt, d,segmentOf1)
+    val ltlt: BoolEf = send(List(lt1,gt1))
+    devLeft.setName("devLeft")
+    dEf.setName("def")
+    Fundef2("grad.ltapex", ltlt, d,segmentOf1)
   }
 
   /** Calls pure lt, result will be true on the side of the cell having smallest value  */
@@ -131,6 +134,28 @@ object Grad {
     new Call2[(V,UI),(E,UI),(T[E, F], B)] (ltDefApex, d,s)with BoolEf
   }
 
+
+  val ltDefApex2: Fundef3[(T[E, F], UI),(E, UI), (E, B),(T[E, F], B) ] =  {
+    /** main variable that we want to compare */
+    val deef = pL[T[E, F], UI]("deef")
+   // deef.setName("pdeef")
+    /** segment is used for computing eq, so we  compute it separately*/
+    val deriv =pL[E, UI]("segmentderiv")
+    val difff=pL[E, B]("difff")
+    /** this was already computed when xor was computed, but we save memory by recomputing it, and it is small */
+     val devLeft:UintE= firstEdge(deef);
+    /** true if both values are different */
+    val lt1: BoolE =neq(deriv & devLeft);
+    /** strictly greater means not strictly smaller, and different */
+    val gt1:BoolE= ~lt1 & difff;
+    val gtgt: BoolEf = send(List(lt1,gt1))  //j'ai inversé.
+    Fundef3("grad.ltapex2", gtgt, deef,deriv, difff)
+  }
+
+  /** Calls pure lt, result will be true on the side of the cell having smallest value  */
+  def ltApex2(deef: UintEf,deriv:UintE,diff:BoolE)(implicit n: repr[B],l:repr[T[E,V]]): BoolEf = {
+    new Call3[(T[E, F], UI),(E, UI), (E, B),(T[E, F], B) ]  (ltDefApex2, deef,deriv, diff) with BoolEf
+  }
 
 
 

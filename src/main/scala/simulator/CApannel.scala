@@ -32,7 +32,7 @@ object CApannel{
                           polygon: Polygon,
                           fontName: String = "SansSerif",
                           fontStyle: Int = java.awt.Font.PLAIN,
-                          maxFontSize: Int = 28,
+                          maxFontSize: Int = 12,
                           minFontSize: Int = 6
                         ): Option[(Font, Int, Int)] = {
 
@@ -100,7 +100,7 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
 
 
       // Iterate from large to small font size
-      def getFittedFontOpt: Option[Font] = (38 to 6 by -1).collectFirst {
+      def getFittedFontOpt: Option[Font] = (24 to 6 by -1).collectFirst {
         case size =>
           val font = new Font("SansSerif",java.awt.Font.PLAIN, size)
           val fm: FontMetrics = g.getFontMetrics(font)
@@ -275,6 +275,7 @@ class CApannel(width: Int, height: Int, env: Env, progCA: CAloops2) extends Pane
     /** remplis tout les  polygones du voronoi avec les textes qui correspondent au displayed loci */
     def drawCATextVoronoi() = {
       val f=g.getFittedFontOpt
+      val u=0
       //env.computeVoronoirColors() //painting allways need to recompute the colors, it would seem
       //for (v: Voroonoi <- env.medium.voronoi.values) {
       for(p<-env.medium.displayedPoint){

@@ -282,6 +282,7 @@ object ASTLfun {
    * we add a "L" to make sure we can access it.
    * todo not sure about  the need to declare that implicit, also, this has already been declared */
   def uI2SIL[L <: Locus](d: ASTLt[L, UI])(implicit m: repr[L]) = unop(uI2SI, d)
+  def sI2UIL[L <: Locus](d: ASTLt[L, SI])(implicit m: repr[L]) = unop(SI2UI, d)
   def b2SIL[L <: Locus](d: ASTLt[L, B])(implicit m: repr[L]) = unop(b2SI, d)
 
 

@@ -21,7 +21,7 @@ object RedS {
    * source and target simplicial locus, as well as reduction operation */
   private def redsfunName[S1 <: S, S2 <: S, R <: Ring](r: redop[R], l: S1)(implicit m: repr[S1], n: repr[S2], p: repr[R]) = {
     val y = 0
-    ("" + "redS" + r._1.name + "." + l.shortName + n.name.shortName).toLowerCase
+    ("" + "redS" + r._1.name + "." + l.shortName + n.name.shortName ).toLowerCase
   }
 
 

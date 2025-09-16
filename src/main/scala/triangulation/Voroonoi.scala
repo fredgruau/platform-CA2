@@ -24,15 +24,19 @@ class Voroonoi(val center: Vector2D) {
   var int32Code:Int=0
   def addBit(bit:Boolean)={
     val newbit=if(bit) 1 else 0
-      int32Code=int32Code<<1 | newbit}
+      int32Code=int32Code<<1 | newbit} //multiplie par 2 et ajoute le nouveau bit.
   def textifyBits(ls:List[String])=
    {
-
-     for(s<-ls) {
+     if(ls.nonEmpty)  for(s<-ls) {
       if ((int32Code & 1) == 1) addText(s)
-      int32Code=int32Code>>>1
+        int32Code=int32Code>>>1
     }
-   if(int32Code !=0)
+     else {
+       val codeInt:String =""+int32Code
+       addText(codeInt)
+       int32Code=0
+     }
+     if(int32Code !=0)
      print(22)
    assert(int32Code==0) //on devrait avoir utilisé tout les bits.
    }

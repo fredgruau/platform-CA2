@@ -2,16 +2,16 @@ package sdn
 
 import compiler.AST.{Layer, delayed, pL}
 import compiler.ASTB.True
-import compiler.ASTBfun.{addRedop, orRedop, redop}
-import compiler.ASTLfun.{cond, e, ltSI, neighbors, orR, reduce, uI2SIL, v}
-import compiler.ASTL.{delayedL, send, transfer}
+import compiler.ASTBfun.{addRedop, derivative, orRedop, redop, unaryToBinary2}
+import compiler.ASTLfun.{cond, e, ltSI, neighbors, neq, orR, orScanRight, reduce, uI2SIL, v}
+import compiler.ASTL.{delayedL, send, transfer, unop}
 import compiler.SpatialType.{BoolE, BoolEv, BoolV, BoolVe, IntE, IntEv, IntV, IntVe, UintV, UintVx}
 import compiler.{AST, ASTLfun, ASTLt, B, E, Locus, Ring, SI, T, UI, V, repr}
 import compiler.repr.nomV
 import dataStruc.BranchNamed
 import dataStruc.DagNode.EmptyBag
 import progOfmacros.Comm.neighborsSym
-import progOfmacros.Wrapper.{borderS, exist, xorBin}
+import progOfmacros.Wrapper.{borderS, exist, unary2Bin, xorBin}
 import sdn.{Agent, Compar, carrySysInstr}
 import sdn.Util.{addLt, addSym, randUintV}
 import sdntool.DistT
@@ -20,14 +20,10 @@ import scala.collection.immutable.HashMap
 /** list the  movable-agent's methods which needs a processing dependant  on the locus L in V,E,Ve, F...
  * will be implemented by Vagent or VeAgent*/
 trait vef[L<:Locus]{
-  /** convert current value of flip, into a modification of the agent'support, in order to update next */
+  /**  computes the new agent'support from flip.
+   * for V agent it is a simple xor,
+   * for Ve agents there will be a non trivial computation */
   def flip2next: AST[(L, B)]
-  /** convert a centered move into a flip
-   * invariant to check invade and empty are not simultaneously true**/
-  def move2flip(m:MoveC1):BoolV
-  /** convert a centered move with a possible "no component" into a flip with a possible "noflip component"
-   * invariant to check yes and no are not simultaneously true*/
-  def move2yesNoFlip(m:MoveC):(BoolV,Option[BoolV])
 }
 /** contains fields we often use on Vagent.  made lazy because possibly not used */
 trait UtilVagent extends BranchNamed{
@@ -46,59 +42,65 @@ trait MovableAgentV extends MovableAg[V] with vef[V] with UtilVagent {
   //override val NisV=  ~isV
   override def flip2next=  delayedL( xorBin(flipAfterLocalConstr,muis) )//delayed is necessary in order to get the very last update of flip
 
-  /** convert a move into a flip */
-  override def move2flip(m:MoveC1):BoolV= {
-   // val invade = exist(m.push.asInstanceOf[Sym].sym);  val empty = m.empty   //bugif empty & invade
-    val invade = exist(neighborsSym(m.push));  val empty = m.empty   //bugif empty & invade
-
-
-    //  val invade = exist(neighborsSym(m.push));  val empty = m.empty   //bugif empty & invade
-    cond(isV,empty,invade)
-  }
-  override def move2yesNoFlip(m:MoveC):(BoolV,Option[BoolV])=m match{
-    case m:MoveC1=> (move2flip(m),None)
-    case m:MoveC2=> (move2flip(m.yes),Some(move2flip(m.no)))
-  }
 }
 
 
-/** support location is computed from parent's support (input neighbors of the DAG */
-abstract class BoundAg[L <: Locus](implicit m: repr[L]) extends  Agent[L]{
-  /** describes how to computes flip from parents */
-  val inheritedFlip:BoolV
-  /** initial flip is computed from the parent */
-  override def flipCreatedByMoves: BoolV = inheritedFlip
-}
-/**  code  common to Movable agents*/
+/**  code  common to Movable agents which stores a support
+ * and can directly apply the move on this support in order to modify it */
 abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] with vef[L]
   with EmptyBag[sdn.MuStruct[_<: Locus,_<:Ring]]  {
-  override val prioRand= addLt(randUintV(3)).asInstanceOf[UintVx] //si on met pas asInstance il gueule non compatibilité de override entre addLt e UintVx
-  /** for the moprioment, priority is pure random.  formulation  casse gueule, car une variable a deux noms de reflection possible: prio et prioRand*/
-  override val prio =prioRand //pour le moment on n'a pas encore plusieurs move possible, dans pas longtemps on va programmer prio et initalflip
 
-  //method that depends on the spatial type of the support:
+  override def allTriggered:UintV={
+    moves.map(_.values.map(_.triggered).reduce(_ | _).asInstanceOf[UintV]).toList.reduce(_ :: _)
+  }
+  override def allTriggeredYes:UintV={
+    moves.map(_.values.map(_.triggeredYes).reduce(_ | _).asInstanceOf[UintV]).toList.reduce(_ :: _)
+  }
+  override def  allFlip: UintV ={
+    moves.map(_.values.map(_.move2flip(isV)).reduce(_ | _).asInstanceOf[UintV]).toList.reduce(_ :: _)
+  }
 
 
-  /** Movable Agent's support is memorized in a layer a movable agent is a mustruct, to it is is called muis. */
+/*
+
+  var tmp:(UintVx,BoolV)=null
+  override def flipAndPrioCreatedByMoves:(UintV,BoolV,UintV)={
+    /** todo: when reducing with |, we must verify that a single move is triggered, among those of equal priority */
+    val triggered: UintV =moves.map(_.values.map(_.triggered).reduce(_ | _).asInstanceOf[UintV]).toList.reduce(_ :: _)
+    val filledTriggered=orScanRight(triggered)
+    /** all false except for highest priority move*/
+    val highgestTriggered=unop(derivative, filledTriggered)
+    /** flips for all priorities */
+    val allFlip: UintV =moves.map(_.values.map(_.move2flip(isV)).reduce(_ | _).asInstanceOf[UintV]).toArray.reduce(_ :: _)
+    /** selectionne le flip parmis les flip des mouvement proposés */
+    ( unary2Bin(filledTriggered ),neq(highgestTriggered&allFlip),highgestTriggered)
+    //we consider only a single move
+    //move2flip(moves(10).asInstanceOf[MoveC1]) //on sait qu'on a mis 9 sur repulse, todo: mettre cela d'aplomb
+  }
+*/
+
+  /** a random priority is needed to help finalize tournament, in case of equality */
+  override val prioRand= {
+    val x=randUintV(1)
+    (x ).asInstanceOf[UintV]
+  } //sans "asInstance" il gueule non compatibilité de override entre addLt e UintVx
+
+  /** Movable Agent's support. It is memorized in a layer a movable agent is a mustruct, so it is  called muis. */
   override val muis=new Layer[(L, B)](1, "global") with ASTLt[L,B] with Stratify [L,B] with carrySysInstr  {
     override val  next: AST[(L, B)] = flip2next.asInstanceOf[ASTLt[L,B]]   }
 
-
-  /** a random priority is needed to help finalize tournament, in case of equality */
-  // val prioRand = ASTLfun.concat2UI(new Rand(), new Rand()) //faudra tester
   /** les moves des movable viennent directement d'une force, et ceux des bounded ? faut voir, si ca se trouve aussi. */
-  def move(force: Force) = addMoves(force.action(this), force.prio)
-  /** convert centered move into one single BoolV flip */
-
-
-  /** priority of the force causing the move. priority 0 is strongest
-   * prio is defined for bounded agents, because it could happen they are also submitted to mutex
-   * they will inherit the priority from their parents, pb if there is two parents.
-   * */
-  override def flipCreatedByMoves:BoolV={
-    //we consider only a single move
-    move2flip(moves(10).asInstanceOf[MoveC1]) //on sait qu'on a mis 9 sur repulse, todo: mettre cela d'aplomb
+  def force(priority:Int, name:String,shortName:Char, force: Force) = {
+    addMoves(priority, name, shortName, force.action(this))
   }
+
+  /** for the moment, priority is pure random.  formulation  casse gueule,
+   * car une variable a deux noms de reflection possible: prio et prioRand
+   * priority of the force causing the move. priority 0 is weakest
+   * prio is defined for bounded agents, because it could happen they are also submitted to mutex
+   *  they will inherit the priority from their parents, pb if there is two parents.
+   */
+  //override val prio =prioRand //pour le moment on n'a pas encore plusieurs move possible, dans pas longtemps on va programmer prio et initalflip
 
 
   /** for movableAgent, canceling of flip is done by  directly voiding the agent's flip! */
@@ -106,4 +108,14 @@ abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] wit
 }
 
 
+
+/** support location is computed from parent's support (input neighbors of the DAG */
+abstract class BoundAg[L <: Locus](implicit m: repr[L]) extends  Agent[L]{
+  /** describes how to computes flip from parents */
+  val inheritedFlip:BoolV
+  /** initial flip is computed from the parent */
+  override def allTriggered:UintV=null;
+  override def allTriggeredYes:UintV=null
+ // override def flipAndPrioCreatedByMoves: (UintVx,BoolV,UintV) = (null,inheritedFlip,null)
+}
 
