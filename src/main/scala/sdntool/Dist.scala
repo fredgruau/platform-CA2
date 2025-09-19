@@ -11,6 +11,7 @@ import compiler.Circuit.hexagon
 import compiler.{ASTLt, _}
 import compiler.SpatialType._
 import dataStruc.{BranchNamed, Named}
+import progOfStaticAgent.{Homogeneize, Leader}
 import progOfmacros.Comm.neighborsSym
 import progOfmacros.{Grad, Wrapper}
 import progOfmacros.Wrapper.{borderS, exist, existS, inside, neqUI2L}
@@ -39,6 +40,8 @@ class MuDist(val source: MuStruct[V, B],val bitSize:Int)extends MuStruct [V,SI] 
   //adds a slow constraint to avoid vortex creation
   source match{
     case ag: sdn.Agent[V]=>
+      /** moving to forbidden would create a source in a negative distance
+       * that would hence not be able to correctly decrease its distance level */
       val forbidden:BoolV= ASTLfun.isneg(muis.pred)
       val  slow=new ag.CancelFlipIf(One(false),forbidden, ag.flipOfMove ) // agent should not invade cells where distance is negative
       ag.constrain("slow",'w',slow)
@@ -72,8 +75,7 @@ class MuDistGcenter(val gc:gCenter) extends MuStruct [V,SI] {
 
   val vortex: BoolF = andR(transfer(cacOld(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
   bugif(vortex) //todo, mettre aussi un bug si y a un écart  sur la source plus grand K en valeur absolue, K reste a déterminer
-  shoow( gap, sloplt, level, gcenterEorV) // necessary so as to use all parameters returned by slopeDelta
-  shoow(vortex)
+  shoow( gap, sloplt, level, gcenterEorV) // necessary so as to use all parameters returned by slopeDeltashoow(vortex)
 
   val repulse: Force = new Force() {
     override def actionV(ag: MovableAgentV): MoveC = {
@@ -94,13 +96,14 @@ trait DistT {
   val d = new MuDist(self,3);
   //show(d); les show doivent etre fait dans le main
 }
+
 /** adds gabriel centers, uses blob computation on slopelt, works like magic */
 trait gCenter{
   self:DistT=> //there is a distance already
 
  /** on calcule le brdE séparement, parceque on s oupconne que a cause de pb de radius
  le calcul de brdE a partir de brdEv est faux.*/
-  val dBrdE:BoolE=addLtSI(d.muis.pred).diff  //ya moyen de faire ca mieux
+  val dBrdE:BoolE=(addLtSI(d.muis.pred)).diff  //ya moyen de faire ca mieux
   val b=addBlobVe(d.sloplt,dBrdE)
   val issV:BoolV=this.asInstanceOf[MovableAgentV].isV
 
