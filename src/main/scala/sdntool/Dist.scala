@@ -8,7 +8,7 @@ import compiler.ASTL._
 import compiler.ASTLfun.{e, _}
 import compiler.ASTLt._
 import compiler.Circuit.hexagon
-import compiler.{ASTLt, _}
+import compiler.{ASTLt, chip, _}
 import compiler.SpatialType._
 import dataStruc.{BranchNamed, Named}
 import progOfStaticAgent.{Homogeneize, Leader}
@@ -73,9 +73,9 @@ class MuDistGcenter(val gc:gCenter) extends MuStruct [V,SI] {
   val incrOld = cond(delayedL(gcenterEorV), sign(opp), deltag)
   val incr = cond(delayedL(gc.gCenterV), sign(opp), cond(delayedL(gc.gCenterE), sign(opp+2), deltag))
 
-  val vortex: BoolF = andR(transfer(cacOld(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
+  val vortex: BoolF = chip.borderF.df & andR(transfer(cacOld(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
   bugif(vortex) //todo, mettre aussi un bug si y a un écart  sur la source plus grand K en valeur absolue, K reste a déterminer
-  shoow( gap, sloplt, level, gcenterEorV) // necessary so as to use all parameters returned by slopeDeltashoow(vortex)
+  shoow( gap, sloplt, level, gcenterEorV,vortex) // necessary so as to use all parameters returned by slopeDeltashoow(vortex)
 
   val repulse: Force = new Force() {
     override def actionV(ag: MovableAgentV): MoveC = {

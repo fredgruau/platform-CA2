@@ -37,7 +37,8 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
    val constrs= new scala.collection.mutable.LinkedHashMap[String,Constr]()
    def codeConstraint: Iterable[String] =constrs.keys.toList.map(_.charAt(0).toString)
    def showConstraint={ shoowText(allFlipCancel,codeConstraint.toList)}
-   def codeMove:Iterable[String] =moves.map(_.keys.head.charAt(0).toString)
+   def codeMove:Iterable[String] =
+     moves.map(_.keys.head.charAt(0).toString)
    def showMoves={ shoowText(highestTriggered,codeMove.toList)}
    def showPositiveMoves={ shoowText(highestTriggeredYes,codeMove.toList)}
 

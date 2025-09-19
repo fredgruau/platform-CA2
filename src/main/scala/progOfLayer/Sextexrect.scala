@@ -7,11 +7,10 @@ import compiler.SpatialType.{BoolV, BoolVe, SintV, UintV, UintVe, UintVx}
 import compiler.{ASTLt, B, UI, V}
 import dataStruc.BranchNamed
 import progOfLayer.Sextexrect.{chooseMaxOf, sharpCmpNoMin, weakCmpProdZero, weakCmpProdtwo}
-
 import progOfmacros.Compute.concat3V
 import progOfmacros.Wrapper.{condL, ltUI2L, neqUI2L, not}
 import sdn.Globals.root4naming
-import sdn.Util.{addSymUI, oneThirdRandBit, randConstUintV}
+import sdn.Util.{addSymUI, oneThirdRandBit, randConstUintV, splitInto6}
 
 /** tests the lt macro, containts a bugif */
 
@@ -19,7 +18,7 @@ class   Sextexrect() extends ConstLayer[V, B](1, "global")  with BranchNamed{
  //we want a constant random to check that selected direction changes of time when two
  //or more vertices reach the minimum.
   val prioRand = randConstUintV(3) //rand1::rand2
-  val choose=chooseMaxOf(prioRand)
+  val choose=chooseMaxOf(prioRand,3)
  show(prioRand,choose)
 
  /*
@@ -107,16 +106,23 @@ object Sextexrect {
   sextex
  }
 
- def chooseMaxOf(prio: UintV): BoolVe={
- val voisins: UintVe = addSymUI(e(prio)).symUI // symUI est un boolVe qui  va contenir les voisins
+ def chooseMaxOf(prio: UintV,k:Int): BoolVe={
+ /**  contients les 6 voisins dans l'ordre clock: east,se,sw, west, nw,ne */
+ val voisins: UintVe = addSymUI(e(prio)).symUI
+  /**  récupére tout les bits de tout ces voisins, reste ensuite a  les regrouper en paquet, un par voisin*/
  val nasI: UintV = concatR(voisins) //on récupére 18 bits a la suite pour 6 voisins, chacun 3 bits,
- val (n0, n1, n2, n3, n4, n5) = (elt(0, nasI), elt(1, nasI), elt(2, nasI), elt(3, nasI), elt(4, nasI), elt(5, nasI)) // aprés on les numérote
+
+
+/*  val (n0, n1, n2, n3, n4, n5) = (elt(0, nasI), elt(1, nasI), elt(2, nasI), elt(3, nasI), elt(4, nasI), elt(5, nasI)) // aprés on les numérote
  val (n6, n7, n8, n9, n10, n11) = (elt(6, nasI), elt(7, nasI), elt(8, nasI), elt(9, nasI), elt(10, nasI), elt(11, nasI)) //aprés on les numérote
  val (n12, n13, n14, n15, n16, n17) = (elt(12, nasI), elt(13, nasI), elt(14, nasI), elt(15, nasI), elt(16, nasI), elt(17, nasI)) // aprés on les numérote
  val (east, se, sw) = (concat3V(n0, n1, n2), concat3V(n3, n4, n5), concat3V(n6, n7, n8))
  val west = concat3V(n9, n10, n11)
  val nwest = concat3V(n12, n13, n14)
- val neast = concat3V(n15, n16, n17)
+ val neast = concat3V(n15, n16, n17)*/
+
+ val Array(east,se,sw, west,nwest,neast)=splitInto6(nasI, k)
+
  /** Two here means that if arg1 = arg2 we expand in both directions, going from a singleton to a tripleton */
  val (northmin, nwnw, nene) = weakCmpProdtwo(nwest, neast)
  //  shoow(northmin,nwnw,nene)

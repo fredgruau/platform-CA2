@@ -45,6 +45,7 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
   def isConst = false
 
 
+
   /** return the affbool that label subtrees nearest to the root */
   def affBoolify(): List[ASTBt[B]] = {
     inputNeighbors.flatMap(_.asInstanceOf[ASTBt[_]].affBoolify())

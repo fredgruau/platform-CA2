@@ -1,7 +1,7 @@
 package compiler
 
 import AST._
-import ASTB.{AffBool, Uint}
+import ASTB.{AffBool, False, True, Uint}
 import ASTBfun.{ASTBg, concat2UI, redop}
 import Instr._
 import VarKind._
@@ -11,7 +11,7 @@ import compiler.DataProg.nameDirCompilLoops
 import compiler.SpatialType.{ASTLtG, IntV, UintV}
 import compiler.Packet.BitLoop
 import dataStruc.Align2.{compose, invert}
-import dataStruc.Util.{existInJava, intBetweenDash, suffixDot, myGetDeclaredMethod, prefixDot}
+import dataStruc.Util.{existInJava, intBetweenDash, myGetDeclaredMethod, prefixDot, suffixDot}
 
 import scala.language.postfixOps
 import scala.collection.{mutable, _}
@@ -373,7 +373,10 @@ case class CallProc(var procName: String, names: List[String], exps: List[AST[_]
    *
    * @return variables name used by the instruction
    */
-  def usedVars(): HashSet[String] = exps.map(_.symbolsExcepLayers).foldLeft(immutable.HashSet.empty[String])(_ | _)
+  def usedVars(): HashSet[String] ={
+   val result= exps.map(_.symbolsExcepLayers).foldLeft(immutable.HashSet.empty[String])(_ | _)
+    result
+  }
 
 
   override def propagate(id1: rewriteAST2): Instr = {
@@ -749,9 +752,10 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
    *         also updates t adding the boolean elements of integers
    */
   override def unfoldInt(t: TabSymb[InfoNbit[_]]): List[Instr] = {
-    val decall = exp.asInstanceOf[ASTBg].deCallify(HashMap.empty[String, ASTBt[B]])
+    val decall: ASTBg = exp.asInstanceOf[ASTBg].deCallify(HashMap.empty[String, ASTBt[B]])
     val res =
-      if (decall.ring == B()) List(Affect[B](name, decall.unfoldInt(t).head))
+      if (decall.ring == B())
+        List(Affect[B](name, decall.unfoldInt(t).head))
     else {
         val boolNames = Instr.deployInt2(name, t(name)) //affectation of int has not been tested yet
       //updates t
@@ -772,9 +776,17 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
   override def codeGenInstr(heap: Vector[String], funs: iTabSymb[DataProgLoop[_]], occupied: Int,
                             allCoalesc: iTabSymb[String]): List[CallProc] = {
 
+    val tototo=exp.asInstanceOf[ASTBt[_ <: Ring]]
+    val primitive=if(!tototo.isConst) "copy"
+    else tototo match {
+      case True() => "set1"
+      case False() => "reset0"
+    }
+    /** si on a une constante, tout est dans le nom set/reset, donc y a plus d'expression */
+    val newexpr=if(!tototo.isConst)List(exp.asInstanceOf[ASTBt[_ <: Ring]].coalesc(allCoalesc)) else(List())
 
-    val res = List(CallProc("copy", List(allCoalesc.getOrElse(name, name)),
-      List(exp.asInstanceOf[ASTBt[_ <: Ring]].coalesc(allCoalesc))))
+    val res =  List(CallProc(primitive, List(allCoalesc.getOrElse(name, name)),newexpr))
+    //System.out.println("totototo"+ primitive)
     res
 }
 }

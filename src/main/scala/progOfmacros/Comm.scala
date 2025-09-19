@@ -3,8 +3,13 @@ package progOfmacros
 import compiler.SpatialType._
 import compiler.AST._
 import compiler.ASTL._
+import compiler.ASTLfun.e
 import compiler._
-/** contains communication primitives using rotations and symmetries */
+import progOfmacros.Wrapper.exist
+/** contains communication primitives using rotations and symmetries
+ *  initially most code are indeed macros, but then we add code that uses those macro
+ *  such as adjacentRing, adjacentBall which uses neighborsSym
+ *  we do not definie macros for those, in order to avoid generating too much java*/
 object Comm {
   /** Unary function: From a boolVe computes another symetric boolVe, exploiting the sym operator on edges */
   val neighborsDef: Fundef1[(T[V, E], B), (T[V, E], B)] = {
@@ -15,6 +20,9 @@ object Comm {
   }
   /** wrapper   */
   def neighborsSym(ve: BoolVe): BoolVe = new Call1[(T[V,E], B), (T[V, E], B)](neighborsDef, ve) with BoolVe
+
+  def adjacentRing(bv: BoolV):BoolV=exist(neighborsSym(e(bv)))
+  def adjacentBall(bv: BoolV):BoolV=adjacentRing(bv)|bv
 
   val neighborsDefUI: Fundef1[(T[V, E], UI), (T[V, E], UI)] = {
     val ve = pL[T[V,E],UI]("ngh")

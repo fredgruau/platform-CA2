@@ -41,6 +41,7 @@ object chip {
   implicit val borderFe = new chip[F, E](null)
   implicit val borderEf = new chip[E, F](new ConstLayer[T[E, F], B](1, "def"))
   implicit val borderE = new chips[E](new ConstLayer[E, B](1, "def"))
+  implicit val borderF = new chips[F](new ConstLayer[F, B](1, "def"))
   //todo inclure tout les transfer locus, pas seulement Ve
 }
 /** this regroups layers which can be accessed from any macro $m$. the name of val correspond to

@@ -81,7 +81,8 @@ abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] wit
 
   /** a random priority is needed to help finalize tournament, in case of equality */
   override val prioRand= {
-    val x=randUintV(1)
+    /** c'est plus sérieux avec deux bits de random priority */
+    val x=randUintV(2)
     (x ).asInstanceOf[UintV]
   } //sans "asInstance" il gueule non compatibilité de override entre addLt e UintVx
 

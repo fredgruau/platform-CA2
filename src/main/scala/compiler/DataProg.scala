@@ -507,7 +507,19 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
     } //  we set the type to macro because we do not need to store them again.
     else {
       //val g = new CodeGen(tSymbVar.asInstanceOf[TabSymb[InfoNbit[_]]], coalesc)
-      updateTsymbNbit(macroFields, MacroField()) // if affectify happens after unfold int, we provide the number of bits
+     //proposition pour demain:
+      //rajouter un test pour restreindre seulement au constantes
+      def isConst2(a:AST[_]):Boolean={
+        a match{
+          case b:ASTBt[_]=>b.isConst
+          case _ => false
+        }
+      }
+      val (const,notConst)=macroFields.partition(isConst2)
+      updateTsymbNbit(const,   if (!isLeafCaLoop )StoredField()else MacroField()) // if affectify happens after unfold int, we provide the number of bits
+
+      //updateTsymbNbit(macroFields, MacroField()) // if affectify happens after unfold int, we provide the number of bits
+      updateTsymbNbit(notConst, StoredField())
       updateTsymbNbit(layerFields, StoredField())
     }
 
@@ -642,9 +654,11 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
 
   /** @return true if function is a leaf function,
    *          not calling other function, so no stored field
+   *          in fact we have to allow stored field for computing constant,
+   *          (a better implementation with constant folding would correct that)
    *          and therefore directly executable as a loopMacro on CA
    *          we check that it is also not isRootMain which could surprisingly be a CA loop if it computes identity */
-  def isLeafCaLoop: Boolean = funs.isEmpty && !tSymbVar.valuesIterator.exists(_.k.isStoredField) && !isRootMain
+  def isLeafCaLoop: Boolean = funs.isEmpty  && !isRootMain //&& !tSymbVar.valuesIterator.exists(_.k.isStoredField)
 
   /**
    *

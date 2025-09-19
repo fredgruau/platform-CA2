@@ -18,7 +18,8 @@ class InfoType[+T](val t: T, val k: VarKind) {
 
   val repr1 = new repr(t)
 
-  def locus: Locus = repr.lpart(repr1.asInstanceOf[repr[(_ <: Locus, _ <: Ring)]]).name
+  def locus: Locus =
+    repr.lpart(repr1.asInstanceOf[repr[(_ <: Locus, _ <: Ring)]]).name
 
   def ring: Ring = repr.rpart(repr1.asInstanceOf[repr[(_ <: Locus, _ <: Ring)]]).name
   /** in some cases (i.e. creation of affectation, there is no obvious locus associated to the variable. */

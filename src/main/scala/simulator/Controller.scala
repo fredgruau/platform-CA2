@@ -62,7 +62,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
 
   /** check that global variables (layer and shown) do not share offset. */
   def invariantFieldOffset = {
-    val h = progCA.displayableLayerHierarchy()
+    val h: String = progCA.displayableLayerHierarchy()
 
     def isGlobal(nameVar: String): Boolean = Named.isLayer(nameVar) || (h.contains(nameVar)) //true if needs to be allways accessible
     val varOfMyCell: Array[String] = new Array(progCA.CAmemWidth)

@@ -72,7 +72,8 @@ class InstrLoop(val affect: Instr, val loops: List[Packet], val instrNumber: Int
 
   /** @return side effect, adds the boolean code to each packet of loops
    */
-  def unfoldInt(): Unit = loops.map(_.addUnfoldInt())
+  def unfoldInt(): Unit =
+    loops.map(_.addUnfoldInt())
 
   /**
    *
@@ -356,6 +357,8 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
   }
 
   def isBoolV(str: String) = tSymbVarSafe(str).t == (V(), B()) // .isInstanceOf[BoolV]
+  def isBool(str: String) = tSymbVarSafe(str).t == B()// .isInstanceOf[BoolV]
+
   def needOnlyoneBit(str: String)= {
     val one=tSymbVarSafe(str).nb==1
     val l=tSymbVarSafe(str).locus

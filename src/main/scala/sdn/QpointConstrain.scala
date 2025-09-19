@@ -31,9 +31,7 @@ trait QPointFields {
   val tripleton: BoolF = insideS[V, F](isV)
   val tripletonV: BoolV = existS[F, V](tripleton)
   //val choose: BoolVe =chooseMinOf(prio)
-
-
-  val choose=chooseMaxOf(prioYesNotQuiescent)
+  val choose=chooseMaxOf(prioYesNotQuiescent,4)
 
 
 

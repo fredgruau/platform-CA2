@@ -142,7 +142,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
           var res: List[String] = List();
           var i = 0
           for (s: String <- shortened) {
-            if (isBoolV(s))
+            if (isBoolV(s)||isBool(s))
               i += 1 //no need to anchor, parameter is already a 1D arrau
             else {
               var j = 0; //j iterates on the indexes of the different scalar componendt
@@ -230,9 +230,17 @@ trait ProduceJava[U <: InfoNbit[_]] {
      * @return list of offset for all named fields. Used for 1-to anchor named 1D arrays, 2-to list memory planes
      * */
     def offsetsInt(tSymbVarAndConstLayer: iTabSymb[InfoNbit[_]]): Map[String, List[Int]] = {
-      tSymbVarAndConstLayer.map { case (k, v) => (k,
+     val result= tSymbVarAndConstLayer.map { case (k, v) => (k,
         //   if (v.t == (V(), B()) /*|| v.t == B()*/)   List(adress(coalesc(k))) else
+        if ( v.t == B()) {
+          //print("totot")
+          val tata=coalesc(k)
+          List(adress(k))
+          //val toto: String =coalesc(k);   List(adress(toto))
+        }
+        else
         {
+          //pour les constante booleenne, leur type est directement B
           val offsetstring = v.locus.deploy2(k, tSymbVarSafe(k))
           for (of <- offsetstring)
             if (!coalesc.contains(of))
@@ -240,6 +248,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
           offsetstring.map((s: String) => adress(coalesc(s))).toList
         })
       }
+      result
     }
 
     val spatialOfffsetsInt = offsetsInt((tSymbVar ++ layerSubProgStrict).filter(x => noDollarNorHashtag(x._1)))
@@ -253,7 +262,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
     def anchorOneVar(oneVar: (String, List[Int])) = {
       val ints = oneVar._2
       var res = ints.map("m[" + _ + "]").mkString(",")
-      if (!isBoolV(oneVar._1))
+      if (!isBoolV(oneVar._1) && !isBool(oneVar._1))
         res = " new int[][]{" + res + "}" //we have a 2D array
       res = oneVar._1 + "=" + res;
       res
@@ -261,7 +270,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
     // def javaIntArray(s: String) = (if (isBoolV(s)) ("int [] ") else ("int [][] ")) + s
     def anchorNamed(offset: Map[String, List[Int]]): String = {
-      val (offset1D, offset2D) = offset.partition(x => isBoolV(x._1)) //x._2.size == 1)
+      val (offset1D, offset2D) = offset.partition(x => isBoolV(x._1)|isBool(x._1)) //x._2.size == 1)
       (if (offset1D.nonEmpty) "int[]" + offset1D.map(anchorOneVar(_)).mkString(",") + ";\n" else "") +
         (if (offset2D.nonEmpty) "int[][]" + offset2D.map(anchorOneVar(_)).mkString(",") + ";\n" else "")
     }
@@ -368,7 +377,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
         def fieldLocus(names: Iterable[String], spatialLayer: Map[String, InfoNbit[_]]): HashMap[String, Locus] = {
           val l: Map[String, Locus] = spatialLayer.map({ case (k, v) => k -> v.t.asInstanceOf[(Locus, Ring)]._1 })
           // .filter(x => !tSymbVar.contains(x._1)) //removes  layers defined in main
-          HashMap[String, Locus]() ++ names.map((s: String) => s -> tSymbVar(s).t.asInstanceOf[(Locus, Ring)]._1) ++ l
+          val namesWithLocus=names.filter(tSymbVar(_).t.isInstanceOf[(Locus, Ring)])
+          HashMap[String, Locus]() ++ namesWithLocus.map((s: String) => s -> tSymbVar(s).t.asInstanceOf[(Locus, Ring)]._1) ++ l
         }
 
         fieldLocus(spatialOfffsetsInt.keys, layerSubProgStrict).map((kv: (String, Locus)) => //we need to know the locus, as soon as  we need to know the bit planes
@@ -445,7 +455,18 @@ trait ProduceJava[U <: InfoNbit[_]] {
       var gateCountOfCall = 0
       call.procName match {
         //we first consider specific system call show, copy, memo, debug
-        case "show" => val callCodeArg = radicalOfVar(call.usedVars().toList.head) //we take the radical for diminishing the number of parameters
+        case "set1" | "reset0" =>
+          callCode= callCode + paramsR(0)  //gros bricolage
+          val result=0
+        case "show" =>
+          val toto=(call.usedVars().toList)
+           if (toto.isEmpty) {
+             val u=0
+             print("jojioioiioj")
+           }
+
+
+          val callCodeArg = radicalOfVar(toto.head) //we take the radical for diminishing the number of parameters
           theDisplayed += callCodeArg //sideeffect, update theDisplayed. display has allways a single arg which is the field to be displayed
           callCode += callCodeArg //in fact we could supress calls to show. We still leave them, just so that we can check those in the compiled java.
         case "copy" => assert(paramsD.size == 1 && paramsR.size == 1) //we copy bit by bit, hence int by int.
@@ -454,7 +475,10 @@ trait ProduceJava[U <: InfoNbit[_]] {
             radicalOfVarIntComp(paramsD(0))
           else radicalOfVar(paramsD(0))
           val locuspR = tSymbVarSafe(pR).locus
-          val locuspD = tSymbVarSafe(pD).locus
+          val copiedConst=tSymbVarSafe(pD).t==B() //verifier
+          val locuspD = if(copiedConst) V() else  tSymbVarSafe(pD).locus
+
+              //here we have scalar used for constant, of type B, which we can assume to be Vertex
           //si on utilise Elt i, y aura un #i a la fin de paramD et pas de # a la fin de paramR
           val weHaveAnElt = paramsD(0).dropRight(1).endsWith("#") && !(paramsR(0).dropRight(1).endsWith("#"))
           val specifComponent: String = if (weHaveAnElt)
@@ -462,7 +486,8 @@ trait ProduceJava[U <: InfoNbit[_]] {
           else " " //rajoute le numéro de la component, pour elt.
           if (locuspR.isTransfer && !locuspD.isTransfer) { //marche pas pour E,F
             //c'est le broadcast qui renvoie void je pense, utilisé par copy
-            callCode = "broadcaast(" + 6 / locuspD.density + ","
+
+            callCode = (if(copiedConst)  "broadcaast1("  else "broadcaast(" )+ 6 / locuspD.density + ","
           } //6 copy from 1D array to 1Darray are turned into a call to broaadcast from 1D arrau to 2D array
           //val l: mutable.LinkedHashSet[String] = mutable.LinkedHashSet(pR, pD)
           callCode += pD + specifComponent + "," + pR

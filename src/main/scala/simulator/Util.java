@@ -5,6 +5,7 @@ import scala.collection.immutable.List;
 import scala.collection.immutable.List$;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 
 
@@ -260,6 +261,27 @@ public class Util {
                     for (int k = 0; k < rapport; k++)
                 copy(src[i+j*nbit], dest[i+j*rapport*nbit+k*nbit]);
     }
+
+    /** does 6 copies, utilisé pour remplir un boolVe a partir d'une constante
+     *
+     * @param rapport should be 6
+     * @param src uniform 1
+     * @param dest
+     */
+    public static void broadcaast1(int rapport, int[] src, int[][] dest) {
+        assert (dest.length==rapport);
+        for (int i = 0; i < rapport; i++)
+            copy(src, dest[i]);
+    }
+
+
+    public static void set1( int[] dest) {
+        Arrays.fill(dest, -1);
+    }
+    public static void reset0( int[] dest) {
+        Arrays.fill(dest, 0);
+    }
+
     /**
      * System call used to update layers, same as copy, we use demo for clarity
      *

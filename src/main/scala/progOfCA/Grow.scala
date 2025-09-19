@@ -15,7 +15,7 @@ import compiler.repr.nomE
 import dataStruc.{BranchNamed, Named}
 import progOfmacros.Topo.brdin
 import sdn.Util.{addBlobE, addBlobVe, safeGrow}
-import sdn.{Blob, BlobE, BlobV, Compar, Compar3, ComparApex}
+import sdn.{Blob, BlobE, BlobV, Compar, Compar3}
 /** same as GrowVorV but based on a boolVe support  MARCHE PAS*/
 class Grow() extends Layer[(V, B)](1, "global") with BoolV  with BranchNamed {
   val is:BoolV=delayedL(this)

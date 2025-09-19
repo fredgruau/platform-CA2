@@ -60,7 +60,7 @@ trait encodeGt extends encodeByInt {
     /** is miror is defined in Prshift, so that it can be called back  during the execution of  the CA loops */
     override def isMirrorSafe(h: Array[Int]): Boolean = encodeGt.super.isMirorSafe(h)
     def prepareBit(mem: Array[Int]): Unit =  {
-      if(nbIntPerLine>1) //rajoue pour faire le propagate si vraiment c'est necessaire
+      if(nbIntPerLine>=1) //rajoue pour faire le propagate si vraiment c'est necessaire
         for (i <- 0 until nbIntPerLine) //i index of a macro columns faut probablement faire une iération de moins
           for (j <- i * nbLineCAp1 until (i + 1) * nbLineCAp1) //j traverse macro coloni
             UtilBitJava.propagateBit1and30(mem, 1 + j, 1 + (j + nbLineCAp1) % (nbIntPerLine * nbLineCAp1))

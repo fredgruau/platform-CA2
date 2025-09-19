@@ -100,6 +100,7 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
    * @param name name of variable being affected
    * @param env  map or scan parameter's expression for index i
    * @return The boolean affectation or boolean expression corresponding to the loop index
+   *         c'est cuila qui fait le travail de pondre du java a partir d'un ASTB
    */
   override def boolifyForIndexI(i: Int, l: BitLoop, name: String, env: HashMap[String, ASTBt[B]]): ASTBt[B] = {
     var name2 = name
@@ -330,7 +331,8 @@ sealed abstract class ASTB[R <: Ring]()(implicit m: repr[R]) extends ASTBt[R] {
 
   /** we will not generate an affect for such expression, it cost only the negation operator, we prefer to recompute it */
 
-  override def unfoldInt(t: TabSymb[InfoNbit[_]]): List[ASTBt[B]] = this.asInstanceOf[ASTB[_]] match {
+  override def unfoldInt(t: TabSymb[InfoNbit[_]]): List[ASTBt[B]] =
+    this.asInstanceOf[ASTB[_]] match {
     case Elt(nb, arg) =>
 
       val l = arg.unfoldInt(t)
@@ -400,10 +402,12 @@ object ASTB {
 
   final case class True()(implicit n: repr[B]) extends ASTB[B] with EmptyBag[AST[_]] {
     override def isConst = true
+
   }
 
   final case class False()(implicit n: repr[B]) extends ASTB[B] with EmptyBag[AST[_]] {
     override def isConst = true
+
   }
 
   implicit def toBoolB(d: ASTBt[B]): Boolean = if (d == True()) true else if (d == False()) false else

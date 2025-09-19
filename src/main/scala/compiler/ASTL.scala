@@ -18,7 +18,7 @@ import scala.collection.{mutable, _}
 import scala.reflect.ClassTag
 import scala.language.implicitConversions
 import dataStruc.Util.{composeAll2, dupliqueOrTriplique, rot, rotPerm, rotR}
-import sdn.{Compar, Compar3, ComparApex, ComparApex2, ComparSI}
+import sdn.{Compar, Compar3,ComparApex2, ComparDiff}
 /**
  * todo we must distinguish between the wrapper of the constructors, and the higher order function which can be defined in another object
  * At some point, we decided to store the type information for each distinct constructor, in order to have direct access to this info
@@ -189,7 +189,7 @@ object SpatialType {
   type SintE = ASTLt[E, SI];
   /** Unsigned int for which lt,gt,eq,le,ge are defined submembers */
   type UintVx = UintV with Compar with ComparApex2 with Compar3;
-  type SintVx = SintV with ComparSI
+  type SintVx = SintV with ComparDiff[SI]
   type UintE = ASTLt[E, UI];
   type UintF = ASTLt[F, UI]
   type UintEv = ASTLt[T[E, V], UI];

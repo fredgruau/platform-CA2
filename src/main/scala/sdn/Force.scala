@@ -51,7 +51,7 @@ case class MoveC1 (val empty: BoolV, val push: BoolVe) extends MoveC{
  * @param no for specifying absence of flip ,  using either no.push or no.Empty
  */
 case class MoveC2(val yes:MoveC1,val no:MoveC1) extends MoveC{
-  override val triggered=yes.triggered^no.triggered
+  override val triggered = yes.triggered^no.triggered
   override val triggeredYes: BoolV = yes.triggered
   /** bugif for a given priority, one move specifies flip, and another move spécifies not flip */
   def move2flip(isV:BoolV):BoolV=yes.move2flip(isV) & ~ no.move2flip(isV)
