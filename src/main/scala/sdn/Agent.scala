@@ -122,6 +122,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
    // val f:BoolV=False()
      val noFlipCancel=eq0(allFlipCancel)
      val flipAfterLocalConstr: BoolV = noFlipCancel  & flipOfMove
+     val flipRandomlyCanceled=flipAfterLocalConstr//& root4naming.addRandBit().asInstanceOf[BoolV]
 
 
 

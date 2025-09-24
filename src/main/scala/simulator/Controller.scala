@@ -38,6 +38,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   /** sometimes we try different random root, so as to explore different possible runs. */
   var randomRoot: Int = xInt(simulParam, "simul", "@randomRoot")
   var density: Int = xInt(simulParam, "simul", "@density")
+  var darkness:Int= xInt(simulParam, "simul", "@darkness")
   //var t:Int=xInt(simulParam, "simul", "@t0")
   /** we need to know the locus of fields which are either displayed or initialized */
   val locusOfDisplayedOrDirectInitField: Map[String, Locus] = progCA.fieldLocus.asScala.toMap
@@ -59,6 +60,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   val selectedGlobalInit: Int = xInt(globalInit, "selected", "@rank") //which is the starting value for global init
   val randomInitNames: Array[Int] = (0 to 9).toArray
   val densityInitNames: Array[Int] = (0 to 99).toArray
+  val darknessInitNames: Array[Int] = (0 to 99 by  5).toArray
 
   /** check that global variables (layer and shown) do not share offset. */
   def invariantFieldOffset = {
@@ -178,7 +180,12 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
         simul.asInstanceOf[Elem] % Attribute(null, "density", density.toString, Null)
       case other => other
     })
-    XML.save("src/main/java/compiledCA/simulParam/" + nameSimulParam, newnewSimulparam)
+    val newnewnewSimulparam = newSimulparam.asInstanceOf[Elem].copy(child = newSimulparam.child.map {
+      case simul @ <simul>{_*}</simul> =>
+        simul.asInstanceOf[Elem] % Attribute(null, "darkness", darkness.toString, Null)
+      case other => other
+    })
+    XML.save("src/main/java/compiledCA/simulParam/" + nameSimulParam, newnewnewSimulparam)
   }
 
 
@@ -228,10 +235,13 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   val densityInitList = new ComboBox[Int](densityInitNames) {
     selection.item = density
   }
+  val darknessInitList = new ComboBox[Int](darknessInitNames) {
+    selection.item = darkness
+  }
 
   //val randomRootField = new TextField("" + randomRoot, 2)
-  contents += (globalInitList, randomInitList,densityInitList) //, randomRootField)
-  listenTo(globalInitList.selection, randomInitList.selection,densityInitList.selection)
+  contents += (globalInitList, randomInitList,densityInitList,darknessInitList) //, randomRootField)
+  listenTo(globalInitList.selection, randomInitList.selection,densityInitList.selection,darknessInitList.selection)
   //todo add a jcombo to select a number between 0 and 9
   /** When we switch mode between pause and play, the icon of the PlayPause button toggles */
   private def togglePlayPauseIcon(): Unit = {
@@ -358,6 +368,10 @@ case SelectionChanged(`globalInitList`) =>
     case SelectionChanged(`densityInitList`) =>
       density = densityInitList.selection.item
       initButtonClick()//InitButton.doClick()
+      updateAndSaveXMLSimulParam()
+    case SelectionChanged(`darknessInitList`) =>
+      darkness= darknessInitList.selection.item
+    //  initButtonClick()//InitButton.doClick()
       updateAndSaveXMLSimulParam()
    case ValueChanged(`speedSlider`) =>
      speed.text = s"Speed : ${speedSlider.value}"

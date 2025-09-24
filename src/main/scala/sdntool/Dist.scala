@@ -72,7 +72,7 @@ class MuDistGcenter(val gc:gCenter) extends MuStruct [V,SI] {
    val opp = -(muis.pred)
   val incrOld = cond(delayedL(gcenterEorV), sign(opp), deltag)
   val incr = cond(delayedL(gc.gCenterV), sign(opp), cond(delayedL(gc.gCenterE), sign(opp+2), deltag))
-
+  /** spurious vortex occurs outside chip.borderF.df, so we have to and with chip.borderF.df in order to prevent false detection of vortex bug */
   val vortex: BoolF = chip.borderF.df & andR(transfer(cacOld(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
   bugif(vortex) //todo, mettre aussi un bug si y a un écart  sur la source plus grand K en valeur absolue, K reste a déterminer
   shoow( gap, sloplt, level, gcenterEorV,vortex) // necessary so as to use all parameters returned by slopeDeltashoow(vortex)
@@ -86,6 +86,9 @@ class MuDistGcenter(val gc:gCenter) extends MuStruct [V,SI] {
       val non = MoveC1(ag.isV & hasNearer, sloplt & ag.brdVe  ) //falseVe
       MoveC2(oui, non)
     }
+
+
+
     // val deefF=new ConstLayer[F, B](1, "def")
   }
 }

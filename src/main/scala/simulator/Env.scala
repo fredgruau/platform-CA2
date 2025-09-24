@@ -150,7 +150,7 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
     for ((plane, points) <- bitPlanes zip medium.locusPlane(locus)) { //we do a dot iteration simultaneously on pointsPlane, and bitPlane
       //   decodeInterleavRot(nbLineCA, nbColCA, plane, sandBox) //we convert the compact encoding on Int32, into simple booleans
       medium.decode(plane, bitPlaneBuffer) //we convert the compact encoding on Int32, into simple booleans
-      medium.sumColorVoronoi(color,bitPlaneBuffer, points)
+      medium.sumColorVoronoi(color,bitPlaneBuffer, points, controller.darkness)
     }
   }
   /** computes the index of the text that should be displayed */

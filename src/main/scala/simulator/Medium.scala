@@ -487,8 +487,9 @@ abstract class Medium(val nbLine: Int, val nbCol: Int, val boundingBox: Dimensio
    * @param color     color to be summed
    * @param bitPlane whether or not it should be summed
    * @param points where it should be summed
+   * @param darkness integer defined by the controller, between 0 and 255
    */
-  def sumColorVoronoi(color: Color, bitPlane:Array[Array[Boolean]], points:pointLines): Unit = {
+  def sumColorVoronoi(color: Color, bitPlane:Array[Array[Boolean]], points:pointLines,darkness:Int): Unit = {
     assert (points.size == nbLine, "pointlines should match CA")
     assert (bitPlane.size == nbLine, "number of  lines should match CA")
      for (i <- 0 until nbLine)  for (j <- 0 until nbCol)
@@ -496,7 +497,7 @@ abstract class Medium(val nbLine: Int, val nbCol: Int, val boundingBox: Dimensio
             val point = points(i)(j) //corresponding point in 2D space
             // assert(point!=None,"we should have defined the color of non existing points")
             if (point.isDefined)
-              theVoronois(Coord2D(point.get.x,point.get.y)).addColor(color) //updating voronoi's polygon color
+              theVoronois(Coord2D(point.get.x,point.get.y)).addColor(color,darkness) //updating voronoi's polygon color
           }
     }
   /**

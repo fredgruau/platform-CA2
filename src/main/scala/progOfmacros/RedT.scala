@@ -1,13 +1,14 @@
 package progOfmacros
 
 import compiler.AST.{Call1, Fundef1, pL}
-import compiler.ASTBfun.{Fundef2R, Fundef2RP, orB, redop}
+import compiler.ASTBfun.{Fundef2R, Fundef2RP, andB, orB, redop}
 import compiler.ASTL.{anticlock, binop, broadcast, clock, transfer}
 import compiler.ASTLfun.reduce
 import compiler.Circuit.iTabSymb
-import compiler.SpatialType.{BoolVe, BoolVf, UintV}
+import compiler.SpatialType.{BoolV, BoolVe, BoolVf, UintV}
 import compiler._
 import progOfmacros.Topo.nbccDef
+import progOfmacros.Wrapper.border
 
 import scala.collection.immutable.HashMap
 /** allows to automatically generate macro for  "Transfer-reduction" such as from Ve to Vf more generally from Zy to Zy
@@ -30,10 +31,15 @@ object RedT {
                                                           (implicit m1: repr[S2], m2: repr[S1], m3: repr[S3], n: repr[R], p: repr[P], a: AntiClock[S1, S2, S3]): ASTLt[T[S1, S3], P] = {
     binop[T[S1, S3], R, R, P](op2, clock(arg), anticlock(arg))
   }
+
+  def shrink(arg:BoolVe):BoolVf=cac(andB,arg)
+
+  /*
   def cac2[S1 <: S, S2 <: S, S3 <: S, R <: Ring, P <: Ring](op2: Fundef2RP[R, P], arg: ASTLt[T[S1, S2], R], arg2: ASTLt[T[S1, S2], R])
                                                           (implicit m1: repr[S2], m2: repr[S1], m3: repr[S3], n: repr[R], p: repr[P], a: AntiClock[S1, S2, S3]): ASTLt[T[S1, S3], P] = {
     binop[T[S1, S3], R, R, P](op2, clock(arg), anticlock(arg2))
   }
+*/
 
   /** memoizes all the already used Boolean reduction */
   private var redTmem: iTabSymb[Fundef1[(TT, Ring), (TT, Ring)]] = HashMap()
@@ -77,12 +83,12 @@ object RedT {
 
 
   /** enlarge around V, from Ve to Vf or vice versa */
-  def enlargeOld[S1 <: S, S2 <: S](arg: ASTLt[T[V, S1], B])(implicit m1: repr[S2], m2: repr[S1], a: AntiClock[V, S1, S2]): ASTLt[T[V, S2], B] =
+  def enlarge[S1 <: S, S2 <: S](arg: ASTLt[T[V, S1], B])(implicit m1: repr[S2], m2: repr[S1], a: AntiClock[V, S1, S2]): ASTLt[T[V, S2], B] =
     cacOld[V, S1, S2, B](orB, arg)
 
   val enlargeFEDef: Fundef1[(T[V, F], B), (T[V, E], B)] = {
     val arg = pL[T[V, F], B]("enlarge")
-    Fundef1("redT.enlargeFE", enlargeOld[F, E](arg), arg)
+    Fundef1("redT.enlargeFE", enlarge[F, E](arg), arg)
   }
 
   def enlargeFE(b: BoolVf): BoolVe =
@@ -91,11 +97,47 @@ object RedT {
 
   val enlargeEFDef: Fundef1[(T[V, E], B), (T[V, F], B)] = {
     val arg = pL[T[V, E], B]("enlarge")
-    Fundef1("redT.enlargeEF", enlargeOld[E, F](arg), arg)
+    Fundef1("redT.enlargeEF", enlarge[E, F](arg), arg)
   }
 
   def enlargeEF(b: BoolVe): BoolVf =
     new Call1[(T[V, E], B), (T[V, F], B)](enlargeEFDef, b) with BoolVf
+
+
+
+
+
+
+  /** shrink around V, from Ve to Vf or vice versa */
+  def shrink[S1 <: S, S2 <: S](arg: ASTLt[T[V, S1], B])(implicit m1: repr[S2], m2: repr[S1], a: AntiClock[V, S1, S2]): ASTLt[T[V, S2], B] =
+    cacOld[V, S1, S2, B](andB, arg)
+
+  val shrinkFEDef: Fundef1[(T[V, F], B), (T[V, E], B)] = {
+    val arg = pL[T[V, F], B]("shrink")
+    Fundef1("redT.shrinkFE", shrink[F, E](arg), arg)
+  }
+
+  def shrinkFE(b: BoolVf): BoolVe =
+    new Call1[(T[V, F], B), (T[V, E], B)](shrinkFEDef, b) with BoolVe
+
+
+  val shrinkEFDef: Fundef1[(T[V, E], B), (T[V, F], B)] = {
+    val arg = pL[T[V, E], B]("shrink")
+    Fundef1("redT.shrinkEF", shrink[E, F](arg), arg)
+  }
+
+  def shrinkEF(b: BoolVe): BoolVf =
+    new Call1[(T[V, E], B), (T[V, F], B)](shrinkEFDef, b) with BoolVf
+
+
+
+
+
+
+
+
+
+
 
   def clock2(arg: BoolVe): BoolVe = clock(clock(arg)) //on peut etendre aux transfer type T[V,F], T[F,x]
 

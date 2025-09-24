@@ -6,7 +6,7 @@ import compiler.ASTBfun.{Fundef2RP, andRedop, concatRedop, ltUI2, minRedop, minU
 import compiler.ASTL._
 import compiler.ASTLfun._
 import compiler.Circuit.iTabSymb
-import compiler.SpatialType.UintE
+import compiler.SpatialType.{BoolE, BoolV, BoolVe, BoolVf, UintE}
 import compiler.repr.{nomB, nomCons, nomV}
 import progOfmacros.RedS.{getRedSFun, redsDirect}
 import progOfmacros.TransferToTransfer.getttFun
@@ -14,6 +14,7 @@ import progOfmacros.RedD.getRedFun
 import progOfmacros.Bino.getBinFun
 import progOfmacros.Cmp.getCmpFun
 import progOfmacros.Cond.getCondFun
+import progOfmacros.RedT.{shrinkEF, shrinkFE}
 import progOfmacros.Unop.Unop.getUnopFun
 
 
@@ -115,11 +116,36 @@ object Wrapper {
   new Call1[(T[S1,S2], R), (T[S1,S3], R)](f, arg) with ASTLt[T[S1,S3], R] {}
   }
 
+
+
+  /** shrinks two times, boolVe to boolVe */
+  def shrink2(arg:BoolVe):BoolVe=shrink[V,F,E,B](shrink[V,E,F,B](arg))
+  def shrink3(arg:BoolVe):BoolVf= shrink[V,E,F,B](shrink2(arg))
+
+  /** adds vertices iff continuous number of neighbors >= 3 to obtain a smoother surface */
+  def smoothen(x:BoolV)={
+    val brd:BoolE =Wrapper.border[V,E,B](transfer(e(x)))
+    val brdVe:BoolVe=transfer(v(brd))
+    x|exist(shrink2(brdVe))
+  }
+  def smoothen2Old(x:BoolV)={
+    val brd:BoolE =Wrapper.border[V,E,B](transfer(e(x)))
+    val brdVe:BoolVe=transfer(v(brd))
+    x|exist(testShrink(x))
+  }
+  def smoothen2(x:BoolV,shrinked:BoolVf)={
+    x|exist(shrinked)
+  }
+  def testShrink(x:BoolV)={
+    val brd:BoolE =Wrapper.border[V,E,B](transfer(e(x)))
+    val brdVe:BoolVe=transfer(v(brd))
+    shrink3(brdVe)  }
+
+
   def leastUI[S1 <: S, S2 <: S](arg: ASTLt[S1, UI])(implicit m: repr[S1], n: repr[S2], d: chip[S2, S1]): ASTLt[S2, UI] = {
     val f: Fundef1[(S1, UI), (S2, UI)] = getRedSFun(minRedop[UI], arg.locus)(m, n, repr.nomUI, d)
     new Call1[(S1, UI), (S2, UI)](f, arg)(repr.nomLR(n, compiler.repr.nomUI)) with ASTLt[S2, UI] {}
   }
-
 
   /** deprecated  */
   def borderSOld[S1 <: S, S2 <: S](arg: ASTLt[S1, B])(implicit m: repr[S1], n: repr[S2], d: chip[S2, S1]): ASTLt[S2, B] = {

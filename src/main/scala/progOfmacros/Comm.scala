@@ -5,7 +5,7 @@ import compiler.AST._
 import compiler.ASTL._
 import compiler.ASTLfun.e
 import compiler._
-import progOfmacros.Wrapper.exist
+import progOfmacros.Wrapper.{exist, inside}
 /** contains communication primitives using rotations and symmetries
  *  initially most code are indeed macros, but then we add code that uses those macro
  *  such as adjacentRing, adjacentBall which uses neighborsSym
@@ -23,6 +23,8 @@ object Comm {
 
   def adjacentRing(bv: BoolV):BoolV=exist(neighborsSym(e(bv)))
   def adjacentBall(bv: BoolV):BoolV=adjacentRing(bv)|bv
+  def insideRing(bv: BoolV)=inside(neighborsSym(e(bv)))
+  def insideBall(bv: BoolV)=bv &insideRing(bv)
 
   val neighborsDefUI: Fundef1[(T[V, E], UI), (T[V, E], UI)] = {
     val ve = pL[T[V,E],UI]("ngh")

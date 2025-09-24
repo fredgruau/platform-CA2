@@ -8,7 +8,7 @@ import dataStruc.{BranchNamed, Named}
 import progOfLayer.Sextexrect.{chooseMaxOf, weakCmpProdZero, weakCmpProdtwo}
 import sdn.rando
 import sdn.{MovableAg, MovableAgentV}
-import progOfmacros.Comm.{apexV, neighborsSym}
+import progOfmacros.Comm.{apexV, insideBall, neighborsSym}
 import progOfmacros.Compute
 import progOfmacros.Compute.{concat3V, implique, impluq}
 import progOfmacros.Wrapper.{exist, existS, inside, insideS, not}
@@ -40,12 +40,16 @@ trait QPointFields {
 
 /** defines all the constraint that should be met by a quasipoint, except for blobs which might not be necessary if Gabriel centers are computed. */
 trait  QpointConstrain extends QPointFields with rando{
-self: MovableAgentV => //a quasi point  is a movableAgentV
-/** if ring, fix one direction  todo to be replaced by sextex*/
-  /** true if selected by a random angle among 12 */
-  //val effRandDir: BoolVe = rand.randDir & isVe
-  /** true if a random direction  points to it */
-  //val touchedByRandDir: BoolV = exist(neighborsSym(effRandDir))
+self: MovableAgentV => //a quasi point  is allways a movableAgentV
+  /**
+   *
+   * @param feature
+   * return a boolV true throughout the seed,
+   * if and only if feature is also true throughout the seed
+   */
+   def forallize(feature:BoolV)={
+      insideBall(imply(muis, feature))
+ }
 
   /** will choose neighbor with smallest flip priority  */
   val  sexKeepFlipIf=new Constr(Array(this), null, flipOfMove) with Named with BranchNamed {

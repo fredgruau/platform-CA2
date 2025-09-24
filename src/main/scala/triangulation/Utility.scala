@@ -1,6 +1,7 @@
 package triangulation
 
 import dataStruc.Coord2D
+import simulator.Controller
 
 import java.awt.{Color, Polygon}
 import java.lang.Integer.decode
@@ -8,8 +9,42 @@ import math.min
 import scala.collection.immutable.HashMap
 import scala.swing.Dimension
 
-/** contains all the simple static functions needed for simulation */
+/** contains all the simple static functions needed for simulation plus some global variables*/
 object Utility {
+
+  /** max registered since last time */
+
+
+  //color Utilities
+
+  def halve(color: Color): Color = {
+    val red = color.getRed
+    val green = color.getGreen
+    val blue = color.getBlue
+    new Color(red / 2, green / 2, blue / 2)
+  }
+
+  def crop(c: Int) = {
+   // maxRedGreenBlue(i)=Math.max(maxRedGreenBlue(i),c)
+    Math.min(c, 255)
+  }
+
+  /**
+   *
+   * @param color
+   * @param c added color, hence multiplied by coefficient
+   *          @param darkness set by the simulator
+   * @return
+   */
+
+  def addColor(color: Color, c: Color,darkness:Int): Color = {
+    val red = crop(color.getRed + Math.ceil( (c.getRed*darkness)/100).toInt)
+    val green = crop(color.getGreen +  Math.ceil( (c.getGreen*darkness)/100).toInt)
+    val blue = crop(color.getBlue +  Math.ceil( (c.getBlue*darkness)/100).toInt)
+    new Color(red, green, blue)
+  }
+
+
   //compute an angle defined by three points, using the scalar product, and arcosinus, at the level of B
   def angle(A:Coord2D,B:Coord2D,C:Coord2D):Double={
     val BA=A.sub(B)
@@ -359,23 +394,5 @@ object Utility {
     }
   }
 
-
-  //color Utilities
-
-  def halve(color: Color): Color = {
-    val red = color.getRed
-    val green = color.getGreen
-    val blue = color.getBlue
-    new Color(red / 2, green / 2, blue / 2)
-  }
-
-  def crop(c: Int) = Math.min(c, 255)
-
-  def addColor(color: Color, c: Color): Color = {
-    val red = crop(color.getRed + c.getRed)
-    val green = crop(color.getGreen + c.getGreen)
-    val blue = crop(color.getBlue + c.getBlue)
-    new Color(red, green, blue)
-  }
 
 }

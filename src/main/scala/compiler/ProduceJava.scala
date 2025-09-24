@@ -514,20 +514,23 @@ trait ProduceJava[U <: InfoNbit[_]] {
              paramCode=concatCallCode ++ paramCode
             System.out.println("concat") //c'est standard
           }
-
-
-
           else{
-
-
           val spatialParam = shortenedSig(dataParam ::: resultParam)
           val bitSigSafe = spatialParam.map(tSymbVarSafe(_).nb)
-          val spatialSigSafe = spatialParam.map(tSymbVarSafe(_).t.asInstanceOf[(Locus, Ring)])
+           val anteSpatialSigSafe=spatialParam.map(tSymbVarSafe(_).t).filter(!_.isInstanceOf[(Locus, Ring)])
+            if(anteSpatialSigSafe.nonEmpty)
+              print("pb")  //a cause des constante, on a des type B() qui se trimballe, qu'on va remplacer par V(),B()
+            val safeSpatialSigSafe=spatialParam.map(tSymbVarSafe(_).t).map(
+              {case t:(Locus, Ring)=>t
+                case B() => (V(),B()) //on escamote B()
+              case _ => throw new Exception("c'est soit B soit un brave locus plus ring")
+              })
+          //val spatialSigSafe = spatialParam.map(tSymbVarSafe(_).t.asInstanceOf[(Locus, Ring)])
           /** for each radical, the number of effective parameter with identical radical. Carefull,if it is 6, it does not imply that we have a transfer, it could be a UnitE with 2 bits for example */
           val densityDirectlyMeasured: List[Int] = spatialParam.map(s => params.filter(radicalOfVar(_) == (radicalOfVar(s))).size) //on teste l'egalité pour eviter les pb avc les prefixes.
           assert(densityDirectlyMeasured.sum == params.size, "regardez si y a pas un nom de parametre qui est suffixe d'un autre" + params.size + "neq" + densityDirectlyMeasured.sum)
 
-          for (((spatialType, nbit), densityDirect) <- spatialSigSafe zip bitSigSafe zip densityDirectlyMeasured) { //retrieve spatial type and  bitSize   of parameters.
+          for (((spatialType, nbit), densityDirect) <- safeSpatialSigSafe zip bitSigSafe zip densityDirectlyMeasured) { //retrieve spatial type and  bitSize   of parameters.
             val locusParamPossiblyWrong: Locus = spatialType._1 //locus is wrong because it is computed from the name of the effective parameter. It is not to be trusted, when broadcasting is done.
             var densityParamPossiblyWrong = nbit * locusParamPossiblyWrong.density //locus is wrong implies density is wrong too
             //pour elt, densityParamPossiblyWrong is wrong, because we pass only one of the numerous bits forming an uint, so we take intoaccount the density directly measured

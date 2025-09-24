@@ -14,12 +14,14 @@ class InfoType[+T](val t: T, val k: VarKind) {
   override def toString: String = t.toString + " " + k.toString
   //def radiusify3(r: Int): InfoType[_] = new InfoType(t, ParamRR(r))
 
-
-
   val repr1 = new repr(t)
 
-  def locus: Locus =
-    repr.lpart(repr1.asInstanceOf[repr[(_ <: Locus, _ <: Ring)]]).name
+  def locus: Locus = {
+    //if(repr1.isInstanceOf[repr[(_ <: Locus, _ <: Ring)]])
+    if(t.isInstanceOf[scala.Tuple2[_ <: Locus, _ <: Ring]])
+      repr.lpart(repr1.asInstanceOf[repr[(_ <: Locus, _ <: Ring)]]).name
+    else V() //wild guess
+  }
 
   def ring: Ring = repr.rpart(repr1.asInstanceOf[repr[(_ <: Locus, _ <: Ring)]]).name
   /** in some cases (i.e. creation of affectation, there is no obvious locus associated to the variable. */

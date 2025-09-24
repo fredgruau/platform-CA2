@@ -16,8 +16,8 @@ import scala.swing.Dimension
  */
 class Voroonoi(val center: Vector2D) {
   var trianglesOK=true
-  def addColor(c: Color) = color = Utility.addColor(color, c)
-  var color: Color = Color.black;
+  def addColor(c: Color,darkness:Int) = color = Utility.addColor(color, c,darkness)
+  var color: Color = Color.black; //on initialise a zero
   /** text to be displayed */
   var text:String = null
   def addText(letter:String)={text=if(text==null) letter else text+letter}

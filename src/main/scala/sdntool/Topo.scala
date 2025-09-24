@@ -19,7 +19,7 @@ import sdn.MovableAgentV
 import progOfmacros.Topo
 import progOfmacros.Compute._
 import progOfmacros.Wrapper.{borderS, exist, existS, inside, insideS, shrink}
-import progOfmacros.RedT.{cac, cac2, enlargeEF, enlargeFE, enlargeOld}
+import progOfmacros.RedT.{cac, enlargeEF, enlargeFE, enlarge}
 import progOfmacros.Topo.{brdin, nbcc, nbccV, nbccVe}
 
 

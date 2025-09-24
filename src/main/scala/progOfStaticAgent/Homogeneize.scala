@@ -1,14 +1,14 @@
 package progOfStaticAgent
 
 import compiler.ASTL.{anticlock, clock, delayedL, sym, transfer}
-import compiler.ASTLfun.{cond, e}
+import compiler.ASTLfun.{cond, e, imply}
 import compiler.SpatialType.{BoolV, BoolVe, BoolVf}
 import compiler.{AST, ASTBfun, ASTLt, B, E, Locus, Ring, SI, T, V}
 import dataStruc.{BranchNamed, Named}
-import progOfmacros.Comm.{adjacentBall, neighborsSym}
+import progOfmacros.Comm.{adjacentBall, insideBall, neighborsSym}
 import progOfmacros.RedT.cac
 import progOfmacros.Wrapper
-import progOfmacros.Wrapper.{exist, existS}
+import progOfmacros.Wrapper.{border, borderS, exist, existS, inside, insideS, smoothen, smoothen2, testShrink}
 import sdn._
 import sdntool.{DistGcenter, DistT, gCenter}
 
@@ -70,10 +70,36 @@ class Homogen() extends Flies2 with DistT with gCenter with DistGcenter
   //showMoves
 };
 
-class Convergent extends Homogen with Lead{
-  //final val stabilize=introduceNewPriority()
-  //force(stabilize,"balance",'_',myleader.balance)//specific forces applied to Flies
-  shoow(myleader.muis)
+class Convergent extends Homogen // with Lead //pas besoin de leader pour le moment
+{
+  final val stabilize=introduceNewPriority()
+   /** border of qparticle  where dg diminishes */
+    val brdVeSloped=brdVe&dg.sloplt
+  /** around isV, adds Vertices on the otherside of brdVeslopped */
+    val isVplus=isV | exist(transfer(sym(transfer(brdVeSloped))))
+  /** add vertex  if three neighbors are on */
+  val isVsmoothed=smoothen(isVplus)
+  /** computes the Vf bool and yes that is right*/
+  val isVtest=testShrink(isVplus)
+  /** add vertex  if four neighbors are on, bugs, more restrictive therefore, than smoothen */
+  val isVsmoothed2=isVplus| exist(isVtest)
+
+  shoow(isVplus,isVsmoothed,isVsmoothed2,isVtest)  /** true for one seed if on its whole border dg diminishes */
+val stable1Old=muis & inside(imply(brdVe,dg.sloplt))
+  val stable1=muis & insideBall(isVsmoothed2)
+  val stable2=forallize(stable1)&isV
+  val balance: Force = new Force() {
+    import compiler.ASTLfun.fromBool
+    override def actionV(ag: MovableAgentV): MoveC = {
+      /** pure negative move */
+      val yes=MoveC1(false,false)
+      /** if stable2 , this will cancel movement of lower priority, */
+      val no = MoveC1(stable2, e(stable2)&brdVe)
+      MoveC2(yes,no)
+    }
+  }
+  force(stabilize,"balance",'_',balance)//specific forces applied to Flies
+  shoow(stable1,stable2)
 }
 
 /**
@@ -107,9 +133,9 @@ class Leader(source: Seed)extends MuStruct [V,B] {
  /** annule le mouvement si stable, donc seul no est défini */
   val balance: Force = new Force() {
     override def actionV(ag: MovableAgentV): MoveC = {
-
-      val non = MoveC1(fromBool[V](false)&muis, fromBool[T[V,E]](false)&fromBool[T[V,E]](false)) //ne va pas empty sur leader, juste pour tester
-    non
+      val yes=MoveC1(false,false) //convergent is a pure negative move
+      val no = MoveC1(muis, false) //ne va pas empty sur leader, juste pour tester
+    MoveC2(yes,no)
     }
   }
 }
