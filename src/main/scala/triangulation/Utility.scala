@@ -198,7 +198,7 @@ object Utility {
 
   /**
    *
-   * @param lCA    input 1D array of boolean of size>30
+   * @param lCA    input 1D array of boolean of size>=30
    * @param lCAmem array of 32bits int, where to pack those booleans as integer
    * @param iStart starting index in lCAmem where to start packing
    * @param iEnd   lastIndex in lCAmem where to finish packing
@@ -206,6 +206,7 @@ object Utility {
    */
   def lineToInts(lCA: Seq[Boolean], lCAmem: Array[Int], iStart: Int, iEnd: Int, nbBlock: Int, blockSize: Int) = {
     for (i <- iStart until iEnd) { // indexes of  target Int32 of LCAmem, if we were not interleaving
+      assert(iStart<iEnd)
       var int32: Int = 0
       //for(j<-0 until lCA.size)
       for (j <- (i - iStart) * 30 until min((i + 1 - iStart) * 30, lCA.size)) // j visits the indexes of the portion in the considered LCA lines

@@ -31,7 +31,7 @@ trait QPointFields {
   val tripleton: BoolF = insideS[V, F](isV)
   val tripletonV: BoolV = existS[F, V](tripleton)
   //val choose: BoolVe =chooseMinOf(prio)
-  val choose=chooseMaxOf(prioYesNotQuiescent,4)
+  val choose: BoolVe =chooseMaxOf(prioYesNotQuiescent,4)
 
 
 
@@ -51,7 +51,7 @@ self: MovableAgentV => //a quasi point  is allways a movableAgentV
       insideBall(imply(muis, feature))
  }
 
-  /** will choose neighbor with smallest flip priority  */
+  /** will choose neighbor with higest flip priority  */
   val  sexKeepFlipIf=new Constr(Array(this), null, flipOfMove) with Named with BranchNamed {
     //val whereto:BoolVe= ~ e(singleton) |choose
     val whereto:BoolVe= imply(e(singleton),choose)

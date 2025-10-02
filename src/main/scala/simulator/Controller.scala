@@ -180,7 +180,7 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
         simul.asInstanceOf[Elem] % Attribute(null, "density", density.toString, Null)
       case other => other
     })
-    val newnewnewSimulparam = newSimulparam.asInstanceOf[Elem].copy(child = newSimulparam.child.map {
+    val newnewnewSimulparam = newnewSimulparam.asInstanceOf[Elem].copy(child = newnewSimulparam.child.map {
       case simul @ <simul>{_*}</simul> =>
         simul.asInstanceOf[Elem] % Attribute(null, "darkness", darkness.toString, Null)
       case other => other

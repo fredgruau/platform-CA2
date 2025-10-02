@@ -6,7 +6,7 @@ import compiler.ASTL.{delayedL, send, transfer, unop}
 import compiler.ASTLfun.{allOne, andLB2R, b2SIL, eq0, f, imply, lt2, ltSI, neq, orScanRight, reduce, uI2SIL, v}
 import compiler.SpatialType.{BoolE, BoolEv, BoolF, BoolV, BoolVe, BoolVf, IntE, IntEv, IntV, IntVe, UintV, UintVx}
 import compiler.repr.nomE
-import compiler.{ASTLfun, ASTLt, B, E, F, Locus, SI, T, UI, V}
+import compiler.{ASTLfun, ASTLt, B, E, F, Locus, SI, T, UI, V, chip}
 import dataStruc.{BranchNamed, Named}
 import progOfCA._
 import progOfmacros.Comm.{apexE, apexV}
@@ -36,7 +36,9 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
 /** the agent's list of consrtrain. Constraints have a name, and the list is also ordered */
    val constrs= new scala.collection.mutable.LinkedHashMap[String,Constr]()
    def codeConstraint: Iterable[String] =constrs.keys.toList.map(_.charAt(0).toString)
-   def showConstraint={ shoowText(allFlipCancel,codeConstraint.toList)}
+   def showConstraint={ shoowText(allFlipCancel,codeConstraint.toList);
+     //shoow(tataaaa)
+   }
    def codeMove:Iterable[String] =
      moves.map(_.keys.head.charAt(0).toString)
    def showMoves={ shoowText(highestTriggered,codeMove.toList)}
@@ -54,8 +56,6 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
      throw new Exception("une contrainte du nom "+name+" exite déja, changez le nom siou plait")
    constrs(shortName+name)=c
  }
-
-
    /** moves are stored in centered form, so that we can restrict them we store one hashmap for each priority. It two moves with identical names are added, we'd have to merge those */
    val moves:ArrayBuffer[mutable.LinkedHashMap[String,MoveC]] = ArrayBuffer() //empty at the beginning
    /** we introdued a new priority use to qualify a new range of move, creating a new functionnality such  as explore, homogeneize, stabilize*/
@@ -107,6 +107,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
     flip is eith computed from the move for movableAgent, or  computed from the parent for bounded agent
     registers where the constraints had a canceling effect*/
    val flipCancel=  new scala.collection.mutable.LinkedHashMap[String,BoolV]() with Named {}
+
    /** applies all the constraints on the move */
    val  allFlipCancel: ASTLt[V, UI] ={
      /** computes an IntVUI  whose individual bits are cancel Flips  */
@@ -119,10 +120,13 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
      }
      delayedL( allFlipCancel(flipOfMove))
    }
+   val tataaaa:BoolVe= ~ (~chip.borderVe.df )
+
    // val f:BoolV=False()
      val noFlipCancel=eq0(allFlipCancel)
      val flipAfterLocalConstr: BoolV = noFlipCancel  & flipOfMove
-     val flipRandomlyCanceled=flipAfterLocalConstr//& root4naming.addRandBit().asInstanceOf[BoolV]
+     val highproba= root4naming.addRandBit().asInstanceOf[BoolV]| root4naming.addRandBit().asInstanceOf[BoolV]
+     val flipRandomlyCanceled=flipAfterLocalConstr //& highproba
 
 
 
@@ -168,10 +172,11 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
        case Both() => insideS(flip)
        case One(v) =>  insideS(flip & (if (v) isV else (NisV))) // result also depend on impact
      })
-     /** flip is ok if prio is minimum with respect to the other side */
-     def tmp: ASTLt[T[E, V], B] =imply(v(mutrig),ags.head.prio.gt)
-     /** flip is preserved if no neighbor edge present a problem */
-     val where=inside(transfer(tmp))
+     /** flip is ok if prio is maximum with respect to the other side */
+     def tmp: BoolEv =imply(v(mutrig),ags.head.prio.gt) //todo faut mettre lt
+     /** flip remains ok if no neighbor edge present a problem */
+       val ttmp=tmp
+     val where: BoolV =inside(transfer(ttmp))
    }
    class MutCancelFlipIf(i: Impact,val mutex:BoolE,flip:BoolV) extends Constr(Array(this), i,flip) {
      /** mutex is triggered if there is indeed two flips on each side of the mutex, and in the right state. */
@@ -199,7 +204,8 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
      }
 
      /** flip is ok if prio is smaller with respect to the other side */
-     val chekLtIfMutrig=imply(f(mutrig),prio.ltApex)
+   //  val chekLtIfMutrig=imply(f(mutrig),prio.ltApex) // je mettait lt au lieu de gt, cela peut créer des oscillations.
+     val chekLtIfMutrig=imply(f(mutrig),prio.gtApex)
      val where=inside(apexV(chekLtIfMutrig))
    }
    /**

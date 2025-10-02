@@ -27,10 +27,13 @@ trait DagNode[+T <: DagNode[T]] {
   //def other: List[T] = List.empty
 
   /** we print without parenthesis when there is a single input */
-  def toStringTree: String = toString + " " +
-    (if (inputNeighbors.size > 1 || this.isInstanceOf[Neton[_]])
-      "(" + inputNeighbors.map(_.toStringTree).foldLeft("")(_ + ", " + _).substring(2) + ")" //le substring vire la premiere virgule
-    else if (inputNeighbors.size == 1) inputNeighbors.head.toStringTree else " ")
+  def toStringTree: String ={
+ //   println("toatoa")
+    toString + " " +
+      (if (inputNeighbors.size > 1 || this.isInstanceOf[Neton[_]])
+        "(" + inputNeighbors.map(_.toStringTree).foldLeft("")(_ + ", " + _).substring(2) + ")" //le substring vire la premiere virgule
+          else if (inputNeighbors.size == 1) inputNeighbors.head.toStringTree else " ")
+  }
 
 
   /** ([

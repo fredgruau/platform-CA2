@@ -26,7 +26,7 @@ object RedD {
   /**
    * @tparam S1 lower case simplicial type E
    * @tparam S2 target simplicial type V
-   *    réduit directement de T[S2,S1] vers S2, (permet de simplifier le code) todo: y enlever les defVe)
+   *    réduit directement de T[S2,S1] vers S2, (permet de simplifier le code) todo: y enlever les defVe céfé, pisque d n'est plus used)
    *                      **/
   private def redfunDef[S1 <: S, S2 <: S, R <: Ring](r: redop[R], l: S1)(implicit m: repr[S1], n: repr[S2], q: repr[R], d: chip[S2, S1]): //pour defVe S1=E,S2=V
   Fundef1[(T[S2,S1], R), (S2, R)] = {

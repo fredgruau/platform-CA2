@@ -3,7 +3,7 @@ package progOfStaticAgent
 import compiler.ASTL.{anticlock, clock, delayedL, sym, transfer}
 import compiler.ASTLfun.{cond, e, imply}
 import compiler.SpatialType.{BoolV, BoolVe, BoolVf}
-import compiler.{AST, ASTBfun, ASTLt, B, E, Locus, Ring, SI, T, V}
+import compiler.{AST, ASTBfun, ASTLt, B, E, Locus, Ring, SI, T, V, chip}
 import dataStruc.{BranchNamed, Named}
 import progOfmacros.Comm.{adjacentBall, insideBall, neighborsSym}
 import progOfmacros.RedT.cac
@@ -40,7 +40,7 @@ class Homogeneize() extends LDAG with Named with BranchNamed
   part.shoow(part.b.vf)
   part.shoowText(part.b.nbCc,List())
   part.shoowText(part.prioRand,List() )
-
+  //part.shoow(chip.borderVe.df)
 }
 
 /** adds quasipoint and blob constraints */
@@ -49,6 +49,7 @@ class Seed extends  MovableAgentV with BlobVouE with QpointConstrain with BlobCo
   shoow(flipOfMove, flipAfterLocalConstr)
   //  for (v<-realFlipCancel.values) shoow(v) //display intermediate, decreasing  flip value
   shoow(meetE, meetV, nbCc, lateBrdE)
+  shoow(doubleton)
   //shoow(doubleton,singleton,tripleton)
 }
 
@@ -57,7 +58,7 @@ class Seed extends  MovableAgentV with BlobVouE with QpointConstrain with BlobCo
 class Flies2 extends Seed {
   /** exploring priority */
   final val explore=introduceNewPriority()
-  force(explore, "explore",'x', Force.total)
+  force(explore, "explore",'O', Force.total)
 }
 
 /**adds gabriel center,  distance to gabriel center, and then repulsive force*/
@@ -66,7 +67,6 @@ class Homogen() extends Flies2 with DistT with gCenter with DistGcenter
   final val homogeneize=introduceNewPriority()
   force(homogeneize,"repulse",'|',dg.repulse)//specific forces applied to Flies
   shoowText(dg.muis, List())
-
   //showMoves
 };
 

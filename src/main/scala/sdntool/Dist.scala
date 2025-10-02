@@ -16,7 +16,7 @@ import progOfmacros.Comm.neighborsSym
 import progOfmacros.{Grad, Wrapper}
 import progOfmacros.Wrapper.{borderS, exist, existS, inside, neqUI2L}
 import progOfmacros.RedT.cacOld
-import sdn.{Blob, BlobOld, BlobVe, Force, LayerS, MovableAgentV, MoveC, MoveC1, MoveC2, MuStruct, One, Stratify, carrySysInstr}
+import sdn.{Blob, BlobOld, BlobVe, Force, LayerS, MovableAgentV, MoveC, MoveC1, MoveC2, MuStruct, One, QPointFields, Stratify, carrySysInstr}
 import sdn.Util.{addBlobVe, addLt, addLtSI}
 
 /**
@@ -33,7 +33,8 @@ class MuDist(val source: MuStruct[V, B],val bitSize:Int)extends MuStruct [V,SI] 
   //gabriel centers can be directly obtain simply by computing Vmeeting-point of the blob, using sloplt
   // and also Emeeting points, nearest to the source.
  // val b = addBlobVe(sloplt) //could be not used.
-
+  val iambig=source.asInstanceOf[QPointFields].tripletonV
+  val incrOld = cond(delayedL(source.muis.munext), cond(iambig,sign(opp+1),sign(opp)), delta)
   val incr = cond(delayedL(source.muis.munext), sign(opp), delta)
   val vortex: BoolF = andR(transfer(cacOld(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
   bugif(vortex) //todo, mettre aussi un bug si y a un écart de 4 sur la source

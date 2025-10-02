@@ -106,6 +106,7 @@ trait encodeGt extends encodeByInt {
       //+2 because first two int not used
       (startCol + line, bitPos % 30 + 1) //, +1 because first bit is reserved for propagation from neighbor
     }
+
     /**
      *
      * @param mv   spefies src and target destination for a single bit, within a CA line of nbColCA cells
@@ -143,7 +144,8 @@ trait encodeGt extends encodeByInt {
       // process top line
       copyLine(mem,nbLine - 2, 0)
       val nbRot=((nbLine-2)/2)%30
-      for(i<- 0 until nbRot ) rotateLineRight(mem,0)
+      for(i<- 0 until nbRot )
+        rotateLineRight(mem,0)
       //process Bottom line
       copyLine(mem,1, nbLine - 1)
       for(i<- 0 until nbRot ) rotateLineLeft(mem,nbLine - 1)
@@ -168,7 +170,10 @@ trait encodeGt extends encodeByInt {
     for (i <- 0 until nbLine) { //we process line i whose length is nbColCA
       /** how much do we need to rotate right */
       val shift = (i / 2) % nbCol
-      lineToInts(rotateLeft(memCAbool(i), shift), memCAint32, i * nbIntPerLine, min((i + 1) * nbIntPerLine, nbCol), nbIntPerLine, nbLine) //rotation is done on the whole CA lines.
+     // lineToInts(rotateLeft(memCAbool(i), shift), memCAint32, i * nbIntPerLine, min((i + 1) * nbIntPerLine, nbCol), nbIntPerLine, nbLine) //rotation is done on the whole CA lines.
+    // cela faisait bugger l'initialisation des def
+
+      lineToInts(rotateLeft(memCAbool(i), shift), memCAint32, i * nbIntPerLine, (i + 1) * nbIntPerLine, nbIntPerLine, nbLine) //rotation is done on the whole CA lines.
     }
     interleaveSpace(memCAint32, nbIntPerLine, nbLine)
   }

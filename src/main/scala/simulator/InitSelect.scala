@@ -125,10 +125,11 @@ trait InitSelect {
   /** the def fields have to be generated for each locus. Hence, it is computed on the fly, in order to save memory */
   private def defInit(l: Locus): Init = new InitMold(l, 1) {
     for (d <- 0 until l.density)
-      for (i <- 0 until nbLine)
+      for (i <- 0 until nbLine) {
         for (j <- 0 until nbCol)
           if (locusPlane(l)(d)(i)(j).isDefined)
             setMemField(d, i, j)
+      }
   }
 
   /** does a random init covering only cells which will not be mirored */
@@ -168,7 +169,8 @@ trait InitSelect {
      */
     def setBoolVField(p: Vector2D): Unit = setBoolVField(p.x.toInt, p.y.toInt)
 
-    def setBoolVField(i: Int, j: Int): Unit = boolVField(i)(j) = true
+    def setBoolVField(i: Int, j: Int): Unit =
+      boolVField(i)(j) = true
   }
 
   /** initalize all the scalar component of a locus in the same way */
@@ -194,7 +196,7 @@ trait InitSelect {
 
     /**
      * @param CAmemFields memory fields to fill
-     *                    fills the set of memory fields corresponding to a CA field, according to a given init wished for
+     *                    fills the set of memory fields corresponding to a CA field, according to a given already computed,  init wished for
      */
     override def init(CAmemFields: Array[Array[Int]]): Unit = {
       assert(CAmemFields.length == memFields.length, "count of CA bit planes does not corresponds " + CAmemFields.length + " " + memFields.length)
@@ -257,9 +259,15 @@ trait InitSelect {
     }*/
 
     var k=0
-    var numColUsed=numColUsable
-     while (numColUsed*numLineUsable>density)
-       { numColUsed -=1 }
+    var maxSquareSize=Math.min(numColUsable,numLineUsable)
+    while (maxSquareSize*maxSquareSize>density)
+    {maxSquareSize-=1}
+    val numLineUsed=maxSquareSize
+    var numColUsed=maxSquareSize
+    //case landscape grid nbColUsable> nbLineUsable
+    while(numColUsed*numLineUsed<density &&  numColUsed<numColUsable-1)
+      {numColUsed+=1}
+
     for(i<-0 to numLineUsable)
       for(j<-0 to numColUsed) {
         if (k < density )

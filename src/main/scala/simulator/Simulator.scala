@@ -166,8 +166,9 @@ object Simulator extends SimpleSwingApplication {
       val nbColPannel: Int = xInt(simulParam, "display", "@nbCol")
       for (env: Env <- iterEnvs) { //effectivement, lorsque on crée les envs, il n'ont pas encore leur pannel
         controller.envList = controller.envList :+ env //we will need to acess the list of env, from the controler
-
-        env.caPannel = new CApannel(controller.CAwidth, controller.CAheight, env, progCA) // the number of CAlines is 1/ sqrt(2) the number of CA colomns.
+       /** height of the pannel of displaying the CA */
+        val CaHeight=env.medium.boundingBox.height
+        env.caPannel = new CApannel(controller.CAwidth,CaHeight /*controller.CAheight*/, env, progCA) // the number of CAlines is 1/ sqrt(2) the number of CA colomns.
           /** allows to add widjet for each CA, such as the time */
           val envPanel = new BoxPanel(Orientation.Vertical) {
             contents += env.iterationLabel

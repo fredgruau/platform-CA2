@@ -90,8 +90,6 @@ trait Compar extends ComparDiff[UI]{
 }
 
 
-
-
 /** same as Compar, except that we compare apex neighbors instead of direct neighbors? */
 /*
 trait ComparApex{

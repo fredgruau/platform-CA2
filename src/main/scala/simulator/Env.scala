@@ -70,6 +70,7 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
         controller.bitSizeDisplayedOrDirectInitField.getOrElse(layerName, 1),
         controller.density
       ) // bitsize  is passed.
+      //if(layerName.startsWith("lldefVe"))     println("lldefVe")
       initMethod.init(memFields2Init.toArray)
 
     }

@@ -763,9 +763,12 @@ object Medium {
    */
   def christal(nbLineCA: Int, nbColCA: Int, widthLt30: Int): Medium with encodeByInt with InitSelect with border= {
     val width = if (nbColCA < 30) widthLt30 else 2 * widthLt30 //we see that for 64 column we draw the CA in the full available width by using two cells.
-    val radiusSqrt = Math.floor(width.toDouble / (2 * nbColCA - 1)) //we compute radius so that the CA fills the available space on the pannel,
-    // normally we assume that the number of lines is the number of columns divided by sqrt(2)
-    val radius: Double = if (nbLineCA * 1.1 < nbColCA) radiusSqrt else (radiusSqrt * nbColCA) / (nbLineCA * 1.4)
+    /** we compute radius so that the CA fills the available width on the pannel,*/
+    val radiusSqrt = Math.floor(width.toDouble / (2 * nbColCA - 1))   // normally we assume that the number of lines is the number of columns divided by sqrt(2)
+
+    val radius: Double = if (nbLineCA * 1.1 < nbColCA) radiusSqrt //si y a pas trop de ligne, le rayon est décidé par la largeur
+       else (radiusSqrt * nbColCA) / (nbLineCA * 1.4)  //sinon c'est le nombre de lignes??
+
     //the height should be around 1/sqrt2 the width
     assert(radius > 0, "not enough space to draw voronoi")
     //computes lattice location of points  in 2D space

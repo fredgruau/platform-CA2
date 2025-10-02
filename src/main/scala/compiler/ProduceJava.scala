@@ -398,7 +398,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
       "DISPLAYABLE" -> //theDisplayed contains two kinds of name:aux and segmented, first step should separate the segmented
         {
           if (theDisplayed.isEmpty)
-            throw (new Exception("you forgot to call show, no field are displayed "))
+            throw (new Exception("you forgot to call show, no fields are displayed "))
           if (!sameRoot(theDisplayed)) {
             throw (new Exception("some fields do not encode a path" + theDisplayed))
             //val ordered=orderDisplayed(theDisplayed)
@@ -459,7 +459,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
           callCode= callCode + paramsR(0)  //gros bricolage
           val result=0
         case "show" =>
-          val toto=(call.usedVars().toList)
+          val toto=(call.usedVarsIncludingLayers().toList)
            if (toto.isEmpty) {
              val u=0
              print("jojioioiioj")

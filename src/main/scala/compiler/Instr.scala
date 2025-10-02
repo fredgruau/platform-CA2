@@ -378,6 +378,11 @@ case class CallProc(var procName: String, names: List[String], exps: List[AST[_]
     result
   }
 
+  def usedVarsIncludingLayers(): HashSet[String] ={
+    val result= exps.map(_.symbolsIncludingLayers).foldLeft(immutable.HashSet.empty[String])(_ | _)
+    result
+  }
+
 
   override def propagate(id1: rewriteAST2): Instr = {
     val newInstr = CallProc(procName, names, exps.map((a: AST[_]) => id1(a)))
