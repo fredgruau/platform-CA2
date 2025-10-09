@@ -82,7 +82,7 @@ object Force{
   import MoveC._
   /** produce maximum possible move, rely on priority to obtain random movement */
   val total:Force=new Force(){
-    override def actionV(ag: MovableAgentV): MoveC = MoveC1(ag.muis,ag.fb.brdVe)//extends and empties everywhere possible.
+    override def actionV(ag: MovableAgentV): MoveC = MoveC1(ag.muis,ag.bf.brdVe)//extends and empties everywhere possible.
   }
 
   /** we designed a random move that does not break the quasipoint property,

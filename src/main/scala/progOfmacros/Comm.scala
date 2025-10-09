@@ -23,8 +23,8 @@ object Comm {
 
   def adjacentRing(bv: BoolV):BoolV=exist(neighborsSym(e(bv)))
   def adjacentBall(bv: BoolV):BoolV=adjacentRing(bv)|bv
-  def insideRing(bv: BoolV)=inside(neighborsSym(e(bv)))
-  def insideBall(bv: BoolV)=bv &insideRing(bv)
+  def insideRing(bv: BoolV):BoolV=inside(neighborsSym(e(bv)))
+  def insideBall(bv: BoolV):BoolV=bv &insideRing(bv)
 
   val neighborsDefUI: Fundef1[(T[V, E], UI), (T[V, E], UI)] = {
     val ve = pL[T[V,E],UI]("ngh")

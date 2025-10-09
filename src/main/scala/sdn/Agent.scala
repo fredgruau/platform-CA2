@@ -55,6 +55,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B] with HasIsV
 /** the agent's list of consrtrain. Constraints have a name, and the list is also ordered */
    val constrs= new scala.collection.mutable.LinkedHashMap[String,Constr]()
    def codeConstraint: Iterable[String] =constrs.keys.toList.map(_.charAt(0).toString)
+   /** shows a letter corresponding to the constraint, for all constraint which effectively contribute in reducing flip */
    def showConstraint={ shoowText(allFlipCancel,codeConstraint.toList);
      //shoow(tataaaa)
    }
@@ -63,17 +64,20 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B] with HasIsV
      moves.map(_.keys.head.charAt(0).toString)
    }
 
-   def showMoves={
-     shoowText(highestTriggered,codeMove.toList)}
+
+   /** will not show move that block movement instead of trigering it */
    def showPositiveMoves={ shoowText(yesHighestTriggered,codeMove.toList)}
-   def showMoveAndConstraint={showPositiveMoves;showConstraint}
+   /** shows also blocking moves */
+   def showMoves={ shoowText(highestTriggered,codeMove.toList)}
+   def showFlip=shoow(flipOfMove, flipAfterLocalConstr)
+   def showMe={shoow(muis);showPositiveMoves;showConstraint;showFlip;
+     showPrio
+   }
    /**
-    *
     * @param name more explicit name
     * @param shortName used for display in CApannel
     * @param c constraint
     */
-
  def constrain(name:String, shortName:Char, c: Constr) = {
    if(constrs.contains(shortName+name))
      throw new Exception("une contrainte du nom "+name+" exite déja, changez le nom siou plait")
@@ -129,6 +133,8 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B] with HasIsV
     * allows to  breaking  symetry in case of tournament with equal force's priority */
    val prioRand:UintV
     val prio: UintVx =addLt(prioRand::prioDet)
+   def showPrio={shoowText(prioRand,List()); shoowText(prio,List())}
+
    val prioYes: UintVx =addLt(prioRand::yesPrioDet)
    /** nullify prio if quiescent */
    val prioYesNotQuiescent=andLB2R(~ isQuiescent, prioYes)

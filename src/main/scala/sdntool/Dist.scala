@@ -35,17 +35,13 @@ class MuDist(val source: MuStruct[V, B],val bitSize:Int)extends MuStruct [V,SI] 
    * par contre on ne peut pas le calculer a partir de slopelt, sinon ca bugge
    * pour des pb de miror qui nécessite de passer par des vertices*/
   val voisinDiff:BoolE=(addLtSI(muis.pred)).diff
-  //gabriel centers can be directly obtain simply by computing Vmeeting-point of the blob, using sloplt
-  // and also Emeeting points, nearest to the source.
- // val b = addBlobVe(sloplt) //could be not used.
   val iambig=source.asInstanceOf[QPointFields].tripletonV
   val incrOld = cond(delayedL(source.muis.munext), cond(iambig,sign(opp+1),sign(opp)), delta)
   val incr = cond(delayedL(source.muis.munext), sign(opp), delta)
   val vortex: BoolF = andR(transfer(cacOld(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
-  buugif(vortex) //todo, mettre aussi un bug si y a un écart de 4 sur la source
-  //adds a slow constraint to avoid vortex creation
+
   source match{
-    case ag: sdn.Agent[V]=>
+    case ag: sdn.Agent[V]=> //adds a slow constraint to avoid vortex creation
       /** moving to forbidden would create a source in a negative distance
        * that would hence not be able to correctly decrease its distance level */
       val forbidden:BoolV= ASTLfun.isneg(muis.pred)
@@ -53,8 +49,11 @@ class MuDist(val source: MuStruct[V, B],val bitSize:Int)extends MuStruct [V,SI] 
       ag.constrain("slow",'w',slow)
     case _ =>
   }
-   shoow(delta,gap, sloplt, level) // necessary so as to use all parameters returned by slopeDelta
-  shoow(vortex)
+
+  def showMe={shoow(delta,gap, sloplt, level) // necessary so as to use all parameters returned by slopeDelta
+    shoow(vortex)
+    buugif(vortex) //todo, mettre aussi un bug si y a un écart de 4 sur la source
+  }
 
  // val deefF=new ConstLayer[F, B](1, "def")
 }
@@ -62,27 +61,21 @@ class MuDist(val source: MuStruct[V, B],val bitSize:Int)extends MuStruct [V,SI] 
 /** computes distance to gabriel centers added to the distance of that gabriel center to seeds i.e, distance to nearest neighbors */
 class MuDistGcenter(val source:MovableAgentV with addDist with addGcenter) extends MuStruct [V,SI] {
   override def inputNeighbors: List[MuStruct[_ <: Locus, _ <: Ring]] = List(source.d)
-
   override val muis: LayerS[V, SI] = new LayerS[V, SI](6, "0") //we put 5 bits so as to obtain continuity
-  {
-    override val next: AST[(V, SI)] = delayedL(this.pred + incr)(this.mym)
-  }
-  val closedFit: ASTLt[V, SI] = source.d.muis.pred - (muis.pred) //dois rester a zero au début puisque d et dg augmente en meme temps,
-  //val fit: ASTLt[V, SI] = cond(delayedL(source.gc.meetV), closedFit, cond(delayedL(source.gc.meetE2), closedFit + 2, 0)) //doit rester negatif et < 4
-  val (sloplt: BoolVe, deltag, level, gap) = Grad.slopDelta(muis.pred)
+  { override val next: AST[(V, SI)] = delayedL(this.pred + incr)(this.mym)  }
+   val (sloplt: BoolVe, deltag, level, gap) = Grad.slopDelta(muis.pred)
 
-  shoowText(deltag,List())
-  val gcenterEorV = source.gc.meet
   val deefV = new ConstLayer[V, B](1, "def")
   //val incrOldOld = cond(delayedL(gc.gCenterV), sign(closedFit), cond(delayedL(gc.gCenterE), sign(closedFit + 2), deltag))
    val opp = -(muis.pred)
-  val incrOld = cond(delayedL(gcenterEorV), sign(opp), deltag)
-  val incr = cond(delayedL(source.gc.meetV), sign(opp), cond(delayedL(source.gc.meetE2), sign(opp+2), deltag))
+   val incr = cond(delayedL(source.gc.meetV), sign(opp), cond(delayedL(source.gc.meetE2), sign(opp+2), deltag))
   /** spurious vortex occurs outside chip.borderF.df, so we have to and with chip.borderF.df in order to prevent false detection of vortex bug */
   val vortex: BoolF = chip.borderF.df & andR(transfer(cacOld(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
-  buugif(vortex) //todo, mettre aussi un bug si y a un écart  sur la source plus grand K en valeur absolue, K reste a déterminer
-  shoow( gap, sloplt, level, gcenterEorV,vortex) // necessary so as to use all parameters returned by slopeDeltashoow(vortex)
-
+  def showMe={
+    shoow( gap, sloplt, level, vortex) // necessary so as to use all parameters returned by slopeDeltashoow(vortex)
+    shoowText(deltag,List())
+    buugif(vortex) //todo, mettre aussi un bug si y a un écart  sur la source plus grand K en valeur absolue, K reste a déterminer
+  }
   /** we may have to replace muis by isV in order to obtain a force that can acts on BoolEv Agents, and not only BoolV agents */
   val repulse: Force = new Force() {
     override def actionV(ag: MovableAgentV): MoveC = {
@@ -93,10 +86,6 @@ class MuDistGcenter(val source:MovableAgentV with addDist with addGcenter) exten
       val non = MoveC1(ag.muis & hasNearer, sloplt & ag.brdVe  ) //falseVe
       MoveC2(oui, non)
     }
-
-
-
-    // val deefF=new ConstLayer[F, B](1, "def")
   }
 }
 
@@ -108,7 +97,7 @@ trait addDist {
 }
 
 /** adds gabriel centers, uses blob computation on slopelt, works like magic */
-trait gCenter{
+trait gCenterOld{
   self:MovableAgentV with addDist=> //there is a distance already
 
  /** on calcule  brdE directement depuis la distance aux seeds,

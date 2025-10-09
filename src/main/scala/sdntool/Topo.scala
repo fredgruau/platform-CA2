@@ -37,13 +37,11 @@ class BlobVFields(val muis:BoolV with carrySysInstr) extends Attributs {
   val notVe= ~isVe
   /** Ve edges leaving the support , we know we may take a sym so we prepare for it, to get a meaningfull name brdVe.sym*/
   val brdVe=transfer(v(brdE)) & isVe//addSym introduit un delayed et compromet le nommage automatique par reflection. addSym( transfer(v(brdE)) & isVe)
-
   override def showMe={ shoow(brdE,brdV,brdVe)   }
-
 }
 /** endows a movableAgentV with the feature needed to a blob stored in a class "f" (shortname) */
 trait addBlobVfields{ self: MovableAgentV =>
-  val fb=new BlobVFields(muis)
+  val bf=new BlobVFields(muis)
 }
 
 trait blob {val meetV:BoolV; val meetE:BoolE}
@@ -57,9 +55,9 @@ abstract class Attributs extends  hasMuisSysInstr with shoow with BranchNamed wi
 abstract class Blob extends Attributs {  val meetV:BoolV; val meetE:BoolE; val nbCc:UintV
   /** allows to picture meeE as vertices */
   def meetE2=existS[E,V](meetE)
-  /** regroup all meeting points */
-  def meet= meetV | meetE2
-override def showMe=shoow(meetV,meetE,nbCc)}
+  /** regroup all meeting points and so, all gabriel centers */
+  val meet= ~ (~ delayedL(meetV | meetE2)) //double négation nécessaire pour nommer.
+override def showMe=shoow(meetV,meetE,nbCc,meet)}
 
 /**
  *
@@ -77,7 +75,7 @@ class BlobV(val muis:BoolV with carrySysInstr,f:BlobVFields) extends Blob  {
 }
 
 /** endows a movableAgentV with the blob meeting points */
-trait addBloobV{ self: MovableAgentV with addBlobVfields =>val m=new BlobV(muis,fb)}
+trait addBloobV{ self: MovableAgentV with addBlobVfields =>val b=new BlobV(muis,bf)}
 /** endows  a  BoolVe COMMING AS THE SLOPELT OF  A DISTANCE with  its  meeting points
  * those meeting points correspond to the gabriel centers.
  * It computes first a borderE, */
@@ -93,16 +91,19 @@ class BlobVe(val muis:BoolV with carrySysInstr,brdE:BoolE, brdVe:BoolVe) extends
    val emptyRhomb:BoolE= ~rhombusExist(brdE) //il y a un gros plateau de distance sur tout le rhombus
   val meetE= selle | emptyRhomb //ca n'est pas un vrai gcenter avec emptyrhomb
 
-  override def showMe: Unit = {super.showMe;shoow(emptyRhomb)}
+  override def showMe: Unit = {super.showMe;shoow(emptyRhomb);shoow(meetE2)}
 }
 
 /** endows a distance with BlobVE meeting points, which are Gcenter */
 trait addBloobVe{ self: MovableAgentV with addBlobVfields with addDist=>val b=new BlobVe(muis,d.voisinDiff,  d.sloplt)}
-/** endows a distance with Gcenter which are almost the same as BlobV'*/
+/** endows a distance with Gcenter which are almost the same as BlobV'
+ * gabriel centers can be directly obtain simply by computing Vmeeting-point of the blob, using sloplt
+ *  and also Emeeting points, nearest to the source.
+ * */
 trait addGcenter{ self: MovableAgentV with addBlobVfields with addDist=>
   val gc=new BlobVe(muis,d.voisinDiff,  d.sloplt){
-    /** silly way of avoiding superposition of agents with Gcenter */
-    override def meetE2: ASTLt[V, B] = super.meetE2 & ~ muis}} //todo verifier que ca fonctionne
+    /** silly way of avoiding superposition of agents with Gcenter, we use a val for testing */
+    override val meetE2: ASTLt[V, B] = super.meetE2 & ~ muis}} //todo verifier que override fonctionne
 
 
 
@@ -184,10 +185,10 @@ trait  BlobConstrain extends Blob  {
 trait  newBlobConstrain   {
   self: MovableAgentV with addBloobV=>
   /** meetV points cannot flip */
-  val vmeet = new CancelFlipIf(Both(),m.meetV,flipOfMove)
+  val vmeet = new CancelFlipIf(Both(),b.meetV,flipOfMove)
   constrain("vmeet",'_',vmeet)
   /**a doubleton cannot flip both vertices*/
-  val emeet = new MutKeepFlipIf(Both(),m.meetE,flipOfMove) with BranchNamed {}
+  val emeet = new MutKeepFlipIf(Both(),b.meetE,flipOfMove) with BranchNamed {}
   constrain("emeet",'=',emeet)
 }
 /** endows  a an agent  defining and edge Frontier (either a BoolV agent or E support) with  its  meeting points.

@@ -1,6 +1,6 @@
 package progOfStaticAgent
 
-import compiler.ASTL.{anticlock, clock, delayedL, sym, transfer}
+import compiler.ASTL.{ASTLg, anticlock, clock, delayedL, sym, transfer}
 import compiler.ASTLfun.{cond, e, imply}
 import compiler.SpatialType.{BoolV, BoolVe, BoolVf}
 import compiler.{AST, ASTBfun, ASTLt, B, E, Locus, Ring, SI, T, V, chip}
@@ -10,95 +10,73 @@ import progOfmacros.RedT.cac
 import progOfmacros.Wrapper
 import progOfmacros.Wrapper.{border, borderS, exist, existS, inside, insideS, smoothen, smoothen2, testShrink}
 import sdn._
-import sdntool.{addDistGcenter, addDist, gCenter}
+import sdntool.{addDist, addDistGcenter}
 
 /**illustrate the working of repulsion combined with exploration  */
 class Homogeneize() extends LDAG with Named with BranchNamed
-{ //val part=new Convergent()
-  val part=new Homogen()
-
-  part.showMoveAndConstraint
- // part.showPositiveMoves
-
-  //part.shoowText(part.dg.muis.pred,List())
-  part.shoow(part.prioDet)
-  //part.shoow(part.yesPrioDet)
-  part.shoowText(part.prio,List())
- // part.shoowText(part.prioYes,List())
- // part.shoowText(part.prioYesNotQuiescent,List())
-  part.shoow(part.prio.ltApex)
- // part.shoow(part.choose)
-  //part.shoow(part.b.upwardSelle,part.b.selle,part.b.downwardSelle,part.b.downwardSelle,part.b.lateBrdVe)
-  part.shoowText(part.prioRand,List() )
-
-/*  part.shoowText(part.d.muis,List()) //necessaire pour la reachabilité
-  part.shoow(part.gCenterV,part.gCenterE,part.dBrdE)
-  part.shoow(part.b.twoAdjBlob)
-  part.shoow(part.b.emptyRhomb)
-  part.shoow(part.b.vf)
-  part.shoowText(part.b.nbCc,List())*/
-
-  //part.shoow(chip.borderVe.df)
+{ val part=new Convergent()
+  //val part=new Homogen()
+  part.showMe
+  part.bf.showMe
+  part.b.showMe
+  part.gc.showMe
+  part.d.showMe; part.dg.showMe
+  part.sf.showMe
 }
 
-/** adds quasipoint and blob constraints */
+/** basic quasiparticle with blob and qpoint constraints */
 class Seed extends  MovableAgentV  with addBloobV with newBlobConstrain with QpointConstrain
- {   def showFlip=shoow(flipOfMove, flipAfterLocalConstr)
-     shoow(muis)
-     //newb.showMe //shoow(doubleton,singleton,tripleton, laateBrdE, newb.meetV, newb.nbCc)
-     fb.showMe
-    m.showMe
-}
 
-/** moves as much as possible, todo put it in its own file */
+/** moves as much as possible */
 class Flies2 extends Seed {
-  /** exploring priority */
-  final val explore=introduceNewPriority()
+  /** exploring priority */  final val explore=introduceNewPriority()
   force(explore, "explore",'O', Force.total)
-  //final val explore2=introduceNewPriority()
- // force(explore2, "toto",'P', Force.total)
+  //final val explore2=introduceNewPriority() // force(explore2, "toto",'P', Force.total)
 }
 
-/**adds gabriel center,  distance to gabriel center, and then repulsive force*/
+/**adds distance, gabriel center,  distance to gabriel center, and then finally repulsive force*/
 class Homogen() extends Flies2 with addDist with addGcenter with addDistGcenter
 {  /** homogeneizing priority */
   final val homogeneize=introduceNewPriority()
   force(homogeneize,"repulse",'|',dg.repulse)//specific forces applied to Flies
   shoowText(dg.muis, List())
-  gc.showMe
+
   //showMoves
 };
 
 class Convergent extends Homogen // with Lead //pas besoin de leader pour le moment
-{
-  final val stabilize=introduceNewPriority()
-   /** border of qparticle  where dg diminishes */
-    val brdVeSloped=brdVe&dg.sloplt
+{  val sf=new Attributs() { //sf==stableFields
+  override val muis: ASTLg with carrySysInstr = Convergent.this.muis
+  /** border of qparticle  where dg diminishes */
+  val brdVeSloped=brdVe&dg.sloplt
   /** around isV, adds Vertices on the otherside of brdVeslopped */
-    val isVplus=isV | exist(transfer(sym(transfer(brdVeSloped))))
+  val isVplus=isV | exist(transfer(sym(transfer(brdVeSloped))))
   /** add vertex  if three neighbors are on */
   val isVsmoothed=smoothen(isVplus)
   /** computes the Vf bool and yes that is right*/
   val isVtest=testShrink(isVplus)
   /** add vertex  if four neighbors are on, bugs, more restrictive therefore, than smoothen */
-  val isVsmoothed2=isVplus| exist(isVtest)
-
- // shoow(isVplus,isVsmoothed,isVsmoothed2,isVtest)  /** true for one seed if on its whole border dg diminishes */
-//val stable1Old=muis & inside(imply(brdVe,dg.sloplt))
-  val stable1=muis & insideBall(isVsmoothed2)
+  val isVsmoothed2: BoolV =isVplus| exist(isVtest)
+  // shoow(isVplus,isVsmoothed,isVsmoothed2,isVtest)  /** true for one seed if on its whole border dg diminishes */
+  //val stable1Old=muis & inside(imply(brdVe,dg.sloplt))
+  val stable1=Convergent.this.muis.asInstanceOf[BoolV] & insideBall(isVsmoothed2)
   val stable2=forallize(stable1) & isV
+
+  override def showMe: Unit =  shoow(stable1,stable2)
+}
+  val stabilize=introduceNewPriority()
   val balance: Force = new Force() {
     import compiler.ASTLfun.fromBool
     override def actionV(ag: MovableAgentV): MoveC = {
       /** pure negative move */
       val yes=MoveC1(false,false)
       /** if stable2 , this will cancel movement of lower priority, */
-      val no = MoveC1(stable2, e(stable2)&brdVe)
+      val no = MoveC1(sf.stable2, e(sf.stable2)&brdVe)
       MoveC2(yes,no)
     }
   }
   force(stabilize,"balance",'_',balance)//specific forces applied to Flies
- // shoow(stable1,stable2)
+
 }
 
 /**
