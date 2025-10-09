@@ -1,3 +1,4 @@
+/*
 package progOfStaticAgent
 
 import compiler.ASTBfun.andRedop
@@ -16,16 +17,17 @@ class Flies() extends  MovableAgentV with BlobVouE with QpointConstrain with Blo
 {  // override def displayConstr:Boolean=true
  //
  final val explore=introduceNewPriority()
- force(explore, "explore",'x', Force.total) //specific forces applied to Flies
+ force(explore, "Explore",'Y', Force.total) //specific forces applied to Flies
  shoow(muis)
  shoow(flipOfMove,flipAfterLocalConstr)
 //  for (v<-realFlipCancel.values) shoow(v) //display intermediate, decreasing  flip value
- shoow(meetE,meetV,nbCc,lateBrdE)
+ shoow(meetE,meetV,nbCc)
  //shoow(prioRand.eq,prio.lt)
 //shoow(doubleton,singleton,tripleton)
 /** contient les premiers caractéres de chaque nom de contraintes */
 
 }
+*/
 
 
 

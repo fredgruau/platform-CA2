@@ -33,7 +33,7 @@ object ASTBt {
   }
 
   def checkUISI(effectivPar: AST[_], opPar: AST[_]) =
-    if (effectivPar.mym.name != opPar.mym.name && effectivPar.mym.name != B())
+    if (effectivPar.mym.name != opPar.mym.name && effectivPar.mym.name != B() /*&& opPar.mym.name!=B()*/)
       throw new Exception("Faut preserver SI ou UI")
 }
 
@@ -153,7 +153,7 @@ trait ASTBt[+R <: Ring] extends AST[R] with MyOpB[R] with MyOpIntB[R] {
       case Call1(op, x) => //il se peut quon rajoute un affect et augmente la tsymb au lieu d' augmenter l'environnement
         //we check that x 's type is a subtype of the paramater
         // we dlike to write something like that op.p1.mym=x.mym if op is element we do not check because concat produces boolean instead of uint
-        if (x.mym.name != op.p1.mym.name && !op.name.startsWith("elt"))
+        if (x.mym.name != op.p1.mym.name && !(op.name.startsWith("elt")/*|op.name.startsWith("orScanRight")*/))
           throw new Exception("Faut preserver SI ou UI")
         val newEnv = env + (op.p1.nameP -> x.asInstanceOf[ASTBg].deCallify(env))
         op.arg.asInstanceOf[ASTBg].deCallify(newEnv)

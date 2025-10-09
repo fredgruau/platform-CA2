@@ -68,16 +68,16 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
 
 
     val prog2 = prog1.treeIfy();
-     // print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
+      print("222222222222222222222222222222222222222222222222222222222222222222222222222222222\n" + prog2);
 
     val prog3: DataProg[InfoType[_]] = prog2.procedurIfy();
-      // print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
+      //print("3333333333333333333333333333333333333333333333333333333333333333333333\n" + prog3);
 
     val prog4: DataProg[InfoNbit[_]] = prog3.bitIfy(List(1)); //List(1)=size of int sent to main (it is a bool).
-    //   print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
+   //print("44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\n" + prog4 + "\n\n")
 
     val prog5: DataProg[InfoNbit[_]] = prog4.macroify();
-    //  println("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
+    //    println("macroIfy55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\n" + prog5 + "\n\n")
 
     val prog5bis: DataProg[InfoNbit[_]] = prog5.addParamRtoDagis2();
      //print("addParamRtoDagis255555555555555555555555555555555555555555555555555\n" + prog5bis + "\n\n")
@@ -86,10 +86,10 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
    // print("radiusify555555555555555555555555555555\n" + prog5ter)
 
     val prog6 = prog5ter.unfoldSpace(m); //ajouter les tm1s!!
-    //  print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
+     print("unfoldSpace666666666666666666666666666666666666666666666666666666666666666666666666666666666666\n" + prog6 + "\n\n")
 
     val prog7 = prog6.treeIfy(); //spatiall unfolding generates reused expression that need to be affected again
-   // print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
+    print("treeIfy777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7 + "\n\n")
 
     val prog7bis = prog7.simplify(); //this will remove id which are read only once.
     //print("simplify777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\n" + prog7bis + "\n\n")
@@ -98,13 +98,13 @@ abstract class Circuit[L <: Locus, R <: Ring](p: Param[_]*) extends AST.Fundef[(
     //  print("detm1ify 8888888888888888888888888888888888888888888888888888888888888888888888888\n" + prog8 + "\n\n")
 
     val prog10: DataProgLoop[InfoNbit[_]] = prog8.loopIfy()
- print("loopify1010101010101010101010101010101010101010" + prog10)
+    print("loopify1010101010101010101010101010101010101010" + prog10)
 
     val prog11: DataProgLoop[InfoNbit[_]] = prog10.unfoldInt()
-print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
+    print("unfold int 111111111111111111111111111111111111111111111111111111111111\n" + prog11)
     val prog12: DataProgLoop[InfoNbit[_]] = prog11.coaalesc() //allocates memory
     //System.out.println(prog12.allLayers)
-    // print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
+     print("\ncoalesccoalesccoalesccoalesccoalesccoalesccoalesc121212121212121212121212121212121212121212121212\n" + prog12)
    // ("\n\n\n javajavajavajavajavajavajavajava\n" + prog12.asInstanceOf[ProduceJava[InfoNbit[_]]].produceAllJavaCode)
     //as a result of compiling, compiledCA is available and will be read by the simulator, so we just launch it.
    // val s=new simulator.Simulator()   s.AppletLauncher()

@@ -8,10 +8,10 @@ import compiler.SpatialType.BoolV
 import compiler.{AST, ASTLt, B, Locus, Ring, V}
 import dataStruc.DagNode.EmptyBag
 import dataStruc.{BranchNamed, Named}
-import sdntool.DistT
+import sdntool.addDist
 import progOfmacros.Wrapper.borderS
 import sdn.{LDAG, MuStruct, Stratify, carrySysInstr, muEmptyBag}
-import sdn.Util.{addBlobE, safeGrow}
+import sdn.Util.safeGrow
 
 import java.util
 import scala.collection.immutable.HashMap
@@ -26,7 +26,7 @@ import scala.collection.immutable.HashMap
 
 /** same, but avoioding the wrapping of a constlayer */
 class Testdist() extends LDAG with Named with BranchNamed {
-  val constPart = new MuStruct[V, B] with muEmptyBag with BranchNamed with DistT {
+  val constPart = new MuStruct[V, B] with muEmptyBag with BranchNamed with addDist {
     /** support of agent */
     override val muis = new ConstLayer[V, B](1, "global") with Stratify[V, B] with ASTLt[V, B] with carrySysInstr
     shoow(muis,d.muis)

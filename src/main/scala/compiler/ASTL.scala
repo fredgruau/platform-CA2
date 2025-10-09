@@ -224,6 +224,12 @@ sealed abstract class ASTL[L <: Locus, R <: Ring]()(implicit m: repr[(L, R)]) ex
       case _ => false
     }
 
+  override def isCoonst =
+    this.asInstanceOf[ASTL[_, _]] match {
+      case Coonst(_, _, _) => true
+      case _ => false
+    }
+
   override def isBinopEdge =
     this.asInstanceOf[ASTL[_, _]] match {
       case BinopEdge(_, _, _, _,_) => true

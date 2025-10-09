@@ -113,7 +113,8 @@ object Simulator extends SimpleSwingApplication {
     val deletedJava = !existInJava(nameDirCompilCA+nameCA+"CA.java")
     /** contains the loops but also many other parameters */
     val progCA: CAloops2 =
-      if(options.contains("-c")||(options.contains("-b")&&(reprogrammed||deletedJava)))  //we recompile with -c or with -b  if CA code has been deleted or reprogrammeed
+      if(options.contains("-c")||(options.contains("-b")&&(reprogrammed||deletedJava)))  //we recompile with -c
+                // or with -b  if CA code has been deleted or reprogrammeed
       { Circuit.pkgCA=pkgCA
         Circuit.compiledCA(nameCA,pkgCA)  //force  compilation
       }

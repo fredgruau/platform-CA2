@@ -128,7 +128,7 @@ trait ProduceJava[U <: InfoNbit[_]] {
       "PARAMETERS" -> {
         /** add type to parameters, either int[] or int[][],
          * one dimension is enough for spatial type boolV, two dimensions are needed for other locus
-         * //parameters are also passed as 1D array if they are Uint of one bit, and V(). */
+         * //parameters are also passed as 1D array if they are Uint of one bit, and V(). this should not*/
         def javaIntArray(s: String) = (if (needOnlyoneBit(s)) ("int [] ") else ("int [][] ")) + s
 
         val parameters = (shortSigIn ::: (shortSigOut ::: layerNames)).map(javaIntArray(_))
@@ -258,11 +258,20 @@ trait ProduceJava[U <: InfoNbit[_]] {
     def initLayer(spatialLayer: Map[String, InfoNbit[_]]): HashMap[String, String] = {
       HashMap[String, String]() ++ spatialLayer.map({ case (s, i) => (s -> i.k.asInstanceOf[LayerField].init) })
     }
+    /** apparemment j'ai besoin d'un anchor different pour les names */
+    def anchorOneVarNamed(oneVar: (String, List[Int])) = {
+      val ints = oneVar._2
+      var res = ints.map("m[" + _ + "]").mkString(",")
+      if (!isBoolV(oneVar._1) && !isBool(oneVar._1) && (oneVar._2.size > 1))
+        res = " new int[][]{" + res + "}" //we have a 2D array
+      res = oneVar._1 + "=" + res;
+      res
+    }
 
     def anchorOneVar(oneVar: (String, List[Int])) = {
       val ints = oneVar._2
       var res = ints.map("m[" + _ + "]").mkString(",")
-      if (!isBoolV(oneVar._1) && !isBool(oneVar._1))
+      if (!isBoolV(oneVar._1) && !isBool(oneVar._1) )//&& (oneVar._2.size > 1))
         res = " new int[][]{" + res + "}" //we have a 2D array
       res = oneVar._1 + "=" + res;
       res
@@ -270,9 +279,10 @@ trait ProduceJava[U <: InfoNbit[_]] {
 
     // def javaIntArray(s: String) = (if (isBoolV(s)) ("int [] ") else ("int [][] ")) + s
     def anchorNamed(offset: Map[String, List[Int]]): String = {
-      val (offset1D, offset2D) = offset.partition(x => isBoolV(x._1)|isBool(x._1)) //x._2.size == 1)
-      (if (offset1D.nonEmpty) "int[]" + offset1D.map(anchorOneVar(_)).mkString(",") + ";\n" else "") +
-        (if (offset2D.nonEmpty) "int[][]" + offset2D.map(anchorOneVar(_)).mkString(",") + ";\n" else "")
+      val problems=offset.filter(x => !isBool(x._1) && !isBoolV(x._1)  && x._2.size == 1)
+      val (offset1D, offset2D) = offset.partition(x => isBoolV(x._1) || isBool(x._1) || x._2.size == 1)
+      (if (offset1D.nonEmpty) "int[]" + offset1D.map(anchorOneVarNamed(_)).mkString(",") + ";\n" else "") +
+        (if (offset2D.nonEmpty) "int[][]" + offset2D.map(anchorOneVarNamed(_)).mkString(",") + ";\n" else "")
     }
 
     //we use the same template technique as the one used for CAloops

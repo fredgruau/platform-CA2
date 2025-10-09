@@ -2,7 +2,7 @@ package compiler
 
 import java.util.stream.Collectors
 import ASTB._
-import AST.{AstPred, Call, Call2, Fundef, Fundef2, Layer, Read, isCons, isNotRead}
+import AST.{AstPred, Call, Call2, Fundef, Fundef2, Layer, Read, and, isCons, isNotRead}
 import Circuit.{AstMap, Machine, TabSymb, iTabSymb, iTabSymb2, takeNbOfBitIntoAccount}
 import VarKind.{LayerField, MacroField, ParamD, ParamR, ParamRR, StoredField}
 import dataStruc.{Align2, Dag, DagInstr, Naame, Named, Schedule, Util, WiredInOut, toSet}
@@ -492,7 +492,12 @@ class DataProg[U <: InfoType[_]](val dagis: DagInstr, val funs: iTabSymb[DataPro
         tSymbVarSafe(x).k == ParamD()
       case _ => true
     }
-    val iT: Set[AST[_]] = dagis.inputTwice.filter(isNotReadReg) //should filter out more stuff because it consumes register which are a precious ressource
+    val isNotConst: AstPred = {
+      case  a:ASTLt[_,_] => ! a.isCoonst
+      case _ =>true
+    }
+    val iT: Set[AST[_]] = dagis.inputTwice.filter(and(isNotReadReg,isNotConst)) //should filter out more stuff because it consumes register which are a precious ressource
+
     val dagis2: DagInstr = dagis.affectIfy(iT, "auxL", dagisScheduleMatters) //also replaces access to data parameters+layers by read
 
     val (layerFields, macroFields) = dagis.newAffect.map(_.exp).partition(isLayerField(_)) // dagis.newAffect, stores precisely affected expression which are also nonGenerators.

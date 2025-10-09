@@ -1,3 +1,4 @@
+/*
 package progOfCA /** contains variation of grow starting with basic growth,
   and then growth to voronoi cells , illustrate redS sytematic computation*/
 
@@ -14,7 +15,7 @@ import compiler.ASTLt.ConstLayer
 import compiler.repr.nomE
 import dataStruc.{BranchNamed, Named}
 import progOfmacros.Topo.brdin
-import sdn.Util.{addBlobE, addBlobVe, safeGrow}
+import sdn.Util.{addBlobE, addBlobVe, newaddBlobVe, safeGrow}
 import sdn.{Blob, BlobE, BlobV, Compar, Compar3}
 /** same as GrowVorV but based on a boolVe support  MARCHE PAS*/
 class Grow() extends Layer[(V, B)](1, "global") with BoolV  with BranchNamed {
@@ -127,3 +128,4 @@ class GrowEV extends Layer[(E, B)](1, "global") with ASTLt[E, B] {
 
 
 
+*/

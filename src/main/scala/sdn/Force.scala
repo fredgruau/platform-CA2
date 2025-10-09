@@ -21,7 +21,7 @@ trait rando {
 
 /**
  * MoveC is a "centered move". It means that it is defined within the body support
- * it encodes a move on V-agents, but also Ve agents. For exemple, the effect of all is also
+ * it can  encodes a move on V-agents, but also Ve agents. For exemple, the effect of all is also
  * to move everywhere possible the agent..
  */
 abstract class MoveC extends Named {
@@ -82,7 +82,7 @@ object Force{
   import MoveC._
   /** produce maximum possible move, rely on priority to obtain random movement */
   val total:Force=new Force(){
-    override def actionV(ag: MovableAgentV): MoveC = MoveC1(ag.isV,ag.brdVe)//extends and empties everywhere possible.
+    override def actionV(ag: MovableAgentV): MoveC = MoveC1(ag.muis,ag.fb.brdVe)//extends and empties everywhere possible.
   }
 
   /** we designed a random move that does not break the quasipoint property,

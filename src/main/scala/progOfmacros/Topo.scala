@@ -22,6 +22,8 @@ object Topo {
     Fundef1("topo.nbcc", nbChanges, ve)
   }
 
+
+  /** same as nbccV except that it does not compute brdVe, it takes it as a parameter, instead.  */
   val nbccVeDef: Fundef1[(T[V, E], B), (V, UI)] = {
     val ve = pL[T[V, E], B]("ringAroundV")
     val vf: BoolVf = cac(ASTBfun.delta, ve)
@@ -50,6 +52,7 @@ object Topo {
 
   /** wrapper to  Call nbccVdef */
   def nbccV(b: BoolE): UintV = new Call1[(E, B), (V, UI)](nbccVDef, b) with UintV
+  /** wrapper to  Call nbccVedef */
   def nbccVe(b: BoolVe): UintV = new Call1[(T[V, E], B), (V, UI)](nbccVeDef, b) with UintV
 
 

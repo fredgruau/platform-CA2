@@ -10,63 +10,62 @@ import progOfmacros.RedT.cac
 import progOfmacros.Wrapper
 import progOfmacros.Wrapper.{border, borderS, exist, existS, inside, insideS, smoothen, smoothen2, testShrink}
 import sdn._
-import sdntool.{DistGcenter, DistT, gCenter}
+import sdntool.{addDistGcenter, addDist, gCenter}
 
 /**illustrate the working of repulsion combined with exploration  */
 class Homogeneize() extends LDAG with Named with BranchNamed
-{ val part=new Convergent()
-  part.shoowText(part.d.muis,List()) //necessaire pour la reachabilité
-  part.shoow(part.dBrdE)
-  part.showConstraint
-  part.showMoves
-  part.showPositiveMoves
-  part.shoow(part.gCenterV,part.gCenterE)
+{ //val part=new Convergent()
+  val part=new Homogen()
+
+  part.showMoveAndConstraint
+ // part.showPositiveMoves
+
   //part.shoowText(part.dg.muis.pred,List())
   part.shoow(part.prioDet)
-  part.shoow(part.prioDetYes)
+  //part.shoow(part.yesPrioDet)
   part.shoowText(part.prio,List())
-  part.shoowText(part.prioYes,List())
-  part.shoowText(part.prioYesNotQuiescent,List())
+ // part.shoowText(part.prioYes,List())
+ // part.shoowText(part.prioYesNotQuiescent,List())
   part.shoow(part.prio.ltApex)
-  part.shoow(part.choose)
-  part.shoow(part.b.selle)
-  part.shoow(part.b.upwardSelle)
-  part.shoow(part.b.downwardSelle)
+ // part.shoow(part.choose)
+  //part.shoow(part.b.upwardSelle,part.b.selle,part.b.downwardSelle,part.b.downwardSelle,part.b.lateBrdVe)
+  part.shoowText(part.prioRand,List() )
+
+/*  part.shoowText(part.d.muis,List()) //necessaire pour la reachabilité
+  part.shoow(part.gCenterV,part.gCenterE,part.dBrdE)
   part.shoow(part.b.twoAdjBlob)
   part.shoow(part.b.emptyRhomb)
-  part.shoow(part.b.lateBrdVe)
-  part.shoow(part.b.lateBrdE)
-  //  part.shoow(part.toto)
   part.shoow(part.b.vf)
-  part.shoowText(part.b.nbCc,List())
-  part.shoowText(part.prioRand,List() )
+  part.shoowText(part.b.nbCc,List())*/
+
   //part.shoow(chip.borderVe.df)
 }
 
 /** adds quasipoint and blob constraints */
-class Seed extends  MovableAgentV with BlobVouE with QpointConstrain with BlobConstrain { // override def displayConstr:Boolean=true
-  shoow(muis)
-  shoow(flipOfMove, flipAfterLocalConstr)
-  //  for (v<-realFlipCancel.values) shoow(v) //display intermediate, decreasing  flip value
-  shoow(meetE, meetV, nbCc, lateBrdE)
-  shoow(doubleton)
-  //shoow(doubleton,singleton,tripleton)
+class Seed extends  MovableAgentV  with addBloobV with newBlobConstrain with QpointConstrain
+ {   def showFlip=shoow(flipOfMove, flipAfterLocalConstr)
+     shoow(muis)
+     //newb.showMe //shoow(doubleton,singleton,tripleton, laateBrdE, newb.meetV, newb.nbCc)
+     fb.showMe
+    m.showMe
 }
-
 
 /** moves as much as possible, todo put it in its own file */
 class Flies2 extends Seed {
   /** exploring priority */
   final val explore=introduceNewPriority()
   force(explore, "explore",'O', Force.total)
+  //final val explore2=introduceNewPriority()
+ // force(explore2, "toto",'P', Force.total)
 }
 
 /**adds gabriel center,  distance to gabriel center, and then repulsive force*/
-class Homogen() extends Flies2 with DistT with gCenter with DistGcenter
+class Homogen() extends Flies2 with addDist with addGcenter with addDistGcenter
 {  /** homogeneizing priority */
   final val homogeneize=introduceNewPriority()
   force(homogeneize,"repulse",'|',dg.repulse)//specific forces applied to Flies
   shoowText(dg.muis, List())
+  gc.showMe
   //showMoves
 };
 
@@ -84,10 +83,10 @@ class Convergent extends Homogen // with Lead //pas besoin de leader pour le mom
   /** add vertex  if four neighbors are on, bugs, more restrictive therefore, than smoothen */
   val isVsmoothed2=isVplus| exist(isVtest)
 
-  shoow(isVplus,isVsmoothed,isVsmoothed2,isVtest)  /** true for one seed if on its whole border dg diminishes */
-val stable1Old=muis & inside(imply(brdVe,dg.sloplt))
+ // shoow(isVplus,isVsmoothed,isVsmoothed2,isVtest)  /** true for one seed if on its whole border dg diminishes */
+//val stable1Old=muis & inside(imply(brdVe,dg.sloplt))
   val stable1=muis & insideBall(isVsmoothed2)
-  val stable2=forallize(stable1)&isV
+  val stable2=forallize(stable1) & isV
   val balance: Force = new Force() {
     import compiler.ASTLfun.fromBool
     override def actionV(ag: MovableAgentV): MoveC = {
@@ -99,7 +98,7 @@ val stable1Old=muis & inside(imply(brdVe,dg.sloplt))
     }
   }
   force(stabilize,"balance",'_',balance)//specific forces applied to Flies
-  shoow(stable1,stable2)
+ // shoow(stable1,stable2)
 }
 
 /**

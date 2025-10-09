@@ -616,6 +616,8 @@ case class Affect[+T](name: String, val exp: AST[T]) extends Instr {
    * @return former instruction with macrofield, plus supplementary affectation
    */
   def insertMacroFieldbeforeReduceParamR(tSymbVar: TabSymb[InfoNbit[_]]): List[Instr] = {
+    if(!tSymbVar(name).isInstanceOf[InfoNbit[_]])
+      println("fuck")
     if (tSymbVar(name).k.isParamR && isRedop) {
       val newName = name + "R"
       tSymbVar.addOne(newName, tSymbVar(name))

@@ -9,13 +9,13 @@ import compiler.Circuit.hexagon
 import compiler._
 import compiler.SpatialType._
 import dataStruc.{BranchNamed, Named}
-import sdn.{BlobE, BlobV, BlobVe, HasBrdE, HasBrdVe, MuStruct}
+import sdn.{  HasBrdE, HasBrdVe, MuStruct}
 import progOfmacros.Comm._
 import progOfmacros.Compute.{concat3V, concat4V}
-import progOfmacros.Topo.brdin
+import progOfmacros.Topo.{brdin, nbccV}
 import progOfmacros.{Grad, Wrapper}
 import progOfmacros.Util.{randE2, randN12, randNext, torusify}
-import progOfmacros.Wrapper.{borderS, enlarge, existS, not, segment1, shrink}
+import progOfmacros.Wrapper.{borderS, enlarge, existS, insideS, not, segment1, shrink}
 import sdn.Globals.{root4naming, setRoot4naming}
 
 import scala.::
@@ -184,18 +184,25 @@ object Util {
 
   /** we directly reuse Delayed creation, in order to be able to add  blob related computation,
    * this naming will automatically define meetV,meetE, BrdV, BrdE*/
-  def addBlobV(_arg: => BoolV): Blob = {
+/*  def addBlobV(_arg: => BoolV): Blob = {
     lazy val delayed = _arg;
     new AST.Delayed[(V, B)](() => delayed) with BoolV with BlobV with Named with BranchNamed {}
+  }*/
+/*  /** we directly reuse Delayed creation, in order to be able to add  blob related computation, on a BoolE
+   * this naming will automatically define meetV,meetE, BrdV, BrdE*/
+  def newAddBlobE(_arg: => BoolE):newBlob = {
+    lazy val delayed = _arg;
+    new AST.Delayed[(E, B)](() => delayed) with BoolE with newBlobE with Named with BranchNamed {override val brdE: BoolE = delayed}
   }
+  */
 
   /** we directly reuse Delayed creation, in order to be able to add  blob related computation, on a BoolE
    * this naming will automatically define meetV,meetE, BrdV, BrdE*/
-  def addBlobE(_arg: => BoolE):Blob = {
+ /* def addBlobE(_arg: => BoolE):Blob = {
     lazy val delayed = _arg;
     new AST.Delayed[(E, B)](() => delayed) with BoolE with BlobE with Named with BranchNamed {override val brdE: BoolE = delayed}
-  }
-  /** we directly reuse Delayed creation, in order to be able to add  blob related computation on a BoolVe,
+  }*/
+/*  /** we directly reuse Delayed creation, in order to be able to add  blob related computation on a BoolVe,
    * this naming will automatically define meetV,meetE, BrdV, BrdE
    * toto is the reduction of arg, ie brdv,
    * it has to be computed direclty from the distance ,
@@ -211,6 +218,24 @@ object Util {
        val brdVe: BoolVe = delayed
       val brdE=delayedL(delayed2) //grace a cet attribut, hasBrdE de blobVe est vérifié
 
+    }
+  }*/
+
+  /** we directly reuse Delayed creation, in order to be able to add  blob related computation on a BoolVe,
+   * this naming will automatically define meetV,meetE, BrdV, BrdE
+   * toto is the reduction of arg, ie brdv,
+   * it has to be computed direclty from the distance ,
+   * this is because the computation does not involve boolV
+   * enough frequantly
+   * computing brdE from BrdEv is possible in princiiple, but it results in error
+   * on the border due to the fact that miror is implemented
+   * only for boolV, for the moment being*/
+  def newaddBlobVe(_arg: => BoolVe,_toto: =>BoolE):newBlobVe = {
+    lazy val delayed = _arg;
+    lazy val delayed2= _toto
+    new AST.Delayed[(T[V,E], B)](() => delayed) with BoolVe with newBlobVe with Named with BranchNamed {
+      val brdVe: BoolVe = delayed
+      val brdE=delayedL(delayed2) //grace a cet attribut, hasBrdE de blobVe est vérifié
     }
   }
 
@@ -231,10 +256,12 @@ object Util {
    * @param b represent a boolV offering computation of meeting points
    * @return places where growig will not cause merging of blobs.
    */
-  def safeGrow(b:Blob):BoolV={
+  def safeGrow(b:newBlob):BoolV={
     val meetEside = existS[E, V](b.meetE) //true if adjacent to a meeting edge
     val meet = b.meetV | meetEside //  all meeting Vertices
-    b.brdV //& ~meet
+    throw new Exception("faire intervenir brdvV")
+    ~meet
+   // b.brdV //& ~meet
   }
 
   /** bits has a number of $6*k$ bits , we sort them in 6 subsequence of $k$ bits */

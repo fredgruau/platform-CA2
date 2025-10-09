@@ -1,3 +1,4 @@
+/*
 package progOfStaticAgent
 
 import compiler.AST.Delayed
@@ -23,3 +24,4 @@ class FliesDist() extends LDAG with Named with BranchNamed
   part.shoow(part.gCenterV,part.gCenterE)
   part.shoow(part.dg.muis.pred)
 }
+*/

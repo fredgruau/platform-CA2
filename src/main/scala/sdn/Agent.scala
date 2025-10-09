@@ -29,8 +29,27 @@ case class Both() extends Impact
 case class One(noFill: Boolean) extends Impact //on veut pouvoir calculer le complementaire d'une contraint, forbid et oblige sont complementaire
 
 
-/** agents are boolean muStruct */
-abstract class Agent[L <: Locus] extends MuStruct[L, B]
+
+
+/** an entity such has a boolV atents or more generally a mustruct, which provide hasIsV, can be completed with utilAgent */
+trait HasIsV{
+/** used for computing flip cancelation depending on impact of constraint, so that constraint can act non only
+ * which can be both(),  noFill(true) noFill(false)
+ * case class One(noFill: Boolean) extends Impact
+ * on veut pouvoir calculer le complementaire d'une contraint, forbid et oblige sont complementaire
+ *  not only for BoolV Agent, but also for Ev Agents */
+val isV: BoolV
+/** can be defined on agent, delayed is needed because  isV is not known yet */
+val NotIsV :BoolV= ~(delayedL(isV))
+}
+
+
+/**
+ * agents are boolean muStruct
+ * @tparam L  locus of the agent's support, we can have Vagent L=V, Ve AgentsL=Ve, ....
+ * For the moment we consider that all agents extend hasIsv, it may be the case that E-agents, do not.
+ */
+abstract class Agent[L <: Locus] extends MuStruct[L, B] with HasIsV
  {
 
 /** the agent's list of consrtrain. Constraints have a name, and the list is also ordered */
@@ -39,11 +58,15 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
    def showConstraint={ shoowText(allFlipCancel,codeConstraint.toList);
      //shoow(tataaaa)
    }
-   def codeMove:Iterable[String] =
+   def codeMove:Iterable[String] = {
+     assert(moves.size>1,"faut au moins deux move, sinon pb entier codé par un bool")
      moves.map(_.keys.head.charAt(0).toString)
-   def showMoves={ shoowText(highestTriggered,codeMove.toList)}
-   def showPositiveMoves={ shoowText(highestTriggeredYes,codeMove.toList)}
+   }
 
+   def showMoves={
+     shoowText(highestTriggered,codeMove.toList)}
+   def showPositiveMoves={ shoowText(yesHighestTriggered,codeMove.toList)}
+   def showMoveAndConstraint={showPositiveMoves;showConstraint}
    /**
     *
     * @param name more explicit name
@@ -66,42 +89,50 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
      assert(!(ht.contains(name)), "each force must have a distinct priority");
      moves(priority)(shortName+name)=m
    }
-
-   def allTriggered:UintV
+   /** not the same for  movable/bound  */
+   def allTriggered:UintV;
    def allTriggeredYes:UintV
-   val filledTriggered=orScanRight(delayedL(allTriggered))
-   val filledTriggeredYes=orScanRight(delayedL(allTriggeredYes))
-   /** all false except for highest priority move*/
-   val highestTriggered=unop(derivative, filledTriggered)
-   val highestTriggeredYes=unop(derivative, filledTriggeredYes)
+   /** does a computation to be repeated specifically for yes moves */
+   def processMoves(all:UintV):(UintV,UintV,UintV)={
+     /** bouche les trouvs avec un orscanrigh */
+     val filled=orScanRight(all)
+     (filled,unop(derivative, filled),unary2Bin(filled))
+   }
+   val (filledTriggered,/** all false except for highest priority move*/highestTriggered,
+   prioDet)=processMoves(delayedL(allTriggered))
+   /** selectionne le flip parmis les flip des mouvement proposés */
+   val flipOfMove=neq(highestTriggered&delayedL(allFlip))
+
+   /** makes a global logical or, of boolean which are true for C2moves,
+    *  if false then there will not be negative move
+    *  and */
+   lazy val presentOfC2moves=moves.map(_.values.map(
+     {
+       case a:MoveC2=>
+         true
+     case a:MoveC1=>
+       false}
+   ).reduce( _ | _)).reduce( _| _)
+
+
+   /** on le fait aussi pour les "yes" move */
+   val (yesFilledTriggered,yesHighestTriggered,yesPrioDet)=
+     if(false/*presentOfC2moves*/)(filledTriggered,highestTriggered, prioDet)
+     else processMoves(delayedL(allTriggeredYes))
    /** flips for all priorities */
    def allFlip:UintV
-    /** selectionne le flip parmis les flip des mouvement proposés */
-    val flipOfMove=neq(highestTriggered&delayedL( allFlip))
-   val prioDet=unary2Bin(filledTriggered )
-   val prioDetYes=unary2Bin(filledTriggeredYes )
-   /** selected positive move has lower priority than selected move, */
-   val isQuiescent:BoolV =lt2(prioDetYes,prioDet)
 
-   /** random integer used for breaking  symetry in case of tournament with equal priority */
+   /** selected positive move has lower priority than selected move, implies quiescence */
+   val isQuiescent:BoolV =lt2(yesPrioDet,prioDet)
+
+   /**  adds a bit of randomnes to forces's priority
+    * allows to  breaking  symetry in case of tournament with equal force's priority */
    val prioRand:UintV
     val prio: UintVx =addLt(prioRand::prioDet)
-   val prioYes: UintVx =addLt(prioRand::prioDetYes)
+   val prioYes: UintVx =addLt(prioRand::yesPrioDet)
    /** nullify prio if quiescent */
    val prioYesNotQuiescent=andLB2R(~ isQuiescent, prioYes)
 
-
-
-   /*
-      /** initial value of flip cause by movements for movable agents, or inherited for bound agents*/
-     def flipAndPrioCreatedByMoves: (UintV,BoolV,UintV)
-      /** used for mutex tournament, includes priorand */
-      val prio=addLt(delayedL(prioRand::flipAndPrioCreatedByMoves._1))
-      /** flipAndPrioCreatedByMoves stores its results in order not to be called two times */
-      val flipOfMove:BoolV=delayedL(flipAndPrioCreatedByMoves._2)
-      val highestTriggered:UintV=delayedL(flipAndPrioCreatedByMoves._3)
-
-   */
 
    /** PEs where movements trigger changes in Agent's support. Either by filling, or by emptying
     flip is eith computed from the move for movableAgent, or  computed from the parent for bounded agent
@@ -120,8 +151,6 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
      }
      delayedL( allFlipCancel(flipOfMove))
    }
-   val tataaaa:BoolVe= ~ (~chip.borderVe.df )
-
    // val f:BoolV=False()
      val noFlipCancel=eq0(allFlipCancel)
      val flipAfterLocalConstr: BoolV = noFlipCancel  & flipOfMove
@@ -130,10 +159,6 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
 
 
 
-  /** used for computing flip cancelation depending on impact */
-  val isV: BoolV
-   /** can be defined on agent, but needs a delayed for isV is not known yet */
-  val NisV :BoolV= not(delayedL(isV))
   /** applying constraints identifies PEs where flip should be canceled, cancelFlip will implement this cancelation */
 
 /////////////we now describe class for easily adding constraint, they are subclass of agents, in order to use the agent's field isV, NisV, and more.
@@ -153,7 +178,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
    class KeepFlipIf(i: Impact,val loc:BoolV,flip:BoolV) extends Constr(Array(this), i,flip)
    { override val where: BoolV = impact match {
      case Both() => loc
-     case One(v) =>  implique (if (v) isV else (NisV),loc)
+     case One(v) =>  implique (if (v) isV else (NotIsV),loc)
    }
    }
    /** Same as KeepFlipIf, exept that now, loc is a method, so that the constraint can be
@@ -170,7 +195,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
      /** mutex is triggered if there is indeed two flips on each side of the mutex, and in the right state. */
      def mutrig:BoolE =mutex &  (impact  match {
        case Both() => insideS(flip)
-       case One(v) =>  insideS(flip & (if (v) isV else (NisV))) // result also depend on impact
+       case One(v) =>  insideS(flip & (if (v) isV else (NotIsV))) // result also depend on impact
      })
      /** flip is ok if prio is maximum with respect to the other side */
      def tmp: BoolEv =imply(v(mutrig),ags.head.prio.gt) //todo faut mettre lt
@@ -182,7 +207,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
      /** mutex is triggered if there is indeed two flips on each side of the mutex, and in the right state. */
      def mutrig:BoolE =mutex &  (impact  match {
        case Both() => insideS(flip)
-       case One(v) =>  insideS(flip & (if (v) isV else (NisV))) // result also depend on impact
+       case One(v) =>  insideS(flip & (if (v) isV else (NotIsV))) // result also depend on impact
      })
      /** flip is ok if prio is minimum with respect to the other side */
      def tmp=imply(v(mutrig),prio.gt)
@@ -198,7 +223,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
        val mutrig:BoolE ={
        mutex &  (impact  match {
          case Both() => inside(apexE(f(flip)))
-         case One(v) =>  inside(apexE(f(flip & (if (v) isV else (NisV)))))// result also depend on impact
+         case One(v) =>  inside(apexE(f(flip & (if (v) isV else (NotIsV)))))// result also depend on impact
        });
        // mutrigv.name="fliesMutrigv";      mutrigv
      }
@@ -217,7 +242,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B]
      /** mutex is triggered if there is indeed two flips on each side of the mutex, and in the right state. */
      val tritrig:BoolF =tritex &  (impact  match {  //y a moyen d'écrire un trigger générique pour mut,tri, et loc
        case Both() => insideS(flip)
-       case One(v) =>  insideS(flip& (if (v) isV else (NisV))) // result also depend on impact
+       case One(v) =>  insideS(flip& (if (v) isV else (NotIsV))) // result also depend on impact
      })
      /** flip is ok if prio is minimum with respect to the other side */
      def tmp: BoolVf =imply(transfer(v(tritrig)),ags.head.prio.gt3)

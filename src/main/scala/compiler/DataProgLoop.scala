@@ -363,7 +363,9 @@ class DataProgLoop[U <: InfoNbit[_]](override val dagis: DagInstr, override val 
     val one=tSymbVarSafe(str).nb==1
     val l=tSymbVarSafe(str).locus
     val two = (l==V())
-    one && two  }
+    val three=isBoolV(str)
+    one && two // &&  three
+  }
   // def isIntV1(str: String) = tSymbVarSafe(str).t == (V(), Int(1)) // .isInstanceOf[BoolV]
 
   //

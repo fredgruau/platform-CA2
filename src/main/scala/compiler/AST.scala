@@ -193,6 +193,9 @@ object AST {
     case AST.Read(_) => false;
     case _ => true
   }
+
+
+
   val isRead: AstPred = {
     case AST.Read(_) => true
     case _ => false
@@ -205,6 +208,7 @@ object AST {
 
   def or(a1: AstPred, a2: AstPred) = (a: AST[_]) => a1(a) | a2(a)
 
+  def and(a1: AstPred, a2: AstPred) = (a: AST[_]) => a1(a) & a2(a)
 
   type rewriteAST[U] = AST[U] => AST[U]
   type rewriteAST2 = AST[_] => AST[_]
@@ -326,6 +330,7 @@ object AST {
      *          must be launched after seting names */
     def oldDystInstr: List[CallProc] = CallProc("memo", List(Named.lify(name)), List(next)) :: sysInstr
 
+      /** returns all the sysInstr plus the memo instruction */
     def systInstr: List[CallProc] = {
       val normal = CallProc("memo", List(Named.lify(name)), List(next)) :: sysInstr
       assert(sysInstr.toSet.size == sysInstr.size, "probably we show several time the same field")

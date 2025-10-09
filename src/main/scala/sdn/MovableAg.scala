@@ -11,10 +11,10 @@ import compiler.repr.nomV
 import dataStruc.BranchNamed
 import dataStruc.DagNode.EmptyBag
 import progOfmacros.Comm.neighborsSym
-import progOfmacros.Wrapper.{borderS, exist, unary2Bin, xorBin}
+import progOfmacros.Wrapper.{borderS, exist, existS, unary2Bin, xorBin}
 import sdn.{Agent, Compar, carrySysInstr}
 import sdn.Util.{addLt, addSym, randUintV}
-import sdntool.DistT
+import sdntool.addDist
 
 import scala.collection.immutable.HashMap
 /** list the  movable-agent's methods which needs a processing dependant  on the locus L in V,E,Ve, F...
@@ -25,19 +25,28 @@ trait vef[L<:Locus]{
    * for Ve agents there will be a non trivial computation */
   def flip2next: AST[(L, B)]
 }
+
 /** contains fields we often use on Vagent.  made lazy because possibly not used */
 trait UtilVagent extends BranchNamed{
   self:MovableAgentV=>
   lazy   val brdE:BoolE=borderS(isV) //push everywhere possible.
+  val laateBrdE:BoolE=delayedL(brdE)
+  val    newbrdV:BoolV=existS(laateBrdE)
   lazy val isVe:BoolVe=e(isV)
   lazy val notVe= ~isVe
   /** Ve edges leaving the support , we know we may take a sym so we prepare for it, to get a meaningfull name brdVe.sym*/
   lazy val brdVe=addSym( transfer(v(brdE)) & isVe)
 }
 
+
 /** defines the methods in vef[V], adds UtilVagent, which mixin some further usefull field*/
-trait MovableAgentV extends MovableAg[V] with vef[V] with UtilVagent {
+trait MovableAgentV extends MovableAg[V] with vef[V] with UtilVagent with addBlobVfields{
   self:MovableAg[V] =>
+  /**
+   * adds feature of blob to muis   */
+//  override val muis=new Layer[(V, B)](1, "global") with ASTLt[V,B]  with Stratify [V,B] with carrySysInstr with featureOfBlob  {
+ //   override val  next: AST[(V, B)] = flip2next   }
+
   override val isV: BoolV = muis
   //override val NisV=  ~isV
   override def flip2next=  delayedL( xorBin(flipRandomlyCanceled,muis) )//delayed is necessary in order to get the very last update of flip
@@ -50,16 +59,17 @@ trait MovableAgentV extends MovableAg[V] with vef[V] with UtilVagent {
 abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] with vef[L]
   with EmptyBag[sdn.MuStruct[_<: Locus,_<:Ring]]  {
 
+
   override def allTriggered:UintV={
     moves.map(_.values.map(_.triggered).reduce(_ | _).asInstanceOf[UintV]).toList.reduce(_ :: _)
   }
   override def allTriggeredYes:UintV={
     moves.map(_.values.map(_.triggeredYes).reduce(_ | _).asInstanceOf[UintV]).toList.reduce(_ :: _)
   }
+  /** for each priority, we look if flip is produced or not */
   override def  allFlip: UintV ={
     moves.map(_.values.map(_.move2flip(isV)).reduce(_ | _).asInstanceOf[UintV]).toList.reduce(_ :: _)
   }
-
 
 /*
 
@@ -87,9 +97,8 @@ abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] wit
   } //sans "asInstance" il gueule non compatibilité de override entre addLt e UintVx
 
   /** Movable Agent's support. It is memorized in a layer a movable agent is a mustruct, so it is  called muis. */
-  override val muis=new Layer[(L, B)](1, "global") with ASTLt[L,B] with Stratify [L,B] with carrySysInstr  {
+  override val muis=new Layer[(L, B)](1, "global") with ASTLt[L,B]  with Stratify [L,B] with carrySysInstr   {
     override val  next: AST[(L, B)] = flip2next.asInstanceOf[ASTLt[L,B]]   }
-
   /** les moves des movable viennent directement d'une force, et ceux des bounded ? faut voir, si ca se trouve aussi. */
   def force(priority:Int, name:String,shortName:Char, force: Force) = {
     addMoves(priority, name, shortName, force.action(this))

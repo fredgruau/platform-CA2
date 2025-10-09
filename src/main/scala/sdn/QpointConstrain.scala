@@ -14,21 +14,21 @@ import progOfmacros.Compute.{concat3V, implique, impluq}
 import progOfmacros.Wrapper.{exist, existS, inside, insideS, not}
 import progOfmacros.RedT.clock2
 import sdn.Util.addSymUI
-/** field needed to compute the contstraint of  a quasipoint, and possibly elsewehere */
+/** field needed to compute the constraints of  a quasipoint, and possibly elsewehere */
 trait QPointFields {
   self: MovableAgentV => //quasiPoints are blobs.
   /** true for the vertices of a qpt consiting exactly of one vertices */
   val noNeighbor = inside(neighborsSym(notVe))
-  val singleton: BoolV = noNeighbor & isV
-  val nonsingleton= ~ singleton  & isV
+  val singleton: BoolV = noNeighbor & muis
+  val nonsingleton= ~ singleton  & muis
   /** true if both apex vertices of the edge are empty */
-  val bothApexEmpty: BoolE = not(orR(apex[V, E, B](f(isV))))
+  val bothApexEmpty: BoolE = not(orR(apex[V, E, B](f(muis))))
   /** true for the edge inside qpt consiting exactly of two vertices */
-  val doubleton: BoolE = insideS[V, E](isV) & bothApexEmpty
+  val doubleton: BoolE = insideS[V, E](muis) & bothApexEmpty
   val doubletonV: BoolV = existS[E, V](doubleton)
   val isApexV: BoolV = exist[F, V](apexV(f(doubleton)))
   /** true for the face inside a qpt consiting exactly of three adjacent  vertices */
-  val tripleton: BoolF = insideS[V, F](isV)
+  val tripleton: BoolF = insideS[V, F](muis)
   val tripletonV: BoolV = existS[F, V](tripleton)
   //val choose: BoolVe =chooseMinOf(prio)
   val choose: BoolVe =chooseMaxOf(prioYesNotQuiescent,4)
