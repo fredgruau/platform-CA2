@@ -26,16 +26,15 @@ trait vef[L<:Locus]{
   def flip2next: AST[(L, B)]
 }
 
-/** contains fields we often use on Vagent.  made lazy because possibly not used */
+/** contains fields of  Vagent.  not used right now,
+ * since we store all of them in blob fields an qpoint fields */
 trait UtilVagent extends BranchNamed{
   self:MovableAgentV=>
-  lazy   val brdE:BoolE=borderS(isV) //push everywhere possible.
-  val laateBrdE:BoolE=delayedL(brdE)
-  val    newbrdV:BoolV=existS(laateBrdE)
-  lazy val isVe:BoolVe=e(isV)
-  lazy val notVe= ~isVe
+  //lazy   val brdE:BoolE=borderS(isV) //push everywhere possible.
+  //val laateBrdE:BoolE=delayedL(brdE)
+  //val    newbrdV:BoolV=existS(laateBrdE)
   /** Ve edges leaving the support , we know we may take a sym so we prepare for it, to get a meaningfull name brdVe.sym*/
-  lazy val brdVe=addSym( transfer(v(brdE)) & isVe)
+  //lazy val brdVe=addSym( transfer(v(brdE)) & isVe)
 }
 
 
@@ -53,12 +52,10 @@ trait MovableAgentV extends MovableAg[V] with vef[V] with UtilVagent with addBlo
 
 }
 
-
 /**  code  common to Movable agents which stores a support
  * and can directly apply the move on this support in order to modify it */
 abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] with vef[L]
   with EmptyBag[sdn.MuStruct[_<: Locus,_<:Ring]]  {
-
 
   override def allTriggered:UintV={
     moves.map(_.values.map(_.triggered).reduce(_ | _).asInstanceOf[UintV]).toList.reduce(_ :: _)
@@ -116,8 +113,6 @@ abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] wit
   /** for movableAgent, canceling of flip is done by  directly voiding the agent's flip! */
   //  override def cancelFlip(where: BoolV): Unit = {  flip = flip & where  }
 }
-
-
 
 /** support location is computed from parent's support (input neighbors of the DAG */
 abstract class BoundAg[L <: Locus](implicit m: repr[L]) extends  Agent[L]{

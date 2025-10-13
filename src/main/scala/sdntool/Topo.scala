@@ -16,18 +16,26 @@ import compiler.Circuit.hexagon
 import compiler._
 import compiler.ASTLt.ConstLayer
 import dataStruc.{BranchNamed, Named}
-import progOfmacros.Comm.{apexE, apexV, neighborsSym, symEv}
+import progOfLayer.Sextexrect.chooseMaxOf
+import progOfStaticAgent.Convergent
+import progOfmacros.Comm.{apexE, apexV, insideBall, neighborsSym, symEv}
 import sdn.MovableAgentV
 import progOfmacros.Topo
 import progOfmacros.Compute._
-import progOfmacros.Wrapper.{borderS, exist, existS, inside, insideS, shrink}
+import progOfmacros.Wrapper.{borderS, exist, existS, inside, insideS, not, shrink}
 import progOfmacros.RedT.{cac, enlarge, enlargeEF, enlargeFE}
 import progOfmacros.Topo.{brdin, nbcc, nbccV, nbccVe}
 import sdn.Util.addSym
-import sdntool.{Bloob, addDist}
+import sdntool.{ addDist}
 /** contains fields that can be computed for any boolV representing blobs, not just Vagents
  * for exemple, we can us it to grow voronoi, which needs meeting point
  * */
+
+/** declares a bunch of spatial attributes, provide the necessary trait "show"  to show a selection of them */
+abstract class Attributs extends  hasMuisSysInstr with shoow with BranchNamed with Named{
+  def showMe
+}
+
 class BlobVFields(val muis:BoolV with carrySysInstr) extends Attributs {
   /** true on the border of the blob */
   val brdE:BoolE=  borderS(~(~ muis) )//push everywhere possible. todo enlever la double négation.
@@ -44,12 +52,7 @@ trait addBlobVfields{ self: MovableAgentV =>
   val bf=new BlobVFields(muis)
 }
 
-trait blob {val meetV:BoolV; val meetE:BoolE}
 
-/** declares a bunch of spatial attributes, provide the trait to show some of them */
-abstract class Attributs extends  hasMuisSysInstr with shoow with BranchNamed with Named{
-  def showMe
-}
 
 /** fields common to all blobs properties; */
 abstract class Blob extends Attributs {  val meetV:BoolV; val meetE:BoolE; val nbCc:UintV
@@ -71,7 +74,7 @@ class BlobV(val muis:BoolV with carrySysInstr,f:BlobVFields) extends Blob  {
   val emptyRhomb: BoolE = ~rhombusExist(f.brdE) // true if center of a NON-totally empty rhombus
   val meetE=twoAdjBlob & emptyRhomb
   /** */
-  override  def showMe={super.showMe;shoow(twoAdjBlob,emptyRhomb) }
+  override  def showMe={super.showMe;shoow(emptyRhomb) }
 }
 
 /** endows a movableAgentV with the blob meeting points */
@@ -91,98 +94,27 @@ class BlobVe(val muis:BoolV with carrySysInstr,brdE:BoolE, brdVe:BoolVe) extends
    val emptyRhomb:BoolE= ~rhombusExist(brdE) //il y a un gros plateau de distance sur tout le rhombus
   val meetE= selle | emptyRhomb //ca n'est pas un vrai gcenter avec emptyrhomb
 
-  override def showMe: Unit = {super.showMe;shoow(emptyRhomb);shoow(meetE2)}
+  override def showMe: Unit = {
+    super.showMe
+    //;shoow(emptyRhomb);shoow(meetE2)
+  }
 }
 
-/** endows a distance with BlobVE meeting points, which are Gcenter */
+/** endows a distance with BlobVE meeting points */
 trait addBloobVe{ self: MovableAgentV with addBlobVfields with addDist=>val b=new BlobVe(muis,d.voisinDiff,  d.sloplt)}
-/** endows a distance with Gcenter which are almost the same as BlobV'
- * gabriel centers can be directly obtain simply by computing Vmeeting-point of the blob, using sloplt
- *  and also Emeeting points, nearest to the source.
+/** endows a distance with Gabriel center which are almost the same as BlobVe'
+ * gabriel centers can be directly obtain simply by computing Ve-meeting-point  using sloplt
+ * we also need brdE
  * */
 trait addGcenter{ self: MovableAgentV with addBlobVfields with addDist=>
   val gc=new BlobVe(muis,d.voisinDiff,  d.sloplt){
-    /** silly way of avoiding superposition of agents with Gcenter, we use a val for testing */
+    /**  silly way of avoiding superposition of agents with Gcente
+     * we just subtract muis from meet2r,
+     * we use a val for testing */
     override val meetE2: ASTLt[V, B] = super.meetE2 & ~ muis}} //todo verifier que override fonctionne
 
 
-
-
-
-/** declares  brdE so that we can compute brdV just by adding another mixin */
-trait HasBrdE{
-  val brdE: BoolE
-  /** we use delayedL because upon creation, brdE turns out to be not yet constructed */
-  val lateBrdE:BoolE=delayedL(brdE)
-}
-
-/** Mixing adding a BrdV when BrdE is defined. BrdV contains both inside and outside vertices*/
-trait BorderV extends HasBrdE {
-  val brdV:BoolV=existS(lateBrdE)
-}
-
-trait newBrdVT extends HasBrdE {
-  val newbrdV:BoolV=existS(lateBrdE)
-}
-
-/** adds a brdE representing an edge border of a plain blobV, (obtained with the xor on edge) */
-trait BorderEofV extends HasBrdE { self: BoolV =>   val brdE: BoolE = borderS(this)}
-
-/** mixin declaring  brdVe so that we can compute brdE just by adding another  mixin and then BrdV just by reusing an already declared mixin*/
-trait HasBrdVe{ val brdVe: BoolVe
-  /** we use delayedL because upon creation, brdVe turns out to be not yet constructed */
-  val lateBrdVe:BoolVe=delayedL(brdVe)
-}
-
-/** mixin declaring  brdVe so that we can compute brdE just by adding another  mixin and then BrdV just by reusing an already declared mixin*/
-trait HasBrdVeAndE{ val brdVe: BoolVe
-  /** we use delayedL because upon creation, brdVe turns out to be not yet constructed */
-  val lateBrdVe:BoolVe=delayedL(brdVe)
-  val BrdE:BoolE
-}
-
-/** mixin adding a brdE to a BrdVe, obsolete, because for one radius is to big,for 2 boolE can be comuted without using the boolVe*/
-trait BorderEofVe extends HasBrdVe with HasBrdE {
-  //when computing brdE, we need it to be either true or false on the border
-  // we can decide to set it to true only if there is a blob, or allways, in which case there will be a center all around the chip,
-  // which may be appropriate if we want ports all around the chip. If we want this last behavoir
-  // we need to use OR2 instead of OR, where neutral will true instead of false.
-  val brdE: BoolE = exist(transfer(lateBrdVe))
-}
-
-/** deefines computation needed for preserving conncectedness of blobs */
-/*trait Blob {
-  val brdE: BoolE
-  val brdV: BoolV
-  val meetV: BoolV
-  val meetE: BoolE
-  val nbCc:UintV
-   val emptyRhomb:BoolE
-  val twoAdjBlob:BoolE
-  //we compute a boolV for ease of display
-}*/
-trait newBlob {
-  val meetV: BoolV
-  val meetE: BoolE
-  val nbCc:UintV
-  val emptyRhomb:BoolE
-  val twoAdjBlob:BoolE
-  //we compute a boolV for ease of display
-}
-/*
-
-trait  BlobConstrain extends Blob  {
-  self: MovableAgentV =>
-  /** meetV points cannot flip */
-  val vmeet = new CancelFlipIf(Both(),meetV,flipOfMove)
-  constrain("vmeet",'_',vmeet)
-  /**a doubleton cannot flip both vertices*/
-  val emeet = new MutKeepFlipIf(Both(),meetE,flipOfMove) with BranchNamed {}
-  constrain("emeet",'=',emeet)
-}
-*/
-
-trait  newBlobConstrain   {
+trait  blobConstrain   {
   self: MovableAgentV with addBloobV=>
   /** meetV points cannot flip */
   val vmeet = new CancelFlipIf(Both(),b.meetV,flipOfMove)
@@ -191,108 +123,85 @@ trait  newBlobConstrain   {
   val emeet = new MutKeepFlipIf(Both(),b.meetE,flipOfMove) with BranchNamed {}
   constrain("emeet",'=',emeet)
 }
-/** endows  a an agent  defining and edge Frontier (either a BoolV agent or E support) with  its  meeting points.
- * it is reused in BoolV by computing the edge border, and in BoolE by renaming the support as brdE */
-trait newBlobVouE extends UtilVagent{
-  self:MovableAgentV =>
-  /** put all the info an anonymous attribute called "b", for hierarchical ordering of info, and printing */
-  val newb = new newBlob with Named with BranchNamed {
-    val nbCc: UintV = nbccV(laateBrdE) //first use of brdE
-    val meetV: BoolV = nbCc > 1 //this makes an implicit conversion of nbCh from unsigned int to signed int. shoudl take into acount only nbch$
-    val twoAdjBlob: BoolE = insideS[V, E](newbrdV) //third use of brdE, check that there is two adjacent blobs next to the empty rhombus
-    val emptyRhomb: BoolE = ~rhombusExist(laateBrdE) // true if center of a NON-totally empty rhombus
-    val meetE: BoolE = emptyRhomb & twoAdjBlob //two conditions that needs to be met, for meeting edges: empty rhombus and two adjacent blobs.
-    def showMe={ shoow(nbCc,meetV,twoAdjBlob,emptyRhomb,meetE,laateBrdE)}
+/** field needed to compute the constraints of  a quasipoint, and possibly elsewehere */
+trait addQpointFields {
+  self: MovableAgentV with addBlobVfields => //MovableAgentV with addBlobVfields =>
+  /** allows to refere to the englobing class from the body of the anonymous attribute */
+  private val selfRef = this
+  /** on utilise une classe anonyme pour stoquer les fields utiliser pour réaliser un quasipoints */
+  val qf = new Attributs() {
+    override val muis: BoolV with carrySysInstr = selfRef.muis
+    /** true for the vertices of a qpt consiting exactly of one vertices */
+    val singleton: BoolV = inside(bf.brdVe) & muis
+    val nonsingleton = ~singleton & muis
+    /** true if both apex vertices of the edge are empty */
+    val bothApexEmpty: BoolE = not(orR(apex[V, E, B](f(muis))))
+    /** true for the edge inside qpt consiting exactly of two vertices */
+    val doubleton: BoolE = insideS[V, E](muis) & bothApexEmpty
+    val doubletonV: BoolV = existS[E, V](doubleton)
+    val isApexV: BoolV = exist[F, V](apexV(f(doubleton)))
+    /** true for the face inside a qpt consiting exactly of three adjacent  vertices */
+    val tripleton: BoolF = insideS[V, F](muis)
+    val tripletonV: BoolV = existS[F, V](tripleton)
+    //val choose: BoolVe =chooseMinOf(prio)
+    //val choose: BoolVe = chooseMaxOf(prioYesNotQuiescent, 4) //todo deplacer dans constraint ca fait jouer prio
+    override def showMe = {
+      shoow(doubletonV, tripletonV)
+    }
   }
 }
 
+/** defines all the constraint that should be met by a quasipoint,
+ * nb: constraints must be expressed as function of prio, and flip
+ * since we do not know those at the time of constraint creation. */
+trait  QpointConstrain extends addQpointFields  with rando{
+  self: MovableAgentV => //a quasi point  is allways a movableAgentV
 
-/*
-trait BlobVouE extends HasBrdE with BorderV with Blob{
-  self:HasBrdE =>
-  val nbCc: UintV = nbccV(lateBrdE)  //first use of brdE
-  val meetV: BoolV = nbCc > 1 //this makes an implicit conversion of nbCh from unsigned int to signed int. shoudl take into acount only nbch$
-  val twoAdjBlob: BoolE = insideS[V, E](brdV) //third use of brdE, check that there is two adjacent blobs next to the empty rhombus
-  val emptyRhomb: BoolE = ~rhombusExist(lateBrdE) // true if center of a NON-totally empty rhombus
-  val meetE: BoolE =  emptyRhomb & twoAdjBlob //two conditions that needs to be met, for meeting edges: empty rhombus and two adjacent blobs.
-}
-*/
-
-/** endows  a plain BoolV with  its  meeting points. */
-//trait BlobV extends BorderEofV  with BlobVouE {  self: BoolV => }
-
-/** endows  a  BoolE with  its  meeting points. computes first a borderV */
-//trait BlobE extends HasBrdE with BlobVouE
-/** endows  a  BoolE with  its  meeting points. computes first a borderV */
-
-//trait newBlobE extends HasBrdE with newBlobVouE
-//trait HasBrdVeEV
-/*
-
-/** endows  a  BoolVe COMMING AS THE SLOPELT OF  A DISTANCE with  its  meeting points
- * those meeting points correspond to the gabriel centers.
- * It computes first a borderE, and then a borderV using mixing*/
-trait BlobVe extends HasBrdVe with BorderV with Blob with Named with BranchNamed {
-  val nbCc: UintV = nbccVe(lateBrdVe) //nbcc 's computation is refined compared to BlobV, and BlobE
-  val vf: BoolVf = cac(ASTBfun.delta, lateBrdVe)/**  true if all neighbors are at equal distance which happen for a PE is encicled by an hexagon of seeds at distance 2, or a the very begining*/
-  // val nicecircle= ~exist(apexV(f(lateBrdE)))
-  /**  make sur meetV is on initially, when dg is flat */
-  val meetVinit= ~exist(transfer(v(lateBrdE)))
-  val meetV: BoolV = ((nbCc > 1)& (nbCc<3))|  meetVinit //makes an implicit conversion of nbCh from unsigned int to signed int. shoudl take into acount only nbch$1
-  val upwardSelle:BoolE =inside(apexE(shrink(lateBrdVe))) //les deux vertex lointaint du losange sont strictement plus loin
-  val downwardSelle:BoolE= ~lateBrdE //les deux vertex proches du losange sont a la meme distance
-  val selle=upwardSelle&downwardSelle
-  val twoAdjBlob: BoolE = insideS[V, E](brdV) //not used for blobVe. attention, pas sur que brdV soit bon cf bug mirror et radius
-  val emptyRhomb:BoolE= ~rhombusExist(lateBrdE) //il y a un gros plateau de distance sur tout le rhombus
-  val meetE= selle | emptyRhomb //ca n'est pas un vrai gcenter avec emptyrhomb
+  /**
+   *
+   * @param feature
+   * return a boolV true throughout the seed,
+   * if and only if feature is also true throughout the seed
+   */
+  def forallize(feature:BoolV)={
+    insideBall(imply(muis, feature))
   }
 
-*/
+  /** will choose neighbor with higest flip priority  */
+  val  sexKeepFlipIf=new Constr(Array(this), null, flipOfMove) with Named with BranchNamed {
+    /** carefull with the number of bit, 4 */
+    val choose: BoolVe = chooseMaxOf(prioYesNotQuiescent, 4) //todo deplacer dans constraint ca fait jouer prio
+    val whereto:BoolVe= imply(e(qf.singleton),choose)
+    /** where = places where flips is still valid after the constraint newFlip<-olcFlip&where
+     * defined has a method, in order allow definition prior to intanciation of needed field, such as flip.  */
+    override val where: BoolV = inside(neighborsSym(whereto))
+  }
+  constrain("growToTwo",'x',sexKeepFlipIf)
+  /** true for neighbors of non singleton*/
+  //  val next2NonSingleton = exist(neighborsSym(e(doubletonV | tripletonV)))
+  val next2NonSingleton = exist(neighborsSym(e(qf.nonsingleton)))
+  /**  cancel growth for non singleton, exept for doubleton, on appex, this needs a tournament*/
+  val leqQuatre: Constr ={
+    new KeepFlipIf(One(false),implique(next2NonSingleton, qf.isApexV),flipOfMove) with Named with BranchNamed {}}
+  constrain("leqQuatre",'q',leqQuatre)
+  /** singleton cannot flip */
+  val diseaperSingle = new CancelFlipIf(One(true),qf.singleton,flipOfMove)
+  constrain("diseaperSingle",'s',diseaperSingle)
+  /**a doubleton cannot flip both vertices*/
+  val diseaperDouble = new MutKeepFlipIf(One(true),qf.doubleton,flipOfMove) with BranchNamed {}
+  constrain("diseaperDouble",'d',diseaperDouble)
+  /** cannot grow from two, to four on both apex */
+  val appearDouble = new MutApexKeepFlipIf(One(false),qf.doubleton,flipOfMove) with Named with BranchNamed {}
+  constrain("appearDouble",'a',appearDouble)
+  /**  a tripleton cannot flip its three vertices*/
+  val diseaperTriple=new TriKeepFlipIf(One(true),qf.tripleton,flipOfMove) with BranchNamed {}
+  constrain("diseaperTriple",'t',diseaperTriple)
 
-/** endows  a  BoolVe COMMING AS THE SLOPELT OF  A DISTANCE with  its  meeting points
- * those meeting points correspond to the gabriel centers.
- * It computes first a borderE, and then a borderV using mixing*/
-trait newBlobVe extends HasBrdVe with newBrdVT with newBlob with Named with BranchNamed {
-  val nbCc: UintV = nbccVe(lateBrdVe) //nbcc 's computation is refined compared to BlobV, and BlobE
-  val vf: BoolVf = cac(ASTBfun.delta, lateBrdVe)/**  true if all neighbors are at equal distance which happen for a PE is encicled by an hexagon of seeds at distance 2, or a the very begining*/
-  // val nicecircle= ~exist(apexV(f(lateBrdE)))
-  /**  make sur meetV is on initially, when dg is flat */
-  val meetVinit= ~exist(transfer(v(lateBrdE)))
-  val meetV: BoolV = ((nbCc > 1)& (nbCc<3))|  meetVinit //makes an implicit conversion of nbCh from unsigned int to signed int. shoudl take into acount only nbch$1
-  val upwardSelle:BoolE =inside(apexE(shrink(lateBrdVe))) //les deux vertex lointaint du losange sont strictement plus loin
-  val downwardSelle:BoolE= ~lateBrdE //les deux vertex proches du losange sont a la meme distance
-  val selle=upwardSelle&downwardSelle
-  val twoAdjBlob: BoolE = insideS[V, E](newbrdV) //not used for blobVe. attention, pas sur que brdV soit bon cf bug mirror et radius
-  val emptyRhomb:BoolE= ~rhombusExist(lateBrdE) //il y a un gros plateau de distance sur tout le rhombus
-  val meetE= selle | emptyRhomb //ca n'est pas un vrai gcenter avec emptyrhomb
+  //val extend2side: BoolVe = clock2(transfer(sym(v(doubleton) & rand.randSide)))
+
+
+  /** used to compute flip cancelation depending on impact */
 }
-
-
-
-/**
- *  This class is not necessary anymore using the function addBlobVe we can compute the blob relevant
- *  information for a BoolVe
- * We keep it because it used intelligence to really workout what is needed to be done on the chip border,
- * in the initial case we considered, which was not including mirors.
- * @param brdE  frontier,
- * @param brdIn oriented contour, brd is computed from brdIn
- * @param brdV  on the frontier, brdV is computed from brd.
- *              computes  V-meeting points and E-meeting points, plus
- *              memorizes intermediate result, such as nbcc, for later use. */
-class BlobOld(brdE: BoolE, brdIn: BoolVe, brdV: BoolV) extends Named with BranchNamed { //the blob is not necessarily a layer todo should be replaced using blobVe
-  val nbCc: UintV = nbcc(brdIn) //first use of brdE
-  val meetV: BoolV = nbCc > 1 //makes an implicit conversion of nbCh from unsigned int to signed int. shoudl take into acount only nbch$1
-  val twoAdjBlob: BoolE = insideS[V, E](brdV) //third use of brdE, check that there is two adjacent blobs next to the empty rhombus
-  val nonEmptyRhomb: BoolE = rhombusExist(brdE) // true if center of a NON-totally empty rhombus
-  val nonEmptyRhomb2: BoolE = orR(transfer(enlargeFE(enlargeEF(brdIn)))) //more precise computation  for detecting edge gabriel centers,
-  // which can also defined as meeting poins
-  val meetE: BoolE = {
-    ~nonEmptyRhomb2 & twoAdjBlob //two conditions that needs to be met, for edge meeting points
-  } //we've got to be able to not have to write calls to andE!!
-  val meetEside = existS[E, V](meetE)
-  val meet = meetV | meetEside
-}
-
 
 
 

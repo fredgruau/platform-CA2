@@ -11,7 +11,6 @@ import dataStruc.{BranchNamed, Named}
 import sdntool.addDist
 import progOfmacros.Wrapper.borderS
 import sdn.{LDAG, MuStruct, Stratify, carrySysInstr, muEmptyBag}
-import sdn.Util.safeGrow
 
 import java.util
 import scala.collection.immutable.HashMap

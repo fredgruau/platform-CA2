@@ -23,12 +23,12 @@ object RedT {
    * either an S1 site is defined and so are it transfer around,
    * or S1 is not and also so are its transfer around it.TODO remplacer par un wrapper sur RedT
    */
-  def cacOld[S1 <: S, S2 <: S, S3 <: S, R <: Ring](r: Fundef2R[R], arg: ASTLt[T[S1, S2], R])(implicit m1: repr[S2], m2: repr[S1], m3: repr[S3], n: repr[R], a: AntiClock[S1, S2, S3]): ASTLt[T[S1, S3], R] = {
+  def cacEndomorph[S1 <: S, S2 <: S, S3 <: S, R <: Ring](r: Fundef2R[R], arg: ASTLt[T[S1, S2], R])(implicit m1: repr[S2], m2: repr[S1], m3: repr[S3], n: repr[R], a: AntiClock[S1, S2, S3]): ASTLt[T[S1, S3], R] = {
     binop(r, clock(arg), anticlock(arg))
   }
 
   def cac[S1 <: S, S2 <: S, S3 <: S, R <: Ring, P <: Ring](op2: Fundef2RP[R, P], arg: ASTLt[T[S1, S2], R])
-                                                          (implicit m1: repr[S2], m2: repr[S1], m3: repr[S3], n: repr[R], p: repr[P], a: AntiClock[S1, S2, S3]): ASTLt[T[S1, S3], P] = {
+         (implicit m1: repr[S2], m2: repr[S1], m3: repr[S3], n: repr[R], p: repr[P], a: AntiClock[S1, S2, S3]): ASTLt[T[S1, S3], P] = {
     binop[T[S1, S3], R, R, P](op2, clock(arg), anticlock(arg))
   }
 
@@ -84,7 +84,7 @@ object RedT {
 
   /** enlarge around V, from Ve to Vf or vice versa */
   def enlarge[S1 <: S, S2 <: S](arg: ASTLt[T[V, S1], B])(implicit m1: repr[S2], m2: repr[S1], a: AntiClock[V, S1, S2]): ASTLt[T[V, S2], B] =
-    cacOld[V, S1, S2, B](orB, arg)
+    cacEndomorph[V, S1, S2, B](orB, arg)
 
   val enlargeFEDef: Fundef1[(T[V, F], B), (T[V, E], B)] = {
     val arg = pL[T[V, F], B]("enlarge")
@@ -110,7 +110,7 @@ object RedT {
 
   /** shrink around V, from Ve to Vf or vice versa */
   def shrink[S1 <: S, S2 <: S](arg: ASTLt[T[V, S1], B])(implicit m1: repr[S2], m2: repr[S1], a: AntiClock[V, S1, S2]): ASTLt[T[V, S2], B] =
-    cacOld[V, S1, S2, B](andB, arg)
+    cacEndomorph[V, S1, S2, B](andB, arg)
 
   val shrinkFEDef: Fundef1[(T[V, F], B), (T[V, E], B)] = {
     val arg = pL[T[V, F], B]("shrink")

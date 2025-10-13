@@ -9,7 +9,7 @@ import compiler.Circuit.hexagon
 import compiler._
 import compiler.SpatialType._
 import dataStruc.{BranchNamed, Named}
-import sdn.{  HasBrdE, HasBrdVe, MuStruct}
+import sdn.{  MuStruct}
 import progOfmacros.Comm._
 import progOfmacros.Compute.{concat3V, concat4V}
 import progOfmacros.Topo.{brdin, nbccV}
@@ -63,9 +63,6 @@ class Root4naming() extends Named with BranchNamed {
   }
 }
 
-
-
-
 /** computes a subfield named "diff" and the opposite, "eq"
  * works for both signed and unsigned integers (the computation is identical)*/
 trait ComparDiff[R<:I]{
@@ -88,27 +85,7 @@ trait Compar extends ComparDiff[UI]{
   val lt: BoolEv =Grad.lt(this,segmentOf1)
   val gt=symEv(lt)
 }
-
-
 /** same as Compar, except that we compare apex neighbors instead of direct neighbors? */
-/*
-trait ComparApex{
-  self:UintV=>
-  val ef: UintEf =apexEui(f(this))
-  /** xor can be usefull for other things, so we keep a pointer to it */
-  val bordApex: UintE =Wrapper.border[F,E,UI](ef)
-  //val bord: UintE =Wrapper.border[V,E,UI](dEv) //a déja calculé dev.
-  /**  usefull both for lt, and for eq a single bit is on, iff operand on each edge side differ */
-  val segmentOf1Apex: UintE = segment1(bordApex) //unop(orScan, bord)
-  /** true if both values are different */
-  val diffApex= elt(0,segmentOf1Apex)
-  /** true if both values are equal */
-  val eqApex= not(diffApex);
-  val ltApex: BoolEf =Grad.ltApex(this,segmentOf1Apex)
-  val gtApex=symEf(ltApex)
-}
-*/
-
 trait ComparApex2{
   self:UintV=>
   val ef: UintEf =apexEui(f(this))
@@ -123,8 +100,6 @@ trait ComparApex2{
   val ltApex: BoolEf =Grad.ltApex2(ef,deriv,diffApex)
   val gtApex=symEf(ltApex)
 }
-
-
 
 /** add a boolVf lt3 which computes gt with respect to the two other neibors of the adjacent face, using an And transfer reduction redT*/
 trait Compar3 {
@@ -182,62 +157,7 @@ object Util {
     new AST.Delayed[(V, SI)](() => delayed) with ASTLt[V, SI] with ComparDiff[SI] with Named with BranchNamed {}
   }
 
-  /** we directly reuse Delayed creation, in order to be able to add  blob related computation,
-   * this naming will automatically define meetV,meetE, BrdV, BrdE*/
-/*  def addBlobV(_arg: => BoolV): Blob = {
-    lazy val delayed = _arg;
-    new AST.Delayed[(V, B)](() => delayed) with BoolV with BlobV with Named with BranchNamed {}
-  }*/
-/*  /** we directly reuse Delayed creation, in order to be able to add  blob related computation, on a BoolE
-   * this naming will automatically define meetV,meetE, BrdV, BrdE*/
-  def newAddBlobE(_arg: => BoolE):newBlob = {
-    lazy val delayed = _arg;
-    new AST.Delayed[(E, B)](() => delayed) with BoolE with newBlobE with Named with BranchNamed {override val brdE: BoolE = delayed}
-  }
-  */
 
-  /** we directly reuse Delayed creation, in order to be able to add  blob related computation, on a BoolE
-   * this naming will automatically define meetV,meetE, BrdV, BrdE*/
- /* def addBlobE(_arg: => BoolE):Blob = {
-    lazy val delayed = _arg;
-    new AST.Delayed[(E, B)](() => delayed) with BoolE with BlobE with Named with BranchNamed {override val brdE: BoolE = delayed}
-  }*/
-/*  /** we directly reuse Delayed creation, in order to be able to add  blob related computation on a BoolVe,
-   * this naming will automatically define meetV,meetE, BrdV, BrdE
-   * toto is the reduction of arg, ie brdv,
-   * it has to be computed direclty from the distance ,
-   * this is because the computation does not involve boolV
-   * enough frequantly
-   * computing brdE from BrdEv is possible in princiiple, but it results in error
-   * on the border due to the fact that miror is implemented
-   * only for boolV, for the moment being*/
-  def addBlobVe(_arg: => BoolVe,_toto: =>BoolE):BlobVe = {
-    lazy val delayed = _arg;
-    lazy val delayed2= _toto
-    new AST.Delayed[(T[V,E], B)](() => delayed) with BoolVe with BlobVe with Named with BranchNamed {
-       val brdVe: BoolVe = delayed
-      val brdE=delayedL(delayed2) //grace a cet attribut, hasBrdE de blobVe est vérifié
-
-    }
-  }*/
-
-  /** we directly reuse Delayed creation, in order to be able to add  blob related computation on a BoolVe,
-   * this naming will automatically define meetV,meetE, BrdV, BrdE
-   * toto is the reduction of arg, ie brdv,
-   * it has to be computed direclty from the distance ,
-   * this is because the computation does not involve boolV
-   * enough frequantly
-   * computing brdE from BrdEv is possible in princiiple, but it results in error
-   * on the border due to the fact that miror is implemented
-   * only for boolV, for the moment being*/
-  def newaddBlobVe(_arg: => BoolVe,_toto: =>BoolE):newBlobVe = {
-    lazy val delayed = _arg;
-    lazy val delayed2= _toto
-    new AST.Delayed[(T[V,E], B)](() => delayed) with BoolVe with newBlobVe with Named with BranchNamed {
-      val brdVe: BoolVe = delayed
-      val brdE=delayedL(delayed2) //grace a cet attribut, hasBrdE de blobVe est vérifié
-    }
-  }
 
 
   /** provide a boolVe with an additional fields sym */
@@ -256,13 +176,7 @@ object Util {
    * @param b represent a boolV offering computation of meeting points
    * @return places where growig will not cause merging of blobs.
    */
-  def safeGrow(b:newBlob):BoolV={
-    val meetEside = existS[E, V](b.meetE) //true if adjacent to a meeting edge
-    val meet = b.meetV | meetEside //  all meeting Vertices
-    throw new Exception("faire intervenir brdvV")
-    ~meet
-   // b.brdV //& ~meet
-  }
+
 
   /** bits has a number of $6*k$ bits , we sort them in 6 subsequence of $k$ bits */
   def splitInto6(bitSequence: UintV, k:Int): Array[UintV] = {

@@ -1,4 +1,4 @@
-/*
+
 package progOfCA /** contains variation of grow starting with basic growth,
   and then growth to voronoi cells , illustrate redS sytematic computation*/
 
@@ -15,16 +15,20 @@ import compiler.ASTLt.ConstLayer
 import compiler.repr.nomE
 import dataStruc.{BranchNamed, Named}
 import progOfmacros.Topo.brdin
-import sdn.Util.{addBlobE, addBlobVe, newaddBlobVe, safeGrow}
-import sdn.{Blob, BlobE, BlobV, Compar, Compar3}
+import sdn.{Blob, BlobV, BlobVFields, BlobVe, Compar, Compar3, addBlobVfields, carrySysInstr}
+
+
 /** same as GrowVorV but based on a boolVe support  MARCHE PAS*/
-class Grow() extends Layer[(V, B)](1, "global") with BoolV  with BranchNamed {
+class GrowBlobVe() extends Layer[(V, B)](1, "global") with BoolV  with carrySysInstr with BranchNamed with Named {
   val is:BoolV=delayedL(this)
+  val bf=new BlobVFields(this)
   val edge: ASTLt[E, B] =borderS(is)
   val brd=brdin(edge,is)
-  val blb=addBlobVe( brd,edge)
-  override val next: AST[(V, B)] = this | safeGrow(blb)  //we extend the blob around the border brdV, except for meeting points
-  show(is,blb.meetE,brd)
+  val b=new BlobVe(this,bf.brdE,bf.brdVe)
+  override val next: AST[(V, B)] = this | bf.brdV & ~b.meet //we extend the blob around the border brdV, except for meeting points
+  show(this)
+  b.showMe
+  bf.showMe
 }
 /** test growVorV/E/Ve by wrapping in a useless constant layer */
 class GrowTest()  extends ConstLayer[V, B](1, "global")  with BranchNamed{
@@ -58,28 +62,24 @@ class GrowRaw extends Layer[(V, B)](1, "global") with ASTLt[V, B] with BranchNam
   // he name of root to arg(0).lowercase
 }
 
-/** test growVorV/E/Ve by wrapping in a useless constant layer */
-/*class GrowVorTestOld()  extends ConstLayer[V, B](1, "global")  with BranchNamed{
-  //  val g=new GrowVorVTest();show(g,g.meetE,g.meetV)
-  //val g=new GrowVorETest();
-  val g=new GrowVorVeTest();
-  show(g,g.blb.meetE,g.blb.meetV) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
-  //val g=new GrowVorVeTest();show(g,g.ve.meetE,g.ve.meetV) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
-}*/
-/** uses plain  blobV computation to grow seed into Voronoi region, just by stoping the growth just before merge happens */
-class GrowVorVTest() extends Layer[(V, B)](1, "global") with BoolV with BlobV with BranchNamed {
-  override val next: AST[(V, B)] = this | safeGrow(this) //we extend the blob around the border brdV, except for meeting meeting points
-  //show(b.meet) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
+/** uses plain  blobV computation to grow seed into Voronoi region,  by stoping the growth just before merge happens */
+class Grow() extends Layer[(V, B)](1, "global") with BoolV  with carrySysInstr with BranchNamed {
+  val bf=new BlobVFields(this)
+  val b=new BlobV(this,bf)
+   override val next: AST[(V, B)] = this | bf.brdV & ~b.meet//we extend the blob around the border brdV, except for meeting meeting points
+  show(this)
+  b.showMe
+  bf.showMe//show(b.meet) // brd,emptyRhomb1, emptyRhomb,twoAdjBlob,
 }
 
-/** same as GrowVorV but based on a boolE support  */
+/** same as GrowVorV but based on a boolE support  *//*
 class GrowVorETest() extends Layer[(V, B)](1, "global") with BoolV  with BranchNamed {
   val is:BoolV=delayedL(this)
   val blb: Blob =addBlobE(borderS(is))  //for a correct testing, edge should be an arbitrary line,
                                           // and not the border of a boolV
   /** we directly build an instance of HasBrdE from the edge, */
   override val next: AST[(V, B)] = this | safeGrow(blb) //we extend the blob around the border brdV, except for meeting meeting points
-}
+}*/
 
 
 
@@ -118,7 +118,7 @@ class GrowEV extends Layer[(E, B)](1, "global") with ASTLt[E, B] {
   val nv: BoolV = orR(transfered) //(n,m,d) yzeté implicit killerest
   override val next: BoolE = existS(nv) //  make use of defVe brough to us implicitely,nb if overrid is not written, it does not work!
   show(this, broadcasted, transfered, nv, next)
-}*/
+}
 
 
 

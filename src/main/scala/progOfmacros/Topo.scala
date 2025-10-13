@@ -7,7 +7,7 @@ import compiler.ASTL._
 import compiler.SpatialType._
 import compiler.Circuit.hexagon
 import compiler._
-import progOfmacros.RedT.{cac, cacOld}
+import progOfmacros.RedT.{cac, cacEndomorph}
 
 /** contains macro computing information used to perseved topological invariants, such as nbcc, or quasiPoint */
 object Topo {

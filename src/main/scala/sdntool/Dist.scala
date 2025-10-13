@@ -1,44 +1,45 @@
 package sdntool
 
 
-import compiler.AST.{Layer, _}
+import compiler.AST._
 import compiler.SpatialType.{BoolVe, _}
 import compiler.ASTBfun.{addRedop, andRedop, isneg, minSignRedop, orRedop, p, redop, xorRedop}
 import compiler.ASTL._
-import compiler.ASTLfun.{e, _}
+import compiler.ASTLfun._
 import compiler.ASTLt._
 import compiler.Circuit.hexagon
-import compiler.{ASTLt, chip, _}
+import compiler._
 import compiler.SpatialType._
 import dataStruc.{BranchNamed, Named}
 import progOfStaticAgent.{Homogeneize, Leader}
 import progOfmacros.Comm.neighborsSym
 import progOfmacros.{Grad, Wrapper}
 import progOfmacros.Wrapper.{borderS, exist, existS, inside, neqUI2L}
-import progOfmacros.RedT.cacOld
-import sdn.{BlobOld, BlobVe, Force, LayerS, MovableAgentV, MoveC, MoveC1, MoveC2, MuStruct, One, QPointFields, Stratify, addGcenter, carrySysInstr}
-import sdn.Util.{addLt, addLtSI, newaddBlobVe}
+import progOfmacros.RedT.cacEndomorph
+import sdn.{ BlobVe, Force, LayerS, MovableAgentV, MoveC, MoveC1, MoveC2, MuStruct, One,  Stratify, addGcenter, carrySysInstr}
+import sdn.Util.{addLt, addLtSI}
 
 /**
  * @param source
  * @param bitSize sometimes more than 3 bits are necessary
  *  * computes distance to source
  */
-class MuDist(val source: MuStruct[V, B],val bitSize:Int)extends MuStruct [V,SI] {
+class MuDist(val source: MuStruct[V, B],val bitSize:Int) extends MuStruct [V,SI] {
   override def inputNeighbors: List[MuStruct[_ <: Locus, _ <: Ring]] = List(source)
   override val muis:LayerS[V, SI]  = new LayerS[V, SI](bitSize, "0")
      { override val next: AST[(V, SI)] =delayedL(this.pred + incr)(this.mym) }
   val opp = - (muis.pred)
   val (sloplt: BoolVe, delta, level, gap) = Grad.slopDelta(muis.pred)
-  /** calcul directement si y a une différence de valeur entre deux Vertex adjacent,
+  /** calcul directement a partir de la distance
+   *  si y a une différence de valeur entre deux Vertex adjacent d'un edge donné,
    * todo devrait  se faire aussi dans slopeDelta pour simplifier
    * par contre on ne peut pas le calculer a partir de slopelt, sinon ca bugge
    * pour des pb de miror qui nécessite de passer par des vertices*/
   val voisinDiff:BoolE=(addLtSI(muis.pred)).diff
-  val iambig=source.asInstanceOf[QPointFields].tripletonV
-  val incrOld = cond(delayedL(source.muis.munext), cond(iambig,sign(opp+1),sign(opp)), delta)
+  //val iambig=source.asInstanceOf[QPointFields].tripletonV
+  //val incrOld = cond(delayedL(source.muis.munext), cond(iambig,sign(opp+1),sign(opp)), delta)
   val incr = cond(delayedL(source.muis.munext), sign(opp), delta)
-  val vortex: BoolF = andR(transfer(cacOld(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
+  val vortex: BoolF = andR(transfer(cacEndomorph(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
 
   source match{
     case ag: sdn.Agent[V]=> //adds a slow constraint to avoid vortex creation
@@ -50,8 +51,7 @@ class MuDist(val source: MuStruct[V, B],val bitSize:Int)extends MuStruct [V,SI] 
     case _ =>
   }
 
-  def showMe={shoow(delta,gap, sloplt, level) // necessary so as to use all parameters returned by slopeDelta
-    shoow(vortex)
+  def showMe={shoow(delta,gap, sloplt, level,vortex) // necessary so as to use all parameters returned by slopeDelta
     buugif(vortex) //todo, mettre aussi un bug si y a un écart de 4 sur la source
   }
 
@@ -70,7 +70,7 @@ class MuDistGcenter(val source:MovableAgentV with addDist with addGcenter) exten
    val opp = -(muis.pred)
    val incr = cond(delayedL(source.gc.meetV), sign(opp), cond(delayedL(source.gc.meetE2), sign(opp+2), deltag))
   /** spurious vortex occurs outside chip.borderF.df, so we have to and with chip.borderF.df in order to prevent false detection of vortex bug */
-  val vortex: BoolF = chip.borderF.df & andR(transfer(cacOld(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
+  val vortex: BoolF = chip.borderF.df & andR(transfer(cacEndomorph(xorRedop[B]._1, sloplt))) // andR( transfer(clock(sloplt) ^ anticlock(sloplt))); //transitive circular lt
   def showMe={
     shoow( gap, sloplt, level, vortex) // necessary so as to use all parameters returned by slopeDeltashoow(vortex)
     shoowText(deltag,List())
@@ -82,8 +82,8 @@ class MuDistGcenter(val source:MovableAgentV with addDist with addGcenter) exten
       val hasNearer: BoolV = Wrapper.exist(sloplt & neighborsSym(e(ag.muis)))
       val hasFurther = Wrapper.exist(neighborsSym(sloplt) & neighborsSym(e(ag.muis)))
       val oui = MoveC1(ag.muis & hasFurther & ~hasNearer,
-        neighborsSym(sloplt) & ag.brdVe) //extends towards increasing value of distances and empties everywhere possible.
-      val non = MoveC1(ag.muis & hasNearer, sloplt & ag.brdVe  ) //falseVe
+        neighborsSym(sloplt) & ag.bf.brdVe) //extends towards increasing value of distances and empties everywhere possible.
+      val non = MoveC1(ag.muis & hasNearer, sloplt & ag.bf.brdVe  ) //falseVe
       MoveC2(oui, non)
     }
   }
@@ -97,28 +97,7 @@ trait addDist {
 }
 
 /** adds gabriel centers, uses blob computation on slopelt, works like magic */
-trait gCenterOld{
-  self:MovableAgentV with addDist=> //there is a distance already
 
- /** on calcule  brdE directement depuis la distance aux seeds,
-  * parceque  a cause de pb de radius
-  * et de miror update qui se fait juste sur les boolV
- le calcul de brdE a partir de brdEv est faux. */
-  val dBrdE:BoolE=(addLtSI(d.muis.pred)).diff  //ya moyen de faire ca mieux en calculant
-  val oldb=newaddBlobVe(d.sloplt,dBrdE) //on passe donc en meme temps le BrdVe et BrdE
-  val b=new BlobVe(muis,dBrdE,d.sloplt) //on passe donc en meme temps le BrdVe et BrdE
-
-
-  val issV:BoolV=this.asInstanceOf[MovableAgentV].isV
-
-  /** true for doubletons */
-  val next2Source: BoolE =exist(transfer(e(issV)))
-  val gCenterV=  b.meetV
-  /** we discard spurious gcenters */
-  val meetE2:BoolV=existS[E,V](delayedL(b.meetE))& ~ issV //ca en exclus trop sans doute.
-  val gCenterE=meetE2
-  val dd: MuDist =d
-}
 
 /** adds distance to gcentern */
 trait addDistGcenter {

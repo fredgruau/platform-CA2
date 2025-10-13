@@ -3,13 +3,14 @@ package sdn
 import compiler.ASTB.{False, Uint}
 import compiler.ASTBfun.{addRedop, derivative, ltUI2, orRedop, redop}
 import compiler.ASTL.{delayedL, send, transfer, unop}
-import compiler.ASTLfun.{allOne, andLB2R, b2SIL, eq0, f, imply, lt2, ltSI, neq, orScanRight, reduce, uI2SIL, v}
+import compiler.ASTLfun.{allOne, andLB2R, b2SIL, e, eq0, f, imply, lt2, ltSI, neq, orScanRight, reduce, uI2SIL, v}
 import compiler.SpatialType.{BoolE, BoolEv, BoolF, BoolV, BoolVe, BoolVf, IntE, IntEv, IntV, IntVe, UintV, UintVx}
 import compiler.repr.nomE
 import compiler.{ASTLfun, ASTLt, B, E, F, Locus, SI, T, UI, V, chip}
 import dataStruc.{BranchNamed, Named}
 import progOfCA._
-import progOfmacros.Comm.{apexE, apexV}
+import progOfLayer.Sextexrect.chooseMaxOf
+import progOfmacros.Comm.{apexE, apexV, neighborsSym}
 import progOfmacros.{Compute, Grad}
 import progOfmacros.Compute.implique
 import progOfmacros.Wrapper.{exist, inside, insideS, not, unary2Bin}
@@ -70,7 +71,11 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B] with HasIsV
    /** shows also blocking moves */
    def showMoves={ shoowText(highestTriggered,codeMove.toList)}
    def showFlip=shoow(flipOfMove, flipAfterLocalConstr)
-   def showMe={shoow(muis);showPositiveMoves;showConstraint;showFlip;
+   var muuis:BoolV= null
+   muuis= ~ (~ delayedL( isV))
+   def showMe={
+
+     shoow(muis,muuis);showPositiveMoves;showConstraint;showFlip;
      showPrio
    }
    /**
@@ -172,13 +177,27 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B] with HasIsV
    /**
     *
     * @param ags one or two agents on which to apply constraint
-    *            Constr is an inner classes of agents, so that it can access its main agent's field.
+    *            Constr is an inner classes of agents, so that it can access its main agent's field such as prio.
     */
 
    abstract class Constr(val ags: Array[Agent[_ <: Locus]], val impact: Impact, flip:BoolV) {
      /** where = places where flips is still valid after the constraint newFlip<-olcFlip&where
       * defined has a method, in order allow definition prior to intanciation of needed field, such as flip.*/
      val where: BoolV //will use fields from the agent: flip, as well as this
+   }
+
+   abstract class Constr2(val ags: Array[Agent[_ <: Locus]], val impact: Impact)( flip:BoolV) {
+     /** where = places where flips is still valid after the constraint newFlip<-olcFlip&where
+      * defined has a method, in order allow definition prior to intanciation of needed field, such as flip.*/
+     val where: BoolV //will use fields from the agent: flip, as well as this
+   }
+
+
+   class KeepFlipIf2(i: Impact,val loc:BoolV)(flip:BoolV) extends Constr2(Array(this), i)(flip)
+   { override val where: BoolV = impact match {
+     case Both() => loc
+     case One(v) =>  implique (if (v) isV else (NotIsV),loc)
+   }
    }
 
    class KeepFlipIf(i: Impact,val loc:BoolV,flip:BoolV) extends Constr(Array(this), i,flip)
@@ -206,7 +225,7 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B] with HasIsV
      /** flip is ok if prio is maximum with respect to the other side */
      def tmp: BoolEv =imply(v(mutrig),ags.head.prio.gt) //todo faut mettre lt
      /** flip remains ok if no neighbor edge present a problem */
-       val ttmp=tmp
+     val ttmp=tmp
      val where: BoolV =inside(transfer(ttmp))
    }
    class MutCancelFlipIf(i: Impact,val mutex:BoolE,flip:BoolV) extends Constr(Array(this), i,flip) {

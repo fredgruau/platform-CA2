@@ -22,10 +22,11 @@ class Homogeneize() extends LDAG with Named with BranchNamed
   part.gc.showMe
   part.d.showMe; part.dg.showMe
   part.sf.showMe
+
 }
 
 /** basic quasiparticle with blob and qpoint constraints */
-class Seed extends  MovableAgentV  with addBloobV with newBlobConstrain with QpointConstrain
+class Seed extends  MovableAgentV  with addBloobV with blobConstrain with addQpointFields with QpointConstrain
 
 /** moves as much as possible */
 class Flies2 extends Seed {
@@ -48,7 +49,7 @@ class Convergent extends Homogen // with Lead //pas besoin de leader pour le mom
 {  val sf=new Attributs() { //sf==stableFields
   override val muis: ASTLg with carrySysInstr = Convergent.this.muis
   /** border of qparticle  where dg diminishes */
-  val brdVeSloped=brdVe&dg.sloplt
+  val brdVeSloped=bf.brdVe & dg.sloplt
   /** around isV, adds Vertices on the otherside of brdVeslopped */
   val isVplus=isV | exist(transfer(sym(transfer(brdVeSloped))))
   /** add vertex  if three neighbors are on */
@@ -71,7 +72,7 @@ class Convergent extends Homogen // with Lead //pas besoin de leader pour le mom
       /** pure negative move */
       val yes=MoveC1(false,false)
       /** if stable2 , this will cancel movement of lower priority, */
-      val no = MoveC1(sf.stable2, e(sf.stable2)&brdVe)
+      val no = MoveC1(sf.stable2, e(sf.stable2)& bf.brdVe)
       MoveC2(yes,no)
     }
   }
