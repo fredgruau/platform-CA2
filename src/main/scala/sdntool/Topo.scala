@@ -119,7 +119,7 @@ trait  blobConstrain   {
   /** meetV points cannot flip */
   //val vmeet = new CancelFlipIf(Both(),b.meetV,flipOfMove);  constrain("vmeet",'_',vmeet)
 
-  val vmeet2: BoolV => Constr =  CancelFlipIf(Both(),b.meetV) _
+  val vmeet2: PartialUI => Constr =  CancelFlipIf(Both(),b.meetV) _
   constrain2("vmeet",'_',vmeet2)
 
   /**a doubleton cannot flip both vertices*/
@@ -170,13 +170,13 @@ trait  QpointConstrain extends addQpointFields  with rando{
     insideBall(imply(muis, feature))
   }
 
-  /** will choose neighbor with higest flip priority, does not depends on flip  */
-  val  sexKeepFlipIf:BoolV=>Constr = (f:BoolV)=>new Constr(Array(this), null, f) with Named with BranchNamed {
+  /** will choose neighbor with higest flip priority in fp, does not depends on flip  */
+  val  sexKeepFlipIf= (fp:PartialUI)=>new Constr(Array(this), null, fp) with Named with BranchNamed {
     /** carefull with the number of bit, 4
      * carefull that this constraint uses prioYesNotQuiescent so it assumes that moves have been already computed
      * if we want to endows our agent with constraints before computing moves, this will not work*/
 
-    val choose: BoolVe = chooseMaxOf(prioYesNotQuiescent, 4) //todo deplacer dans constraint ca fait jouer prio
+    val choose: BoolVe = chooseMaxOf(fp.value, 4) //todo deplacer dans constraint ca fait jouer prio
     val whereto:BoolVe= imply(e(qf.singleton),choose)
     /** where = places where flips is still valid after the constraint newFlip<-oldFlip&where
      * defined has a method, in order allow definition prior to intanciation of needed field, such as flip.  */
