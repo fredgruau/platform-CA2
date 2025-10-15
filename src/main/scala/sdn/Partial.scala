@@ -1,17 +1,20 @@
 package sdn
 
+import compiler.ASTLfun.andLB2R
 import compiler.SpatialType.BoolV
-import compiler.{ASTL, Locus, Ring}
+import compiler.{ASTL, ASTLt, B, Locus, Ring, V, repr}
 
 /**
  *
  * @param defined true if value is defined
  * @param value actual partially defined value
- * @tparam L locus
- * @tparam R  ring
+ * @tparam R  ring can be signed, unsigned int, or bool
  * we very often use partially defined value, defining a class for it allows to regroup all the code for this.
+ * the main exemple is to group flip and prio, because prio is relevant only if flip is true.
+ * invariant dans ce cas est defined=false=>value=0
+ * si l'invariant n'est pas verifié, on peut le restored en faisant value = andlbtoR( defined, value)
  */
-class PartialASTL[L <: Locus, R <: Ring](val defined:BoolV, val value:ASTL[L ,R]){
-
+class PartialASTL[ R <: Ring](val defined:BoolV, val value:ASTLt[V,R])(implicit m:repr[R]){
+  def restoreInvariant: ASTLt[V, R] = andLB2R(defined, value)
 }
 

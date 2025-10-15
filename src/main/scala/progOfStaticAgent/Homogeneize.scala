@@ -9,6 +9,7 @@ import progOfmacros.Comm.{adjacentBall, insideBall, neighborsSym}
 import progOfmacros.RedT.cac
 import progOfmacros.Wrapper
 import progOfmacros.Wrapper.{border, borderS, exist, existS, inside, insideS, smoothen, smoothen2, testShrink}
+import sdn.MuStruct.showMustruct
 import sdn._
 import sdntool.{addDist, addDistGcenter}
 
@@ -22,7 +23,7 @@ class Homogeneize() extends LDAG with Named with BranchNamed
   part.gc.showMe
   part.d.showMe; part.dg.showMe
   part.sf.showMe
-
+  showMustruct
 }
 
 /** basic quasiparticle with blob and qpoint constraints */

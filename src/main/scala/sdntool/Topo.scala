@@ -117,12 +117,14 @@ trait addGcenter{ self: MovableAgentV with addBlobVfields with addDist=>
 trait  blobConstrain   {
   self: MovableAgentV with addBloobV=>
   /** meetV points cannot flip */
-  val vmeet = new CancelFlipIf(Both(),b.meetV,flipOfMove)
-  constrain("vmeet",'_',vmeet)
+  //val vmeet = new CancelFlipIf(Both(),b.meetV,flipOfMove);  constrain("vmeet",'_',vmeet)
+
+  val vmeet2: BoolV => Constr =  CancelFlipIf(Both(),b.meetV) _
+  constrain2("vmeet",'_',vmeet2)
+
   /**a doubleton cannot flip both vertices*/
-  val emeet = new MutKeepFlipIf(Both(),b.meetE,flipOfMove) with BranchNamed {}
-  constrain("emeet",'=',emeet)
-}
+  //val emeet = new MutKeepFlipIf(Both(),b.meetE,flipOfMove) with BranchNamed {};  constrain("emeet",'=',emeet)
+  val emeet2 = MutKeepFlipIf(Both(),b.meetE) _ ;  constrain2("emeet",'=',emeet2);}
 /** field needed to compute the constraints of  a quasipoint, and possibly elsewehere */
 trait addQpointFields {
   self: MovableAgentV with addBlobVfields => //MovableAgentV with addBlobVfields =>
@@ -134,6 +136,7 @@ trait addQpointFields {
     /** true for the vertices of a qpt consiting exactly of one vertices */
     val singleton: BoolV = inside(bf.brdVe) & muis
     val nonsingleton = ~singleton & muis
+    val next2NonSingleton = exist(neighborsSym(e(nonsingleton)))
     /** true if both apex vertices of the edge are empty */
     val bothApexEmpty: BoolE = not(orR(apex[V, E, B](f(muis))))
     /** true for the edge inside qpt consiting exactly of two vertices */
@@ -167,35 +170,37 @@ trait  QpointConstrain extends addQpointFields  with rando{
     insideBall(imply(muis, feature))
   }
 
-  /** will choose neighbor with higest flip priority  */
-  val  sexKeepFlipIf=new Constr(Array(this), null, flipOfMove) with Named with BranchNamed {
-    /** carefull with the number of bit, 4 */
+  /** will choose neighbor with higest flip priority, does not depends on flip  */
+  val  sexKeepFlipIf:BoolV=>Constr = (f:BoolV)=>new Constr(Array(this), null, f) with Named with BranchNamed {
+    /** carefull with the number of bit, 4
+     * carefull that this constraint uses prioYesNotQuiescent so it assumes that moves have been already computed
+     * if we want to endows our agent with constraints before computing moves, this will not work*/
+
     val choose: BoolVe = chooseMaxOf(prioYesNotQuiescent, 4) //todo deplacer dans constraint ca fait jouer prio
     val whereto:BoolVe= imply(e(qf.singleton),choose)
-    /** where = places where flips is still valid after the constraint newFlip<-olcFlip&where
+    /** where = places where flips is still valid after the constraint newFlip<-oldFlip&where
      * defined has a method, in order allow definition prior to intanciation of needed field, such as flip.  */
     override val where: BoolV = inside(neighborsSym(whereto))
   }
-  constrain("growToTwo",'x',sexKeepFlipIf)
+  constrain2("growToTwo",'x',sexKeepFlipIf)
   /** true for neighbors of non singleton*/
   //  val next2NonSingleton = exist(neighborsSym(e(doubletonV | tripletonV)))
-  val next2NonSingleton = exist(neighborsSym(e(qf.nonsingleton)))
+
   /**  cancel growth for non singleton, exept for doubleton, on appex, this needs a tournament*/
-  val leqQuatre: Constr ={
-    new KeepFlipIf(One(false),implique(next2NonSingleton, qf.isApexV),flipOfMove) with Named with BranchNamed {}}
-  constrain("leqQuatre",'q',leqQuatre)
+  val leqQuatre =    KeepFlipIf(One(false),implique(qf.next2NonSingleton, qf.isApexV)) _
+  constrain2("leqQuatre",'q',leqQuatre)
   /** singleton cannot flip */
-  val diseaperSingle = new CancelFlipIf(One(true),qf.singleton,flipOfMove)
-  constrain("diseaperSingle",'s',diseaperSingle)
+  val diseaperSingle = CancelFlipIf(One(true),qf.singleton)_
+  constrain2("diseaperSingle",'s',diseaperSingle)
   /**a doubleton cannot flip both vertices*/
-  val diseaperDouble = new MutKeepFlipIf(One(true),qf.doubleton,flipOfMove) with BranchNamed {}
-  constrain("diseaperDouble",'d',diseaperDouble)
+  val diseaperDouble = MutKeepFlipIf(One(true),qf.doubleton)_
+  constrain2("diseaperDouble",'d',diseaperDouble)
   /** cannot grow from two, to four on both apex */
-  val appearDouble = new MutApexKeepFlipIf(One(false),qf.doubleton,flipOfMove) with Named with BranchNamed {}
-  constrain("appearDouble",'a',appearDouble)
+  val appearDouble = MutApexKeepFlipIf(One(false),qf.doubleton) _
+  constrain2("appearDouble",'a',appearDouble)
   /**  a tripleton cannot flip its three vertices*/
-  val diseaperTriple=new TriKeepFlipIf(One(true),qf.tripleton,flipOfMove) with BranchNamed {}
-  constrain("diseaperTriple",'t',diseaperTriple)
+  val diseaperTriple=TriKeepFlipIf(One(true),qf.tripleton)_
+  constrain2("diseaperTriple",'t',diseaperTriple)
 
   //val extend2side: BoolVe = clock2(transfer(sym(v(doubleton) & rand.randSide)))
 

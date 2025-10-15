@@ -46,8 +46,8 @@ class MuDist(val source: MuStruct[V, B],val bitSize:Int) extends MuStruct [V,SI]
       /** moving to forbidden would create a source in a negative distance
        * that would hence not be able to correctly decrease its distance level */
       val forbidden:BoolV= ASTLfun.isneg(muis.pred)
-      val  slow=new ag.CancelFlipIf(One(false),forbidden, ag.flipOfMove ) // agent should not invade cells where distance is negative
-      ag.constrain("slow",'w',slow)
+      val  slow=ag.CancelFlipIf(One(false),forbidden ) _// agent should not invade cells where distance is negative
+      ag.constrain2("slow",'w',slow)
     case _ =>
   }
 

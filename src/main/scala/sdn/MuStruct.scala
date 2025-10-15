@@ -72,6 +72,10 @@ trait muEmptyBag extends EmptyBag[MuStruct[_ <: Locus, _ <: Ring]]
 
 object MuStruct{
    var allMuStruct:mutable.ArrayDeque[MuStruct[_<:Locus,_<:Ring]]=mutable.ArrayDeque()
+  /** we can display mustruct only after DataProg has been built and names have been given using reflection */
+   def showMustruct=for(m<-allMuStruct)
+     System.out.println(m.toString)
+   //def setFlipofMove()=  for(m<-allMuStruct)   if(m.isInstanceOf[Agent])
 
    //var sortedMuStruct:List[MuStruct[_<:Locus,_<:Ring]]=List()
 
