@@ -10,7 +10,7 @@ import compiler.DataProg.{isRootMainVar, nameDirCompilLoops}
 import compiler.SpatialType.BoolV
 import dataStruc.{Named, Util}
 import dataStruc.Util.{hierarchyDisplayedField, parenthesizedExp, prefixDash}
-import sdn.{LDAG, MovableAg, MovableAgentV, MuStruct, Root4naming}
+import sdn.{LDAG, MovableAg, MovableAgV, MuStruct, Root4naming}
 import simulator.CAloops2
 
 import java.io.File
@@ -197,7 +197,7 @@ object Circuit {
           case ast:BoolV
              => //rootObject.setName("");
             ast  //if we have a single layer CA, by convention it is a boolV, and also  the root Ast
-          case ag:MovableAg[V] with MovableAgentV
+          case ag:MovableAg[V] with MovableAgV
              =>rootObject.setName(""); //evite de se trimballer un "N" partout
             ag.muis //if we have a single agent,  the update of its chi layer is the rootAST, therefore, it has to need  all the other layers.
           case ldag:LDAG =>rootObject.setName("");ldag.particle.asInstanceOf[MuStruct[V,B]].muis

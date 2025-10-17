@@ -3,6 +3,7 @@ package sdn
 import compiler.ASTLfun.andLB2R
 import compiler.SpatialType.{BoolV, UintV, UintVx}
 import compiler.{ASTL, ASTLt, B, Locus, Ring, UI, V, repr}
+import dataStruc.{BranchNamed, Named}
 import sdn.Util.addLt
 
 /**
@@ -19,6 +20,6 @@ class PartialASTL[ R <: Ring](val defined:BoolV, val value:ASTLt[V,R])(implicit 
   def restoreInvariant: ASTLt[V, R] = andLB2R(defined, value)
 }
 
-class PartialUI (override val defined:BoolV, override val value:UintV)extends PartialASTL[UI](defined,value){
+class PartialUI (override val defined:BoolV, override val value:UintV)extends PartialASTL[UI](defined,value) with Named with BranchNamed{
    val valuc:UintVx = if(value.isInstanceOf[UintVx]) value.asInstanceOf[UintVx] else addLt(value)
 }

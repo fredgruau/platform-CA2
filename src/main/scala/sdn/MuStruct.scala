@@ -7,7 +7,7 @@ import compiler.repr.{nomB, nomV}
 import compiler.{AST, ASTBt, ASTL, ASTLfun, ASTLt, B, CallProc, Circuit, Locus, Ring, SI, V, repr}
 import dataStruc.{BranchNamed, DagNode, Named}
 import dataStruc.DagNode.EmptyBag
-import sdn.Agent
+import sdn.AgentF
 import sdn.MuStruct.allMuStruct
 
 import scala.Predef.->
@@ -28,7 +28,8 @@ trait shoow{
   self:hasMuisSysInstr=>
   def buugif(v: AST[_]) = {muis.syysInstr ::= CallProc("bug", List(), List(v))  }
   def shoow(vs: AST[_]*) = {for (v <- vs)   muis.syysInstr ::= CallProc("show", List(), List(v)) }
-  def shoowText(v: AST[_],ls:List[String])={  muis.syysInstr ::= CallProc("show", List(), List(v))
+  def shoowText(v: AST[_],ls:List[String])={
+    muis.syysInstr ::= CallProc("show", List(), List(v))
     Circuit.labelsOfFieldsBeforeName=Circuit.labelsOfFieldsBeforeName + ((v , ls))
   }
 
@@ -65,6 +66,8 @@ val muis: ASTL.Strate[L,R] with ASTLt[L,R] with carrySysInstr
   def locus: Locus =muis.locus//todo, on pourrait calculer cela directement
 }
 
+
+
 trait muEmptyBag extends EmptyBag[MuStruct[_ <: Locus, _ <: Ring]]
 /** Bound agent need not layers */
 //abstract class BoundAg[L<:Locus] extends Agent[L]
@@ -75,7 +78,15 @@ object MuStruct{
   /** we can display mustruct only after DataProg has been built and names have been given using reflection */
    def showMustruct=for(m<-allMuStruct)
      System.out.println(m.toString)
-   //def setFlipofMove()=  for(m<-allMuStruct)   if(m.isInstanceOf[Agent])
+   def setFliprioOfMove()=  for(m<-allMuStruct) m match {
+     case a:AgentF[_]=>  a.setFliprioOfMove()
+     case _ =>
+
+   }
+  def setFlipCanceled()=  for(m<-allMuStruct) m match {
+    case a:AgentF[_]=>      a.setFlipCancel()
+    case _ =>
+  }
 
    //var sortedMuStruct:List[MuStruct[_<:Locus,_<:Ring]]=List()
 

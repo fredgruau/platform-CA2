@@ -63,13 +63,14 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
       /** fields layerName's components */
       val memFields2Init: Seq[Array[Int]] = memFields(layerName) //gets the memory plane
       val initNameFinal = initName.getOrElse(layerName, controller.initName(layerName)) //either it is the root layer or we find it in env
-      val finalInitMethodName: String = if (initNameFinal== "global") controller.globalInitList.selection.item //currently selected init method
+      val finalInitMethodName: String = if (initNameFinal.startsWith(  "global")) controller.globalInitList.selection.item //currently selected init method
       else initNameFinal
+      /** if true, negate the ini */
+      val inverted=initNameFinal.startsWith(  "globalInv")
       val initMethod: Init = medium.initSelect(finalInitMethodName,
         controller.locusOfDisplayedOrDirectInitField(layerName), // locus is passed. It is used in def/center/yaxis
         controller.bitSizeDisplayedOrDirectInitField.getOrElse(layerName, 1),
-        controller.density
-      ) // bitsize  is passed.
+        controller.density ,inverted     ) // bitsize  is passed.
       //if(layerName.startsWith("lldefVe"))     println("lldefVe")
       initMethod.init(memFields2Init.toArray)
 

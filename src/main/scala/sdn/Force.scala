@@ -69,12 +69,12 @@ abstract class Force extends  Named {
   /**
    * @return an agent-centered move   * when applied, the movement produced is already centered on the agents.
    */
-  def actionV(ag:MovableAgentV): MoveC= {assert(false,"force "+name+"undefined on Vagent");null}
+  def actionV(ag:MovableAgV): MoveC= {assert(false,"force "+name+"undefined on Vagent");null}
   //def actionVe(ag:VeAg): MoveC={assert(false,"force "+name+"undefined on Veagent");null}
   /** when applied, the movement produced is already centered on the agents.*/
   def action (ag: MovableAg[_<:Locus]): MoveC=
     ag.locus match {
-    case V() => actionV(ag.asInstanceOf[MovableAgentV])
+    case V() => actionV(ag.asInstanceOf[MovableAgV])
    // case T(V(),E()) => actionVe(ag.asInstanceOf[MovAgVe])
   }
 }
@@ -82,7 +82,7 @@ object Force{
   import MoveC._
   /** produce maximum possible move, rely on priority to obtain random movement */
   val total:Force=new Force(){
-    override def actionV(ag: MovableAgentV): MoveC = MoveC1(ag.muis,ag.bf.brdVe)//extends and empties everywhere possible.
+    override def actionV(ag: MovableAgV): MoveC = MoveC1(ag.muis,ag.bf.brdVe)//extends and empties everywhere possible.
   }
 
   /** we designed a random move that does not break the quasipoint property,

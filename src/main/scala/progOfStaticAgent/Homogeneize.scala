@@ -4,30 +4,39 @@ import compiler.ASTL.{ASTLg, anticlock, clock, delayedL, sym, transfer}
 import compiler.ASTLfun.{cond, e, imply}
 import compiler.SpatialType.{BoolV, BoolVe, BoolVf}
 import compiler.{AST, ASTBfun, ASTLt, B, E, Locus, Ring, SI, T, V, chip}
+import dataStruc.DagNode.EmptyBag
 import dataStruc.{BranchNamed, Named}
 import progOfmacros.Comm.{adjacentBall, insideBall, neighborsSym}
 import progOfmacros.RedT.cac
 import progOfmacros.Wrapper
 import progOfmacros.Wrapper.{border, borderS, exist, existS, inside, insideS, smoothen, smoothen2, testShrink}
-import sdn.MuStruct.showMustruct
+import sdn.MuStruct.{setFlipCanceled, setFliprioOfMove, showMustruct}
 import sdn._
 import sdntool.{addDist, addDistGcenter}
 
 /**illustrate the working of repulsion combined with exploration  */
 class Homogeneize() extends LDAG with Named with BranchNamed
 { val part=new Convergent()
-  //val part=new Homogen()
+  val vor=new Vor(part)//
+  // val part=new Homogen()
+  showMustruct
+  setFliprioOfMove()
+  setFlipCanceled()
+  part.shoow(vor.muis) //triggers evaluation
+  part.shoow(part.muis)
+ vor.showMe
   part.showMe
   part.bf.showMe
   part.b.showMe
-  part.gc.showMe
+  part.bve.showMe
   part.d.showMe; part.dg.showMe
-  part.sf.showMe
-  showMustruct
+ part.sf.showMe
+
 }
 
 /** basic quasiparticle with blob and qpoint constraints */
-class Seed extends  MovableAgentV  with addBloobV with blobConstrain with addQpointFields with QpointConstrain
+class Seed extends MovableAg[V]("global") with MovableAgV  with addBloobV with blobConstrain with addQpointFields with QpointConstrain
+  with EmptyBag[sdn.MuStruct[_<: Locus,_<:Ring]]
 
 /** moves as much as possible */
 class Flies2 extends Seed {
@@ -41,10 +50,8 @@ class Homogen() extends Flies2 with addDist with addGcenter with addDistGcenter
 {  /** homogeneizing priority */
   final val homogeneize=introduceNewPriority()
   force(homogeneize,"repulse",'|',dg.repulse)//specific forces applied to Flies
-  shoowText(dg.muis, List())
-
-  //showMoves
-};
+  shoowText(dg.muis, List()) //showMoves
+}
 
 class Convergent extends Homogen // with Lead //pas besoin de leader pour le moment
 {  val sf=new Attributs() { //sf==stableFields
@@ -69,15 +76,26 @@ class Convergent extends Homogen // with Lead //pas besoin de leader pour le mom
   val stabilize=introduceNewPriority()
   val balance: Force = new Force() {
     import compiler.ASTLfun.fromBool
-    override def actionV(ag: MovableAgentV): MoveC = {
-      /** pure negative move */
-      val yes=MoveC1(false,false)
+    override def actionV(ag: MovableAgV): MoveC = {
+      val yes=MoveC1(false,false) //force is pure negative
       /** if stable2 , this will cancel movement of lower priority, */
-      val no = MoveC1(sf.stable2, e(sf.stable2)& bf.brdVe)
+      val no = MoveC1(sf.stable2, e(sf.stable2)& bf.brdVe) // negative  forces
       MoveC2(yes,no)
     }
   }
-  force(stabilize,"balance",'_',balance)//specific forces applied to Flies
+  force(stabilize,"balance",'_',balance)
+}
+
+
+class Vor(h:Homogen) extends MovableAg[V]("globalInv") with MovableAgV with addBloobV with blobConstrain //with blobConstrTrou
+{
+  override def inputNeighbors=List(h.gc,h.d)
+  /** exploring priority */   val explore=introduceNewPriority()
+  force(explore, "explore",'O', bf.smoothen)
+  val homogeneize=introduceNewPriority()
+  force(homogeneize,"repulse",'|',h.d.repulse)//specific forces applied to Flies
+  shoowText(h.d.muis, List())
+
 
 }
 
@@ -111,7 +129,7 @@ class Leader(source: Seed)extends MuStruct [V,B] {
   import compiler.ASTLfun.fromBool //pour avoir la conversion implicite de boolean vers boolVe
  /** annule le mouvement si stable, donc seul no est défini */
   val balance: Force = new Force() {
-    override def actionV(ag: MovableAgentV): MoveC = {
+    override def actionV(ag: MovableAgV): MoveC = {
       val yes=MoveC1(false,false) //convergent is a pure negative move
       val no = MoveC1(muis, false) //ne va pas empty sur leader, juste pour tester
     MoveC2(yes,no)

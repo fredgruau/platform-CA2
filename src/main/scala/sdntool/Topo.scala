@@ -19,14 +19,14 @@ import dataStruc.{BranchNamed, Named}
 import progOfLayer.Sextexrect.chooseMaxOf
 import progOfStaticAgent.Convergent
 import progOfmacros.Comm.{apexE, apexV, insideBall, neighborsSym, symEv}
-import sdn.MovableAgentV
-import progOfmacros.Topo
+import sdn.MovableAgV
+import progOfmacros.{Topo, Wrapper}
 import progOfmacros.Compute._
-import progOfmacros.Wrapper.{borderS, exist, existS, inside, insideS, not, shrink}
+import progOfmacros.Wrapper.{borderS, exist, existS, inside, insideS, not, shrink, shrink1, shrink2}
 import progOfmacros.RedT.{cac, enlarge, enlargeEF, enlargeFE}
 import progOfmacros.Topo.{brdin, nbcc, nbccV, nbccVe}
 import sdn.Util.addSym
-import sdntool.{ addDist}
+import sdntool.{MuDist, addDist}
 /** contains fields that can be computed for any boolV representing blobs, not just Vagents
  * for exemple, we can us it to grow voronoi, which needs meeting point
  * */
@@ -45,15 +45,23 @@ class BlobVFields(val muis:BoolV with carrySysInstr) extends Attributs {
   val notVe= ~isVe
   /** Ve edges leaving the support , we know we may take a sym so we prepare for it, to get a meaningfull name brdVe.sym*/
   val brdVe=transfer(v(brdE)) & isVe//addSym introduit un delayed et compromet le nommage automatique par reflection. addSym( transfer(v(brdE)) & isVe)
-  override def showMe={ shoow(brdE,brdV,brdVe)   }
+  val brdVeOut=transfer(v(brdE)) & e(~muis)//todo bien possible qu'on puisse travailler juste avec un seul brdVe
+  val smoothen: Force = new Force() {
+    override def actionV(ag: MovableAgV): MoveC = {
+      /** true if >= three consecutive neighbors */
+      val lightConcave=exist(shrink2(brdVeOut))& ~  inside(brdVeOut)
+      val inE:BoolE=insideS(muis)
+      val convex= ~exist(shrink1(transfer(v(inE))))
+      val oui= MoveC1(ag.muis & convex, brdVe & neighborsSym(e(lightConcave)) )
+        oui
+    }
+  }
+  override def showMe={ shoow(brdE,brdV,brdVe,brdVeOut)   }
 }
 /** endows a movableAgentV with the feature needed to a blob stored in a class "f" (shortname) */
-trait addBlobVfields{ self: MovableAgentV =>
+trait addBlobVfields{ self: MovableAgV =>
   val bf=new BlobVFields(muis)
 }
-
-
-
 /** fields common to all blobs properties; */
 abstract class Blob extends Attributs {  val meetV:BoolV; val meetE:BoolE; val nbCc:UintV
   /** allows to picture meeE as vertices */
@@ -78,10 +86,10 @@ class BlobV(val muis:BoolV with carrySysInstr,f:BlobVFields) extends Blob  {
 }
 
 /** endows a movableAgentV with the blob meeting points */
-trait addBloobV{ self: MovableAgentV with addBlobVfields =>val b=new BlobV(muis,bf)}
+trait addBloobV{ self: MovableAgV with addBlobVfields =>val b=new BlobV(muis,bf)}
 /** endows  a  BoolVe COMMING AS THE SLOPELT OF  A DISTANCE with  its  meeting points
  * those meeting points correspond to the gabriel centers.
- * It computes first a borderE, */
+ * It computes first a borderE, muis is passed for the sole pupose of enabling shoow */
 class BlobVe(val muis:BoolV with carrySysInstr,brdE:BoolE, brdVe:BoolVe) extends Blob{
   val nbCc: UintV = nbccVe(brdVe) //nbcc 's computation is refined compared to BlobV, and BlobE
   val vf: BoolVf = cac(ASTBfun.delta, brdVe)/**  true if all neighbors are at equal distance which happen for a PE is encicled by an hexagon of seeds at distance 2, or a the very begining*/
@@ -101,33 +109,37 @@ class BlobVe(val muis:BoolV with carrySysInstr,brdE:BoolE, brdVe:BoolVe) extends
 }
 
 /** endows a distance with BlobVE meeting points */
-trait addBloobVe{ self: MovableAgentV with addBlobVfields with addDist=>val b=new BlobVe(muis,d.voisinDiff,  d.sloplt)}
+//trait addBloobVe{ self: MovableAgV with addBlobVfields with addDist=>val b=new BlobVe(muis,d.voisinDiff,  d.sloplt)}
 /** endows a distance with Gabriel center which are almost the same as BlobVe'
  * gabriel centers can be directly obtain simply by computing Ve-meeting-point  using sloplt
  * we also need brdE
  * */
-trait addGcenter{ self: MovableAgentV with addBlobVfields with addDist=>
-  val gc=new BlobVe(muis,d.voisinDiff,  d.sloplt){
+trait addGcenter{
+  self: MovableAgV with addBlobVfields with addDist=>
+  val bve=new BlobVe(muis,d.voisinDiff,  d.sloplt){
     /**  silly way of avoiding superposition of agents with Gcente
      * we just subtract muis from meet2r,
      * we use a val for testing */
-    override val meetE2: ASTLt[V, B] = super.meetE2 & ~ muis}} //todo verifier que override fonctionne
+    override val meetE2: ASTLt[V, B] = super.meetE2 & ~ muis}
+    val gc= new DetectedAgV(bve.meetE2) with keepInsideForce {
+    override def inputNeighbors = List(d)
 
-
+  }
+} //todo verifier que override fonctionne
+trait blobConstrTrou{
+  self: MovableAgV with addBloobV=>
+  val videPlein= MutKeepFlipIf(Both(),bf.brdE) _ ;  addConstraint("videplein",';',videPlein)}
 trait  blobConstrain   {
-  self: MovableAgentV with addBloobV=>
+  self: MovableAgV with addBloobV=>
   /** meetV points cannot flip */
-  //val vmeet = new CancelFlipIf(Both(),b.meetV,flipOfMove);  constrain("vmeet",'_',vmeet)
-
-  val vmeet2: PartialUI => Constr =  CancelFlipIf(Both(),b.meetV) _
-  constrain2("vmeet",'_',vmeet2)
-
+  val vmeet: PartialUI => Constr =  CancelFlipIf(Both(),b.meetV) _
+  addConstraint("vmeet",'_',vmeet)
   /**a doubleton cannot flip both vertices*/
-  //val emeet = new MutKeepFlipIf(Both(),b.meetE,flipOfMove) with BranchNamed {};  constrain("emeet",'=',emeet)
-  val emeet2 = MutKeepFlipIf(Both(),b.meetE) _ ;  constrain2("emeet",'=',emeet2);}
+  val emeet = MutKeepFlipIf(Both(),b.meetE) _ ;  addConstraint("emeet",'=',emeet);}
 /** field needed to compute the constraints of  a quasipoint, and possibly elsewehere */
+
 trait addQpointFields {
-  self: MovableAgentV with addBlobVfields => //MovableAgentV with addBlobVfields =>
+  self: MovableAgV with addBlobVfields => //MovableAgentV with addBlobVfields =>
   /** allows to refere to the englobing class from the body of the anonymous attribute */
   private val selfRef = this
   /** on utilise une classe anonyme pour stoquer les fields utiliser pour réaliser un quasipoints */
@@ -158,7 +170,7 @@ trait addQpointFields {
  * nb: constraints must be expressed as function of prio, and flip
  * since we do not know those at the time of constraint creation. */
 trait  QpointConstrain extends addQpointFields  with rando{
-  self: MovableAgentV => //a quasi point  is allways a movableAgentV
+  self: MovableAgV => //a quasi point  is allways a movableAgentV
 
   /**
    *
@@ -182,25 +194,25 @@ trait  QpointConstrain extends addQpointFields  with rando{
      * defined has a method, in order allow definition prior to intanciation of needed field, such as flip.  */
     override val where: BoolV = inside(neighborsSym(whereto))
   }
-  constrain2("growToTwo",'x',sexKeepFlipIf)
+  addConstraint("growToTwo",'x',sexKeepFlipIf)
   /** true for neighbors of non singleton*/
   //  val next2NonSingleton = exist(neighborsSym(e(doubletonV | tripletonV)))
 
   /**  cancel growth for non singleton, exept for doubleton, on appex, this needs a tournament*/
   val leqQuatre =    KeepFlipIf(One(false),implique(qf.next2NonSingleton, qf.isApexV)) _
-  constrain2("leqQuatre",'q',leqQuatre)
+  addConstraint("leqQuatre",'q',leqQuatre)
   /** singleton cannot flip */
   val diseaperSingle = CancelFlipIf(One(true),qf.singleton)_
-  constrain2("diseaperSingle",'s',diseaperSingle)
+  addConstraint("diseaperSingle",'s',diseaperSingle)
   /**a doubleton cannot flip both vertices*/
   val diseaperDouble = MutKeepFlipIf(One(true),qf.doubleton)_
-  constrain2("diseaperDouble",'d',diseaperDouble)
+  addConstraint("diseaperDouble",'d',diseaperDouble)
   /** cannot grow from two, to four on both apex */
   val appearDouble = MutApexKeepFlipIf(One(false),qf.doubleton) _
-  constrain2("appearDouble",'a',appearDouble)
+  addConstraint("appearDouble",'a',appearDouble)
   /**  a tripleton cannot flip its three vertices*/
   val diseaperTriple=TriKeepFlipIf(One(true),qf.tripleton)_
-  constrain2("diseaperTriple",'t',diseaperTriple)
+  addConstraint("diseaperTriple",'t',diseaperTriple)
 
   //val extend2side: BoolVe = clock2(transfer(sym(v(doubleton) & rand.randSide)))
 

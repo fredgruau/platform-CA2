@@ -1,17 +1,18 @@
 package sdn
 
+import compiler.AST.Layer
 import compiler.ASTB.{False, Uint}
 import compiler.ASTBfun.{addRedop, derivative, ltUI2, orRedop, redop}
 import compiler.ASTL.{delayedL, send, transfer, unop}
-import compiler.ASTLfun.{allOne, andLB2R, b2SIL, e, eq0, f, imply, lt2, ltSI, neq, orScanRight, reduce, uI2SIL, v}
+import compiler.ASTLfun.{allOne, andLB2R, b2SIL, e, eq0, f, fromBool, imply, lt2, ltSI, neighbors, neq, orScanRight, reduce, uI2SIL, v}
 import compiler.SpatialType.{BoolE, BoolEv, BoolF, BoolV, BoolVe, BoolVf, IntE, IntEv, IntV, IntVe, UintV, UintVx}
 import compiler.repr.nomE
-import compiler.{ASTLfun, ASTLt, B, E, F, Locus, SI, T, UI, V, chip}
+import compiler.{AST, ASTLfun, ASTLt, B, E, F, Locus, SI, T, UI, V, chip, repr}
 import dataStruc.{BranchNamed, Named}
 import progOfCA._
 import progOfLayer.Sextexrect.chooseMaxOf
 import progOfmacros.Comm.{apexE, apexV, neighborsSym}
-import progOfmacros.{Compute, Grad}
+import progOfmacros.{Compute, Grad, Wrapper}
 import progOfmacros.Compute.implique
 import progOfmacros.Wrapper.{exist, inside, insideS, not, unary2Bin}
 import sdn.Globals.root4naming
@@ -43,58 +44,92 @@ val isV: BoolV
 /** can be defined on agent, delayed is needed because  isV is not known yet */
 val NotIsV :BoolV= ~(delayedL(isV))
 }
-
-
 /**
- * agents are boolean muStruct
- * @tparam L  locus of the agent's support, we can have Vagent L=V, Ve AgentsL=Ve, ....
- * For the moment we consider that all agents extend hasIsv, it may be the case that E-agents, do not.
- */
-abstract class Agent[L <: Locus] extends MuStruct[L, B] with HasIsV
+* agents are boolean muStruct udated using force
+  * * @tparam L  locus of the agent's support, we can have Vagent L=V, Ve AgentsL=Ve, ....
+* For the moment we consider that all agents extend hasIsv, it may be the case that E-agents, do not.
+  */
+abstract class Agent[L <: Locus] extends MuStruct[L, B] with HasIsV {
+  /** also used by DetectedAg */
+  var flipAfterLocalConstr: BoolV=null
+  var flipRandomlyCanceled: BoolV=null
+  /**  */
+}
+
+trait keepInsideForce {
+  self : Agent[V]=>
+  val nouveau=muis.munext & ~muis.pred
+
+  /** if there is an ag present next to nouveau , it will be pushed to fill the nouveau
+   * noneed to empty whatever, so empty remains false.  */
+  def keepInside:Force=  new Force() {
+    override def actionV(ag: MovableAgV): MoveC = {
+      /** the surrounding agent does not yet contain nouveau */
+      val nouveauToFill = nouveau & ~ag.muis
+      /** if not null will create a push */
+      val push=neighbors(nouveauToFill) & e(ag.muis)
+      val coveredByPush=exist(neighborsSym(push))
+      /** should be true everywhere */
+      val nouveauIsFilled=imply(coveredByPush,nouveauToFill)
+      val oui = MoveC1(fromBool(false), push)
+    oui
+    }
+  }
+}
+
+
+
+
+
+/** detected Agents directly compute their next state using a field called "detected"
+ * they are not really agent because they do not undergo forces.
+ * we can compute deflipSimult, also for those agents, in order to check that no deflip will apply*/
+abstract class DetectedAgV ( val detected: BoolV )  extends Agent[V] {
+  /** support of agent, implemented as a layer. we also use it to store a list  of system instructions */
+  override val muis=new Layer[(V, B)](1, "global") with ASTLt[V,B]  with Stratify [V,B] with carrySysInstr   {
+    override val  next = detected  }
+  override val isV: BoolV = muis
+  //artificially reconstructed
+   flipAfterLocalConstr=muis ^ muis.next
+}
+
+//class Gcenter(arg: ) extends DetectedAgV
+
+
+/**  agentsF are Agents  udated using force */
+abstract class AgentF[L <: Locus] extends Agent[L]
  {
 
 /** the agent's list of consrtrain. Constraints have a name, and the list is also ordered */
-   //val constrs= new scala.collection.mutable.LinkedHashMap[String,Constr]()
-   /** the agent's list of consrtrain, but before we know flip */
-   val constrs2= new scala.collection.mutable.LinkedHashMap[String,PartialUI =>Constr]()
-   def codeConstraint: Iterable[String] =constrs2.keys.toList.map(_.charAt(0).toString)
+   val constrs= new scala.collection.mutable.LinkedHashMap[String,PartialUI =>Constr]()
+   /** stores the first letter of each constraint's name. This lettre is to be displayed on vertice where constraint is active
+    * there can be several active constraints*/
+   def codeConstraint: Iterable[String] =constrs.keys.toList.map(_.charAt(0).toString)
    /** shows a letter corresponding to the constraint, for all constraint which effectively contribute in reducing flip */
-   def showConstraint={ shoowText(allFlipCancel,codeConstraint.toList);
-     //shoow(tataaaa)
-   }
-   def codeMove:Iterable[String] = {
-     assert(moves.size>1,"faut au moins deux move, sinon pb entier codé par un bool")
-     moves.map(_.keys.head.charAt(0).toString)
-   }
+   def showConstraint={ shoowText(allFlipCancel,codeConstraint.toList);  }
 
+   /** stores the first letter of each move's name for all priorities, This lettre is to be displayed if move is selected
+    * there can be at  most  one positive move selected
+    * if move is blocking nothing get displayed, and  isquiscent will be true */
+   def codeMove:Iterable[String] = { assert(moves.size>1,"faut au moins deux move, sinon pb entier codé par un bool")
+     moves.map(_.keys.head.charAt(0).toString) }
 
-   /** will not show move that block movement instead of trigering it */
-   def showPositiveMoves={ shoowText(yesHighestTriggered,codeMove.toList)}
-   /** shows also blocking moves */
-   def showMoves={ shoowText(highestTriggered,codeMove.toList)}
-   def showFlip=shoow(flipOfMove, flipAfterLocalConstr)
+   /** will show only move that trigger movement. Move that "block" movement are hidden,  */
+   def showPositiveMoves={  shoowText(yesHighestTriggered,codeMove.toList)}
+   // /** shows also  moves that block movement */
+  // def showMoves={ shoowText(highestTriggered,codeMove.toList)}
+   def showFlip=shoow(fliprioOfMove.defined, isQuiescent, flipAfterLocalConstr)
  /** test que les var s'affiche bien */
-  // var muuis:BoolV=   ~ (~ delayedL( isV))
-   def showMe={
-
-     shoow(muis);showPositiveMoves;showConstraint;showFlip;
-     showPrio
-   }
+   def showMe={showPositiveMoves;showConstraint;showFlip;}
    /**
     * @param name more explicit name
     * @param shortName used for display in CApannel
-    * @param c constraint
+    * @param c constraint to be added to the list of agent's constraint
+    *          it is a function because at the time of adding the constraint, prio and flip are no known yet
     */
- /*def constrain(name:String, shortName:Char, c: Constr) = {
-   if(constrs.contains(shortName+name))
-     throw new Exception("une contrainte du nom "+name+" exite déja, changez le nom siou plait")
-   constrs(shortName+name)=c
- }*/
-   def constrain2(name:String, shortName:Char, c: PartialUI=>Constr) = {
-   if(constrs2.contains(shortName+name))
-     throw new Exception("une contrainte du nom "+name+" exite déja, changez le nom siou plait")
-   constrs2(shortName+name)=c
- }
+   def addConstraint(name:String, shortName:Char, c: PartialUI=>Constr) = {
+   if(constrs.contains(shortName+name))    throw new Exception("une contrainte du nom "+name+" exite déja, changez le nom siou plait")
+   constrs(shortName+name)=c  }
    /** moves are stored in centered form, so that we can restrict them we store one hashmap for each priority. It two moves with identical names are added, we'd have to merge those */
    val moves:ArrayBuffer[mutable.LinkedHashMap[String,MoveC]] = ArrayBuffer() //empty at the beginning
    /** we introdued a new priority use to qualify a new range of move, creating a new functionnality such  as explore, homogeneize, stabilize*/
@@ -108,108 +143,85 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B] with HasIsV
    /** not the same for  movable/bound  */
    def allTriggered:UintV;
    def allTriggeredYes:UintV
-   /** does a computation to be repeated specifically for yes moves */
-   def processMoves(all:UintV):(UintV,UintV,UintV)={
-     /** bouche les trouvs avec un orscanrigh */
-     val filled=orScanRight(all)
-     (filled,unop(derivative, filled),unary2Bin(filled))
-   }
-
-   /**  */
-   def setFlipOfMove()={}
-
-   val (filledTriggered,/** all false except for highest priority move*/highestTriggered,
-   prioDet)=processMoves(delayedL(allTriggered))
-   /** selectionne le flip parmis les flip des mouvement proposés */
-   val flipOfMove=neq(highestTriggered&delayedL(allFlip))
-
-   /** makes a global logical or, of boolean which are true for C2moves,
-    *  if false then there will not be negative move
-    *  and */
-   lazy val presentOfC2moves=moves.map(_.values.map(
-     {
-       case a:MoveC2=>
-         true
-     case a:MoveC1=>
-       false}
-   ).reduce( _ | _)).reduce( _| _)
-
-
-   /** on le fait aussi pour les "yes" move */
-   val (yesFilledTriggered,yesHighestTriggered,yesPrioDet)=
-     if(false/*presentOfC2moves*/)(filledTriggered,highestTriggered, prioDet)
-     else processMoves(delayedL(allTriggeredYes))
    /** flips for all priorities */
    def allFlip:UintV
-
-   /** selected positive move has lower priority than selected move, implies quiescence */
-   val isQuiescent:BoolV =lt2(yesPrioDet,prioDet)
-   /** flip real takes into account negative moves by maintaining flip only for non quiescent vertice */
-   val flipReal=flipOfMove & ~isQuiescent
+  //variable defined when computing fliprioOfMove
+   var isQuiescent:BoolV=null
+   var yesHighestTriggered:UintV=null
    /**  adds a bit of randomnes to forces's priority
     * allows to  breaking  symetry in case of tournament with equal force's priority */
    val prioRand:UintV
-    val prio: UintVx =addLt(prioRand::prioDet)
-   def showPrio={shoowText(prioRand,List()); shoowText(prio,List())}
+   var fliprioOfMove:PartialUI=null
+   /**  */
+   def setFliprioOfMove() = {
+     /** does a computation to be repeated specifically for yes moves */
+     def processMoves(all:UintV):(UintV,UintV,UintV)={
+       /** bouche les trous avec un orscanrigh */
+       val filled=orScanRight(all)
+       (filled,unop(derivative, filled),unary2Bin(filled))
+     }
+     val (filledTriggered,/** all false except for highest priority move */ highestTriggered, prioDet) =
+       processMoves(allTriggered)
+     /** selectionne le flip parmis les flip des mouvement proposés */
+     val flipOfMove = neq(highestTriggered & allFlip)
 
-   val prioYes: UintVx =addLt(prioRand::yesPrioDet)
-   /** nullify prio if vertice is quiescent we are interested only in high prio only if move is generated
-    * this priority is the one to be used when evaluationg local constraints*/
-   val prioYesNotQuiescent=addLt(andLB2R(~ isQuiescent, prioYes))
+     /** on le fait aussi pour les "yes" move */
+     val (yesFilledTriggered, yHT, yesPrioDet) = {
+       /** makes a global logical or, of boolean which are true for C2moves,
+        * if false then there will not be negative move
+        * and yesFilledtriggered is equal to fill triggered, thereby simplifying the computation*/
+       val presenceOfC2moves = moves.map(_.values.map({case a: MoveC2 =>true  case a: MoveC1 =>  false} ).reduce(_ | _)).reduce(_ | _)
+       if (!presenceOfC2moves ) (filledTriggered, highestTriggered, prioDet)
+       else processMoves(allTriggeredYes)
+     }
+     yesHighestTriggered = yHT //used for printable purpose
+     /** selected positive move has lower priority than selected move, implies quiescence */
+     isQuiescent = lt2(yesPrioDet, prioDet)
+     val prioYes: UintV = prioRand :: yesPrioDet
+     /** nullify prio if vertice is quiescent we are interested only in high prio only if move is generated
+      * this priority is the one to be used when evaluationg local constraints */
+     val prioYesNotQuiescent = addLt(andLB2R(~isQuiescent, prioYes))
+     fliprioOfMove=new PartialUI(flipOfMove, prioYesNotQuiescent)
+   }
+  //setFliprioOfMove() //this is now done separately
 
    /** PEs where movements trigger changes in Agent's support. Either by filling, or by emptying
     flip is eith computed from the move for movableAgent, or  computed from the parent for bounded agent
     registers where the constraints had a canceling effect*/
    val flipCancel=  new scala.collection.mutable.LinkedHashMap[String,BoolV]() with Named {}
+   val highproba= root4naming.addRandBit().asInstanceOf[BoolV]| root4naming.addRandBit().asInstanceOf[BoolV]
 
    /** applies all the constraints on the move */
-   val  allFlipCancel: ASTLt[V, UI] ={
+   var  allFlipCancel: UintV = null
      /** computes an IntVUI  whose individual bits are cancel Flips  */
      def allFlipCancel(fliprio: PartialUI): UintV = {
-       //ancien a virer bientot
-   /*    for ((name, c) <- constrs) {
-         flipCancel(name) = ~c.where & flip //where also takes into account flipOfMove
-       }*/
-       for ((name, c) <- constrs2)
-         flipCancel(name) = ~c(fliprio).where & fliprio.defined //where also takes into account flipOfMove
+       for ((name, c) <- constrs)   flipCancel(name) = ~c(fliprio).where & fliprio.defined //where also takes into account flipOfMove
        val allFlipCancel: Array[UintV] = flipCancel.values.toArray.map(_.asInstanceOf[UintV])
        allFlipCancel.reduce(_ :: _)
      }
-     //delayedL( allFlipCancel(flipOfMove))
-     delayedL( allFlipCancel(new PartialUI(flipReal,prioYesNotQuiescent )))
-   }
-   // val f:BoolV=False()
+
+   def setFlipCancel()= {
+     allFlipCancel=allFlipCancel(fliprioOfMove)
      val noFlipCancel=eq0(allFlipCancel)
-     val flipAfterLocalConstr: BoolV = noFlipCancel  & flipOfMove
-     val highproba= root4naming.addRandBit().asInstanceOf[BoolV]| root4naming.addRandBit().asInstanceOf[BoolV]
-     val flipRandomlyCanceled=flipAfterLocalConstr //& highproba //decommenter pour annuler au hasard, utilise pour casser les cycles
-
-
-
+     flipAfterLocalConstr = noFlipCancel  & fliprioOfMove.defined
+     flipRandomlyCanceled=flipAfterLocalConstr //& highproba //decommenter pour annuler au hasard, utilise pour casser les cycles
+   }
+   //setFlipCancel() //this is now done one Mustruct
   /** applying constraints identifies PEs where flip should be canceled, cancelFlip will implement this cancelation */
-
-/////////////we now describe class for easily adding constraint, they are subclass of agents, in order to use the agent's field isV, NisV, and more.
-
-   /**
-    *
-    * @param ags one or two agents on which to apply constraint
+///we now describe class for easily adding constraint, they are subclass of agents, in order to use the agent's field isV,
+   // NisV, and more. They used an object to defined an apply method allowing to curify the function , because fliprio is not available yet
+   /** @param ags one or two agents on which to apply constraint
     *            Constr is an inner classes of agents, so that it can access its main agent's field such as prio.
     */
-
-   abstract class Constr(val ags: Array[Agent[_ <: Locus]], val impact: Impact, fliprio:PartialUI) {
+   abstract class Constr(val ags: Array[AgentF[_ <: Locus]], val impact: Impact, fliprio:PartialUI) {
      /** where = places where flips is still valid after the constraint newFlip<-olcFlip&where
       * defined has a method, in order allow definition prior to intanciation of needed field, such as flip.*/
      val where: BoolV //will use fields from the agent: flip, as well as this
    }
-
-
-
-   class KeepFlipIf(i: Impact,val loc:BoolV,fliprio:PartialUI) extends Constr(Array(this), i,fliprio)
-   { override val where: BoolV = impact match {
+   class KeepFlipIf(i: Impact,val loc:BoolV,fliprio:PartialUI) extends Constr(Array(this), i,fliprio) { override val where: BoolV =
+     impact match {
      case Both() => loc    case One(v) =>  implique (if (v) isV else (NotIsV),loc)   }   }
     object KeepFlipIf{def apply(i: Impact, l:BoolV)(fliprio:PartialUI): KeepFlipIf = new KeepFlipIf(i,l,fliprio)}
-
-
    class CancelFlipIf(i: Impact, l:BoolV,fliprio:PartialUI) extends KeepFlipIf(i,~l,fliprio)
    object CancelFlipIf{def apply(i: Impact, l:BoolV)(fliprio:PartialUI): CancelFlipIf = new CancelFlipIf(i,l,fliprio)   }
    /**
@@ -256,13 +268,11 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B] with HasIsV
        case One(v) =>  insideS(fliprio.defined& (if (v) isV else (NotIsV))) // result also depend on impact
      })
      /** flip is ok if prio is minimum with respect to the other side */
-     def tmp: BoolVf =imply(transfer(v(tritrig)),ags.head.prio.gt3)
+     def tmp: BoolVf =imply(transfer(v(tritrig)),fliprio.valuc.gt3)
      /** flip is preserved if no neighbor edge present a problem */
      val where=inside(tmp)
    }
 object TriKeepFlipIf{def apply(i: Impact, tritex: BoolF)(fliprio:PartialUI): TriKeepFlipIf =
   new TriKeepFlipIf(i,tritex,fliprio) }
-
-
 
  }

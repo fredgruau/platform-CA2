@@ -6,13 +6,13 @@ import compiler.ASTBfun.{addRedop, derivative, orRedop, redop, unaryToBinary2}
 import compiler.ASTLfun.{cond, e, ltSI, neighbors, neq, orR, orScanRight, reduce, uI2SIL, v}
 import compiler.ASTL.{delayedL, send, transfer, unop}
 import compiler.SpatialType.{BoolE, BoolEv, BoolV, BoolVe, IntE, IntEv, IntV, IntVe, UintV, UintVx}
-import compiler.{AST, ASTLfun, ASTLt, B, E, Locus, Ring, SI, T, UI, V, repr}
+import compiler.{AST, ASTL, ASTLfun, ASTLt, B, E, Locus, Ring, SI, T, UI, V, repr}
 import compiler.repr.nomV
 import dataStruc.BranchNamed
 import dataStruc.DagNode.EmptyBag
 import progOfmacros.Comm.neighborsSym
 import progOfmacros.Wrapper.{borderS, exist, existS, unary2Bin, xorBin}
-import sdn.{Agent, Compar, carrySysInstr}
+import sdn.{AgentF, Compar, carrySysInstr}
 import sdn.Util.{addLt, addSym, randUintV}
 import sdntool.addDist
 
@@ -29,7 +29,7 @@ trait vef[L<:Locus]{
 /** contains fields of  Vagent.  not used right now,
  * since we store all of them in blob fields an qpoint fields */
 trait UtilVagent extends BranchNamed{
-  self:MovableAgentV=>
+  self:MovableAgV=>
   //lazy   val brdE:BoolE=borderS(isV) //push everywhere possible.
   //val laateBrdE:BoolE=delayedL(brdE)
   //val    newbrdV:BoolV=existS(laateBrdE)
@@ -39,23 +39,19 @@ trait UtilVagent extends BranchNamed{
 
 
 /** defines the methods in vef[V], adds UtilVagent, which mixin some further usefull field*/
-trait MovableAgentV extends MovableAg[V] with vef[V] with UtilVagent with addBlobVfields{
+trait MovableAgV extends MovableAg[V] with vef[V] with UtilVagent with addBlobVfields{
   self:MovableAg[V] =>
-  /**
-   * adds feature of blob to muis   */
-//  override val muis=new Layer[(V, B)](1, "global") with ASTLt[V,B]  with Stratify [V,B] with carrySysInstr with featureOfBlob  {
- //   override val  next: AST[(V, B)] = flip2next   }
-
   override val isV: BoolV = muis
   //override val NisV=  ~isV
-  override def flip2next=  delayedL( xorBin(flipRandomlyCanceled,muis) )//delayed is necessary in order to get the very last update of flip
-
+  override def flip2next=  flipRandomlyCanceled ^muis//delayedL(xorBin(flipRandomlyCanceled,muis) )//delayed is necessary in order to get the very last update of flip
 }
+
+
 
 /**  code  common to Movable agents which stores a support
  * and can directly apply the move on this support in order to modify it */
-abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] with vef[L]
-  with EmptyBag[sdn.MuStruct[_<: Locus,_<:Ring]]  {
+abstract  class MovableAg[L <: Locus](init:String)(implicit m: repr[L]) extends  AgentF[L] with vef[L]
+  {
 
   override def allTriggered:UintV={
     moves.map(_.values.map(_.triggered).reduce(_ | _).asInstanceOf[UintV]).toList.reduce(_ :: _)
@@ -94,8 +90,8 @@ abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] wit
   } //sans "asInstance" il gueule non compatibilité de override entre addLt e UintVx
 
   /** Movable Agent's support. It is memorized in a layer a movable agent is a mustruct, so it is  called muis. */
-  override val muis=new Layer[(L, B)](1, "global") with ASTLt[L,B]  with Stratify [L,B] with carrySysInstr   {
-    override val  next: AST[(L, B)] = flip2next.asInstanceOf[ASTLt[L,B]]   }
+  override val muis=new Layer[(L, B)](1, init) with ASTLt[L,B]  with Stratify [L,B] with carrySysInstr   {
+    override val  next: AST[(L, B)] = delayedL(flip2next.asInstanceOf[ASTLt[L,B]])   }
   /** les moves des movable viennent directement d'une force, et ceux des bounded ? faut voir, si ca se trouve aussi. */
   def force(priority:Int, name:String,shortName:Char, force: Force) = {
     addMoves(priority, name, shortName, force.action(this))
@@ -114,13 +110,4 @@ abstract  class MovableAg[L <: Locus](implicit m: repr[L]) extends  Agent[L] wit
   //  override def cancelFlip(where: BoolV): Unit = {  flip = flip & where  }
 }
 
-/** support location is computed from parent's support (input neighbors of the DAG */
-abstract class BoundAg[L <: Locus](implicit m: repr[L]) extends  Agent[L]{
-  /** describes how to computes flip from parents */
-  val inheritedFlip:BoolV
-  /** initial flip is computed from the parent */
-  override def allTriggered:UintV=null;
-  override def allTriggeredYes:UintV=null
- // override def flipAndPrioCreatedByMoves: (UintVx,BoolV,UintV) = (null,inheritedFlip,null)
-}
 

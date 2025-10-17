@@ -28,13 +28,13 @@ trait InitSelect {
    * @return an  "Init" which can initialize a layer, because of lazy, this init is created once and then reused
    *         this is the only public method provided by the initSelect trait,
    */
-  def initSelect(initMethodName: String, l: Locus, nbit: Int,density:Int): Init = {
+  def initSelect(initMethodName: String, l: Locus, nbit: Int,density:Int, inverted:Boolean): Init = {
     initMethodName match {
       case "0" => zeroInit
       case "true" => unInit
       case "center" => centerInit
       case "blackHole" =>
-        blackHoleInit(density)
+        blackHoleInit(density,inverted)
       case "debug" => zeroInit
       case "sparse" => sparseInitInside(l, nbit)
       case "randinside" => randInitInside(l, nbit)
@@ -171,6 +171,8 @@ trait InitSelect {
 
     def setBoolVField(i: Int, j: Int): Unit =
       boolVField(i)(j) = true
+    def flipBoolVField(i: Int, j: Int): Unit =
+      boolVField(i)(j) = !boolVField(i)(j)
   }
 
   /** initalize all the scalar component of a locus in the same way */
@@ -240,25 +242,14 @@ trait InitSelect {
    * @param density nombre de point crées
    * @return creates a blackhole, i.e a rectangle of nearby points
    */
-  private def blackHoleInit(density:Int): InitMaald = new InitMaald(1) {
+  private def blackHoleInit(density:Int,inverted:Boolean): InitMaald = new InitMaald(1) {
     val upperleft=new Vector2D(2, 2)
     val deltaY=3//nbCol/3 -4
     val deltaX=3// nbLine/3 -4
     /** nombre de point par ligne */
     val numColUsable=(nbCol-3)/3  //faudra faire fois 3  + 3
     val numLineUsable=(nbLine-3)/3  //faudra faire fois 3  +3
-
-/*
-    var nbPointPerLine:Int=Math.ceil(Math.sqrt(density)).toInt
-    var nbPointPerCol:Int=Math.ceil( density/nbPointPerLine.toDouble).toInt
-    if(3+3*nbPointPerCol>nbLine){
-      nbPointPerCol=(nbLine-3)/3   //le max possible
-      nbPointPerLine  = density/nbPointPerCol
-      if(3+3*nbPointPerLine>nbCol)
-        nbPointPerLine=(nbCol-3)/3 //le max possible
-    }*/
-
-    var k=0
+   var k=0
     var maxSquareSize=Math.min(numColUsable,numLineUsable)
     while (maxSquareSize*maxSquareSize>density)
     {maxSquareSize-=1}
@@ -274,5 +265,11 @@ trait InitSelect {
           setBoolVField(upperleft.add(new Vector2D(i * deltaX, j * deltaY)))
         k=k+1
       }
+    if (inverted)
+      for(i<-0 until nbLine)
+        for(j<-0 until  nbCol)
+          flipBoolVField(i,j)
+
   }
+
 }

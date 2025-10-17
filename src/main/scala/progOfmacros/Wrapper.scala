@@ -119,6 +119,7 @@ object Wrapper {
 
 
   /** shrinks two times, boolVe to boolVe */
+  def shrink1(arg:BoolVe):BoolVf=shrink[V,E,F,B](arg)
   def shrink2(arg:BoolVe):BoolVe=shrink[V,F,E,B](shrink[V,E,F,B](arg))
   def shrink3(arg:BoolVe):BoolVf= shrink[V,E,F,B](shrink2(arg))
 

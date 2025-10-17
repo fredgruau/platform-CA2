@@ -268,7 +268,7 @@ public class Util {
      * @param src uniform 1
      * @param dest
      */
-    public static void broadcaast1(int rapport, int[] src, int[][] dest) {
+    public static void broadcaast(int rapport, int[] src, int[][] dest) {
         assert (dest.length==rapport);
         for (int i = 0; i < rapport; i++)
             copy(src, dest[i]);
