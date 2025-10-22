@@ -123,7 +123,7 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
     //computeVoronoirInt32() // for the initial painting
     repaint() //  cannot be called now, because the associated pannel has not been created yet.
     if (controller.isPlaying) //lauch the threads
-      play()
+      play(true)
   }
 
   /**
@@ -200,14 +200,14 @@ class Env(arch: String, nbLine: Int, nbCol: Int, val controller: Controller, ini
 
 
   /** contains a thread which iterates the CA, while not asked to pause */
-  def play(): Unit = {
+  def play(fwd:Boolean): Unit = {
     val thread = new Thread {
       override def run(): Unit = {
         while (controller.isPlaying) //no pause asked by the user, no bugs detected
         { var nbIter = 0;
           val nbLoops=math.pow(2,controller.speedSlider.value)
-          while (controller.isPlaying && nbIter < nbLoops )
-          {forward();
+          while (controller.isPlaying && nbIter < nbLoops ) // display every 2^speedSlider.value
+          {if(fwd) forward() else backward(1);
             nbIter+=1
             if (bugs.size > 0)
               controller.isPlaying = false;

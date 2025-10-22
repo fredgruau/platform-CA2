@@ -202,7 +202,8 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
   val BackwardButton = new SimpleButton(backwardIcon) //myButton(forwardIcon, this)
   val FastForwardButton = new SimpleButton(fastForwardIcon) //myButton(forwardIcon, this)
   val FastBackwardButton = new SimpleButton(fastBackwardIcon) //myButton(forwardIcon, this)
-   val PlayPauseButton = new SimpleButton(if (isPlaying) pauseNormalIcon  else playNormalIcon)
+  val PlayPauseButton = new SimpleButton(if (isPlaying) pauseNormalIcon  else playNormalIcon)
+  val PlayReverseButton = new SimpleButton(playReverseIcon)
   val ShowCrossButton = new SimpleButton(closeBoxIcon)
 
 
@@ -338,7 +339,12 @@ class Controller(val nameCA: String, var globalInit: Node, val globalInitName: S
      isPlaying = !isPlaying
      togglePlayPauseIcon()
      if (isPlaying)
-       playEnv() //lauch the threads
+       playEnv(true) //lauch the threads
+    case ButtonClicked(PlayReverseButton) =>//| KeyReleased(_, Key.Space, _, _) =>
+      isPlaying = !isPlaying
+      //togglePlayPauseIcon()
+      if (isPlaying)
+        playEnv(false) //lauch the threads
    case ButtonClicked(ForwardButton)=> //| KeyReleased(_, Key.Right, _, _)
      forwardEnv()
      repaintEnv()
@@ -397,9 +403,13 @@ case SelectionChanged(`globalInitList`) =>
      env.repaint()
  }
 
- private def playEnv(): Unit =
+  /**
+   *
+   * @param fwd plays forward if true, else backward
+   */
+ private def playEnv(fwd:Boolean): Unit =
    for (env <- envList)
-     env.play()
+     env.play(fwd)
 
 
  //2^speedSlider.value

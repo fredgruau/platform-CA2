@@ -4,9 +4,8 @@
     <display nbCol="2" CAwidth="820" CAheight="780" iter="CAsize"/>
     <simul darkness="45" density="12" randomRoot="8" isPlaying="false"/>
     <sizes>
+        <size nbLine="20" nbCol="30" t0="0"/>
         <size nbLine="12" nbCol="14" t0="0"/>
         <size nbLine="6" nbCol="8" t0="0"/>
-        <size nbLine="20" nbCol="30" t0="0"/>
     </sizes>
-
 </fixed>

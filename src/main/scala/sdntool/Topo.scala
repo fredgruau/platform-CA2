@@ -22,9 +22,10 @@ import progOfmacros.Comm.{apexE, apexV, insideBall, neighborsSym, symEv}
 import sdn.MovableAgV
 import progOfmacros.{Topo, Wrapper}
 import progOfmacros.Compute._
-import progOfmacros.Wrapper.{borderS, exist, existS, inside, insideS, not, shrink, shrink1, shrink2}
+import progOfmacros.Wrapper.{borderS, exist, existS, inside, insideS, not, shrink, shrink1, shrink2, shrink3}
 import progOfmacros.RedT.{cac, enlarge, enlargeEF, enlargeFE}
 import progOfmacros.Topo.{brdin, nbcc, nbccV, nbccVe}
+import sdn.Globals.root4naming
 import sdn.Util.addSym
 import sdntool.{MuDist, addDist}
 /** contains fields that can be computed for any boolV representing blobs, not just Vagents
@@ -42,21 +43,28 @@ class BlobVFields(val muis:BoolV with carrySysInstr) extends Attributs {
   /** true on vertices next to the border of the blob */
   val  brdV:BoolV=existS(brdE)
   val isVe:BoolVe=e(muis)
+  /** true if there is filled vertice toward each of the 6 directions */
+  val qqnEnFace:BoolVe=neighborsSym(isVe)
   val notVe= ~isVe
   /** Ve edges leaving the support , we know we may take a sym so we prepare for it, to get a meaningfull name brdVe.sym*/
-  val brdVe=transfer(v(brdE)) & isVe//addSym introduit un delayed et compromet le nommage automatique par reflection. addSym( transfer(v(brdE)) & isVe)
+  val brdVeIn=transfer(v(brdE)) & isVe//addSym introduit un delayed et compromet le nommage automatique par reflection. addSym( transfer(v(brdE)) & isVe)
   val brdVeOut=transfer(v(brdE)) & e(~muis)//todo bien possible qu'on puisse travailler juste avec un seul brdVe
+  val rand= root4naming.addRandBit().asInstanceOf[BoolV]
+  val lightConcave=( exist(shrink3(brdVeOut)) | (exist(shrink2(brdVeOut)) & rand) ) & ~  inside(brdVeOut)
+
   val smoothen: Force = new Force() {
     override def actionV(ag: MovableAgV): MoveC = {
-      /** true if >= three consecutive neighbors */
-      val lightConcave=exist(shrink2(brdVeOut))& ~  inside(brdVeOut)
+      /** true if >= three consecutive neighbors & ~  inside(brdVeOut) rules out singleton holes which would otherwise be filled*/
+
+
       val inE:BoolE=insideS(muis)
-      val convex= ~exist(shrink1(transfer(v(inE))))
-      val oui= MoveC1(ag.muis & convex, brdVe & neighborsSym(e(lightConcave)) )
+      /**  */
+      val convex: BoolV = ~exist(shrink1(transfer(v(inE))))
+      val oui= MoveC1(ag.muis & convex, brdVeIn & neighborsSym(e(lightConcave)) )
         oui
     }
   }
-  override def showMe={ shoow(brdE,brdV,brdVe,brdVeOut)   }
+  override def showMe={ shoow(brdE,brdV,brdVeIn,brdVeOut)   }
 }
 /** endows a movableAgentV with the feature needed to a blob stored in a class "f" (shortname) */
 trait addBlobVfields{ self: MovableAgV =>
@@ -116,14 +124,15 @@ class BlobVe(val muis:BoolV with carrySysInstr,brdE:BoolE, brdVe:BoolVe) extends
  * */
 trait addGcenter{
   self: MovableAgV with addBlobVfields with addDist=>
+  val thismuis=muis
   val bve=new BlobVe(muis,d.voisinDiff,  d.sloplt){
     /**  silly way of avoiding superposition of agents with Gcente
      * we just subtract muis from meet2r,
      * we use a val for testing */
-    override val meetE2: ASTLt[V, B] = super.meetE2 & ~ muis}
-    val gc= new DetectedAgV(bve.meetE2) with keepInsideForce {
-    override def inputNeighbors = List(d)
+    override val meetE2: ASTLt[V, B] = (super.meetE2 )& ~ thismuis}
 
+    val gc= new DetectedAgV(bve.meetE2|bve.meetV) with keepInsideForce {
+    override def inputNeighbors = List(d)
   }
 } //todo verifier que override fonctionne
 trait blobConstrTrou{
@@ -146,7 +155,7 @@ trait addQpointFields {
   val qf = new Attributs() {
     override val muis: BoolV with carrySysInstr = selfRef.muis
     /** true for the vertices of a qpt consiting exactly of one vertices */
-    val singleton: BoolV = inside(bf.brdVe) & muis
+    val singleton: BoolV = inside(bf.brdVeIn) & muis
     val nonsingleton = ~singleton & muis
     val next2NonSingleton = exist(neighborsSym(e(nonsingleton)))
     /** true if both apex vertices of the edge are empty */
@@ -169,7 +178,7 @@ trait addQpointFields {
 /** defines all the constraint that should be met by a quasipoint,
  * nb: constraints must be expressed as function of prio, and flip
  * since we do not know those at the time of constraint creation. */
-trait  QpointConstrain extends addQpointFields  with rando{
+trait  QpointConstrain extends addQpointFields  with rando {
   self: MovableAgV => //a quasi point  is allways a movableAgentV
 
   /**

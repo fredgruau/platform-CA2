@@ -7,7 +7,7 @@ import compiler.repr.{nomB, nomV}
 import compiler.{AST, ASTBt, ASTL, ASTLfun, ASTLt, B, CallProc, Circuit, Locus, Ring, SI, V, repr}
 import dataStruc.{BranchNamed, DagNode, Named}
 import dataStruc.DagNode.EmptyBag
-import sdn.AgentF
+import sdn.ForceAg
 import sdn.MuStruct.allMuStruct
 
 import scala.Predef.->
@@ -79,12 +79,20 @@ object MuStruct{
    def showMustruct=for(m<-allMuStruct)
      System.out.println(m.toString)
    def setFliprioOfMove()=  for(m<-allMuStruct) m match {
-     case a:AgentF[_]=>  a.setFliprioOfMove()
+     case a:ForceAg[_]=>  a.setFliprioOfMove()
      case _ =>
-
    }
   def setFlipCanceled()=  for(m<-allMuStruct) m match {
-    case a:AgentF[_]=>      a.setFlipCancel()
+    case a:ForceAg[_]=>      a.setFlipCancel()
+    case _ =>
+  }
+  def showTrucPourDebugger=
+  for(m<-allMuStruct) m match {
+    case v:Vor => //v.tmpVe=v.moves(1).head._2.asInstanceOf[MoveC2].yes.push
+      //v.tmp=v.moves(1).head._2.asInstanceOf[MoveC2].yes.triggeredYes
+      //v.tmp2=v.moves(1).head._2.asInstanceOf[MoveC2].yes.empty
+      v.tmp=v.bf.lightConcave
+      v.shoow(v.tmp)
     case _ =>
   }
 

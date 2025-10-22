@@ -24,7 +24,7 @@ class GrowBlobVe() extends Layer[(V, B)](1, "global") with BoolV  with carrySysI
   val bf=new BlobVFields(this)
   val edge: ASTLt[E, B] =borderS(is)
   val brd=brdin(edge,is)
-  val b=new BlobVe(this,bf.brdE,bf.brdVe)
+  val b=new BlobVe(this,bf.brdE,bf.brdVeIn)
   override val next: AST[(V, B)] = this | bf.brdV & ~b.meet //we extend the blob around the border brdV, except for meeting points
   show(this)
   b.showMe

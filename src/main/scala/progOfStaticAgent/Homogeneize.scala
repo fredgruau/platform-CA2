@@ -10,26 +10,28 @@ import progOfmacros.Comm.{adjacentBall, insideBall, neighborsSym}
 import progOfmacros.RedT.cac
 import progOfmacros.Wrapper
 import progOfmacros.Wrapper.{border, borderS, exist, existS, inside, insideS, smoothen, smoothen2, testShrink}
-import sdn.MuStruct.{setFlipCanceled, setFliprioOfMove, showMustruct}
+import sdn.MuStruct.{setFlipCanceled, setFliprioOfMove, showMustruct, showTrucPourDebugger}
 import sdn._
 import sdntool.{addDist, addDistGcenter}
 
 /**illustrate the working of repulsion combined with exploration  */
 class Homogeneize() extends LDAG with Named with BranchNamed
 { val part=new Convergent()
-  val vor=new Vor(part)//
-  // val part=new Homogen()
   showMustruct
   setFliprioOfMove()
+  showTrucPourDebugger
   setFlipCanceled()
-  part.shoow(vor.muis) //triggers evaluation
+  part.shoow(part.vor.muis) //triggers evaluation
   part.shoow(part.muis)
- vor.showMe
+  part.vor.showMe
+  part.vor.b.showMe
+  part.vor.bf.showMe
   part.showMe
   part.bf.showMe
   part.b.showMe
   part.bve.showMe
   part.d.showMe; part.dg.showMe
+  part.gc.showme
  part.sf.showMe
 
 }
@@ -46,7 +48,7 @@ class Flies2 extends Seed {
 }
 
 /**adds distance, gabriel center,  distance to gabriel center, and then finally repulsive force*/
-class Homogen() extends Flies2 with addDist with addGcenter with addDistGcenter
+class Homogen() extends Flies2 with addDist with addGcenter with addDistGcenter with addVor
 {  /** homogeneizing priority */
   final val homogeneize=introduceNewPriority()
   force(homogeneize,"repulse",'|',dg.repulse)//specific forces applied to Flies
@@ -57,7 +59,7 @@ class Convergent extends Homogen // with Lead //pas besoin de leader pour le mom
 {  val sf=new Attributs() { //sf==stableFields
   override val muis: ASTLg with carrySysInstr = Convergent.this.muis
   /** border of qparticle  where dg diminishes */
-  val brdVeSloped=bf.brdVe & dg.sloplt
+  val brdVeSloped=bf.brdVeIn & dg.sloplt
   /** around isV, adds Vertices on the otherside of brdVeslopped */
   val isVplus=isV | exist(transfer(sym(transfer(brdVeSloped))))
   /** add vertex  if three neighbors are on */
@@ -79,7 +81,7 @@ class Convergent extends Homogen // with Lead //pas besoin de leader pour le mom
     override def actionV(ag: MovableAgV): MoveC = {
       val yes=MoveC1(false,false) //force is pure negative
       /** if stable2 , this will cancel movement of lower priority, */
-      val no = MoveC1(sf.stable2, e(sf.stable2)& bf.brdVe) // negative  forces
+      val no = MoveC1(sf.stable2, e(sf.stable2)& bf.brdVeIn) // negative  forces
       MoveC2(yes,no)
     }
   }
@@ -87,17 +89,6 @@ class Convergent extends Homogen // with Lead //pas besoin de leader pour le mom
 }
 
 
-class Vor(h:Homogen) extends MovableAg[V]("globalInv") with MovableAgV with addBloobV with blobConstrain //with blobConstrTrou
-{
-  override def inputNeighbors=List(h.gc,h.d)
-  /** exploring priority */   val explore=introduceNewPriority()
-  force(explore, "explore",'O', bf.smoothen)
-  val homogeneize=introduceNewPriority()
-  force(homogeneize,"repulse",'|',h.d.repulse)//specific forces applied to Flies
-  shoowText(h.d.muis, List())
-
-
-}
 
 /**
  *

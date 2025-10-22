@@ -29,6 +29,8 @@ abstract class MoveC extends Named {
   /** when computing push, we selected maxprio only among the yes, we do not consider the no */
   val triggeredYes:BoolV
   def move2flip(is:BoolV):BoolV
+  /** should remain false */
+  val bug:BoolV
 }
 
 /** @param empty where to withdraw at
@@ -43,6 +45,7 @@ case class MoveC1 (val empty: BoolV, val push: BoolVe) extends MoveC{
   val triggered=empty|invade
   override val triggeredYes: BoolV = triggered
   def move2flip(isV:BoolV):BoolV=cond(isV,empty,invade)
+  val bug=empty & invade
 }
 
 /**
@@ -51,7 +54,8 @@ case class MoveC1 (val empty: BoolV, val push: BoolVe) extends MoveC{
  * @param no for specifying absence of flip ,  using either no.push or no.Empty
  */
 case class MoveC2(val yes:MoveC1,val no:MoveC1) extends MoveC{
-  override val triggered = yes.triggered^no.triggered
+  override val triggered = yes.triggered | no.triggered
+  val bug= yes.triggered & no.triggered | yes.bug | no.bug
   override val triggeredYes: BoolV = yes.triggered
   /** bugif for a given priority, one move specifies flip, and another move spécifies not flip */
   def move2flip(isV:BoolV):BoolV=yes.move2flip(isV) & ~ no.move2flip(isV)
@@ -82,7 +86,7 @@ object Force{
   import MoveC._
   /** produce maximum possible move, rely on priority to obtain random movement */
   val total:Force=new Force(){
-    override def actionV(ag: MovableAgV): MoveC = MoveC1(ag.muis,ag.bf.brdVe)//extends and empties everywhere possible.
+    override def actionV(ag: MovableAgV): MoveC = MoveC1(ag.muis,ag.bf.brdVeIn)//extends and empties everywhere possible.
   }
 
   /** we designed a random move that does not break the quasipoint property,

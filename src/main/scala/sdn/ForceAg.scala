@@ -28,7 +28,8 @@ sealed trait Impact
 /** constraint is applied whether it is empty or not */
 case class Both() extends Impact
 /**  constraint will prevent filling (resp emptying), if noFill is true (resp. false)*/
-case class One(noFill: Boolean) extends Impact //on veut pouvoir calculer le complementaire d'une contraint, forbid et oblige sont complementaire
+case class
+One(noFill: Boolean) extends Impact //on veut pouvoir calculer le complementaire d'une contraint, forbid et oblige sont complementaire
 
 
 
@@ -58,7 +59,9 @@ abstract class Agent[L <: Locus] extends MuStruct[L, B] with HasIsV {
 
 trait keepInsideForce {
   self : Agent[V]=>
-  val nouveau=muis.munext & ~muis.pred
+  /** place where new self appears */
+  val nouveau= muis.munext & ~muis.pred
+  val alreadyThere=muis.munext & muis.pred
 
   /** if there is an ag present next to nouveau , it will be pushed to fill the nouveau
    * noneed to empty whatever, so empty remains false.  */
@@ -66,13 +69,15 @@ trait keepInsideForce {
     override def actionV(ag: MovableAgV): MoveC = {
       /** the surrounding agent does not yet contain nouveau */
       val nouveauToFill = nouveau & ~ag.muis
-      /** if not null will create a push */
+      /** if not null will create a push in order to fill nouveau which are not yet filled */
       val push=neighbors(nouveauToFill) & e(ag.muis)
       val coveredByPush=exist(neighborsSym(push))
       /** should be true everywhere */
-      val nouveauIsFilled=imply(coveredByPush,nouveauToFill)
+      val nouveauIsFilled: BoolV =imply(coveredByPush,nouveauToFill)
       val oui = MoveC1(fromBool(false), push)
-    oui
+      /** we must not empty voronoi in places where it will contain gcenters*/
+      val non = MoveC1(alreadyThere&ag.muis,e(fromBool(false)))
+      MoveC2(oui,non)
     }
   }
 }
@@ -89,15 +94,16 @@ abstract class DetectedAgV ( val detected: BoolV )  extends Agent[V] {
   override val muis=new Layer[(V, B)](1, "global") with ASTLt[V,B]  with Stratify [V,B] with carrySysInstr   {
     override val  next = detected  }
   override val isV: BoolV = muis
-  //artificially reconstructed
+  //artificially reconstructed, we will be able to watch if it happens to be canceled by simult constraint
    flipAfterLocalConstr=muis ^ muis.next
+  def showme={shoow(detected)}
 }
 
 //class Gcenter(arg: ) extends DetectedAgV
 
 
 /**  agentsF are Agents  udated using force */
-abstract class AgentF[L <: Locus] extends Agent[L]
+abstract class ForceAg[L <: Locus] extends Agent[L]
  {
 
 /** the agent's list of consrtrain. Constraints have a name, and the list is also ordered */
@@ -115,10 +121,19 @@ abstract class AgentF[L <: Locus] extends Agent[L]
      moves.map(_.keys.head.charAt(0).toString) }
 
    /** will show only move that trigger movement. Move that "block" movement are hidden,  */
-   def showPositiveMoves={  shoowText(yesHighestTriggered,codeMove.toList)}
+   def showPositiveMoves={
+     shoowText(yesHighestTriggered,codeMove.toList)
+     shoowText(allBugs,codeMove.toList)
+   }
    // /** shows also  moves that block movement */
   // def showMoves={ shoowText(highestTriggered,codeMove.toList)}
-   def showFlip=shoow(fliprioOfMove.defined, isQuiescent, flipAfterLocalConstr)
+   def showFlip={
+     shoowText(
+       fliprioOfMove.valuc, List()
+     )
+     shoow(fliprioOfMove.valuc.lt)
+     shoow(fliprioOfMove.defined, isQuiescent, flipAfterLocalConstr)
+   }
  /** test que les var s'affiche bien */
    def showMe={showPositiveMoves;showConstraint;showFlip;}
    /**
@@ -142,12 +157,14 @@ abstract class AgentF[L <: Locus] extends Agent[L]
    }
    /** not the same for  movable/bound  */
    def allTriggered:UintV;
+   def allBug:UintV;
    def allTriggeredYes:UintV
    /** flips for all priorities */
    def allFlip:UintV
   //variable defined when computing fliprioOfMove
    var isQuiescent:BoolV=null
    var yesHighestTriggered:UintV=null
+   var allBugs:UintV=null
    /**  adds a bit of randomnes to forces's priority
     * allows to  breaking  symetry in case of tournament with equal force's priority */
    val prioRand:UintV
@@ -174,6 +191,7 @@ abstract class AgentF[L <: Locus] extends Agent[L]
        if (!presenceOfC2moves ) (filledTriggered, highestTriggered, prioDet)
        else processMoves(allTriggeredYes)
      }
+     allBugs=allBug
      yesHighestTriggered = yHT //used for printable purpose
      /** selected positive move has lower priority than selected move, implies quiescence */
      isQuiescent = lt2(yesPrioDet, prioDet)
@@ -201,6 +219,9 @@ abstract class AgentF[L <: Locus] extends Agent[L]
      }
 
    def setFlipCancel()= {
+     //we separate local, mutex, mutapex, tritex, sextex
+     val local=constrs.filter(_._2.isInstanceOf[KeepFlipIf])
+     var mut=constrs.filter(_._2.isInstanceOf[KeepFlipIf])
      allFlipCancel=allFlipCancel(fliprioOfMove)
      val noFlipCancel=eq0(allFlipCancel)
      flipAfterLocalConstr = noFlipCancel  & fliprioOfMove.defined
@@ -213,7 +234,7 @@ abstract class AgentF[L <: Locus] extends Agent[L]
    /** @param ags one or two agents on which to apply constraint
     *            Constr is an inner classes of agents, so that it can access its main agent's field such as prio.
     */
-   abstract class Constr(val ags: Array[AgentF[_ <: Locus]], val impact: Impact, fliprio:PartialUI) {
+   abstract class Constr(val ags: Array[ForceAg[_ <: Locus]], val impact: Impact, fliprio:PartialUI) {
      /** where = places where flips is still valid after the constraint newFlip<-olcFlip&where
       * defined has a method, in order allow definition prior to intanciation of needed field, such as flip.*/
      val where: BoolV //will use fields from the agent: flip, as well as this
@@ -222,6 +243,7 @@ abstract class AgentF[L <: Locus] extends Agent[L]
      impact match {
      case Both() => loc    case One(v) =>  implique (if (v) isV else (NotIsV),loc)   }   }
     object KeepFlipIf{def apply(i: Impact, l:BoolV)(fliprio:PartialUI): KeepFlipIf = new KeepFlipIf(i,l,fliprio)}
+
    class CancelFlipIf(i: Impact, l:BoolV,fliprio:PartialUI) extends KeepFlipIf(i,~l,fliprio)
    object CancelFlipIf{def apply(i: Impact, l:BoolV)(fliprio:PartialUI): CancelFlipIf = new CancelFlipIf(i,l,fliprio)   }
    /**
@@ -236,7 +258,7 @@ abstract class AgentF[L <: Locus] extends Agent[L]
        case One(v) =>  insideS(fliprio.defined & (if (v) isV else (NotIsV))) // result also depend on impact
      })
      /** flip is ok if prio is maximum with respect to the other side */
-     def tmp: BoolEv =imply(v(mutrig),fliprio.valuc.gt) //todo faut mettre lt
+     def tmp: BoolEv =imply(v(mutrig),fliprio.valuc.lt) //todo faut mettre lt?oui, lt est vrai du coté de la plus grosse prio
      /** flip remains ok if no neighbor edge present a problem */
      val ttmp=tmp
      val where: BoolV =inside(transfer(ttmp))
@@ -256,7 +278,7 @@ abstract class AgentF[L <: Locus] extends Agent[L]
        })}
      /** flip is ok if prio is smaller with respect to the other side */
      //  val chekLtIfMutrig=imply(f(mutrig),prio.ltApex) // je mettait lt au lieu de gt, cela peut créer des oscillations.
-     val chekLtIfMutrig=imply(f(mutrig),fliprio.valuc.gtApex)
+     val chekLtIfMutrig=imply(f(mutrig),fliprio.valuc.ltApex)
      val where=inside(apexV(chekLtIfMutrig))
    }
  object MutApexKeepFlipIf{def apply(i: Impact, mutex:BoolE)(fliprio:PartialUI): MutApexKeepFlipIf =

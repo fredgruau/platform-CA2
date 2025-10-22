@@ -12,7 +12,7 @@ import dataStruc.BranchNamed
 import dataStruc.DagNode.EmptyBag
 import progOfmacros.Comm.neighborsSym
 import progOfmacros.Wrapper.{borderS, exist, existS, unary2Bin, xorBin}
-import sdn.{AgentF, Compar, carrySysInstr}
+import sdn.{ForceAg, Compar, carrySysInstr}
 import sdn.Util.{addLt, addSym, randUintV}
 import sdntool.addDist
 
@@ -50,12 +50,13 @@ trait MovableAgV extends MovableAg[V] with vef[V] with UtilVagent with addBlobVf
 
 /**  code  common to Movable agents which stores a support
  * and can directly apply the move on this support in order to modify it */
-abstract  class MovableAg[L <: Locus](init:String)(implicit m: repr[L]) extends  AgentF[L] with vef[L]
+abstract  class MovableAg[L <: Locus](init:String)(implicit m: repr[L]) extends  ForceAg[L] with vef[L]
   {
 
   override def allTriggered:UintV={
     moves.map(_.values.map(_.triggered).reduce(_ | _).asInstanceOf[UintV]).toList.reduce(_ :: _)
   }
+
   override def allTriggeredYes:UintV={
     moves.map(_.values.map(_.triggeredYes).reduce(_ | _).asInstanceOf[UintV]).toList.reduce(_ :: _)
   }
@@ -63,6 +64,11 @@ abstract  class MovableAg[L <: Locus](init:String)(implicit m: repr[L]) extends 
   override def  allFlip: UintV ={
     moves.map(_.values.map(_.move2flip(isV)).reduce(_ | _).asInstanceOf[UintV]).toList.reduce(_ :: _)
   }
+
+
+    override def  allBug: UintV ={
+      moves.map(_.values.map(_.bug).reduce(_ | _).asInstanceOf[UintV]).toList.reduce(_ :: _)
+    }
 
 /*
 

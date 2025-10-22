@@ -207,6 +207,7 @@ object ExampleData {
   val fileIcon: ImageIcon = Icon("src/ressources/file.png")
   val folderIcon: ImageIcon = Icon("src/ressources/folder.png")
   val playNormalIcon: ImageIcon = Icon("src/ressources/play_black.gif")
+  val playReverseIcon: ImageIcon = Icon("src/ressources/playReverse.jpg")
   val pauseNormalIcon: ImageIcon = Icon("src/ressources/pause_black.gif")
   val forwardIcon: ImageIcon = Icon("src/ressources/skip_forward_black.gif")
   // val fastForwardIcon: ImageIcon = Icon("src/ressources/fastForwardSkip.png")
